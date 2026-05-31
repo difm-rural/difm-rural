@@ -27,22 +27,43 @@ function getStatusText(job, bidCount) {
   switch (job.status) {
     case 'open':      return bidCount > 0 ? `${bidCount} bid${bidCount > 1 ? 's' : ''}` : 'Open'
     case 'accepted':
-    case 'in_progress': return 'In progress'
+    case 'in_progress': return 'Awarded'
     case 'completed': return 'Completed'
     case 'cancelled': return 'Cancelled'
     default:          return job.status
   }
 }
 
-export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle }) {
+function postedAgo(createdAt) {
+  if (!createdAt) return 'Posted recently'
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return 'Posted recently'
+  const diffDays = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays <= 0) return 'Posted today'
+  if (diffDays === 1) return 'Posted 1 day ago'
+  if (diffDays < 30) return `Posted ${diffDays} days ago`
+  const diffMonths = Math.floor(diffDays / 30)
+  return diffMonths === 1 ? 'Posted 1 month ago' : `Posted ${diffMonths} months ago`
+}
+
+export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle, actionLabel = 'View' }) {
   const profile    = job.profiles || {}
   const hasBids    = bidCount > 0 && job.status === 'open'
   const isOpen     = job.status === 'open'
   const initials   = getInitials(profile.full_name)
   const name       = shortName(profile.full_name)
   const descPreview = truncateWords(job.description)
-  const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open'
+  const paidAmount = job.completedAmount ?? job.acceptedBidAmount
+  const budgetText = job.status === 'completed' && paidAmount != null
+    ? `$${paidAmount} NZD`
+    : job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open'
   const statusText = getStatusText(job, bidCount)
+  const photoUrl = Array.isArray(job.photos) && job.photos.length > 0 ? job.photos[0] : null
+  const showCompletedSummary = job.status === 'completed' && (
+    paidAmount != null ||
+    job.providerRatingGiven ||
+    job.requesterRatingGiven
+  )
 
   return (
     <TouchableOpacity
@@ -69,7 +90,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
               <Text style={styles.watchBtnText}>🔖</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.budgetLabel}>Budget</Text>
+          <Text style={styles.budgetLabel}>{job.status === 'completed' && paidAmount != null ? 'Paid' : 'Budget'}</Text>
           <Text style={styles.budgetAmount}>{budgetText}</Text>
           {hasBids && (
             <View style={styles.bidBadge}>
@@ -78,6 +99,10 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
           )}
         </View>
       </View>
+
+      {photoUrl ? (
+        <Image source={{ uri: photoUrl }} style={styles.jobPhoto} />
+      ) : null}
 
       {/* Middle: avatar + description preview */}
       <View style={styles.middleRow}>
@@ -96,13 +121,34 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
       {/* Location */}
       <Text style={styles.location}>📍 {job.location_name}</Text>
 
+      <Text style={styles.postedDate}>{postedAgo(job.created_at)}</Text>
+
+      {showCompletedSummary ? (
+        <View style={styles.completedSummary}>
+          {paidAmount != null ? (
+            <View style={styles.summaryPill}>
+              <Text style={styles.summaryLabel}>Paid</Text>
+              <Text style={styles.summaryValue}>${paidAmount} NZD</Text>
+            </View>
+          ) : null}
+          <View style={styles.ratingRow}>
+            <Text style={styles.ratingText}>
+              Provider gave: {job.providerRatingGiven ? `${job.providerRatingGiven}/5` : 'Not rated yet'}
+            </Text>
+            <Text style={styles.ratingText}>
+              You gave: {job.requesterRatingGiven ? `${job.requesterRatingGiven}/5` : 'Not rated yet'}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerName} numberOfLines={1}>★ 0.0 New · {name}</Text>
         <View style={styles.footerRight}>
           <Text style={styles.statusText}>{statusText}</Text>
           <View style={[styles.viewBtn, !isOpen && styles.viewBtnOutline]}>
-            <Text style={[styles.viewBtnText, !isOpen && styles.viewBtnTextOutline]}>View</Text>
+            <Text style={[styles.viewBtnText, !isOpen && styles.viewBtnTextOutline]}>{actionLabel}</Text>
           </View>
         </View>
       </View>
@@ -124,6 +170,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cardHighlight: { borderWidth: 1.5, borderColor: colors.primary },
+  jobPhoto: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: colors.background,
+  },
 
   topRow: {
     flexDirection: 'row',
@@ -185,7 +238,24 @@ const styles = StyleSheet.create({
   },
   avatarInitials: { fontSize: 16, fontWeight: '700', color: colors.primary },
   description:    { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
-  location:       { fontSize: 13, color: colors.textMuted, marginBottom: 12 },
+  location:       { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+  postedDate:     { fontSize: 12, color: colors.textMuted, marginBottom: 12 },
+  completedSummary: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  summaryPill: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '700' },
+  summaryValue: { fontSize: 13, color: colors.primary, fontWeight: '800' },
+  ratingRow: { gap: 4 },
+  ratingText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
 
   footer: {
     flexDirection: 'row',

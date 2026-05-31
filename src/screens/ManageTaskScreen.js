@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
@@ -60,24 +61,40 @@ function ActionRow({ emoji, iconBg, label, subtitle, onPress, last }) {
 }
 
 export default function ManageTaskScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets()
   const { job: initialJob, bidCount = 0 } = route.params
   const [job, setJob] = useState(initialJob)
   const [acceptedBid, setAcceptedBid] = useState(null)
   const [loadingBid, setLoadingBid] = useState(false)
+  const [bids, setBids] = useState([])
+  const [loadingBids, setLoadingBids] = useState(false)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [providerReview, setProviderReview] = useState(null)
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null))
-  }, [])
+    async function loadCurrentUserAndJob() {
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id || null)
+      setAuthChecked(true)
+      const { data: latestJob } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', initialJob.id)
+        .single()
+      if (latestJob) setJob(latestJob)
+    }
+    loadCurrentUserAndJob()
+  }, [initialJob.id])
 
   useEffect(() => {
     if (['accepted', 'in_progress', 'completed'].includes(job.status)) {
       setLoadingBid(true)
       fetchAcceptedBid()
     }
+    if (job.status === 'open') fetchBids()
   }, [job.id, job.status])
 
   useEffect(() => {
@@ -108,6 +125,60 @@ export default function ManageTaskScreen({ navigation, route }) {
     setLoadingBid(false)
   }
 
+  async function fetchBids() {
+    setLoadingBids(true)
+    try {
+      const { data: bidsData, error } = await supabase
+        .from('bids')
+        .select('id, provider_id, amount, status, message, created_at, line_items, available_from, estimated_duration')
+        .eq('job_id', job.id)
+        .not('status', 'eq', 'rejected')
+        .order('amount', { ascending: true })
+      if (error) throw error
+
+      const providerIds = bidsData?.map(b => b.provider_id).filter(Boolean) || []
+      const { data: providerProfiles } = providerIds.length > 0
+        ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds)
+        : { data: [] }
+
+      const bidsWithProfiles = bidsData?.map(bid => ({
+        ...bid,
+        provider: providerProfiles?.find(p => p.id === bid.provider_id) || null,
+      })) || []
+
+      setBids(bidsWithProfiles)
+    } catch (error) {
+      console.log('Error fetching bids:', error)
+    } finally {
+      setLoadingBids(false)
+    }
+  }
+
+  async function acceptBid(bid) {
+    const provName = bid.provider?.full_name || 'this provider'
+    Alert.alert(
+      'Accept bid?',
+      `Accept ${provName}'s bid of $${bid.amount} NZD? All other bids will be declined.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Accept',
+          onPress: async () => {
+            const { error: bidError } = await supabase
+              .from('bids').update({ status: 'accepted' }).eq('id', bid.id)
+            if (bidError) { Alert.alert('Error', bidError.message); return }
+            await supabase.from('bids').update({ status: 'rejected' }).eq('job_id', job.id).neq('id', bid.id)
+            const { error: jobError } = await supabase.from('jobs').update({ status: 'accepted' }).eq('id', job.id)
+            if (jobError) { Alert.alert('Error', jobError.message); return }
+            Alert.alert('Bid accepted!', `${provName} has been notified.`, [
+              { text: 'OK', onPress: () => setJob(prev => ({ ...prev, status: 'accepted' })) },
+            ])
+          },
+        },
+      ]
+    )
+  }
+
   async function fetchProviderReview() {
     try {
       const review = await loadReview({
@@ -130,7 +201,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           : { label: 'Open', color: '#166534', bg: '#dcfce7' }
       case 'accepted':
       case 'in_progress':
-        return { label: 'In progress', color: '#1e40af', bg: '#dbeafe' }
+        return { label: 'Awarded', color: '#1e40af', bg: '#dbeafe' }
       case 'completed':
         return { label: 'Completed', color: colors.textSecondary, bg: colors.border }
       case 'cancelled':
@@ -142,9 +213,17 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   const badge = getBadge()
   const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
+  const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
+
+  function ensureTaskOwner() {
+    if (isTaskOwner) return true
+    Alert.alert('Not available', 'Only the requester who posted this job can manage or edit it.')
+    return false
+  }
 
   // ─── Handlers ─────────────────────────────────────────────────────
   function handleEdit() {
+    if (!ensureTaskOwner()) return
     navigation.navigate('PostJob', { job, mode: 'edit', bidCount })
   }
 
@@ -158,11 +237,12 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   function handleCancel() {
+    if (!ensureTaskOwner()) return
     let message = 'Are you sure you want to cancel this task?'
     if (job.status === 'open' && bidCount > 0) {
       message = `You have ${bidCount} bid${bidCount > 1 ? 's' : ''} on this task. Cancelling will notify providers their bids were unsuccessful. Continue?`
     } else if (job.status === 'accepted' || job.status === 'in_progress') {
-      message = 'This job has been accepted by a provider. Are you sure you want to cancel? The provider will be notified.'
+      message = 'This job has been awarded to a provider. Are you sure you want to cancel? The provider will be notified.'
     }
     Alert.alert('Cancel task', message, [
       { text: 'No', style: 'cancel' },
@@ -170,7 +250,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         text: 'Yes, cancel',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('jobs').update({ status: 'cancelled' }).eq('id', job.id)
+          const { error } = await supabase.from('jobs').update({ status: 'cancelled' }).eq('id', job.id).eq('requester_id', currentUserId)
+          if (error) { Alert.alert('Something went wrong', error.message || 'Please try again', [{ text: 'OK' }]); return }
           navigation.goBack()
         },
       },
@@ -178,13 +259,15 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   function handleDelete() {
+    if (!ensureTaskOwner()) return
     Alert.alert('Delete task', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('jobs').delete().eq('id', job.id)
+          const { error } = await supabase.from('jobs').delete().eq('id', job.id).eq('requester_id', currentUserId)
+          if (error) { Alert.alert('Something went wrong', error.message || 'Please try again', [{ text: 'OK' }]); return }
           navigation.goBack()
         },
       },
@@ -192,18 +275,22 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   function handleReviewBids() {
+    if (!ensureTaskOwner()) return
     navigation.navigate('JobDetail', { job })
   }
 
   function handleLeaveReview() {
+    if (!ensureTaskOwner()) return
     setReviewVisible(true)
   }
 
   function handlePayProvider() {
+    if (!ensureTaskOwner()) return
     Alert.alert('Coming soon', 'Provider payment will be available here in a future release.')
   }
 
   async function handleSubmitReview({ rating, comment }) {
+    if (!ensureTaskOwner()) return
     if (!currentUserId || !acceptedBid?.providerId) return
     setSavingReview(true)
     try {
@@ -237,6 +324,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   function handleConfirmComplete() {
+    if (!ensureTaskOwner()) return
     Alert.alert(
       'Confirm complete',
       'Mark this task as complete? This confirms the work is done.',
@@ -245,7 +333,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         {
           text: 'Confirm',
           onPress: async () => {
-            const { error } = await supabase.from('jobs').update({ status: 'completed' }).eq('id', job.id)
+            const { error } = await supabase.from('jobs').update({ status: 'completed' }).eq('id', job.id).eq('requester_id', currentUserId)
             if (error) {
               Alert.alert('Error', error.message)
               return
@@ -258,6 +346,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   function handleRepost() {
+    if (!ensureTaskOwner()) return
     navigation.navigate('PostJob', {
       prefill: {
         title: job.title,
@@ -272,7 +361,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   // ─── Shared header JSX ────────────────────────────────────────────
   const headerJSX = (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       <TouchableOpacity
         style={styles.backBtn}
         onPress={() => navigation.goBack()}
@@ -281,17 +370,59 @@ export default function ManageTaskScreen({ navigation, route }) {
         accessibilityLabel="Go back">
         <Text style={styles.backBtnText}>← Back</Text>
       </TouchableOpacity>
+      <Text style={styles.kicker}>Task</Text>
       <Text style={styles.headerTitle} accessibilityRole="header">Manage task</Text>
       <Text style={styles.headerSubtitle} numberOfLines={2}>{job.title}</Text>
     </View>
   )
 
+  if (!authChecked) {
+    return (
+      <View style={styles.screen}>
+        {headerJSX}
+        <View style={styles.center}>
+          <Text style={styles.loadingText}>Loading task...</Text>
+        </View>
+      </View>
+    )
+  }
+
+  if (currentUserId && !isTaskOwner) {
+    return (
+      <View style={styles.screen}>
+        {headerJSX}
+        <View style={[styles.scrollContent, { flex: 1 }]}>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>View only</Text>
+            <Text style={styles.accessBody}>
+              This job was posted by another requester, so it cannot be edited or managed from your account.
+            </Text>
+            <TouchableOpacity
+              style={styles.viewJobBtn}
+              onPress={() => navigation.replace('JobDetail', { job })}
+              accessibilityRole="button"
+              accessibilityLabel="View job details">
+              <Text style={styles.viewJobBtnText}>View job details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.viewProfileBtn}
+              onPress={() => navigation.navigate('RequesterProfile', { requesterId: job.requester_id })}
+              accessibilityRole="button"
+              accessibilityLabel="View requester profile">
+              <Text style={styles.viewProfileBtnText}>View requester profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    )
+  }
+
   // ─────────────────────────────────────────────────────────────────
   //  ACCEPTED / IN-PROGRESS LAYOUT
   // ─────────────────────────────────────────────────────────────────
-  const isInProgress = job.status === 'accepted' || job.status === 'in_progress'
+  const isAwarded = job.status === 'accepted' || job.status === 'in_progress'
 
-  if (isInProgress) {
+  if (isAwarded) {
     const providerFirstName = acceptedBid?.providerName?.split(' ')[0] || 'Provider'
     const initials = getInitials(acceptedBid?.providerName)
 
@@ -301,7 +432,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Task overview */}
@@ -309,7 +440,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             <View style={styles.acceptedHeaderRow}>
               <Text style={styles.acceptedJobTitle} numberOfLines={3}>{job.title}</Text>
               <View style={styles.greenBadge}>
-                <Text style={styles.greenBadgeText}>Accepted ✓</Text>
+                <Text style={styles.greenBadgeText}>Awarded</Text>
               </View>
             </View>
             <SummaryRow icon="📍" label="Location" value={job.location_name} />
@@ -324,7 +455,12 @@ export default function ManageTaskScreen({ navigation, route }) {
               <Text style={styles.loadingText}>Loading…</Text>
             ) : acceptedBid ? (
               <>
-                <View style={styles.providerRow}>
+                <TouchableOpacity
+                  style={styles.providerRow}
+                  onPress={() => navigation.navigate('ProviderProfile', { providerId: acceptedBid.providerId })}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${acceptedBid.providerName}'s profile`}>
                   {acceptedBid.avatarUrl ? (
                     <Image source={{ uri: acceptedBid.avatarUrl }} style={styles.providerAvatar} />
                   ) : (
@@ -336,10 +472,11 @@ export default function ManageTaskScreen({ navigation, route }) {
                     <Text style={styles.providerName}>{acceptedBid.providerName}</Text>
                     <Text style={styles.providerMeta}>★ 0.0 · New provider</Text>
                   </View>
-                </View>
+                  <Text style={styles.actionChevron}>›</Text>
+                </TouchableOpacity>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxText}>
-                    Bid accepted · ${acceptedBid.bidAmount} NZD · Contact {providerFirstName} to confirm start time
+                    Awarded · ${acceptedBid.bidAmount} NZD · Use chat with {providerFirstName} to confirm timing and details
                   </Text>
                 </View>
               </>
@@ -462,8 +599,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       key: 'repost',
       emoji: '♻️',
       iconBg: colors.primaryLight,
-      label: 'Repost task',
-      subtitle: 'Create a new listing based on this task',
+      label: 'Repost job',
+      subtitle: 'Create a new listing based on this job',
       onPress: handleRepost,
     },
     showCancel && {
@@ -506,6 +643,75 @@ export default function ManageTaskScreen({ navigation, route }) {
           <SummaryRow icon="📅" label="Posted"    value={timeAgo(job.created_at)} last />
         </View>
 
+        {/* Bids received — inline on open jobs */}
+        {job.status === 'open' && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>Bids received</Text>
+              {bids.length > 0 && (
+                <View style={[styles.statusBadge, { backgroundColor: '#fef3c7' }]}>
+                  <Text style={[styles.statusBadgeText, { color: '#92400e' }]}>
+                    {bids.length} bid{bids.length > 1 ? 's' : ''}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {loadingBids ? (
+              <Text style={styles.loadingText}>Loading bids…</Text>
+            ) : bids.length === 0 ? (
+              <Text style={styles.noBidsText}>No bids yet — check back soon</Text>
+            ) : (
+              bids.map((bid, idx) => {
+                const provName = bid.provider?.full_name || 'Provider'
+                const initials = getInitials(provName)
+                return (
+                  <View key={bid.id} style={[styles.bidCard, idx < bids.length - 1 && styles.bidCardBorder]}>
+                    <View style={styles.bidHeader}>
+                      {bid.provider?.avatar_url ? (
+                        <Image source={{ uri: bid.provider.avatar_url }} style={styles.bidAvatar} />
+                      ) : (
+                        <View style={styles.bidAvatarFallback}>
+                          <Text style={styles.bidAvatarInitials}>{initials}</Text>
+                        </View>
+                      )}
+                      <View style={styles.bidProviderInfo}>
+                        <Text style={styles.bidProviderName}>{provName}</Text>
+                        <Text style={styles.bidAmount}>${bid.amount} NZD</Text>
+                      </View>
+                    </View>
+                    {bid.line_items?.length > 1 && (
+                      <View style={styles.lineItemsBreakdown}>
+                        {bid.line_items.map((li, i) => (
+                          <View key={i} style={styles.breakdownRow}>
+                            <Text style={styles.breakdownLabel}>{li.label}</Text>
+                            <Text style={styles.breakdownAmount}>${(li.amount || 0).toFixed(2)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    {!!bid.message && (
+                      <Text style={styles.bidMessage}>{bid.message}</Text>
+                    )}
+                    {!!bid.available_from && (
+                      <Text style={styles.bidMeta}>📅 Available from: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                    )}
+                    {!!bid.estimated_duration && (
+                      <Text style={styles.bidMeta}>⏱ Est. duration: {bid.estimated_duration}</Text>
+                    )}
+                    <TouchableOpacity
+                      style={styles.acceptBidBtn}
+                      onPress={() => acceptBid(bid)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Accept bid from ${provName}`}>
+                      <Text style={styles.acceptBidBtnText}>Accept bid</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              })
+            )}
+          </View>
+        )}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Actions</Text>
           {actionItems.map((item, idx) => (
@@ -538,23 +744,24 @@ export default function ManageTaskScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
 
   // ─── Header ────────────────────────────────────────────────────
   header: {
-    backgroundColor: colors.primary,
-    paddingTop: 56,
+    backgroundColor: colors.background,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 14,
   },
   backBtn: {
     marginBottom: 12,
-    minHeight: 44,
+    minHeight: 36,
     justifyContent: 'center',
     alignSelf: 'flex-start',
   },
-  backBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 16, fontWeight: '600' },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: colors.white, marginBottom: 6 },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: '500', lineHeight: 20 },
+  backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
+  headerSubtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
 
   // ─── Scroll ────────────────────────────────────────────────────
   scroll: { flex: 1 },
@@ -586,6 +793,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 12,
   },
+  accessBody: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 21,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  viewJobBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minHeight: 48,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewJobBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
+  viewProfileBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    minHeight: 48,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewProfileBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
 
   // ─── Status badge ───────────────────────────────────────────────
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
@@ -732,4 +967,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnDangerOutlineText: { color: colors.danger, fontSize: 16, fontWeight: '700' },
+
+  // ─── Bids list ──────────────────────────────────────────────────
+  noBidsText: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 16, lineHeight: 22 },
+  bidCard: { paddingHorizontal: 16, paddingVertical: 14 },
+  bidCardBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
+  bidHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  bidAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: colors.primary },
+  bidAvatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bidAvatarInitials: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  bidProviderInfo: { flex: 1 },
+  bidProviderName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  bidAmount: { fontSize: 17, fontWeight: 'bold', color: colors.primary },
+  bidMessage: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 8, fontStyle: 'italic' },
+  bidMeta:    { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+  lineItemsBreakdown: { marginVertical: 6, paddingVertical: 6, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#e8e8e8', marginBottom: 8 },
+  breakdownRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+  breakdownLabel:  { fontSize: 13, color: colors.textSecondary },
+  breakdownAmount: { fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
+  acceptBidBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  acceptBidBtnText: { color: colors.white, fontSize: 14, fontWeight: '700' },
 })

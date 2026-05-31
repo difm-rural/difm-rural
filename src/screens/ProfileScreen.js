@@ -32,6 +32,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
@@ -51,6 +52,7 @@ const MONTHS = [
 ]
 
 export default function ProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets()
   const [loading, setLoading]               = useState(true)
   const [saving, setSaving]                 = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -230,7 +232,7 @@ export default function ProfileScreen({ navigation }) {
       return
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -245,7 +247,7 @@ export default function ProfileScreen({ navigation }) {
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -350,7 +352,7 @@ export default function ProfileScreen({ navigation }) {
 
   const hasPhoto = !!profile.avatar_url
   const ratingText = ratingSummary.count > 0
-    ? `${ratingSummary.average.toFixed(1)} / 5 · ${ratingSummary.count} reviewer${ratingSummary.count === 1 ? '' : 's'}`
+    ? `${Number(ratingSummary.average || 0).toFixed(1)} / 5 · ${ratingSummary.count} reviewer${ratingSummary.count === 1 ? '' : 's'}`
     : 'No reviews yet'
 
   if (loading) {
@@ -366,7 +368,7 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
 
         {/* ── Green header ─────────────────────────────────────── */}
         <View style={styles.header}>

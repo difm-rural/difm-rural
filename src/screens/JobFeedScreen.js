@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
@@ -9,6 +10,7 @@ import JobCard from '../components/JobCard'
 import SkeletonCard from '../components/SkeletonCard'
 
 export default function JobFeedScreen({ navigation }) {
+  const insets = useSafeAreaInsets()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -25,6 +27,7 @@ export default function JobFeedScreen({ navigation }) {
     if (userIdRef.current) {
       fetchWatchlistIds(userIdRef.current).then(ids => setWatchedIds(ids))
     }
+    fetchJobs()
   }, []))
 
   async function init() {
@@ -177,7 +180,7 @@ export default function JobFeedScreen({ navigation }) {
           )}
           keyExtractor={item => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
         />
       )}
     </View>

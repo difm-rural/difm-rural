@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   authenticate,
   clearCredentials,
@@ -16,6 +17,7 @@ import { colors } from '../theme/tokens'
 const BIOMETRICS_ENABLED = false
 
 export default function LoginScreen({ navigation }) {
+  const insets = useSafeAreaInsets()
   const [email, setEmail]         = useState('')
   const [password, setPassword]   = useState('')
   const [loading, setLoading]     = useState(false)
@@ -114,8 +116,15 @@ export default function LoginScreen({ navigation }) {
   const biometricIcon  = biometricType === 'face' ? '🔐' : '👆'
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title} accessibilityRole="header">DIFM Rural</Text>
+    <View style={styles.screen}>
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
+        <View style={styles.topBarInner}>
+          <Text style={styles.wordmark}>DIFM Rural</Text>
+          <Text style={styles.tagline}>GET JOBS DONE</Text>
+        </View>
+      </View>
+      <View style={[styles.formArea, { paddingBottom: insets.bottom + 16 }]}>
+      <Text style={styles.title} accessibilityRole="header">Welcome back</Text>
       <Text style={styles.subtitle}>Get rural jobs done</Text>
 
       <TextInput
@@ -144,6 +153,14 @@ export default function LoginScreen({ navigation }) {
         onSubmitEditing={handleLogin}
         accessibilityLabel="Password"
       />
+
+      <TouchableOpacity
+        style={styles.forgotBtn}
+        onPress={() => navigation?.navigate('ForgotPassword')}
+        accessibilityRole="button"
+        accessibilityLabel="Forgot password">
+        <Text style={styles.forgotText}>Forgot password?</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.button}
@@ -175,13 +192,19 @@ export default function LoginScreen({ navigation }) {
         accessibilityLabel="Create a new account">
         <Text style={styles.link}>Don't have an account? Register</Text>
       </TouchableOpacity>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background },
-  title:    { fontSize: 32, fontWeight: 'bold', color: colors.primary, textAlign: 'center', marginBottom: 4 },
+  screen:      { flex: 1, backgroundColor: colors.background },
+  topBar:      { backgroundColor: '#2d6a4f' },
+  topBarInner: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  wordmark:    { color: '#ffffff', fontSize: 16, fontWeight: '500', letterSpacing: 1 },
+  tagline:     { color: '#95d5b2', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase' },
+  formArea:    { flex: 1, justifyContent: 'center', padding: 24 },
+  title:    { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 4 },
   subtitle: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 24 },
 
   input: {
@@ -221,6 +244,9 @@ const styles = StyleSheet.create({
   },
   biometricIcon: { fontSize: 22 },
   biometricText: { fontSize: 15, fontWeight: '700', color: colors.primary },
+
+  forgotBtn:  { alignSelf: 'flex-end', paddingVertical: 6, marginBottom: 4 },
+  forgotText: { color: colors.textMuted, fontSize: 14 },
 
   linkBtn: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 12 },
   link:    { color: colors.primary, textAlign: 'center', fontSize: 15 },

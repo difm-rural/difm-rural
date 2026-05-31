@@ -1,144 +1,293 @@
-import React from 'react'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import React, { useEffect, useState } from 'react'
+import {
+  Alert,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
-const TILES = [
-  {
-    label: 'Post a task',
-    subtitle: 'Describe your job and get offers',
-    icon: '✏️',
-    primary: true,
-    screen: 'GuestPostJob',
-    hint: 'Opens the task posting form',
-  },
-  {
-    label: 'Browse listings',
-    subtitle: 'See available jobs near you',
-    icon: '🔍',
-    primary: false,
-    screen: 'GuestJobFeed',
-    hint: 'Opens the job listings feed',
-  },
-]
+function HorizontalSection({ title, items, onPressItem, onGuestAction }) {
+  if (!items.length) return null
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <FlatList
+        horizontal
+        data={items}
+        keyExtractor={item => `${item._type}-${item.id}`}
+        renderItem={({ item }) => (
+          <JobServiceCard
+            item={item}
+            isGuest
+            onGuestAction={onGuestAction}
+            onPress={() => onPressItem(item)}
+          />
+        )}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.hListContent}
+        ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
+        ListFooterComponent={<View style={{ width: 40 }} />}
+        snapToInterval={SNAP_INTERVAL}
+        decelerationRate="fast"
+      />
+    </View>
+  )
+}
 
 export default function LandingScreen({ navigation }) {
+  const insets = useSafeAreaInsets()
+  const [jobs, setJobs] = useState([])
+  const [services, setServices] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [mode, setMode] = useState('home')
+  const [search, setSearch] = useState('')
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    await Promise.all([fetchJobs(), fetchServices()])
+    setLoading(false)
+    setRefreshing(false)
+  }
+
+  async function fetchJobs() {
+    const { data: jobsData } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+
+    const raw = jobsData || []
+    if (raw.length === 0) { setJobs([]); return }
+
+    const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]
+    const [{ data: profilesData }, { data: bidsData }] = requesterIds.length > 0
+      ? await Promise.all([
+        supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
+        supabase.from('bids').select('job_id').in('job_id', raw.map(j => j.id)).eq('status', 'pending'),
+      ])
+      : [{ data: [] }, { data: [] }]
+
+    const bidCountMap = {}
+    bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+
+    setJobs(raw.map(j => ({
+      ...j,
+      _type: 'job',
+      profiles: profilesData?.find(p => p.id === j.requester_id) || null,
+      bidCount: bidCountMap[j.id] || 0,
+    })))
+  }
+
+  async function fetchServices() {
+    const { data: servicesData } = await supabase
+      .from('services')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+
+    const raw = servicesData || []
+    if (raw.length === 0) { setServices([]); return }
+
+    const providerIds = [...new Set(raw.map(s => s.provider_id).filter(Boolean))]
+    const { data: profilesData } = providerIds.length > 0
+      ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds)
+      : { data: [] }
+    const profileMap = {}
+    profilesData?.forEach(p => { profileMap[p.id] = p })
+
+    setServices(raw.map(s => ({ ...s, _type: 'service', profile: profileMap[s.provider_id] || null })))
+  }
+
+  function onRefresh() {
+    setRefreshing(true)
+    load()
+  }
+
+  function handleGuestAction() {
+    Alert.alert(
+      'Sign in required',
+      'Sign in to save this to your watchlist.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => navigation.navigate('Login') },
+      ]
+    )
+  }
+
+  const q = search.trim().toLowerCase()
+  const filteredJobs = q
+    ? jobs.filter(j => [j.title, j.description, j.category, j.location_name]
+        .some(v => String(v || '').toLowerCase().includes(q)))
+    : jobs
+  const filteredServices = q
+    ? services.filter(s => [s.title, s.description, s.category, s.location_name]
+        .some(v => String(v || '').toLowerCase().includes(q)))
+    : services
+
+  const showJobs = mode !== 'services'
+  const isEmpty = (showJobs ? filteredJobs.length === 0 : true) && filteredServices.length === 0
+
   return (
-    <View style={styles.container}>
+    <View style={styles.screen}>
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
+        <View style={styles.topBarInner}>
+          <Text style={styles.wordmark}>DIFM Rural</Text>
+          <Text style={styles.tagline}>GET JOBS DONE</Text>
+        </View>
+      </View>
+
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>RURAL SERVICES MARKETPLACE</Text>
-        <Text style={styles.brand} accessibilityRole="header">DIFM Rural</Text>
-        <Text style={styles.tagline}>Get rural jobs done, reliably</Text>
+        <Text style={styles.title} accessibilityRole="header">Find rural help</Text>
+        <Text style={styles.subtitle}>Browse jobs and services before you sign in.</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search water, fencing, tractor..."
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          accessibilityLabel="Search jobs and services"
+        />
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.sectionLabel}>What would you like to do?</Text>
-
-        <View style={styles.grid}>
-          {TILES.map(tile => (
-            <TouchableOpacity
-              key={tile.label}
-              style={[styles.tile, tile.primary && styles.tilePrimary]}
-              onPress={() => navigation.navigate(tile.screen)}
-              accessibilityRole="button"
-              accessibilityLabel={tile.label}
-              accessibilityHint={tile.hint}>
-              <Text style={styles.tileIcon}>{tile.icon}</Text>
-              <Text style={[styles.tileLabel, tile.primary && styles.tileLabelPrimary]}>
-                {tile.label}
-              </Text>
-              <Text style={[styles.tileSubtitle, tile.primary && styles.tileSubtitlePrimary]}>
-                {tile.subtitle}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      {loading ? (
+        <View style={styles.center}>
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
-      </View>
+      ) : isEmpty ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle}>Nothing listed yet</Text>
+          <Text style={styles.emptyBody}>Check back soon, or post the first job.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        >
+          {showJobs && (
+            <HorizontalSection
+              title="Available tasks"
+              items={filteredJobs}
+              onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
+              onGuestAction={handleGuestAction}
+            />
+          )}
+          <HorizontalSection
+            title="Available services"
+            items={filteredServices}
+            onPressItem={item => navigation.navigate('ServiceDetail', { service: item })}
+            onGuestAction={handleGuestAction}
+          />
+        </ScrollView>
+      )}
 
-      <SafeAreaView edges={['bottom']} style={styles.footer}>
+      <View style={[styles.tabBar, { paddingBottom: insets.bottom || 10 }]}>
         <TouchableOpacity
-          style={styles.authButton}
-          onPress={() => navigation.navigate('Register')}
+          style={styles.tab}
+          onPress={() => setMode('home')}
           accessibilityRole="button"
-          accessibilityLabel="Sign in or create an account"
-          accessibilityHint="Opens the account registration screen">
-          <Text style={styles.authButtonText}>Sign in / Create account</Text>
+          accessibilityState={{ selected: mode === 'home' }}>
+          <Text style={[styles.tabIcon, mode === 'home' && styles.tabActive]}>⌂</Text>
+          <Text style={[styles.tabLabel, mode === 'home' && styles.tabActive]}>Home</Text>
         </TouchableOpacity>
-        <View style={styles.loginRow}>
-          <Text style={styles.loginPrompt}>Already have an account? </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Login')}
-            hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
-            style={styles.loginLinkBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Log in to existing account">
-            <Text style={styles.loginLink}>Log in</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => setMode('services')}
+          accessibilityRole="button"
+          accessibilityState={{ selected: mode === 'services' }}>
+          <Text style={[styles.tabIcon, mode === 'services' && styles.tabActive]}>⊙</Text>
+          <Text style={[styles.tabLabel, mode === 'services' && styles.tabActive]}>Services</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => navigation.navigate('GuestPostJob')}
+          accessibilityRole="button">
+          <Text style={styles.tabIcon}>＋</Text>
+          <Text style={styles.tabLabel}>Post</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => navigation.navigate('Login')}
+          accessibilityRole="button">
+          <Text style={styles.tabIcon}>◯</Text>
+          <Text style={styles.tabLabel}>Account</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-
+  screen:      { flex: 1, backgroundColor: colors.background },
+  topBar:      { backgroundColor: '#2d6a4f' },
+  topBarInner: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  wordmark:    { color: '#ffffff', fontSize: 16, fontWeight: '500', letterSpacing: 1 },
+  tagline:     { color: '#95d5b2', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase' },
   header: {
-    backgroundColor: colors.primary,
-    paddingTop: 70,
-    paddingBottom: 32,
-    paddingHorizontal: 24,
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 14,
+    backgroundColor: colors.background,
   },
-  eyebrow: {
-    fontSize: 13,
+  title: {
+    fontSize: 34,
+    lineHeight: 38,
     fontWeight: '700',
-    letterSpacing: 1.4,
-    color: colors.primaryMuted,
-    marginBottom: 8,
-    textTransform: 'uppercase',
+    color: colors.textPrimary,
   },
-  brand: { fontSize: 40, fontWeight: 'bold', color: colors.white, marginBottom: 8 },
-  tagline: { fontSize: 16, color: colors.primaryMuted, textAlign: 'center', lineHeight: 24 },
-
-  body: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
-  sectionLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600', marginBottom: 16, letterSpacing: 0.3 },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  tile: {
-    width: '47.5%',
+  subtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 16 },
+  searchInput: {
     backgroundColor: colors.white,
     borderRadius: 14,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 15,
+    color: colors.textPrimary,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    minHeight: 44,
+    minHeight: 48,
   },
-  tilePrimary: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
-  tileIcon: { fontSize: 26, marginBottom: 10 },
-  tileLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  tileLabelPrimary: { color: colors.primary },
-  tileSubtitle: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
-  tileSubtitlePrimary: { color: '#52b788' },
 
-  footer: { paddingHorizontal: 20, paddingBottom: 16 },
-  authButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginBottom: 14,
-    minHeight: 52,
-    justifyContent: 'center',
+  section: { marginTop: 20 },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    paddingHorizontal: 14,
+    marginBottom: 10,
   },
-  authButtonText: { color: colors.white, fontSize: 16, fontWeight: '700' },
-  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', minHeight: 44 },
-  loginPrompt: { color: colors.textMuted, fontSize: 15 },
-  loginLinkBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  loginLink: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  hListContent: { paddingLeft: 14 },
+
+  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  loadingText: { color: colors.textMuted, fontSize: 15 },
+  emptyTitle:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+  emptyBody:   { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+
+  tabBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+  },
+  tab:      { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 54 },
+  tabIcon:  { fontSize: 20, color: colors.textMuted, lineHeight: 24 },
+  tabLabel: { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginTop: 2 },
+  tabActive: { color: colors.primary },
 })

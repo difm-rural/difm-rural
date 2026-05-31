@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../theme/tokens'
 
 export default function GuestJobDetailScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets()
   const { job } = route.params
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
@@ -26,16 +28,20 @@ export default function GuestJobDetailScreen({ route, navigation }) {
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backRow}
+          style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
+        <Text style={styles.kicker}>{job.category}</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">{job.title}</Text>
+      </View>
 
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.badgeRow}>
           <Text style={styles.category}>{job.category}</Text>
           <Text style={styles.price}>
@@ -43,7 +49,6 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.title} accessibilityRole="header">{job.title}</Text>
         <Text style={styles.location}>📍 {job.location_name}</Text>
         <Text style={styles.description}>{job.description}</Text>
 
@@ -103,13 +108,19 @@ export default function GuestJobDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 60 },
-  backRow: { marginBottom: 16, minHeight: 44, justifyContent: 'center' },
-  backText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
+  header: {
+    backgroundColor: colors.background,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+  },
+  backBtn: { marginBottom: 12, minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
+  backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
+  container: { flex: 1, backgroundColor: colors.background, padding: 20 },
   badgeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   category: { backgroundColor: colors.primaryLight, color: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, fontSize: 13, fontWeight: '600' },
   price: { fontWeight: 'bold', color: colors.primary, fontSize: 17 },
-  title: { fontSize: 22, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8 },
   location: { color: colors.textMuted, fontSize: 14, marginBottom: 16 },
   description: { color: colors.textSecondary, fontSize: 16, lineHeight: 26, marginBottom: 32 },
   bidButton: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginBottom: 12, minHeight: 52, justifyContent: 'center' },

@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 
 export default function RegisterScreen({ navigation }) {
+  const insets = useSafeAreaInsets()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -32,7 +34,8 @@ export default function RegisterScreen({ navigation }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 16 }]} keyboardShouldPersistTaps="handled">
+      <Text style={styles.kicker}>DIFM Rural</Text>
       <Text style={styles.title} accessibilityRole="header">Create Account</Text>
 
       <TextInput
@@ -146,7 +149,8 @@ export default function RegisterScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background },
-  title: { fontSize: 28, fontWeight: 'bold', color: colors.primary, textAlign: 'center', marginBottom: 24 },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, textAlign: 'center', marginBottom: 8 },
+  title: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 24 },
   input: {
     backgroundColor: colors.white,
     borderRadius: 8,

@@ -1,15 +1,75 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+  Alert,
+  FlatList,
+  Keyboard,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
-import PressableCard from '../components/PressableCard'
+import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
+
+const FILTERS = [
+  { id: 'All',            label: 'All' },
+  { id: 'Fencing',        label: 'Fencing' },
+  { id: 'Machinery',      label: 'Machinery' },
+  { id: 'Water delivery', label: 'Water' },
+  { id: 'Animal care',    label: 'Animal care' },
+  { id: 'Maintenance',    label: 'Maintenance' },
+  { id: 'Labour',         label: 'Labour' },
+  { id: 'Other',          label: 'Other' },
+]
+
+function isNearUser(item, userRegion) {
+  if (!userRegion || !userRegion.length || !item.location_name) return false
+  const loc = (item.location_name || '').toLowerCase()
+  return userRegion.some(kw => loc.includes(kw))
+}
+
+function HorizontalSection({ title, items, onPressItem, onGuestHeartPress }) {
+  if (!items.length) return null
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <FlatList
+        horizontal
+        data={items}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <JobServiceCard
+            item={item}
+            isGuest
+            onGuestAction={onGuestHeartPress}
+            onPress={() => onPressItem(item)}
+          />
+        )}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.hListContent}
+        ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
+        ListFooterComponent={<View style={{ width: 40 }} />}
+        snapToInterval={SNAP_INTERVAL}
+        decelerationRate="fast"
+      />
+    </View>
+  )
+}
 
 export default function GuestJobFeedScreen({ navigation }) {
+  const insets = useSafeAreaInsets()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [userRegion, setUserRegion] = useState(null)
+  const [filter, setFilter] = useState('All')
+  const [search, setSearch] = useState('')
   const regionRef = useRef(null)
 
   useEffect(() => { init() }, [])
@@ -18,7 +78,7 @@ export default function GuestJobFeedScreen({ navigation }) {
     const region = await getUserRegion()
     regionRef.current = region
     setUserRegion(region)
-    await fetchJobs(region)
+    await fetchJobs()
   }
 
   async function getUserRegion() {
@@ -38,122 +98,225 @@ export default function GuestJobFeedScreen({ navigation }) {
     }
   }
 
-  async function fetchJobs(region = regionRef.current) {
-    const { data, error } = await supabase
+  async function fetchJobs() {
+    const { data: jobsData } = await supabase
       .from('jobs')
       .select('*')
       .eq('status', 'open')
       .order('created_at', { ascending: false })
-    if (!error) setJobs(sortByLocality(data || [], region))
+
+    const raw = jobsData || []
+    if (raw.length === 0) { setJobs([]); setLoading(false); setRefreshing(false); return }
+
+    const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]
+    const [{ data: profilesData }, { data: bidsData }] = requesterIds.length > 0
+      ? await Promise.all([
+        supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
+        supabase.from('bids').select('job_id').in('job_id', raw.map(j => j.id)).eq('status', 'pending'),
+      ])
+      : [{ data: [] }, { data: [] }]
+
+    const bidCountMap = {}
+    bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+
+    setJobs(raw.map(j => ({
+      ...j,
+      _type: 'job',
+      profiles: profilesData?.find(p => p.id === j.requester_id) || null,
+      bidCount: bidCountMap[j.id] || 0,
+    })))
     setLoading(false)
     setRefreshing(false)
   }
 
-  function isLocal(locationName, region) {
-    if (!region || !locationName) return false
-    const loc = locationName.toLowerCase()
-    return region.some(kw => loc.includes(kw))
+  function onRefresh() {
+    setRefreshing(true)
+    fetchJobs()
   }
 
-  function sortByLocality(allJobs, region) {
-    if (!region) return allJobs
-    return [
-      ...allJobs.filter(j => isLocal(j.location_name, region)),
-      ...allJobs.filter(j => !isLocal(j.location_name, region)),
-    ]
-  }
-
-  function renderJob({ item }) {
-    const nearby = isLocal(item.location_name, userRegion)
-    return (
-      <PressableCard
-        key={item.id}
-        style={[styles.card, nearby && styles.localCard]}
-        onPress={() => navigation.navigate('GuestJobDetail', { job: item })}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.title}, ${item.category}, ${item.price_type === 'fixed' ? `$${item.price} NZD` : 'Open to bids'}`}
-        accessibilityHint="Double tap to view job details">
-        <View style={styles.cardHeader}>
-          <View style={styles.badgeRow}>
-            <Text style={styles.category}>{item.category}</Text>
-            {nearby && <Text style={styles.nearBadge}>Near you</Text>}
-          </View>
-          <Text style={styles.price}>
-            {item.price_type === 'fixed' ? `$${item.price} NZD` : 'Open to Bids'}
-          </Text>
-        </View>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.location}>📍 {item.location_name}</Text>
-          <Text style={styles.tapHint}>Tap to view →</Text>
-        </View>
-      </PressableCard>
+  function handleGuestAction() {
+    Alert.alert(
+      'Sign in required',
+      'Sign in to save this to your watchlist.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => navigation.navigate('Login') },
+      ]
     )
   }
 
-  if (loading) {
-    return <View style={styles.center}><Text style={{ color: colors.primary }}>Loading...</Text></View>
-  }
+  const filtered = (() => {
+    let items = [...jobs]
+    if (filter !== 'All') items = items.filter(i => i.category === filter)
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      items = items.filter(i =>
+        [i.title, i.description, i.category, i.location_name].some(v => String(v || '').toLowerCase().includes(q))
+      )
+    }
+    return items
+  })()
+
+  const nearYou = filtered.filter(i => isNearUser(i, userRegion))
+  const furtherAway = filtered.filter(i => !isNearUser(i, userRegion))
+  const bothEmpty = nearYou.length === 0 && furtherAway.length === 0
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
+    <View style={styles.screen}>
+
+      {/* Green header */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
           style={styles.backBtn}
+          onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.back}>← Back</Text>
+          <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
-        {userRegion && <Text style={styles.localNote}>Local first</Text>}
+        <Text style={styles.brandLabel}>DIFM RURAL</Text>
+        <Text style={styles.title}>Available jobs</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search fencing, water, tractor..."
+          placeholderTextColor="rgba(255,255,255,0.6)"
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={Keyboard.dismiss}
+          returnKeyType="done"
+          blurOnSubmit
+          accessibilityLabel="Search jobs"
+        />
       </View>
-      <Text style={styles.heading} accessibilityRole="header">Available Jobs</Text>
-      {jobs.length === 0 ? (
+
+      {/* Filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={styles.filterContent}>
+        {FILTERS.map(f => (
+          <TouchableOpacity
+            key={f.id}
+            style={[styles.chip, filter === f.id && styles.chipActive]}
+            onPress={() => setFilter(f.id)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: filter === f.id }}>
+            <Text style={[styles.chipText, filter === f.id && styles.chipTextActive]}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Content */}
+      {loading ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No jobs posted yet</Text>
-          <Text style={styles.emptySubtext}>Check back soon!</Text>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      ) : bothEmpty ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle}>No jobs found</Text>
+          <Text style={styles.emptyBody}>Try a different search or filter.</Text>
         </View>
       ) : (
-        <FlatList
-          data={jobs}
-          renderItem={renderJob}
-          keyExtractor={item => item.id}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); fetchJobs() }}
-              tintColor={colors.primary}
-            />
-          }
-          contentContainerStyle={{ paddingBottom: 20 }}
-        />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          }>
+          <HorizontalSection
+            title="Near you"
+            items={nearYou}
+            onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
+            onGuestHeartPress={handleGuestAction}
+          />
+          <HorizontalSection
+            title="Further away"
+            items={furtherAway}
+            onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
+            onGuestHeartPress={handleGuestAction}
+          />
+          {furtherAway.length === 0 && nearYou.length > 0 && (
+            <View style={styles.noMore}>
+              <Text style={styles.noMoreText}>No more jobs found</Text>
+            </View>
+          )}
+        </ScrollView>
       )}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 16, paddingTop: 60 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  backBtn: { minHeight: 44, justifyContent: 'center' },
-  back: { color: colors.primary, fontSize: 16, fontWeight: '600' },
-  heading: { fontSize: 26, fontWeight: 'bold', color: colors.primary, marginBottom: 16 },
-  localNote: { fontSize: 13, color: colors.primary, fontWeight: '600', backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  card: { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: colors.border },
-  localCard: { borderColor: colors.primary, borderWidth: 1.5 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  category: { backgroundColor: colors.primaryLight, color: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 13, fontWeight: '600' },
-  nearBadge: { backgroundColor: colors.primary, color: colors.white, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, fontSize: 13, fontWeight: '600' },
-  price: { fontWeight: 'bold', color: colors.primary, fontSize: 15 },
-  title: { fontSize: 17, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 6 },
-  description: { color: colors.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 10 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  location: { color: colors.textMuted, fontSize: 13, flex: 1 },
-  tapHint: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { fontSize: 18, fontWeight: 'bold', color: colors.textSecondary },
-  emptySubtext: { color: colors.textMuted, marginTop: 4, fontSize: 15 },
+  screen: { flex: 1, backgroundColor: colors.background },
+
+  header: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+  },
+  backBtn: { marginBottom: 10, alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
+  backBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600' },
+  brandLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#95d5b2',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: colors.white,
+    marginBottom: 14,
+    lineHeight: 30,
+  },
+  searchInput: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    fontSize: 14,
+    color: colors.white,
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+
+  filterBar: { flexGrow: 0, backgroundColor: colors.background },
+  filterContent: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipActive:     { backgroundColor: colors.textPrimary, borderColor: colors.textPrimary },
+  chipText:       { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  chipTextActive: { color: colors.white },
+
+  section: { marginTop: 20 },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  hListContent: { paddingLeft: 14 },
+
+  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  loadingText: { color: colors.textMuted, fontSize: 15 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+  emptyBody:  { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+  noMore:     { paddingVertical: 20, alignItems: 'center' },
+  noMoreText: { fontSize: 13, color: colors.textMuted },
 })
