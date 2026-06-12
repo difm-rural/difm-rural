@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import { useUser } from '../../context/UserContext'
-import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../../components/JobServiceCard'
+import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
 
 const FILTERS = [
@@ -65,10 +65,17 @@ function HorizontalSection({ title, items, onPressItem }) {
         data={items}
         keyExtractor={item => `service-${item.id}`}
         renderItem={({ item }) => (
-          <JobServiceCard
-            item={item}
-            onPress={() => onPressItem(item)}
-          />
+          <View style={styles.serviceCardWrap}>
+            <JobServiceCard
+              item={item}
+              onPress={() => onPressItem(item)}
+            />
+            {item.is_active === false && (
+              <View style={styles.pausedBadge}>
+                <Text style={styles.pausedBadgeText}>Advertising paused</Text>
+              </View>
+            )}
+          </View>
         )}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.hListContent}
@@ -85,6 +92,7 @@ export default function BrowseTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const { profile } = useUser()
   const isProvider = profile?.primary_role === 'provider' || profile?.primary_role === 'both'
+  const [currentUserId, setCurrentUserId] = useState(null)
   const [services,    setServices]    = useState([])
   const [userRegion,  setUserRegion]  = useState('')
   const [userLat,     setUserLat]     = useState(null)
@@ -98,6 +106,7 @@ export default function BrowseTabScreen({ navigation }) {
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
+    setCurrentUserId(user?.id || null)
 
     if (user?.id) {
       const { data: prof } = await supabase
@@ -118,19 +127,32 @@ export default function BrowseTabScreen({ navigation }) {
       }
     } catch { /* location denied — fall back to region text matching */ }
 
-    await fetchServices()
+    await fetchServices(user?.id || null)
     setLoading(false)
     setRefreshing(false)
   }
 
-  async function fetchServices() {
+  async function fetchServices(userId = currentUserId) {
     const { data: servicesData } = await supabase
       .from('services')
       .select('*')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
 
-    const raw = servicesData || []
+    let raw = servicesData || []
+    if (userId) {
+      const { data: ownServicesData } = await supabase
+        .from('services')
+        .select('*')
+        .eq('provider_id', userId)
+        .order('created_at', { ascending: false })
+
+      const byId = {}
+      raw.forEach(service => { byId[service.id] = service })
+      ownServicesData?.forEach(service => { byId[service.id] = service })
+      raw = Object.values(byId)
+    }
+
     if (raw.length === 0) { setServices([]); return }
 
     const providerIds = [...new Set(raw.map(s => s.provider_id).filter(Boolean))]
@@ -168,6 +190,10 @@ export default function BrowseTabScreen({ navigation }) {
   }
 
   function handlePress(item) {
+    if (item.provider_id === currentUserId) {
+      navigation.navigate('CreateService', { service: item })
+      return
+    }
     navigation.navigate('ServiceDetail', { service: item })
   }
 
@@ -197,7 +223,15 @@ export default function BrowseTabScreen({ navigation }) {
     if (userLat != null && i._distanceKm != null) return parseFloat(i._distanceKm) > 50
     return !isNearUser(i, userRegion)
   })
-  const isEmpty = nearYou.length === 0 && allServices.length === 0
+  const yourServices = isProvider && currentUserId
+    ? filtered.filter(i => i.provider_id === currentUserId)
+    : []
+  const otherServices = isProvider && currentUserId
+    ? filtered.filter(i => i.provider_id !== currentUserId)
+    : []
+  const isEmpty = isProvider
+    ? yourServices.length === 0 && otherServices.length === 0
+    : nearYou.length === 0 && allServices.length === 0
 
   return (
     <View style={styles.screen}>
@@ -221,11 +255,12 @@ export default function BrowseTabScreen({ navigation }) {
 
       {isProvider && (
         <TouchableOpacity
-          style={styles.jobsBanner}
-          onPress={() => navigation.navigate('JobFeed')}
+          style={styles.manageBanner}
+          onPress={() => navigation.navigate('MyServices')}
           accessibilityRole="button"
-          accessibilityLabel="Browse open jobs">
-          <Text style={styles.jobsBannerText}>🔨 Looking for work? Browse open jobs →</Text>
+          accessibilityLabel="Manage your advertised services">
+          <Text style={styles.manageBannerTitle}>Manage your services</Text>
+          <Text style={styles.manageBannerText}>Edit, pause advertising, or delete a listing</Text>
         </TouchableOpacity>
       )}
 
@@ -258,7 +293,7 @@ export default function BrowseTabScreen({ navigation }) {
           <Text style={styles.emptyBody}>Check back soon or post a job to get quotes.</Text>
           <TouchableOpacity
             style={styles.emptyBtn}
-            onPress={() => navigation.getParent()?.navigate('Home', { screen: 'PostJob' })}
+            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob' })}
             accessibilityRole="button"
             accessibilityLabel="Post a job">
             <Text style={styles.emptyBtnText}>Post a job →</Text>
@@ -272,22 +307,40 @@ export default function BrowseTabScreen({ navigation }) {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }>
 
-          <HorizontalSection
-            title="Near you"
-            items={nearYou}
-            onPressItem={handlePress}
-          />
+          {isProvider ? (
+            <>
+              <HorizontalSection
+                title="Your services"
+                items={yourServices}
+                onPressItem={handlePress}
+              />
 
-          <HorizontalSection
-            title="All services"
-            items={allServices}
-            onPressItem={handlePress}
-          />
+              <HorizontalSection
+                title="Other services"
+                items={otherServices}
+                onPressItem={handlePress}
+              />
+            </>
+          ) : (
+            <>
+              <HorizontalSection
+                title="Near you"
+                items={nearYou}
+                onPressItem={handlePress}
+              />
 
-          {allServices.length === 0 && nearYou.length > 0 && (
-            <View style={styles.noMore}>
-              <Text style={styles.noMoreText}>All available services shown above</Text>
-            </View>
+              <HorizontalSection
+                title="All services"
+                items={allServices}
+                onPressItem={handlePress}
+              />
+
+              {allServices.length === 0 && nearYou.length > 0 && (
+                <View style={styles.noMore}>
+                  <Text style={styles.noMoreText}>All available services shown above</Text>
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       )}
@@ -335,16 +388,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.25)',
   },
 
-  jobsBanner: {
-    backgroundColor: '#e8f5e9',
+  manageBanner: {
+    backgroundColor: colors.white,
     marginHorizontal: 14,
     marginTop: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.primary,
     padding: 12,
   },
-  jobsBannerText: { fontSize: 13, color: '#085041', fontWeight: '600' },
+  manageBannerTitle: { fontSize: 14, color: colors.primary, fontWeight: '800', marginBottom: 3 },
+  manageBannerText: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
 
   filterBar: { flexGrow: 0, backgroundColor: colors.background },
   filterContent: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
@@ -373,6 +427,17 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   hListContent: { paddingLeft: 14 },
+  serviceCardWrap: { width: CARD_WIDTH },
+  pausedBadge: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginTop: 6,
+  },
+  pausedBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
 
   center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   loadingText: { color: colors.textMuted, fontSize: 15 },

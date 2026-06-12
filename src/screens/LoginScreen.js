@@ -1,221 +1,423 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import React, { useRef, useState } from 'react'
 import {
-  authenticate,
-  clearCredentials,
-  getBiometricType,
-  getCredentials,
-  hasDeclined,
-  isBiometricAvailable,
-  saveCredentials,
-  setDeclined,
-} from '../lib/biometrics'
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import { useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import {
+  authenticate,
+  clearSession,
+  clearSessionTokens,
+  getBiometricType,
+  getSavedSession,
+  isBiometricAvailable,
+  isBiometricEnabled,
+  saveSession,
+} from '../lib/biometrics'
 
-const BIOMETRICS_ENABLED = false
+function getBiometricLabel(type) {
+  if (type === 'face') return 'Face ID'
+  return 'Fingerprint or PIN'
+}
 
 export default function LoginScreen({ navigation }) {
   const insets = useSafeAreaInsets()
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [loading, setLoading]     = useState(false)
+  const [stage, setStage] = useState('email') // 'email' | 'verify'
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState(['', '', '', '', '', ''])
+  const [loading, setLoading] = useState(false)
+  const [focused, setFocused] = useState(null)
   const [biometricReady, setBiometricReady] = useState(false)
-  const [biometricType, setBiometricType]   = useState('fingerprint')
+  const [biometricType,  setBiometricType]  = useState('fingerprint')
 
-  const passwordRef = useRef(null)
+  const inputRefs = useRef([...Array(6)].map(() => React.createRef()))
 
-  useEffect(() => {
-    if (!BIOMETRICS_ENABLED) return
-    async function setup() {
-      const available = await isBiometricAvailable()
-      console.log('isBiometricAvailable:', available)
-      const credentials = await getCredentials()
-      console.log('getCredentials:', !!credentials)
-      if (available && credentials) {
-        setBiometricReady(true)
-        const type = await getBiometricType()
-        setBiometricType(type)
-        console.log('biometricType:', type)
+  // Re-check on every focus so the button appears immediately after enabling
+  // and disappears after sign-out clears the stored tokens.
+  useFocusEffect(
+    React.useCallback(() => {
+      async function checkBiometric() {
+        const available = await isBiometricAvailable()
+        const session   = await getSavedSession() // null if tokens cleared by sign-out
+        if (available && session) {
+          setBiometricReady(true)
+          const type = await getBiometricType()
+          setBiometricType(type)
+        } else {
+          setBiometricReady(false)
+        }
       }
-    }
-    setup()
-  }, [])
+      checkBiometric()
+    }, [])
+  )
+
+  // ─── Biometric login ──────────────────────────────────────────────────────────
 
   async function handleBiometricLogin() {
-    const label = biometricType === 'face' ? 'Face ID' : 'fingerprint'
-    const success = await authenticate(`Sign in with ${label}`)
-    if (!success) return
+    try {
+      const success = await authenticate()
+      if (!success) return
 
-    const creds = await getCredentials()
-    if (!creds) return
+      const session = await getSavedSession()
+      if (!session) {
+        // Tokens were cleared (e.g. sign-out) but enabled flag persists.
+        // Next OTP login will silently restore them.
+        setBiometricReady(false)
+        Alert.alert('Please sign in with your email', 'Your session has expired.')
+        return
+      }
 
+      const { error } = await supabase.auth.setSession({
+        access_token:  session.accessToken,
+        refresh_token: session.refreshToken,
+      })
+
+      if (error) {
+        // Tokens invalid — clear them but keep enabled flag so next OTP login
+        // silently refreshes and biometric works again on the login after that.
+        await clearSessionTokens()
+        setBiometricReady(false)
+        Alert.alert('Session expired', 'Please sign in with your email code.')
+      }
+      // On success AppNavigator handles redirect via onAuthStateChange
+    } catch (e) {
+      Alert.alert('Error', e.message)
+    }
+  }
+
+  // ─── OTP flow ─────────────────────────────────────────────────────────────────
+
+  async function handleSendCode() {
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed) {
+      Alert.alert('Email required', 'Please enter your email address.')
+      return
+    }
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
-      email: creds.email,
-      password: creds.password,
+    const { error } = await supabase.auth.signInWithOtp({
+      email:   trimmed,
+      options: { shouldCreateUser: true },
     })
     if (error) {
-      await clearCredentials()
-      setBiometricReady(false)
-      Alert.alert('Sign in failed', 'Your saved credentials are outdated. Please sign in with your password.')
+      Alert.alert('Error', error.message)
+    } else {
+      setStage('verify')
     }
     setLoading(false)
   }
 
-  async function handleLogin() {
-    if (!email || !password) {
-      Alert.alert('Missing fields', 'Please enter your email and password.')
+  function handleDigitChange(index, value) {
+    const newCode = [...code]
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, '').split('')
+      digits.forEach((d, i) => {
+        if (index + i < 6) newCode[index + i] = d
+      })
+      setCode(newCode)
+      const lastFilled = Math.min(index + digits.length - 1, 5)
+      inputRefs.current[lastFilled]?.current?.focus()
+      if (index + digits.length >= 6) verifyCode(newCode.join(''))
       return
     }
+    newCode[index] = value
+    setCode(newCode)
+    if (value && index < 5) inputRefs.current[index + 1]?.current?.focus()
+    if (newCode.every(d => d !== '')) verifyCode(newCode.join(''))
+  }
+
+  function handleDigitKeyPress(index, key) {
+    if (key === 'Backspace' && !code[index] && index > 0) {
+      inputRefs.current[index - 1]?.current?.focus()
+    }
+  }
+
+  async function verifyCode(codeString) {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: codeString,
+      type:  'email',
+    })
+
     if (error) {
-      Alert.alert('Login Failed', error.message)
+      Alert.alert('Invalid code', 'The code is incorrect or has expired. Please try again.')
+      setCode(['', '', '', '', '', ''])
+      inputRefs.current[0]?.current?.focus()
       setLoading(false)
       return
     }
-    if (BIOMETRICS_ENABLED) await maybePromptBiometricSetup(email, password)
+
+    // Handle biometric token storage after successful OTP
+    if (data?.session) {
+      const available = await isBiometricAvailable()
+      if (available) {
+        const alreadyEnabled = await isBiometricEnabled()
+
+        if (alreadyEnabled) {
+          // Silently refresh stored tokens — biometric button will work on next cold start
+          await saveSession(data.session.access_token, data.session.refresh_token)
+        } else {
+          // Save tokens now (before the Alert, to avoid race with navigation),
+          // then offer the user a choice. "Not now" clears everything.
+          await saveSession(data.session.access_token, data.session.refresh_token)
+          setTimeout(() => {
+            Alert.alert(
+              'Sign in faster next time',
+              'Use fingerprint, Face ID or your device PIN instead of an email code next time?',
+              [
+                {
+                  text: 'Enable',
+                  onPress: async () => {
+                    const type = await getBiometricType()
+                    setBiometricReady(true)
+                    setBiometricType(type)
+                  },
+                },
+                {
+                  text: 'Not now',
+                  style: 'cancel',
+                  onPress: async () => {
+                    await clearSession() // declined — remove everything
+                  },
+                },
+              ]
+            )
+          }, 500)
+        }
+      }
+    }
+
+    // AppNavigator handles redirect via onAuthStateChange
     setLoading(false)
   }
 
-  async function maybePromptBiometricSetup(confirmedEmail, confirmedPassword) {
-    const available = await isBiometricAvailable()
-    if (!available) return
+  async function resendCode() {
+    await supabase.auth.signInWithOtp({
+      email:   email.trim().toLowerCase(),
+      options: { shouldCreateUser: true },
+    })
+    Alert.alert('Code sent', 'A new code has been sent to your email.')
+    setCode(['', '', '', '', '', ''])
+    inputRefs.current[0]?.current?.focus()
+  }
 
-    const existing = await getCredentials()
-    if (existing) return
+  // ─── Verify stage ─────────────────────────────────────────────────────────────
 
-    const declined = await hasDeclined()
-    if (declined) return
+  if (stage === 'verify') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={[styles.topBar, { paddingTop: insets.top }]}>
+          <View style={styles.topBarInner}>
+            <TouchableOpacity
+              onPress={() => { setStage('email'); setCode(['', '', '', '', '', '']) }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back to email entry">
+              <Text style={styles.backArrow}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.wordmark}>DIFM RURAL</Text>
+            <View style={{ width: 32 }} />
+          </View>
+        </View>
 
-    const type = await getBiometricType()
-    const label = type === 'face' ? 'Face ID' : 'fingerprint'
-    Alert.alert(
-      'Enable biometric login?',
-      `Sign in faster next time using ${label}.`,
-      [
-        {
-          text: 'Not now',
-          onPress: () => setDeclined(),
-        },
-        {
-          text: 'Enable',
-          onPress: async () => {
-            await saveCredentials(confirmedEmail, confirmedPassword)
-            setBiometricReady(true)
-            setBiometricType(type)
-          },
-        },
-      ]
+        <ScrollView
+          contentContainerStyle={[styles.formArea, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+
+          <Text style={styles.title} accessibilityRole="header">Check your email</Text>
+          <Text style={styles.subtitle}>
+            We sent a 6-digit code to{'\n'}
+            <Text style={styles.emailHighlight}>{email.trim().toLowerCase()}</Text>
+          </Text>
+
+          <View style={styles.digitContainer}>
+            {code.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={inputRefs.current[index]}
+                style={[
+                  styles.digitBox,
+                  digit && styles.digitBoxFilled,
+                  focused === index && styles.digitBoxFocused,
+                ]}
+                value={digit}
+                onChangeText={value => handleDigitChange(index, value)}
+                onKeyPress={({ nativeEvent }) => handleDigitKeyPress(index, nativeEvent.key)}
+                onFocus={() => setFocused(index)}
+                onBlur={() => setFocused(null)}
+                keyboardType="number-pad"
+                maxLength={6}
+                textAlign="center"
+                accessibilityLabel={`Digit ${index + 1}`}
+                editable={!loading}
+              />
+            ))}
+          </View>
+
+          {loading && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.loadingText}>Verifying...</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.resendBtn}
+            onPress={resendCode}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Resend sign in code">
+            <Text style={styles.resendText}>Didn't get it? Resend code</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     )
   }
 
-  const biometricLabel = biometricType === 'face' ? 'Face ID' : 'fingerprint'
-  const biometricIcon  = biometricType === 'face' ? '🔐' : '👆'
+  // ─── Email stage ──────────────────────────────────────────────────────────────
+
+  const biometricLabel = getBiometricLabel(biometricType)
+  const biometricIcon  = biometricType === 'face' ? '👤' : '👆'
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <View style={styles.topBarInner}>
-          <Text style={styles.wordmark}>DIFM Rural</Text>
+          <Text style={styles.wordmark}>DIFM RURAL</Text>
           <Text style={styles.tagline}>GET JOBS DONE</Text>
         </View>
       </View>
-      <View style={[styles.formArea, { paddingBottom: insets.bottom + 16 }]}>
-      <Text style={styles.title} accessibilityRole="header">Welcome back</Text>
-      <Text style={styles.subtitle}>Get rural jobs done</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        returnKeyType="next"
-        blurOnSubmit={false}
-        onSubmitEditing={() => passwordRef.current?.focus()}
-        accessibilityLabel="Email address"
-      />
-      <TextInput
-        ref={passwordRef}
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="done"
-        onSubmitEditing={handleLogin}
-        accessibilityLabel="Password"
-      />
+      <ScrollView
+        contentContainerStyle={[styles.formArea, { paddingBottom: insets.bottom + 24 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
 
-      <TouchableOpacity
-        style={styles.forgotBtn}
-        onPress={() => navigation?.navigate('ForgotPassword')}
-        accessibilityRole="button"
-        accessibilityLabel="Forgot password">
-        <Text style={styles.forgotText}>Forgot password?</Text>
-      </TouchableOpacity>
+        <Text style={styles.title} accessibilityRole="header">Sign in</Text>
+        <Text style={styles.subtitle}>
+          Enter your email to receive a sign in code
+        </Text>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleLogin}
-        disabled={loading}
-        accessibilityRole="button"
-        accessibilityLabel="Log in"
-        accessibilityHint="Double tap to sign in to your account">
-        <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Log In'}</Text>
-      </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="you@example.com"
+          placeholderTextColor={colors.textMuted}
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          returnKeyType="done"
+          onSubmitEditing={handleSendCode}
+          editable={!loading}
+          accessibilityLabel="Email address"
+        />
 
-      {biometricReady && (
         <TouchableOpacity
-          style={styles.biometricButton}
-          onPress={handleBiometricLogin}
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleSendCode}
           disabled={loading}
           accessibilityRole="button"
-          accessibilityLabel={`Sign in with ${biometricLabel}`}
-          accessibilityHint={`Double tap to sign in using ${biometricLabel}`}>
-          <Text style={styles.biometricIcon}>{biometricIcon}</Text>
-          <Text style={styles.biometricText}>Sign in with {biometricLabel}</Text>
+          accessibilityLabel="Send sign in code">
+          {loading ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.buttonText}>Send code →</Text>
+          )}
         </TouchableOpacity>
-      )}
 
-      <TouchableOpacity
-        style={styles.linkBtn}
-        onPress={() => navigation?.navigate('Register')}
-        accessibilityRole="button"
-        accessibilityLabel="Create a new account">
-        <Text style={styles.link}>Don't have an account? Register</Text>
-      </TouchableOpacity>
-      </View>
-    </View>
+        {biometricReady && (
+          <TouchableOpacity
+            style={styles.biometricButton}
+            onPress={handleBiometricLogin}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={`Sign in with ${biometricLabel}`}>
+            <Text style={styles.biometricIcon}>{biometricIcon}</Text>
+            <Text style={styles.biometricText}>Sign in with {biometricLabel}</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.googleBtn}
+          disabled
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Google (coming soon)">
+          <Text style={styles.googleBtnText}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.footerText}>
+          New to DIFM Rural? Just enter your email —{'\n'}
+          we'll create your account automatically.
+        </Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
-  screen:      { flex: 1, backgroundColor: colors.background },
-  topBar:      { backgroundColor: '#2d6a4f' },
-  topBarInner: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
-  wordmark:    { color: '#ffffff', fontSize: 16, fontWeight: '500', letterSpacing: 1 },
-  tagline:     { color: '#95d5b2', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase' },
-  formArea:    { flex: 1, justifyContent: 'center', padding: 24 },
-  title:    { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 4 },
-  subtitle: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 24 },
+  screen: { flex: 1, backgroundColor: colors.background },
+
+  topBar: { backgroundColor: '#2d6a4f' },
+  topBarInner: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  backArrow: { fontSize: 22, color: '#ffffff', fontWeight: '500', width: 32 },
+  wordmark:  { color: '#ffffff', fontSize: 16, fontWeight: '500', letterSpacing: 1 },
+  tagline:   { color: '#95d5b2', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase' },
+
+  formArea: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+
+  title: {
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
+  },
+  emailHighlight: {
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
 
   input: {
     backgroundColor: colors.white,
     borderRadius: 8,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 16,
     fontSize: 16,
     borderWidth: 1,
     borderColor: colors.border,
     minHeight: 52,
+    color: colors.textPrimary,
   },
 
   button: {
@@ -223,31 +425,85 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 8,
-    minHeight: 52,
     justifyContent: 'center',
+    minHeight: 52,
+    marginBottom: 12,
   },
+  buttonDisabled: { opacity: 0.7 },
   buttonText: { color: colors.white, fontSize: 16, fontWeight: '700' },
 
   biometricButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
-    paddingVertical: 16,
-    borderRadius: 8,
+    gap: 10,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-    gap: 10,
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginBottom: 12,
+    backgroundColor: colors.white,
     minHeight: 52,
   },
   biometricIcon: { fontSize: 22 },
-  biometricText: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  biometricText: { fontSize: 15, fontWeight: '500', color: colors.primary },
 
-  forgotBtn:  { alignSelf: 'flex-end', paddingVertical: 6, marginBottom: 4 },
-  forgotText: { color: colors.textMuted, fontSize: 14 },
+  googleBtn: {
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    marginBottom: 24,
+    opacity: 0.5,
+  },
+  googleBtnText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
 
-  linkBtn: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 12 },
-  link:    { color: colors.primary, textAlign: 'center', fontSize: 15 },
+  footerText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  digitContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    marginVertical: 24,
+  },
+  digitBox: {
+    width: 48,
+    height: 56,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    fontSize: 24,
+    fontWeight: '500',
+    textAlign: 'center',
+    color: '#222',
+  },
+  digitBoxFilled:  { borderColor: colors.primary, backgroundColor: '#f0faf4' },
+  digitBoxFocused: { borderColor: colors.primary, borderWidth: 2 },
+
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  loadingText: { fontSize: 14, color: colors.textMuted },
+
+  resendBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  resendText: { fontSize: 15, color: colors.primary, fontWeight: '600' },
 })

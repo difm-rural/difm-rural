@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import {
   Alert,
   Animated,
+  ActivityIndicator,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -16,6 +17,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 
@@ -23,12 +25,14 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 const CATEGORIES = ['Machinery', 'Labour', 'Water delivery', 'Animal care', 'Maintenance', 'Fencing', 'Other']
 const PRICING_TYPES = [
+  { id: 'quote_required', label: 'Quote required' },
   { id: 'hourly', label: 'Hourly' },
   { id: 'per_unit', label: 'Per unit' },
   { id: 'fixed', label: 'Fixed' },
   { id: 'day_rate', label: 'Day rate' },
 ]
 const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Equipment', 'Review']
+const AI_FUNCTION_NAME = 'create-service-draft-from-photo'
 
 function getPhotoUri(photo) {
   return typeof photo === 'string' ? photo : photo?.uri
@@ -43,8 +47,62 @@ function normalizePickedAsset(asset) {
   }
 }
 
-function formatDisplayDate(d) {
-  return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+async function preparePhotoForDraft(asset) {
+  const resized = await manipulateAsync(
+    asset.uri,
+    [{ resize: { width: 1200 } }],
+    { compress: 0.72, format: SaveFormat.JPEG, base64: true }
+  )
+
+  return {
+    uri: resized.uri,
+    base64: resized.base64 || asset.base64 || null,
+    mimeType: 'image/jpeg',
+    fileName: `service-draft-${Date.now()}.jpg`,
+  }
+}
+
+function toDateValue(value) {
+  if (!value) return null
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const parsed = toDateValue(item)
+      if (parsed) return parsed
+    }
+    return null
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value
+  if (typeof value === 'number' || typeof value === 'string') {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+  if (value?.nativeEvent?.timestamp) {
+    const parsed = new Date(value.nativeEvent.timestamp)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+  return null
+}
+
+function formatDisplayDate(value) {
+  const date = toDateValue(value)
+  if (!date) return ''
+  return date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatAvailabilityPayload(value) {
+  const date = toDateValue(value)
+  return date ? [date.toISOString().split('T')[0]] : null
+}
+
+function formatMissingField(field) {
+  const value = String(field || '').replace(/_/g, ' ').trim().toLowerCase()
+  if (!value) return null
+  if (value.includes('service area') || value === 'location') return 'Add service area'
+  if (value.includes('pricing') || value.includes('rate')) return 'Confirm pricing'
+  if (value.includes('availability')) return 'Add availability'
+  if (value.includes('title')) return 'Add service title'
+  if (value.includes('category')) return 'Choose category'
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 function base64ToArrayBuffer(base64) {
@@ -72,6 +130,13 @@ export default function CreateServiceScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const editingService = route?.params?.service || null
   const isEditing = !!editingService?.id
+  const [creationMode, setCreationMode] = useState(isEditing ? 'manual' : (route?.params?.startMode || 'choose'))
+  const [sourcePhoto, setSourcePhoto] = useState(null)
+  const [draftSource, setDraftSource] = useState(isEditing ? 'manual' : null)
+  const [draftMissingFields, setDraftMissingFields] = useState([])
+  const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
+  const [creatingDraft, setCreatingDraft] = useState(false)
+  const [draftError, setDraftError] = useState('')
   const [step, setStep] = useState(1)
 
   const [title, setTitle] = useState(editingService?.title || '')
@@ -84,9 +149,10 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [unitLabel, setUnitLabel] = useState(editingService?.unit_label || '')
   const [locationName, setLocationName] = useState(editingService?.location_name || '')
   const [travelRange, setTravelRange] = useState(editingService?.travel_range_km != null ? String(editingService.travel_range_km) : '')
-  const [availableFrom,   setAvailableFrom]   = useState(editingService?.availability ? new Date(editingService.availability) : null)
+  const [availableFrom,   setAvailableFrom]   = useState(toDateValue(editingService?.availability))
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [includesEquipment, setIncludesEquipment] = useState(!!editingService?.includes_equipment)
+  const [serviceActive, setServiceActive] = useState(editingService?.is_active !== false)
 
   const [submitting, setSubmitting] = useState(false)
   const stepTranslateX = useRef(new Animated.Value(0)).current
@@ -105,31 +171,268 @@ export default function CreateServiceScreen({ navigation, route }) {
   function canProceed() {
     if (step === 1) return !!(title.trim() && category)
     if (step === 2) return true
-    if (step === 3) return !!(pricingType && rate.trim())
+    if (step === 3) return !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
     if (step === 4) return !!locationName.trim()
     if (step === 5) return true
+    if (step === 6) return !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
     return true
   }
 
   function formatRate() {
+    if (pricingType === 'quote_required') return 'Quote required'
     if (pricingType === 'hourly') return `$${rate}/hr`
     if (pricingType === 'day_rate') return `$${rate}/day`
     if (pricingType === 'per_unit') return `$${rate}/${unitLabel || 'unit'}`
     return `$${rate} fixed`
   }
 
-  async function pickPhoto() {
+  function normalizeCategory(value) {
+    if (!value) return ''
+    const found = CATEGORIES.find(cat => cat.toLowerCase() === String(value).toLowerCase())
+    return found || 'Other'
+  }
+
+  function normalizePricingType(value) {
+    const v = String(value || '').toLowerCase()
+    if (v === 'hourly') return 'hourly'
+    if (v === 'fixed') return 'fixed'
+    if (v === 'quote_required' || v === 'unknown') return 'quote_required'
+    if (v === 'day_rate' || v === 'per_day') return 'day_rate'
+    if (v === 'per_unit' || v === 'per_load' || v === 'per_job') return 'per_unit'
+    return ''
+  }
+
+  function applyAiDraft(draft) {
+    const nextTitle = draft?.title || ''
+    const nextCategory = normalizeCategory(draft?.category)
+    const nextDescription = draft?.full_description || draft?.description || draft?.short_description || ''
+    const nextPricingType = normalizePricingType(draft?.pricing_type)
+    const nextRate = draft?.price_amount != null ? String(draft.price_amount) : ''
+    const nextLocation = draft?.service_area || draft?.location_name || ''
+    const nextEquipment = Array.isArray(draft?.equipment) ? draft.equipment.length > 0 : !!draft?.includes_equipment
+
+    setTitle(nextTitle)
+    setCategory(nextCategory)
+    setDescription(nextDescription)
+    setPricingType(nextPricingType)
+    setRate(nextPricingType === 'quote_required' ? '' : nextRate)
+    setUnitLabel(nextPricingType === 'per_unit' ? (draft?.unit_label || 'job') : '')
+    setLocationName(nextLocation)
+    setTravelRange(draft?.travel_range_km != null ? String(draft.travel_range_km) : '')
+    setIncludesEquipment(nextEquipment)
+    setDraftMissingFields(Array.isArray(draft?.missing_fields) ? draft.missing_fields.map(formatMissingField).filter(Boolean) : [])
+    setDraftConfidenceNotes(Array.isArray(draft?.confidence_notes) ? draft.confidence_notes : [])
+    setDraftSource('photo')
+    setCreationMode('manual')
+    setStep(6)
+  }
+
+  async function chooseSourcePhoto(fromCamera) {
+    setDraftError('')
+    try {
+      const permission = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission needed', `Please allow ${fromCamera ? 'camera' : 'photo'} access to create a draft from a photo.`)
+        return
+      }
+
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: true })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: true })
+
+      if (!result.canceled) {
+        const picked = normalizePickedAsset(result.assets[0])
+        const prepared = await preparePhotoForDraft(picked)
+        setSourcePhoto(prepared)
+      }
+    } catch (error) {
+      Alert.alert('Photo unavailable', error?.message || 'Could not open the camera or photo library.')
+    }
+  }
+
+  async function createDraftFromPhoto() {
+    if (!sourcePhoto?.base64) {
+      Alert.alert('Photo not ready', 'Please choose a photo with readable service details.')
+      return
+    }
+
+    setCreatingDraft(true)
+    setDraftError('')
+    const approxBytes = Math.round((sourcePhoto.base64.length * 3) / 4)
+    const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
+      body: {
+        image_base64: sourcePhoto.base64,
+        mime_type: sourcePhoto.mimeType || 'image/jpeg',
+        image_size_bytes: approxBytes,
+      },
+    })
+    setCreatingDraft(false)
+
+    if (error) {
+      setDraftError(error.message || 'The draft assistant is not available yet.')
+      setPhotos(prev => prev.length >= 4 ? prev : [...prev, sourcePhoto])
+      setDraftMissingFields(['Add service title', 'Choose category', 'Add service area', 'Add pricing'])
+      return
+    }
+
+    setPhotos(prev => prev.length >= 4 ? prev : [...prev, sourcePhoto])
+    applyAiDraft(data?.draft || data)
+  }
+
+  function renderStartChoice() {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity
+            style={styles.headerBackBtn}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel and go back">
+            <Text style={styles.headerBackBtnText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.kicker}>DIFM Rural</Text>
+          <Text style={styles.headerTitle} accessibilityRole="header">Advertise a service</Text>
+          <Text style={styles.headerSub}>How would you like to start?</Text>
+        </View>
+
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.startContent}>
+          <TouchableOpacity
+            style={styles.startOption}
+            onPress={() => setCreationMode('manual')}
+            accessibilityRole="button"
+            accessibilityLabel="Create service manually">
+            <View style={styles.startIconWrap}>
+              <Text style={styles.startIcon}>+</Text>
+            </View>
+            <View style={styles.startCopy}>
+              <Text style={styles.startTitle}>Create manually</Text>
+              <Text style={styles.startBody}>Build your listing step by step.</Text>
+            </View>
+            <Text style={styles.startArrow}>{'>'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.startOption}
+            onPress={() => setCreationMode('photo')}
+            accessibilityRole="button"
+            accessibilityLabel="Create service from photo">
+            <View style={styles.startIconWrap}>
+              <Text style={styles.startIcon}>[]</Text>
+            </View>
+            <View style={styles.startCopy}>
+              <Text style={styles.startTitle}>Create from photo</Text>
+              <Text style={styles.startBody}>Use a flyer, business card, sign, screenshot, or note.</Text>
+            </View>
+            <Text style={styles.startArrow}>{'>'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    )
+  }
+
+  function renderPhotoDraft() {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity
+            style={styles.headerBackBtn}
+            onPress={() => sourcePhoto ? setSourcePhoto(null) : setCreationMode('choose')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
+            <Text style={styles.headerBackBtnText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.kicker}>Photo-to-draft</Text>
+          <Text style={styles.headerTitle} accessibilityRole="header">Create from photo</Text>
+          <Text style={styles.headerSub}>Take or upload a clear photo that shows your service details.</Text>
+        </View>
+
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.startContent}>
+          {sourcePhoto ? (
+            <>
+              <Image source={{ uri: sourcePhoto.uri }} style={styles.sourcePreview} />
+              <Text style={styles.photoHint}>Make sure the text is clear and not cut off.</Text>
+              {creatingDraft && (
+                <View style={styles.draftProgress}>
+                  <ActivityIndicator color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.draftProgressTitle}>Creating your draft...</Text>
+                    <Text style={styles.draftProgressBody}>Reading the photo and finding service details.</Text>
+                  </View>
+                </View>
+              )}
+              {!!draftError && (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningTitle}>Draft assistant unavailable</Text>
+                  <Text style={styles.warningText}>{draftError}</Text>
+                  <Text style={styles.warningText}>You can still use this photo and fill the service in manually.</Text>
+                </View>
+              )}
+              <View style={styles.footerRow}>
+                <TouchableOpacity
+                  style={styles.backBtn}
+                  onPress={() => setSourcePhoto(null)}
+                  disabled={creatingDraft}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retake or choose another photo">
+                  <Text style={styles.backBtnText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.nextBtn, creatingDraft && styles.btnDisabled]}
+                  onPress={draftError ? () => { setDraftSource('photo'); setCreationMode('manual'); setStep(1) } : createDraftFromPhoto}
+                  disabled={creatingDraft}
+                  accessibilityRole="button"
+                  accessibilityLabel="Use photo">
+                  <Text style={styles.nextBtnText}>{draftError ? 'Use manually' : 'Use photo'}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.photoChoice}
+                onPress={() => chooseSourcePhoto(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Take photo">
+                <Text style={styles.photoChoiceTitle}>Take photo</Text>
+                <Text style={styles.photoChoiceBody}>Capture a flyer, business card, sign, or handwritten note.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.photoChoice}
+                onPress={() => chooseSourcePhoto(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Upload photo">
+                <Text style={styles.photoChoiceTitle}>Upload photo</Text>
+                <Text style={styles.photoChoiceBody}>Use a saved screenshot, poster, or service image.</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
+      </View>
+    )
+  }
+
+  async function pickPhoto(fromCamera = false) {
     if (photos.length >= 4) return
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    const permission = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync()
+    const { status } = permission
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow photo access to add service photos.')
+      Alert.alert('Permission needed', `Please allow ${fromCamera ? 'camera' : 'photo'} access to add service photos.`)
       return
     }
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
+      const result = fromCamera
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.7, allowsEditing: true })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
       if (!result.canceled) setPhotos(prev => [...prev, normalizePickedAsset(result.assets[0])])
     } catch (error) {
-      Alert.alert('Photo library unavailable', error?.message || 'Could not open the photo library.')
+      Alert.alert('Photo unavailable', error?.message || `Could not open the ${fromCamera ? 'camera' : 'photo library'}.`)
     }
   }
 
@@ -177,6 +480,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     setSubmitting(true)
+    const publishRate = pricingType === 'quote_required' ? 0 : parseFloat(rate)
     const payload = {
       provider_id: user.id,
       title: title.trim(),
@@ -185,13 +489,13 @@ export default function CreateServiceScreen({ navigation, route }) {
       location_name: locationName.trim(),
       travel_range_km: travelRange ? parseFloat(travelRange) : null,
       pricing_type: pricingType,
-      rate: parseFloat(rate),
+      rate: publishRate,
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
       minimum_units: 1,
       includes_equipment: includesEquipment,
       payment_timing: 'on_completion',
-      availability: availableFrom ? availableFrom.toISOString().split('T')[0] : null,
-      is_active: true,
+      availability: formatAvailabilityPayload(availableFrom),
+      is_active: isEditing ? serviceActive : true,
       ...(isEditing && photos.length === 0 ? { photos: [] } : {}),
     }
 
@@ -228,10 +532,90 @@ export default function CreateServiceScreen({ navigation, route }) {
       }
     }
 
+    function leavePublishScreen() {
+      if (isEditing) {
+        navigation.goBack()
+        return
+      }
+
+      const routeNames = navigation.getState()?.routeNames || []
+      if (routeNames.includes('MyServices') && typeof navigation.replace === 'function') {
+        navigation.replace('MyServices', { createdService: serviceForRoute })
+        return
+      }
+
+      if (routeNames.includes('MyServices')) {
+        navigation.navigate('MyServices', { createdService: serviceForRoute })
+        return
+      }
+
+      navigation.getParent()?.navigate('Account', {
+        screen: 'MyServices',
+        params: { createdService: serviceForRoute },
+      })
+    }
+
     setSubmitting(false)
     Alert.alert(isEditing ? 'Service updated!' : 'Service published!', isEditing ? 'Your service has been updated.' : 'Your service is now live.', [
-      { text: 'OK', onPress: () => isEditing ? navigation.goBack() : navigation.navigate('MyServices', { createdService: serviceForRoute }) },
+      { text: 'OK', onPress: leavePublishScreen },
     ])
+  }
+
+  async function handleDeleteService() {
+    if (!isEditing || !editingService?.id) return
+
+    const { data: bookingsData, error: bookingError } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('service_id', editingService.id)
+      .limit(1)
+
+    if (bookingError) {
+      Alert.alert('Could not check bookings', bookingError.message)
+      return
+    }
+
+    if (bookingsData?.length > 0) {
+      Alert.alert(
+        'Cannot delete this service',
+        'This service has booking history. Pause advertising instead so it stops showing to requesters while existing jobs and records remain available.'
+      )
+      return
+    }
+
+    Alert.alert(
+      'Delete service',
+      `Delete "${title || 'this service'}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+              Alert.alert('Sign in required', 'Please sign in again to delete this service.')
+              return
+            }
+
+            const { error } = await supabase
+              .from('services')
+              .delete()
+              .eq('id', editingService.id)
+              .eq('provider_id', user.id)
+
+            if (error) {
+              Alert.alert('Could not delete service', error.message)
+              return
+            }
+
+            Alert.alert('Service deleted', 'This service has been removed.', [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ])
+          },
+        },
+      ]
+    )
   }
 
   function renderProgress() {
@@ -312,13 +696,22 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
           ))}
           {photos.length < 4 && (
-            <TouchableOpacity
-              style={styles.photoAdd}
-              onPress={pickPhoto}
-              accessibilityRole="button"
-              accessibilityLabel="Choose service photo">
-              <Text style={styles.photoAddText}>Choose photo</Text>
-            </TouchableOpacity>
+            <View style={styles.photoActionWrap}>
+              <TouchableOpacity
+                style={styles.photoAdd}
+                onPress={() => pickPhoto(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Take service photo">
+                <Text style={styles.photoAddText}>Take photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.photoAdd}
+                onPress={() => pickPhoto(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Choose service photo">
+                <Text style={styles.photoAddText}>Choose photo</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </>
@@ -344,34 +737,41 @@ export default function CreateServiceScreen({ navigation, route }) {
           ))}
         </View>
 
-        <View style={styles.inlineRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.fieldLabel}>Rate</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="120"
-              placeholderTextColor={colors.textMuted}
-              value={rate}
-              onChangeText={setRate}
-              keyboardType="numeric"
-              accessibilityLabel="Rate in NZD"
-            />
+        {pricingType === 'quote_required' ? (
+          <View style={styles.helpBox}>
+            <Text style={styles.helpBoxTitle}>Requester will ask for a quote</Text>
+            <Text style={styles.helpBoxText}>Use this when price depends on distance, job size, materials, or conditions.</Text>
           </View>
-          {pricingType === 'per_unit' && (
+        ) : (
+          <View style={styles.inlineRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Unit</Text>
+              <Text style={styles.fieldLabel}>Rate</Text>
               <TextInput
                 style={styles.input}
-                placeholder="trough"
+                placeholder="120"
                 placeholderTextColor={colors.textMuted}
-                value={unitLabel}
-                onChangeText={setUnitLabel}
-                autoCapitalize="none"
-                accessibilityLabel="Unit label"
+                value={rate}
+                onChangeText={setRate}
+                keyboardType="numeric"
+                accessibilityLabel="Rate in NZD"
               />
             </View>
-          )}
-        </View>
+            {pricingType === 'per_unit' && (
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Unit</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="trough"
+                  placeholderTextColor={colors.textMuted}
+                  value={unitLabel}
+                  onChangeText={setUnitLabel}
+                  autoCapitalize="none"
+                  accessibilityLabel="Unit label"
+                />
+              </View>
+            )}
+          </View>
+        )}
 
       </>
     )
@@ -412,7 +812,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           accessibilityRole="button"
           accessibilityLabel="Select available from date">
           <Text style={availableFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
-            {availableFrom ? formatDisplayDate(availableFrom) : 'Available now'}
+            {formatDisplayDate(availableFrom) || 'Available now'}
           </Text>
           <Text style={styles.datePickerIcon}>📅</Text>
         </TouchableOpacity>
@@ -429,13 +829,15 @@ export default function CreateServiceScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
             <DateTimePicker
-              value={availableFrom || new Date()}
+              value={toDateValue(availableFrom) || new Date()}
               mode="date"
               minimumDate={new Date()}
-              onChange={(event, selected) => {
+              onValueChange={(selected) => {
                 if (Platform.OS === 'android') setShowDatePicker(false)
-                if (selected) setAvailableFrom(selected)
+                const nextDate = toDateValue(selected)
+                if (nextDate) setAvailableFrom(nextDate)
               }}
+              onDismiss={() => setShowDatePicker(false)}
             />
           </>
         )}
@@ -471,6 +873,15 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function renderStep6() {
+    const missingItems = [
+      !title.trim() && 'Add service title',
+      !category && 'Choose category',
+      !pricingType && 'Choose pricing type',
+      pricingType !== 'quote_required' && !rate.trim() && 'Add rate',
+      !locationName.trim() && 'Add service area',
+      ...draftMissingFields,
+    ].filter(Boolean)
+    const uniqueMissingItems = [...new Set(missingItems)]
     const rows = [
       { label: 'Service', value: title },
       { label: 'Category', value: category },
@@ -478,13 +889,51 @@ export default function CreateServiceScreen({ navigation, route }) {
       { label: 'Location', value: locationName },
       travelRange && { label: 'Travel', value: `${travelRange} km` },
       { label: 'Equipment', value: includesEquipment ? 'Included' : 'Not included' },
-      availableFrom && { label: 'Available', value: formatDisplayDate(availableFrom) },
+      formatDisplayDate(availableFrom) && { label: 'Available', value: formatDisplayDate(availableFrom) },
       photos.length > 0 && { label: 'Photos', value: `${photos.length} photo${photos.length === 1 ? '' : 's'}` },
     ].filter(Boolean)
 
     return (
       <>
-        <Text style={styles.stepHeading}>Ready to publish?</Text>
+        <Text style={styles.stepHeading}>{draftSource === 'photo' ? 'Review your draft' : 'Ready to publish?'}</Text>
+        {draftSource === 'photo' && (
+          <View style={styles.sourceNote}>
+            <Text style={styles.sourceNoteTitle}>Draft created from your photo</Text>
+            <Text style={styles.sourceNoteText}>Please check every detail before publishing.</Text>
+          </View>
+        )}
+        {uniqueMissingItems.length > 0 && (
+          <View style={styles.missingCard}>
+            <Text style={styles.missingTitle}>Needs your review</Text>
+            {uniqueMissingItems.map(item => (
+              <Text key={item} style={styles.missingItem}>- {item}</Text>
+            ))}
+            <View style={styles.reviewActions}>
+              <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(1)}>
+                <Text style={styles.reviewActionText}>Edit basics</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(3)}>
+                <Text style={styles.reviewActionText}>Edit pricing</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(4)}>
+                <Text style={styles.reviewActionText}>Edit area</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {uniqueMissingItems.length === 0 && (
+          <View style={styles.reviewActionsTop}>
+            <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(1)}>
+              <Text style={styles.reviewActionText}>Edit basics</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(3)}>
+              <Text style={styles.reviewActionText}>Edit pricing</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(4)}>
+              <Text style={styles.reviewActionText}>Edit area</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={styles.reviewCard}>
           {rows.map((row, i) => (
             <View key={row.label} style={[styles.reviewRow, i < rows.length - 1 && styles.reviewRowBorder]}>
@@ -493,10 +942,44 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
           ))}
         </View>
+        {isEditing && (
+          <View style={styles.managementCard}>
+            <Text style={styles.managementTitle}>Service advertising</Text>
+            <Text style={styles.managementBody}>
+              {serviceActive
+                ? 'This service is visible to requesters. Pause advertising while you make adjustments.'
+                : 'This service is hidden from requesters. Existing bookings and chats are not cancelled.'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.pauseBtn, !serviceActive && styles.resumeBtn]}
+              onPress={() => setServiceActive(prev => !prev)}
+              accessibilityRole="button"
+              accessibilityLabel={serviceActive ? 'Pause service advertising' : 'Resume service advertising'}>
+              <Text style={[styles.pauseBtnText, !serviceActive && styles.resumeBtnText]}>
+                {serviceActive ? 'Pause advertising' : 'Resume advertising'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteServiceBtn}
+              onPress={handleDeleteService}
+              accessibilityRole="button"
+              accessibilityLabel="Delete service">
+              <Text style={styles.deleteServiceText}>Delete service</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {!!description && (
           <View style={styles.descCard}>
             <Text style={styles.reviewLabel}>Description</Text>
             <Text style={styles.descText}>{description}</Text>
+          </View>
+        )}
+        {draftConfidenceNotes.length > 0 && (
+          <View style={styles.descCard}>
+            <Text style={styles.reviewLabel}>Notes</Text>
+            {draftConfidenceNotes.map(note => (
+              <Text key={note} style={styles.descText}>- {note}</Text>
+            ))}
           </View>
         )}
       </>
@@ -504,6 +987,9 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   const RENDERERS = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6]
+
+  if (creationMode === 'choose') return renderStartChoice()
+  if (creationMode === 'photo') return renderPhotoDraft()
 
   return (
     <View style={styles.screen}>
@@ -524,12 +1010,14 @@ export default function CreateServiceScreen({ navigation, route }) {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
         <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: stepTranslateX }] }]}>
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled">
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive">
             {RENDERERS[step - 1]()}
           </ScrollView>
         </Animated.View>
@@ -565,9 +1053,9 @@ export default function CreateServiceScreen({ navigation, route }) {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.nextBtn, submitting && styles.btnDisabled]}
+                style={[styles.nextBtn, (submitting || !canProceed()) && styles.btnDisabled]}
                 onPress={handlePublish}
-                disabled={submitting}
+                disabled={submitting || !canProceed()}
                 accessibilityRole="button"
                 accessibilityLabel="Publish service">
                 <Text style={styles.nextBtnText}>{submitting ? 'Saving...' : isEditing ? 'Save' : 'Publish'}</Text>
@@ -621,6 +1109,7 @@ const styles = StyleSheet.create({
   chipText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
   chipTextActive: { color: colors.white },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  photoActionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, flex: 1, minWidth: 180 },
   photoThumb: { width: 82, height: 82, borderRadius: 12, position: 'relative' },
   photoImg: { width: 82, height: 82, borderRadius: 12, backgroundColor: colors.border },
   photoRemove: {
@@ -671,6 +1160,39 @@ const styles = StyleSheet.create({
   reviewRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
   reviewLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '700', width: 88, flexShrink: 0 },
   reviewValue: { fontSize: 14, color: colors.textPrimary, flex: 1, fontWeight: '600', textAlign: 'right' },
+  managementCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginTop: 12,
+    gap: 10,
+  },
+  managementTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  managementBody: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
+  pauseBtn: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  resumeBtn: { backgroundColor: colors.primary },
+  pauseBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  resumeBtnText: { color: colors.white },
+  deleteServiceBtn: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.danger,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  deleteServiceText: { fontSize: 14, fontWeight: '700', color: colors.danger },
   descCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16, marginTop: 12 },
   descText: { fontSize: 14, color: colors.textSecondary, lineHeight: 22, marginTop: 8 },
   footer: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
@@ -699,4 +1221,105 @@ const styles = StyleSheet.create({
   pickerDoneText:        { fontSize: 16, fontWeight: '600', color: colors.primary },
   clearDateBtn:          { marginTop: 6, paddingVertical: 4 },
   clearDateText:         { fontSize: 13, color: colors.textMuted, textDecorationLine: 'underline' },
+  startContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28, gap: 12 },
+  startOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    minHeight: 92,
+    gap: 12,
+  },
+  startIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startIcon: { color: colors.primary, fontSize: 24, fontWeight: '700', lineHeight: 28 },
+  startCopy: { flex: 1 },
+  startTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  startBody: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
+  startArrow: { fontSize: 22, color: colors.textMuted, fontWeight: '700' },
+  photoChoice: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    minHeight: 96,
+    justifyContent: 'center',
+  },
+  photoChoiceTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  photoChoiceBody: { fontSize: 14, lineHeight: 21, color: colors.textSecondary },
+  sourcePreview: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: 14,
+    backgroundColor: colors.border,
+  },
+  photoHint: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: 10, marginBottom: 14 },
+  draftProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  draftProgressTitle: { fontSize: 14, fontWeight: '700', color: colors.primaryDark, marginBottom: 2 },
+  draftProgressBody: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
+  warningBox: {
+    backgroundColor: colors.warningLight,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f2d2a2',
+    padding: 14,
+    marginBottom: 12,
+  },
+  warningTitle: { fontSize: 14, fontWeight: '700', color: colors.warning, marginBottom: 6 },
+  warningText: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginBottom: 4 },
+  sourceNote: {
+    backgroundColor: colors.infoLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  sourceNoteTitle: { fontSize: 14, fontWeight: '700', color: colors.info, marginBottom: 4 },
+  sourceNoteText: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  missingCard: {
+    backgroundColor: colors.warningLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  missingTitle: { fontSize: 14, fontWeight: '700', color: colors.warning, marginBottom: 8 },
+  missingItem: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
+  helpBox: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 14,
+  },
+  helpBoxTitle: { fontSize: 14, fontWeight: '700', color: colors.primaryDark, marginBottom: 5 },
+  helpBoxText: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  reviewActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  reviewActionsTop: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  reviewActionBtn: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  reviewActionText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 })

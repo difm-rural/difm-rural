@@ -25,11 +25,19 @@ const SKILLS = [
   'Trucking', 'Shearing', 'Chainsaw', 'Tractor operation', 'Other',
 ]
 
+const ROLE_OPTIONS = [
+  { key: 'requester', emoji: '🏡', label: 'Post jobs',  sub: 'I need jobs done on my property' },
+  { key: 'provider',  emoji: '🔧', label: 'Do jobs',   sub: 'I provide rural services' },
+  { key: 'both',      emoji: '🔄', label: 'Both',       sub: 'I do both' },
+]
+
+// Step meta indexed by step number (0–4)
 const STEP_META = [
-  { title: 'DIFM RURAL',    subtitle: null },
-  { title: 'Your profile',  subtitle: 'How others will see you' },
-  { title: 'Your skills',   subtitle: 'What can you help with?' },
-  { title: 'All set!',      subtitle: 'Your profile is ready' },
+  { title: 'DIFM RURAL',   subtitle: null },                              // 0 role selection
+  { title: 'DIFM RURAL',   subtitle: null },                              // 1 welcome
+  { title: 'Your profile', subtitle: 'How others will see you' },         // 2 details
+  { title: 'Your skills',  subtitle: 'What can you help with?' },         // 3 skills
+  { title: 'All set!',     subtitle: 'Your profile is ready' },           // 4 summary
 ]
 
 function getInitials(name) {
@@ -71,11 +79,18 @@ function ProgressBar({ pct }) {
 export default function OnboardingScreen({ profile: initialProfile, onComplete }) {
   const insets = useSafeAreaInsets()
 
-  const [step, setStep]         = useState(1)
+  // step 0 = role selection, 1 = welcome, 2 = profile, 3 = skills, 4 = summary
+  const [step, setStep]         = useState(0)
   const [saving, setSaving]     = useState(false)
   const [uploading, setUploading] = useState(false)
 
-  // Profile fields — initialised from prop, then overwritten by fresh DB fetch
+  // Role (new: selected in step 0)
+  const [primaryRole, setPrimaryRole] = useState(
+    initialProfile?.primary_role || initialProfile?.role || null
+  )
+
+  // Profile fields
+  const [fullName,    setFullName]    = useState(initialProfile?.full_name    || '')
   const [displayName, setDisplayName] = useState(
     initialProfile?.display_name || initialProfile?.full_name?.trim().split(/\s+/)[0] || ''
   )
@@ -90,11 +105,9 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   const [qualInput,      setQualInput]      = useState('')
   const [showQualInput,  setShowQualInput]  = useState(false)
 
-  // Derived display values from the prop (these don't change during onboarding)
-  const fullName    = initialProfile?.full_name || ''
-  const role        = initialProfile?.primary_role || initialProfile?.role || 'requester'
-  const roleLabel   = role === 'provider' ? 'Provider' : role === 'both' ? 'Both' : 'Requester'
-  const isRequester = role === 'requester'
+  // Derived
+  const roleLabel   = primaryRole === 'provider' ? 'Provider' : primaryRole === 'both' ? 'Both' : 'Requester'
+  const isRequester = primaryRole === 'requester'
   const initials    = getInitials(displayName || fullName)
 
   // ─── Fresh data load ──────────────────────────────────────────────────────────
@@ -112,6 +125,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       .eq('id', user.id)
       .single()
     if (profile) {
+      setPrimaryRole(profile.primary_role || profile.role || null)
+      setFullName(profile.full_name || '')
       setDisplayName(profile.display_name || profile.full_name?.trim().split(/\s+/)[0] || '')
       setPhone(profile.phone || '')
       setAddress(profile.address || '')
@@ -136,6 +151,28 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
     onComplete()
   }
 
+  async function savePrimaryRole() {
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) {
+        Alert.alert('Error', 'Not logged in. Please restart the app.')
+        return
+      }
+      const { error } = await supabase
+        .from('profiles')
+        .update({ primary_role: primaryRole, role: primaryRole })
+        .eq('id', user.id)
+      if (error) {
+        Alert.alert('Error saving', error.message)
+        return
+      }
+      setStep(1)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function saveStep2AndAdvance() {
     setSaving(true)
     try {
@@ -147,6 +184,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       const { error } = await supabase
         .from('profiles')
         .update({
+          full_name:    fullName.trim()    || null,
           display_name: displayName.trim() || null,
           phone:        phone.trim()       || null,
           address:      address            || null,
@@ -240,6 +278,14 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   // ─── Navigation ───────────────────────────────────────────────────────────────
 
   function handleNext() {
+    if (step === 0) {
+      if (!primaryRole) {
+        Alert.alert('Select a role', 'Please choose how you will use the app.')
+        return
+      }
+      savePrimaryRole()
+      return
+    }
     if (step === 1) { setStep(2); return }
     if (step === 2) { saveStep2AndAdvance(); return }
     if (step === 3) { saveStep3AndAdvance(); return }
@@ -247,10 +293,45 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   }
 
   async function handleSkip() {
+    // Role selection (step 0) cannot be skipped
+    if (step === 0) return
     await markComplete()
   }
 
   // ─── Step renderers ───────────────────────────────────────────────────────────
+
+  function renderStep0() {
+    return (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
+        keyboardShouldPersistTaps="handled">
+        {ROLE_OPTIONS.map(r => (
+          <TouchableOpacity
+            key={r.key}
+            style={[styles.roleTile, primaryRole === r.key && styles.roleTileSelected]}
+            onPress={() => setPrimaryRole(r.key)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ selected: primaryRole === r.key }}
+            accessibilityLabel={`${r.label} — ${r.sub}`}>
+            <Text style={styles.roleTileEmoji}>{r.emoji}</Text>
+            <View style={styles.roleTileBody}>
+              <Text style={[styles.roleTileLabel, primaryRole === r.key && styles.roleTileLabelSelected]}>
+                {r.label}
+              </Text>
+              <Text style={[styles.roleTileSub, primaryRole === r.key && styles.roleTileSubSelected]}>
+                {r.sub}
+              </Text>
+            </View>
+            {primaryRole === r.key && (
+              <Text style={styles.roleTileCheck}>✓</Text>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    )
+  }
 
   function renderStep1() {
     return (
@@ -262,7 +343,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         <View style={styles.infoCard}>
           <Text style={styles.infoCardIcon}>👤</Text>
           <View style={styles.infoCardBody}>
-            <Text style={styles.infoCardLabel}>You're registered as</Text>
+            <Text style={styles.infoCardLabel}>You're set up as</Text>
             <View style={styles.roleBadge}>
               <Text style={styles.roleBadgeText}>{roleLabel}</Text>
             </View>
@@ -295,7 +376,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   }
 
   function renderStep2() {
-    const displayUri = avatarUrl
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -317,8 +397,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
               <View style={styles.avatarCircle}>
                 {uploading ? (
                   <ActivityIndicator color={colors.primary} />
-                ) : displayUri ? (
-                  <Image source={{ uri: displayUri }} style={styles.avatarImg} />
+                ) : avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
                 ) : (
                   <Text style={styles.avatarInitials}>{initials}</Text>
                 )}
@@ -328,6 +408,18 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
               </View>
             </TouchableOpacity>
           </View>
+
+          <Text style={styles.fieldLabel}>Full name</Text>
+          <TextInput
+            style={styles.input}
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="First and last name"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="words"
+            returnKeyType="next"
+            accessibilityLabel="Full name"
+          />
 
           <Text style={styles.fieldLabel}>Display name</Text>
           <TextInput
@@ -481,7 +573,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   }
 
   function renderStep4() {
-    const displayUri  = avatarUrl
     const shownSkills = skills.slice(0, 4)
     const extraSkills = skills.length > 4 ? skills.length - 4 : 0
     const nameToShow  = displayName || fullName || 'Welcome!'
@@ -496,8 +587,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         <View style={styles.summaryCard}>
           <View style={styles.summaryAvatarRow}>
             <View style={styles.summaryAvatarCircle}>
-              {displayUri ? (
-                <Image source={{ uri: displayUri }} style={styles.summaryAvatarImg} />
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.summaryAvatarImg} />
               ) : (
                 <Text style={styles.summaryAvatarInitials}>{getInitials(nameToShow)}</Text>
               )}
@@ -559,15 +650,15 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
-  const meta        = STEP_META[step - 1]
-  const isStep1     = step === 1
-  const isLastStep  = step === 4
-  const totalSteps  = isRequester ? 3 : 4
-  const visualStep  = isRequester && step === 4 ? 3 : step
+  const meta       = STEP_META[step] || STEP_META[0]
+  const isLastStep = step === 4
+  // Steps for requester: 0,1,2,4 (skip 3) → 4 total. Provider: 0–4 → 5 total.
+  const totalSteps  = isRequester ? 4 : 5
+  const currentDot  = Math.min(step + 1, totalSteps)
   const progressPct = isRequester
-    ? ({ 1: 33, 2: 66, 4: 100 }[step] ?? 100)
-    : ({ 1: 25, 2: 50, 3: 75, 4: 100 }[step] ?? 100)
-  const btnLabel    = isLastStep ? 'Go to dashboard →' : saving ? 'Saving…' : 'Next →'
+    ? ({ 0: 25, 1: 50, 2: 75, 4: 100 }[step] ?? 100)
+    : ({ 0: 20, 1: 40, 2: 60, 3: 80, 4: 100 }[step] ?? 100)
+  const btnLabel = isLastStep ? 'Go to dashboard →' : saving ? 'Saving…' : 'Next →'
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -575,13 +666,20 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       {/* Green header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          {isStep1
-            ? <Text style={styles.brandLabel}>DIFM RURAL</Text>
-            : <Text style={styles.stepKicker}>{meta.title}</Text>
-          }
-          <StepDots current={visualStep} total={totalSteps} />
+          {step <= 1 ? (
+            <Text style={styles.brandLabel}>DIFM RURAL</Text>
+          ) : (
+            <Text style={styles.stepKicker}>{meta.title}</Text>
+          )}
+          <StepDots current={currentDot} total={totalSteps} />
         </View>
-        {isStep1 ? (
+
+        {step === 0 ? (
+          <>
+            <Text style={styles.headerTitle}>Welcome to DIFM Rural</Text>
+            <Text style={styles.headerSub}>How will you mainly use the app?</Text>
+          </>
+        ) : step === 1 ? (
           <>
             <Text style={styles.headerTitle}>Welcome!</Text>
             <Text style={styles.headerSub}>Let's get your account set up</Text>
@@ -597,6 +695,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
       {/* Step content */}
       <View style={{ flex: 1 }}>
+        {step === 0 && renderStep0()}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
@@ -613,7 +712,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           accessibilityLabel={btnLabel}>
           <Text style={styles.nextBtnText}>{btnLabel}</Text>
         </TouchableOpacity>
-        {!isLastStep && (
+        {/* Skip is not available for step 0 (role required) or last step */}
+        {!isLastStep && step > 0 && (
           <TouchableOpacity
             style={styles.skipBtn}
             onPress={handleSkip}
@@ -677,6 +777,36 @@ const styles = StyleSheet.create({
 
   // ─── Step content ─────────────────────────────────────────────────────────────
   stepContent: { padding: 20 },
+
+  // ─── Role selection tiles (Step 0) ────────────────────────────────────────────
+  roleTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  roleTileSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  roleTileEmoji: { fontSize: 32 },
+  roleTileBody:  { flex: 1 },
+  roleTileLabel: {
+    fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4,
+  },
+  roleTileLabelSelected: { color: colors.primary },
+  roleTileSub: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  roleTileSubSelected: { color: colors.primaryDark },
+  roleTileCheck: { fontSize: 22, color: colors.primary, fontWeight: '700' },
 
   // ─── Info cards (Step 1) ──────────────────────────────────────────────────────
   infoCard: {

@@ -46,7 +46,7 @@ function postedAgo(createdAt) {
   return diffMonths === 1 ? 'Posted 1 month ago' : `Posted ${diffMonths} months ago`
 }
 
-export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle, actionLabel = 'View' }) {
+export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle, actionLabel = 'View', distanceKm = null }) {
   const profile    = job.profiles || {}
   const hasBids    = bidCount > 0 && job.status === 'open'
   const isOpen     = job.status === 'open'
@@ -119,7 +119,9 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
       </View>
 
       {/* Location */}
-      <Text style={styles.location}>📍 {job.location_name}</Text>
+      <Text style={styles.location}>
+        📍 {job.location_name}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
+      </Text>
 
       <Text style={styles.postedDate}>{postedAgo(job.created_at)}</Text>
 

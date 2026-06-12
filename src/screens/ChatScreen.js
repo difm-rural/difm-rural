@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
-import { GOOGLE_MAPS_API_KEY } from '../lib/constants'
+import { staticMapUrl } from '../lib/maps'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
 
 function parseSpecialMessage(content) {
@@ -29,12 +29,16 @@ function parseSpecialMessage(content) {
 }
 
 function staticMapThumbUrl(lat, lng) {
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=14&size=400x200&scale=2&markers=color:red|${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
+  return staticMapUrl(lat, lng, { zoom: 14, width: 400, height: 200 })
 }
 
 export default function ChatScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
-  const { jobId, jobTitle, otherUserId, otherUserName } = route.params
+  const { jobId, bookingId, jobTitle, otherUserId, otherUserName } = route.params
+  const isServiceBookingChat = !!bookingId
+  const chatId = bookingId || jobId
+  const messageTable = isServiceBookingChat ? 'service_booking_messages' : 'messages'
+  const idColumn = isServiceBookingChat ? 'booking_id' : 'job_id'
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
@@ -48,26 +52,35 @@ export default function ChatScreen({ route, navigation }) {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user.id)
 
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select('status')
-        .eq('id', jobId)
-        .single()
-      setJobStatus(jobData?.status || null)
+      if (isServiceBookingChat) {
+        const { data: bookingData } = await supabase
+          .from('bookings')
+          .select('status')
+          .eq('id', bookingId)
+          .single()
+        setJobStatus(bookingData?.status || null)
+      } else {
+        const { data: jobData } = await supabase
+          .from('jobs')
+          .select('status')
+          .eq('id', jobId)
+          .single()
+        setJobStatus(jobData?.status || null)
+      }
 
       const { data } = await supabase
-        .from('messages')
+        .from(messageTable)
         .select('*')
-        .eq('job_id', jobId)
+        .eq(idColumn, chatId)
         .order('created_at', { ascending: true })
 
       setMessages(data || [])
 
       channel = supabase
-        .channel(`chat-job-${jobId}`)
+        .channel(`${messageTable}-${chatId}`)
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages', filter: `job_id=eq.${jobId}` },
+          { event: 'INSERT', schema: 'public', table: messageTable, filter: `${idColumn}=eq.${chatId}` },
           payload => {
             setMessages(prev => {
               if (prev.some(m => m.id === payload.new.id)) return prev
@@ -75,11 +88,20 @@ export default function ChatScreen({ route, navigation }) {
             })
           }
         )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'jobs', filter: `id=eq.${jobId}` },
-          payload => { setJobStatus(payload.new?.status || null) }
-        )
+      if (isServiceBookingChat) {
+        channel.on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `id=eq.${bookingId}` },
+            payload => { setJobStatus(payload.new?.status || null) }
+          )
+      } else {
+        channel.on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'jobs', filter: `id=eq.${jobId}` },
+            payload => { setJobStatus(payload.new?.status || null) }
+          )
+      }
+      channel
         .subscribe()
     }
 
@@ -88,29 +110,29 @@ export default function ChatScreen({ route, navigation }) {
     return () => {
       if (channel) supabase.removeChannel(channel)
     }
-  }, [jobId])
+  }, [chatId, isServiceBookingChat])
 
   async function sendMessage() {
     const content = text.trim()
     if (!content) return
 
-    const { data: latestJob } = await supabase
-      .from('jobs')
+    const { data: latestRecord } = await supabase
+      .from(isServiceBookingChat ? 'bookings' : 'jobs')
       .select('status')
-      .eq('id', jobId)
+      .eq('id', chatId)
       .single()
 
-    if (latestJob?.status === 'completed') {
+    if (latestRecord?.status === 'completed') {
       setJobStatus('completed')
-      Alert.alert('Chat closed', 'This job has been marked complete, so chat is now read-only.')
+      Alert.alert('Chat closed', 'This work has been marked complete, so chat is now read-only.')
       return
     }
 
     setText('')
 
     const { data, error } = await supabase
-      .from('messages')
-      .insert({ job_id: jobId, sender_id: currentUserId, receiver_id: otherUserId, content })
+      .from(messageTable)
+      .insert({ [idColumn]: chatId, sender_id: currentUserId, receiver_id: otherUserId, content })
       .select()
       .single()
 
@@ -143,8 +165,8 @@ export default function ChatScreen({ route, navigation }) {
       text: '📍 Shared location',
     })
     await supabase
-      .from('messages')
-      .insert({ job_id: jobId, sender_id: currentUserId, receiver_id: otherUserId, content })
+      .from(messageTable)
+      .insert({ [idColumn]: chatId, sender_id: currentUserId, receiver_id: otherUserId, content })
   }
 
   async function sendProgressPhoto() {
@@ -158,7 +180,7 @@ export default function ChatScreen({ route, navigation }) {
 
     const coords  = await getCurrentLocation()
     const uri     = result.assets[0].uri
-    const path    = `${jobId}/progress_${Date.now()}.jpg`
+    const path    = `${chatId}/progress_${Date.now()}.jpg`
 
     let photoUrl = ''
     try {
@@ -177,7 +199,7 @@ export default function ChatScreen({ route, navigation }) {
       caption = `📍 Taken at ${addr}`
 
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      if (user && !isServiceBookingChat) {
         await supabase.from('job_checkins').insert({
           job_id:       jobId,
           user_id:      user.id,
@@ -191,8 +213,8 @@ export default function ChatScreen({ route, navigation }) {
 
     const content = JSON.stringify({ type: 'photo', url: photoUrl || uri, caption })
     await supabase
-      .from('messages')
-      .insert({ job_id: jobId, sender_id: currentUserId, receiver_id: otherUserId, content })
+      .from(messageTable)
+      .insert({ [idColumn]: chatId, sender_id: currentUserId, receiver_id: otherUserId, content })
   }
 
   function renderMessage({ item }) {
@@ -306,11 +328,11 @@ export default function ChatScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={[styles.empty, { transform: [{ scaleY: -1 }] }]}>
+            <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No messages yet</Text>
               <Text style={styles.emptyBody}>
                 {isChatClosed
-                  ? 'No messages were sent before this job was completed.'
+                  ? 'No messages were sent before this work was completed.'
                   : 'Send a message to get started'}
               </Text>
             </View>
@@ -322,7 +344,7 @@ export default function ChatScreen({ route, navigation }) {
           <View style={[styles.closedBox, { paddingBottom: insets.bottom + 12 }]}>
             <Text style={styles.closedTitle}>Chat closed</Text>
             <Text style={styles.closedText}>
-              This job has been marked complete. Messages are now read-only.
+              This work has been marked complete. Messages are now read-only.
             </Text>
           </View>
         ) : (

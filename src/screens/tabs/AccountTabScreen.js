@@ -20,6 +20,15 @@ import { useUser } from '../../context/UserContext'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
+import {
+  authenticate,
+  clearSession,
+  clearSessionTokens,
+  getBiometricType,
+  isBiometricAvailable,
+  isBiometricEnabled,
+  saveSession,
+} from '../../lib/biometrics'
 
 const ALL_SKILLS = [
   'Fencing', 'General labour', 'Machinery operation', 'Animal care',
@@ -83,7 +92,9 @@ export default function AccountTabScreen({ navigation }) {
   const [showQualInput, setShowQualInput]   = useState(false)
   const [qualInput, setQualInput]           = useState('')
   const [savingSkills, setSavingSkills]     = useState(false)
-  const [ratingSummary, setRatingSummary]   = useState({ average: 0, count: 0 })
+  const [ratingSummary, setRatingSummary]       = useState({ average: 0, count: 0 })
+  const [biometricEnabled,   setBiometricEnabled]   = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
   const [editModal, setEditModal]           = useState({
     visible: false, field: '', label: '', value: '', keyboardType: 'default',
@@ -123,7 +134,49 @@ export default function AccountTabScreen({ navigation }) {
       setRatingSummary({ average: 0, count: 0 })
     }
 
+    const [available, enabled] = await Promise.all([isBiometricAvailable(), isBiometricEnabled()])
+    setBiometricAvailable(available)
+    setBiometricEnabled(enabled)
+
     setLoading(false)
+  }
+
+  // ─── Biometric toggle ──────────────────────────────────────────────────────
+
+  async function handleBiometricToggle() {
+    if (biometricEnabled) {
+      Alert.alert(
+        'Disable biometric login?',
+        'You will need to use your email code to sign in next time.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Disable',
+            style: 'destructive',
+            onPress: async () => {
+              await clearSession()
+              setBiometricEnabled(false)
+            },
+          },
+        ]
+      )
+    } else {
+      const success = await authenticate()
+      if (!success) return
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        Alert.alert('Error', 'No active session found. Please sign out and back in.')
+        return
+      }
+
+      await saveSession(session.access_token, session.refresh_token)
+      setBiometricEnabled(true)
+
+      const type  = await getBiometricType()
+      const label = type === 'face' ? 'Face ID' : 'fingerprint'
+      Alert.alert('Enabled', `${label} login is now active.`)
+    }
   }
 
   // ─── Edit field modal ──────────────────────────────────────────────────────
@@ -259,7 +312,15 @@ export default function AccountTabScreen({ navigation }) {
   function handleSignOut() {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => supabase.auth.signOut() },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          // Keep the enabled flag so biometric is re-activated after next OTP login
+          await clearSessionTokens()
+          supabase.auth.signOut()
+        },
+      },
     ])
   }
 
@@ -488,9 +549,19 @@ export default function AccountTabScreen({ navigation }) {
               onPress={() => Alert.alert('Notifications', 'Notification preferences coming soon.')}
             />
             <MenuRow
-              icon="🔄" label="Dashboard mode" value={roleLabel} last
+              icon="🔄" label="Dashboard mode" value={roleLabel}
+              last={!biometricAvailable}
               onPress={handleRoleChange}
             />
+            {biometricAvailable && (
+              <MenuRow
+                icon="🔐"
+                label="Biometric login"
+                value={biometricEnabled ? 'Enabled' : 'Disabled'}
+                last
+                onPress={handleBiometricToggle}
+              />
+            )}
           </View>
 
           {/* Support */}

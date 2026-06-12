@@ -17,10 +17,13 @@ begin
     add constraint bookings_status_check
     check (status in (
       'pending',
+      'quote_sent',
       'confirmed',
       'in_progress',
       'awaiting_completion',
+      'cancellation_requested',
       'completed',
+      'withdrawn',
       'cancelled',
       'declined'
     ));

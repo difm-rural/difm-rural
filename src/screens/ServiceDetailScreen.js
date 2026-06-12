@@ -21,6 +21,7 @@ function getInitials(name) {
 
 function formatPricingType(type) {
   switch (type) {
+    case 'quote_required': return 'Quote required'
     case 'hourly':   return 'Hourly rate'
     case 'per_unit': return 'Per unit'
     case 'fixed':    return 'Fixed price'
@@ -54,10 +55,13 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const [profile, setProfile] = useState(initialService.profile || null)
   const [quantity, setQuantity] = useState(initialService.minimum_units || 1)
   const [isBooked, setIsBooked] = useState(false)
+  const [activeBooking, setActiveBooking] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState(null)
 
   const rate = asNumber(service.rate)
   const isEstimatable = ['hourly', 'per_unit', 'day_rate'].includes(service.pricing_type)
-  const total = isEstimatable ? formatCurrency(quantity * rate) : formatCurrency(rate)
+  const isQuoteRequired = service.pricing_type === 'quote_required'
+  const total = isQuoteRequired ? null : isEstimatable ? formatCurrency(quantity * rate) : formatCurrency(rate)
 
   useEffect(() => {
     fetchService()
@@ -77,15 +81,64 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
   async function fetchBookingStatus() {
     const { data: { user } } = await supabase.auth.getUser()
+    setCurrentUserId(user?.id || null)
     if (!user) return
+    if (user.id === service.provider_id) {
+      setActiveBooking(null)
+      setIsBooked(false)
+      return
+    }
     const { data } = await supabase
       .from('bookings')
-      .select('id')
+      .select('id, status, provider_id, requester_id, service_id')
       .eq('service_id', service.id)
       .eq('requester_id', user.id)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion'])
+      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'])
+      .order('created_at', { ascending: false })
       .limit(1)
-    setIsBooked((data || []).length > 0)
+    const booking = data?.[0] || null
+    setActiveBooking(booking)
+    setIsBooked(!!booking)
+  }
+
+  function handleCancelBooking() {
+    if (!activeBooking) return
+    const isPendingBooking = activeBooking.status === 'pending'
+    const message = isPendingBooking
+      ? 'Withdraw this service request before the provider accepts it? The provider will be notified.'
+      : 'Request cancellation? The provider will be asked to confirm.'
+
+    Alert.alert(isPendingBooking ? 'Withdraw request' : 'Request cancellation', message, [
+      { text: 'No', style: 'cancel' },
+      {
+        text: isPendingBooking ? 'Withdraw request' : 'Request cancellation',
+        style: 'destructive',
+        onPress: async () => {
+          const nextStatus = isPendingBooking ? 'withdrawn' : 'cancellation_requested'
+          const { error } = await supabase
+            .from('bookings')
+            .update({ status: nextStatus })
+            .eq('id', activeBooking.id)
+            .eq('requester_id', activeBooking.requester_id)
+            .eq('status', activeBooking.status)
+
+          if (error) {
+            Alert.alert(isPendingBooking ? 'Could not withdraw request' : 'Could not request cancellation', error.message)
+            return
+          }
+
+          if (isPendingBooking) {
+            // The provider is notified by a database trigger.
+            setActiveBooking(null)
+            setIsBooked(false)
+            Alert.alert('Request withdrawn', 'The provider has been notified.')
+          } else {
+            setActiveBooking(prev => prev ? { ...prev, status: 'cancellation_requested' } : prev)
+            Alert.alert('Cancellation requested', 'The provider will be asked to confirm the cancellation.')
+          }
+        },
+      },
+    ])
   }
 
   async function fetchProfile() {
@@ -106,6 +159,19 @@ export default function ServiceDetailScreen({ route, navigation }) {
     ? service.availability.join(', ')
     : 'Flexible'
   const photos = Array.isArray(service.photos) ? service.photos : []
+  const isOwnService = !!currentUserId && currentUserId === service.provider_id
+
+  function openEditService() {
+    const routeNames = navigation.getState()?.routeNames || []
+    if (routeNames.includes('CreateService')) {
+      navigation.navigate('CreateService', { service })
+      return
+    }
+    navigation.getParent()?.navigate('Account', {
+      screen: 'CreateService',
+      params: { service },
+    })
+  }
 
   return (
     <View style={styles.screen}>
@@ -175,7 +241,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
           <DetailRow label="Pricing type" value={formatPricingType(service.pricing_type)} />
           <DetailRow
               label="Rate"
-              value={service.pricing_type === 'hourly'
+              value={service.pricing_type === 'quote_required'
+              ? 'Quote required'
+              : service.pricing_type === 'hourly'
               ? `$${rate}/hr`
               : service.pricing_type === 'day_rate'
               ? `$${rate}/day`
@@ -212,7 +280,11 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {isBooked && (
           <View style={styles.bookedInfoBox}>
             <Text style={styles.bookedInfoIcon}>✓</Text>
-            <Text style={styles.bookedInfoText}>You have an active booking for this service.</Text>
+            <Text style={styles.bookedInfoText}>
+              {activeBooking?.status === 'cancellation_requested'
+                ? 'Cancellation requested. Waiting for provider confirmation.'
+                : 'You have an active booking for this service.'}
+            </Text>
           </View>
         )}
 
@@ -251,16 +323,29 @@ export default function ServiceDetailScreen({ route, navigation }) {
       {/* Book button */}
       <View style={[styles.bookFooter, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
-          style={isBooked ? styles.viewBookingBtn : styles.bookBtn}
-          onPress={isBooked
+          style={isOwnService ? styles.bookBtn : isBooked ? styles.viewBookingBtn : styles.bookBtn}
+          onPress={isOwnService
+            ? openEditService
+            : isBooked
             ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
             : () => navigation.navigate('BookingConfirm', { service, quantity })}
           accessibilityRole="button"
-          accessibilityLabel={isBooked ? 'View your booking' : 'Book this service'}>
-          <Text style={isBooked ? styles.viewBookingBtnText : styles.bookBtnText}>
-            {isBooked ? 'View booking →' : `Book now · $${total} NZD`}
+          accessibilityLabel={isOwnService ? 'Edit service' : isBooked ? 'View your booking' : 'Book this service'}>
+          <Text style={isOwnService ? styles.bookBtnText : isBooked ? styles.viewBookingBtnText : styles.bookBtnText}>
+            {isOwnService ? 'Edit service' : isBooked ? 'View booking ->' : isQuoteRequired ? 'Request quote' : `Book now - $${total} NZD`}
           </Text>
         </TouchableOpacity>
+        {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
+          <TouchableOpacity
+            style={styles.cancelBookingBtn}
+            onPress={handleCancelBooking}
+            accessibilityRole="button"
+            accessibilityLabel={activeBooking?.status === 'pending' ? 'Withdraw service request' : 'Request cancellation'}>
+            <Text style={styles.cancelBookingBtnText}>
+              {activeBooking?.status === 'pending' ? 'Withdraw request' : 'Request cancellation'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   )
@@ -413,6 +498,15 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   viewBookingBtnText: { color: colors.primary, fontSize: 16, fontWeight: 'bold' },
+  cancelBookingBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  cancelBookingBtnText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
 
   bookFooter: {
     backgroundColor: colors.white,

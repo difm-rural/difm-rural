@@ -8,12 +8,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { updateLastSeen } from '../lib/preferences'
+import { clearSessionTokens, isBiometricEnabled, saveSession } from '../lib/biometrics'
 
 // ─── Tab screens ──────────────────────────────────────────────────────────────
 import HomeTabScreen     from '../screens/tabs/HomeTabScreen'
+import JobsTabScreen     from '../screens/tabs/JobsTabScreen'
 import BrowseTabScreen   from '../screens/tabs/BrowseTabScreen'
 import ActivityTabScreen from '../screens/tabs/ActivityTabScreen'
 import AccountTabScreen  from '../screens/tabs/AccountTabScreen'
+import NotificationsScreen from '../screens/NotificationsScreen'
+import { onBadgeRefresh } from '../lib/badgeEvents'
 
 // ─── Post job wizard screens ──────────────────────────────────────────────────
 import PostJobStep1JobType  from '../screens/postjob/PostJobStep1JobType'
@@ -29,6 +33,7 @@ import ManageTaskScreen     from '../screens/ManageTaskScreen'
 import JobDetailScreen      from '../screens/JobDetailScreen'
 import ChatScreen           from '../screens/ChatScreen'
 import ServiceDetailScreen  from '../screens/ServiceDetailScreen'
+import ServiceBookingDetailScreen from '../screens/ServiceBookingDetailScreen'
 import BookingConfirmScreen from '../screens/BookingConfirmScreen'
 import CreateServiceScreen  from '../screens/CreateServiceScreen'
 import MyServicesScreen     from '../screens/MyServicesScreen'
@@ -48,8 +53,6 @@ import JobMapScreen         from '../components/JobMapScreen'
 // ─── Guest / unauthenticated screens ─────────────────────────────────────────
 import LandingScreen          from '../screens/LandingScreen'
 import LoginScreen            from '../screens/LoginScreen'
-import RegisterScreen         from '../screens/RegisterScreen'
-import ForgotPasswordScreen   from '../screens/ForgotPasswordScreen'
 import GuestJobFeedScreen     from '../screens/GuestJobFeedScreen'
 import GuestJobDetailScreen   from '../screens/GuestJobDetailScreen'
 
@@ -57,6 +60,7 @@ const GuestStack     = createNativeStackNavigator()
 const OnboardingNav  = createNativeStackNavigator()
 const Tab            = createBottomTabNavigator()
 const HomeNav        = createNativeStackNavigator()
+const JobsNav        = createNativeStackNavigator()
 const BrowseNav      = createNativeStackNavigator()
 const ActivityNav    = createNativeStackNavigator()
 const AccountNav     = createNativeStackNavigator()
@@ -78,6 +82,7 @@ function HomeStackNav() {
       <HomeNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <HomeNav.Screen name="Chat"          component={ChatScreen}          />
       <HomeNav.Screen name="ServiceDetail"       component={ServiceDetailScreen}      />
+      <HomeNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <HomeNav.Screen name="BookingConfirm"      component={BookingConfirmScreen}     />
       <HomeNav.Screen name="RequesterProfile"    component={RequesterProfileScreen}   />
       <HomeNav.Screen name="ProviderProfile"     component={ProviderProfileScreen}    />
@@ -85,7 +90,32 @@ function HomeStackNav() {
       <HomeNav.Screen name="LocationPicker"      component={LocationPickerScreen}     />
       <HomeNav.Screen name="AreaTracer"          component={AreaTracerScreen}         />
       <HomeNav.Screen name="JobMap"              component={JobMapScreen}             />
+      <HomeNav.Screen name="Notifications"       component={NotificationsScreen}      />
     </HomeNav.Navigator>
+  )
+}
+
+function JobsStackNav() {
+  return (
+    <JobsNav.Navigator screenOptions={STACK_OPTS}>
+      <JobsNav.Screen name="JobsBoard"            component={JobsTabScreen}        />
+      <JobsNav.Screen name="PostJob"              component={PostJobStep1JobType}  />
+      <JobsNav.Screen name="PostJobStep2Location" component={PostJobStep2Location} />
+      <JobsNav.Screen name="PostJobStep3Details"  component={PostJobStep3Details}  />
+      <JobsNav.Screen name="PostJobStep4Budget"   component={PostJobStep4Budget}   />
+      <JobsNav.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
+      <JobsNav.Screen name="JobDetail"            component={JobDetailScreen}      />
+      <JobsNav.Screen name="ManageTask"           component={ManageTaskScreen}     />
+      <JobsNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
+      <JobsNav.Screen name="Chat"                 component={ChatScreen}           />
+      <JobsNav.Screen name="RequesterProfile"     component={RequesterProfileScreen} />
+      <JobsNav.Screen name="ProviderProfile"      component={ProviderProfileScreen}  />
+      <JobsNav.Screen name="ReviewsList"          component={ReviewsListScreen}      />
+      <JobsNav.Screen name="LocationPicker"       component={LocationPickerScreen}   />
+      <JobsNav.Screen name="AreaTracer"           component={AreaTracerScreen}       />
+      <JobsNav.Screen name="JobMap"               component={JobMapScreen}           />
+      <JobsNav.Screen name="Notifications"        component={NotificationsScreen}    />
+    </JobsNav.Navigator>
   )
 }
 
@@ -96,8 +126,11 @@ function BrowseStackNav() {
       <BrowseNav.Screen name="JobFeed"      component={JobFeedScreen}       />
       <BrowseNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <BrowseNav.Screen name="ServiceDetail" component={ServiceDetailScreen} />
+      <BrowseNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <BrowseNav.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+      <BrowseNav.Screen name="MyServices"      component={MyServicesScreen}       />
       <BrowseNav.Screen name="CreateService"   component={CreateServiceScreen}    />
+      <BrowseNav.Screen name="LocationPicker"  component={LocationPickerScreen}   />
       <BrowseNav.Screen name="Chat"            component={ChatScreen}             />
       <BrowseNav.Screen name="RequesterProfile" component={RequesterProfileScreen} />
       <BrowseNav.Screen name="ProviderProfile"  component={ProviderProfileScreen}  />
@@ -116,11 +149,14 @@ function ActivityStackNav() {
       <ActivityNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <ActivityNav.Screen name="Chat"          component={ChatScreen}          />
       <ActivityNav.Screen name="ServiceDetail"      component={ServiceDetailScreen}    />
+      <ActivityNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <ActivityNav.Screen name="BookingConfirm"     component={BookingConfirmScreen}   />
+      <ActivityNav.Screen name="LocationPicker"     component={LocationPickerScreen}   />
       <ActivityNav.Screen name="RequesterProfile"   component={RequesterProfileScreen} />
       <ActivityNav.Screen name="ProviderProfile"    component={ProviderProfileScreen}  />
       <ActivityNav.Screen name="ReviewsList"        component={ReviewsListScreen}      />
       <ActivityNav.Screen name="JobMap"             component={JobMapScreen}           />
+      <ActivityNav.Screen name="Notifications"      component={NotificationsScreen}   />
     </ActivityNav.Navigator>
   )
 }
@@ -133,6 +169,9 @@ function AccountStackNav() {
       <AccountNav.Screen name="CreateService" component={CreateServiceScreen} />
       <AccountNav.Screen name="Profile"       component={ProfileScreen}      />
       <AccountNav.Screen name="ServiceDetail"  component={ServiceDetailScreen}  />
+      <AccountNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
+      <AccountNav.Screen name="BookingConfirm" component={BookingConfirmScreen} />
+      <AccountNav.Screen name="LocationPicker" component={LocationPickerScreen} />
       <AccountNav.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       <AccountNav.Screen name="ReviewsList"     component={ReviewsListScreen}     />
     </AccountNav.Navigator>
@@ -142,6 +181,7 @@ function AccountStackNav() {
 // ─── Custom tab bar ───────────────────────────────────────────────────────────
 const TAB_DEFS = [
   { name: 'Home',     label: 'Home'     },
+  { name: 'Jobs',     label: 'Jobs'     },
   { name: 'Browse',   label: 'Services' },
   { name: 'Activity', label: 'Activity' },
   { name: 'Account',  label: 'Account'  },
@@ -152,6 +192,7 @@ function TabIcon({ name, active, avatarUrl }) {
   const c = active ? colors.primary : inactive
   switch (name) {
     case 'Home':     return <Text style={{ fontSize: 22, color: c, lineHeight: 26 }}>⌂</Text>
+    case 'Jobs':     return <Text style={{ fontSize: 20, color: c, lineHeight: 26 }}>⚒</Text>
     case 'Browse':   return <Text style={{ fontSize: 20, color: c, lineHeight: 26 }}>⚙</Text>
     case 'Activity': return <Text style={{ fontSize: 20, color: c, lineHeight: 26 }}>≡</Text>
     case 'Account':
@@ -170,14 +211,15 @@ function TabIcon({ name, active, avatarUrl }) {
   }
 }
 
-function CustomTabBar({ state, navigation, activityBadge, browseBadge, clearBrowseBadge }) {
+function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBadge, clearJobsBadge, clearServicesBadge }) {
   const insets = useSafeAreaInsets()
   const { avatarUrl } = useUser()
 
-  // Hide tab bar when a nested stack screen is shown (e.g. PostJob, ManageTask, etc.)
+  // Hide tab bar on pushed workflows, but keep it visible on job management.
   const activeRoute = state.routes[state.index]
   const nestedStackIndex = activeRoute?.state?.index ?? 0
-  if (nestedStackIndex > 0) return null
+  const nestedRouteName = activeRoute?.state?.routes?.[nestedStackIndex]?.name
+  if (nestedStackIndex > 0 && nestedRouteName !== 'ManageTask') return null
 
   return (
     <View style={[tabStyles.bar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
@@ -185,14 +227,16 @@ function CustomTabBar({ state, navigation, activityBadge, browseBadge, clearBrow
         const tab      = TAB_DEFS[index]
         const isFocused = state.index === index
         const badge = route.name === 'Activity' ? activityBadge
-          : route.name === 'Browse' ? browseBadge : 0
+          : route.name === 'Jobs' ? jobsBadge
+          : route.name === 'Browse' ? servicesBadge : 0
 
         return (
           <TouchableOpacity
             key={route.key}
             style={tabStyles.tab}
             onPress={() => {
-              if (route.name === 'Browse') clearBrowseBadge?.()
+              if (route.name === 'Jobs') clearJobsBadge?.()
+              if (route.name === 'Browse') clearServicesBadge?.()
               if (!isFocused) navigation.navigate(route.name)
             }}
             activeOpacity={0.7}
@@ -253,14 +297,22 @@ const tabStyles = StyleSheet.create({
 })
 
 // ─── Authenticated tab navigator ──────────────────────────────────────────────
-function AuthenticatedApp({ activityBadge, browseBadge, clearBrowseBadge }) {
+function AuthenticatedApp({ activityBadge, jobsBadge, servicesBadge, clearJobsBadge, clearServicesBadge }) {
   return (
     <Tab.Navigator
       tabBar={(props) => (
-        <CustomTabBar {...props} activityBadge={activityBadge} browseBadge={browseBadge} clearBrowseBadge={clearBrowseBadge} />
+        <CustomTabBar
+          {...props}
+          activityBadge={activityBadge}
+          jobsBadge={jobsBadge}
+          servicesBadge={servicesBadge}
+          clearJobsBadge={clearJobsBadge}
+          clearServicesBadge={clearServicesBadge}
+        />
       )}
       screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Home"     component={HomeStackNav}     />
+      <Tab.Screen name="Jobs"     component={JobsStackNav}     />
       <Tab.Screen name="Browse"   component={BrowseStackNav}   />
       <Tab.Screen name="Activity" component={ActivityStackNav} />
       <Tab.Screen name="Account"  component={AccountStackNav}  />
@@ -285,8 +337,6 @@ function GuestApp() {
     <GuestStack.Navigator screenOptions={STACK_OPTS}>
       <GuestStack.Screen name="Landing"         component={LandingScreen}        />
       <GuestStack.Screen name="Login"           component={LoginScreen}          />
-      <GuestStack.Screen name="Register"        component={RegisterScreen}       />
-      <GuestStack.Screen name="ForgotPassword"  component={ForgotPasswordScreen} />
       <GuestStack.Screen name="GuestJobFeed"    component={GuestJobFeedScreen}   />
       <GuestStack.Screen name="GuestJobDetail"  component={GuestJobDetailScreen} />
       <GuestStack.Screen name="GuestPostJob"          component={PostJobStep1JobType}  />
@@ -310,7 +360,8 @@ export default function AppNavigator() {
   const [loading,          setLoading]          = useState(true)
   const [showOnboarding,   setShowOnboarding]   = useState(false)
   const [activityBadge,    setActivityBadge]    = useState(0)
-  const [browseBadge,      setBrowseBadge]      = useState(0)
+  const [jobsBadge,        setJobsBadge]        = useState(0)
+  const [servicesBadge,    setServicesBadge]    = useState(0)
 
   const sessionRef = useRef(null)
   const profileRef = useRef(null)
@@ -324,7 +375,19 @@ export default function AppNavigator() {
       else setLoading(false)
     })
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      // Keep stored biometric tokens current whenever Supabase refreshes them
+      if (event === 'TOKEN_REFRESHED' && session) {
+        const enabled = await isBiometricEnabled()
+        if (enabled) await saveSession(session.access_token, session.refresh_token)
+      }
+
+      // Clear only tokens on sign-out — keep the enabled flag so the next
+      // OTP login silently refreshes them and biometric works on cold start.
+      if (event === 'SIGNED_OUT') {
+        await clearSessionTokens()
+      }
+
       setSession(session)
       if (session) {
         await postPendingJobIfAny(session.user.id)
@@ -333,7 +396,8 @@ export default function AppNavigator() {
       } else {
         setProfile(null)
         setActivityBadge(0)
-        setBrowseBadge(0)
+        setJobsBadge(0)
+        setServicesBadge(0)
         setLoading(false)
       }
     })
@@ -343,7 +407,16 @@ export default function AppNavigator() {
         fetchBadgeCounts(sessionRef.current.user.id, profileRef.current)
       }
     })
-    return () => appStateSub.remove()
+    // Screens (e.g. the notifications inbox after mark-read) can ask for a refresh
+    const unsubscribeBadges = onBadgeRefresh(() => {
+      if (sessionRef.current?.user?.id) {
+        fetchBadgeCounts(sessionRef.current.user.id, profileRef.current)
+      }
+    })
+    return () => {
+      appStateSub.remove()
+      unsubscribeBadges()
+    }
   }, [])
 
   async function postPendingJobIfAny(userId) {
@@ -436,7 +509,7 @@ export default function AppNavigator() {
 
       setActivityBadge(activityCount)
 
-      // Browse badge: jobs + services posted in the last 24 hours by others
+      // Tab badges: jobs and services posted in the last 24 hours by others
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const [{ count: newJobs }, { count: newServices }] = await Promise.all([
         supabase.from('jobs').select('id', { count: 'exact', head: true })
@@ -444,7 +517,8 @@ export default function AppNavigator() {
         supabase.from('services').select('id', { count: 'exact', head: true })
           .eq('is_active', true).gte('created_at', yesterday).neq('provider_id', userId),
       ])
-      setBrowseBadge((newJobs || 0) + (newServices || 0))
+      setJobsBadge(newJobs || 0)
+      setServicesBadge(newServices || 0)
     } catch (error) {
       console.log('Error fetching badge counts:', error)
     }
@@ -464,7 +538,13 @@ export default function AppNavigator() {
         {session && showOnboarding
           ? <OnboardingApp profile={profile} onComplete={handleOnboardingComplete} />
           : session
-            ? <AuthenticatedApp activityBadge={activityBadge} browseBadge={browseBadge} clearBrowseBadge={() => setBrowseBadge(0)} />
+            ? <AuthenticatedApp
+                activityBadge={activityBadge}
+                jobsBadge={jobsBadge}
+                servicesBadge={servicesBadge}
+                clearJobsBadge={() => setJobsBadge(0)}
+                clearServicesBadge={() => setServicesBadge(0)}
+              />
             : <GuestApp />
         }
       </NavigationContainer>

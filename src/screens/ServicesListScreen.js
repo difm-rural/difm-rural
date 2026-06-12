@@ -29,6 +29,7 @@ function getInitials(name) {
 function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
   switch (pricing_type) {
+    case 'quote_required': return 'Quote required'
     case 'hourly':   return `$${rate}/hr`
     case 'day_rate': return `$${rate}/day`
     case 'per_unit': return `$${rate}/${unit_label || 'unit'}`

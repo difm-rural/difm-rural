@@ -42,6 +42,10 @@ function providerCompletionSeenKey(userId) {
   return `difm:provider-completed-review-seen:${userId}`
 }
 
+function bookingNeedsQuote(booking) {
+  return (booking?.service || booking?.services)?.pricing_type === 'quote_required'
+}
+
 // ─── Requester booking card ───────────────────────────────────────────────────
 
 function RequesterBookingCard({ booking, navigation, onRefresh }) {
@@ -50,11 +54,16 @@ function RequesterBookingCard({ booking, navigation, onRefresh }) {
 
   const statusLabel = {
     pending:     'Pending confirmation',
+    quote_sent:  'Quote sent',
     confirmed:   'Confirmed',
     in_progress: 'In progress',
     awaiting_completion: 'Ready to confirm',
+    cancellation_requested: 'Cancellation requested',
     completed:   'Completed',
+    withdrawn:   'Withdrawn',
+    cancelled:   'Cancelled',
   }[booking.status] || booking.status
+  const canRequesterCancel = ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion'].includes(booking.status)
 
   const unitLabel = service.pricing_type === 'hourly' ? 'hr'
     : service.pricing_type === 'day_rate' ? 'day'
@@ -81,6 +90,51 @@ function RequesterBookingCard({ booking, navigation, onRefresh }) {
     )
   }
 
+  function handleCancelRequest() {
+    const isPendingBooking = ['pending', 'quote_sent'].includes(booking.status)
+    const message = isPendingBooking
+      ? 'Withdraw this service request before the provider accepts it? The provider will be notified.'
+      : 'Request cancellation? The provider will be asked to confirm.'
+
+    Alert.alert(isPendingBooking ? 'Withdraw request' : 'Request cancellation', message, [
+      { text: 'No', style: 'cancel' },
+      {
+        text: isPendingBooking ? 'Withdraw request' : 'Request cancellation',
+        style: 'destructive',
+        onPress: async () => {
+          const nextStatus = isPendingBooking ? 'withdrawn' : 'cancellation_requested'
+          const { error } = await supabase
+            .from('bookings')
+            .update({ status: nextStatus })
+            .eq('id', booking.id)
+            .eq('requester_id', booking.requester_id)
+            .eq('status', booking.status)
+
+          if (error) {
+            Alert.alert(isPendingBooking ? 'Could not withdraw request' : 'Could not request cancellation', error.message)
+            return
+          }
+
+          if (isPendingBooking) {
+            try {
+              await supabase.from('notifications').insert({
+                user_id: booking.provider_id,
+                type: 'service_booking_withdrawn',
+                body: `A service request for "${service.title || 'your service'}" has been withdrawn.`,
+                metadata: {
+                  booking_id: booking.id,
+                  service_id: booking.service_id,
+                  requester_id: booking.requester_id,
+                },
+              })
+            } catch {}
+          }
+          onRefresh?.()
+        },
+      },
+    ])
+  }
+
   return (
     <View style={styles.bookingCard}>
       <View style={styles.bookingCardHeader}>
@@ -95,6 +149,7 @@ function RequesterBookingCard({ booking, navigation, onRefresh }) {
       <View style={styles.bookingMetaRow}>
         {provider.full_name ? <Text style={styles.bookingMeta}>👤 {provider.full_name}</Text> : null}
         {service.location_name ? <Text style={styles.bookingMeta}>📍 {service.location_name}</Text> : null}
+        {booking.location_note ? <Text style={styles.bookingMeta}>Pin note: {booking.location_note}</Text> : null}
       </View>
 
       <View style={styles.bookingMetaRow}>
@@ -128,9 +183,7 @@ function RequesterBookingCard({ booking, navigation, onRefresh }) {
         <View style={styles.pBtnRow}>
           <TouchableOpacity
             style={styles.pBtnSecondary}
-            onPress={() => navigation.navigate('ServiceDetail', {
-              service: { ...service, profile: provider },
-            })}
+            onPress={() => navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'requester' })}
             accessibilityRole="button"
             accessibilityLabel="View booking details">
             <Text style={styles.pBtnSecondaryText}>View booking →</Text>
@@ -147,14 +200,24 @@ function RequesterBookingCard({ booking, navigation, onRefresh }) {
         <View style={styles.pBtnRow}>
           <TouchableOpacity
             style={styles.pBtnPrimary}
-            onPress={() => navigation.navigate('ServiceDetail', {
-              service: { ...service, profile: provider },
-            })}
+            onPress={() => navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'requester' })}
             accessibilityRole="button"
             accessibilityLabel="View booking details">
             <Text style={styles.pBtnPrimaryText}>View booking →</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {canRequesterCancel && (
+        <TouchableOpacity
+          style={[styles.pBtnSecondary, { marginTop: 8 }]}
+          onPress={handleCancelRequest}
+          accessibilityRole="button"
+          accessibilityLabel={['pending', 'quote_sent'].includes(booking.status) ? 'Withdraw service request' : 'Request booking cancellation'}>
+          <Text style={styles.pBtnSecondaryText}>
+            {['pending', 'quote_sent'].includes(booking.status) ? 'Withdraw request' : 'Request cancellation'}
+          </Text>
+        </TouchableOpacity>
       )}
     </View>
   )
@@ -162,9 +225,10 @@ function RequesterBookingCard({ booking, navigation, onRefresh }) {
 
 // ─── Provider booking card (pending — confirm/decline) ────────────────────────
 
-function ProviderPendingBookingCard({ booking, onConfirm, onDecline }) {
+function ProviderPendingBookingCard({ booking, navigation, onConfirm, onDecline }) {
   const service = booking.service || {}
   const requester = booking.requester || {}
+  const needsQuote = service.pricing_type === 'quote_required'
 
   const unitLabel = service.pricing_type === 'hourly' ? 'hr'
     : service.pricing_type === 'day_rate' ? 'day'
@@ -200,6 +264,7 @@ function ProviderPendingBookingCard({ booking, onConfirm, onDecline }) {
       <View style={styles.pMetaRow}>
         {requester.full_name ? <Text style={styles.pMeta}>👤 {requester.full_name}</Text> : null}
         {booking.location_name ? <Text style={styles.pMeta}>📍 {booking.location_name}</Text> : null}
+        {booking.location_note ? <Text style={styles.pMeta}>Pin note: {booking.location_note}</Text> : null}
       </View>
 
       <View style={styles.pMetaRow}>
@@ -230,7 +295,10 @@ function ProviderPendingBookingCard({ booking, onConfirm, onDecline }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.pBtnPrimary}
-          onPress={() => onConfirm(booking)}
+          onPress={() => {
+            if (needsQuote) navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })
+            else onConfirm(booking)
+          }}
           accessibilityRole="button"
           accessibilityLabel="Confirm booking">
           <Text style={styles.pBtnPrimaryText}>Confirm booking →</Text>
@@ -242,11 +310,12 @@ function ProviderPendingBookingCard({ booking, onConfirm, onDecline }) {
 
 // ─── Provider booking card (active — in progress / complete) ──────────────────
 
-function ProviderActiveBookingCard({ booking, navigation, onStatusUpdate }) {
+function ProviderActiveBookingCard({ booking, navigation, onStatusUpdate, onDismiss }) {
   const service = booking.service || {}
   const requester = booking.requester || {}
   const isInProgress = booking.status === 'in_progress'
   const isAwaitingCompletion = booking.status === 'awaiting_completion'
+  const isTerminal = ['withdrawn', 'cancelled'].includes(booking.status)
 
   function scheduledLabel(val) {
     if (!val) return null
@@ -264,12 +333,12 @@ function ProviderActiveBookingCard({ booking, navigation, onStatusUpdate }) {
 
   function handleComplete() {
     Alert.alert(
-      'Complete service?',
-      'This will notify the requester to confirm completion.',
+      'Let requester know?',
+      'Tell the requester this service has been completed and is ready for confirmation.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Complete service',
+          text: 'Send',
           onPress: async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
@@ -293,7 +362,15 @@ function ProviderActiveBookingCard({ booking, navigation, onStatusUpdate }) {
     <View style={[styles.pCard, styles.pCardAccepted]}>
       <View style={styles.pCardHeader}>
         <Text style={styles.pCardTitle} numberOfLines={2}>{service.title || 'Service booking'}</Text>
-        {isAwaitingCompletion ? (
+        {booking.status === 'withdrawn' ? (
+          <View style={styles.pBadgeAmber}>
+            <Text style={styles.pBadgeAmberText}>Withdrawn</Text>
+          </View>
+        ) : booking.status === 'cancelled' ? (
+          <View style={styles.pBadgeAmber}>
+            <Text style={styles.pBadgeAmberText}>Cancelled</Text>
+          </View>
+        ) : isAwaitingCompletion ? (
           <View style={styles.pBadgeBlue}>
             <Text style={styles.pBadgeBlueText}>Awaiting confirmation</Text>
           </View>
@@ -331,10 +408,18 @@ function ProviderActiveBookingCard({ booking, navigation, onStatusUpdate }) {
       </View>
 
       <View style={styles.pBtnRow}>
-        {isAwaitingCompletion ? (
+        {isTerminal ? (
           <TouchableOpacity
             style={styles.pBtnPrimary}
-            onPress={() => navigation.navigate('ServiceDetail', { service })}
+            onPress={onDismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss service booking">
+            <Text style={styles.pBtnPrimaryText}>Dismiss</Text>
+          </TouchableOpacity>
+        ) : isAwaitingCompletion ? (
+          <TouchableOpacity
+            style={styles.pBtnPrimary}
+            onPress={() => navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })}
             accessibilityRole="button"
             accessibilityLabel="View service booking">
             <Text style={styles.pBtnPrimaryText}>View booking →</Text>
@@ -345,7 +430,7 @@ function ProviderActiveBookingCard({ booking, navigation, onStatusUpdate }) {
             onPress={handleComplete}
             accessibilityRole="button"
             accessibilityLabel="Complete service">
-            <Text style={styles.pBtnPrimaryText}>Complete service →</Text>
+            <Text style={styles.pBtnPrimaryText}>Let requester know completed</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -383,7 +468,7 @@ function ProviderCompletedBookingCard({ booking, navigation }) {
       </View>
       <TouchableOpacity
         style={styles.pBtnPrimary}
-        onPress={() => navigation.navigate('ServiceDetail', { service })}
+        onPress={() => navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })}
         accessibilityRole="button"
         accessibilityLabel="View completed service">
         <Text style={styles.pBtnPrimaryText}>View service →</Text>
@@ -916,7 +1001,7 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
       .from('bookings')
       .select('*, services(*)')
       .eq('requester_id', uid)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'completed'])
+      .in('status', ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'completed', 'withdrawn'])
       .order('created_at', { ascending: false })
 
     const bookings = bookingsData || []
@@ -1034,8 +1119,11 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
 
     const pending = enriched.filter(b => b.status === 'pending')
     setPendingBookings(pending)
-    setActiveServiceBookings(enriched.filter(b => ['confirmed', 'in_progress', 'awaiting_completion'].includes(b.status)))
-    setCompletedServiceBookings(enriched.filter(b => b.status === 'completed'))
+    setActiveServiceBookings(enriched.filter(b =>
+      ['quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'withdrawn', 'cancelled'].includes(b.status)
+      && !(['withdrawn', 'cancelled'].includes(b.status) && b.provider_archive_at)
+    ))
+    setCompletedServiceBookings(enriched.filter(b => ['completed', 'withdrawn'].includes(b.status)))
     return pending
   }
 
@@ -1084,6 +1172,10 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
   }
 
   async function handleConfirmBooking(booking) {
+    if (bookingNeedsQuote(booking)) {
+      navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })
+      return
+    }
     const { error } = await supabase
       .from('bookings').update({ status: 'confirmed' }).eq('id', booking.id)
     if (error) { Alert.alert('Error', error.message); return }
@@ -1098,6 +1190,24 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
     if (error) { Alert.alert('Error', error.message); return }
     Alert.alert('Booking declined', 'The requester has been notified.')
     fetchProviderBookings(userId)
+  }
+
+  async function handleDismissProviderBooking(booking) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { error } = await supabase
+      .from('bookings')
+      .update({ provider_archive_at: new Date().toISOString() })
+      .eq('id', booking.id)
+      .eq('provider_id', user.id)
+      .in('status', ['withdrawn', 'cancelled'])
+
+    if (error) {
+      Alert.alert('Could not dismiss booking', error.message)
+      return
+    }
+    fetchProviderBookings(user.id)
   }
 
   async function notifyCompletedProviderJobs(uid) {
@@ -1257,8 +1367,8 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
   const awardedPosted     = postedJobs.filter(j => j.status === 'accepted' || j.status === 'in_progress')
   const completedPosted   = postedJobs.filter(j => j.status === 'completed')
   const activeBids        = myBids.filter(b => b.status === 'pending')
-  const activeBookings    = myBookings.filter(b => ['pending', 'confirmed', 'in_progress', 'awaiting_completion'].includes(b.status))
-  const completedBookings = myBookings.filter(b => b.status === 'completed')
+  const activeBookings    = myBookings.filter(b => ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'].includes(b.status))
+  const completedBookings = myBookings.filter(b => ['completed', 'withdrawn'].includes(b.status))
 
   if (loading) {
     return (
@@ -1486,6 +1596,7 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
                 <ProviderPendingBookingCard
                   key={booking.id}
                   booking={booking}
+                  navigation={navigation}
                   onConfirm={handleConfirmBooking}
                   onDecline={handleDeclineBooking}
                 />
@@ -1546,6 +1657,7 @@ export default function UnifiedDashboardScreen({ navigation, route }) {
                   booking={booking}
                   navigation={navigation}
                   onStatusUpdate={fetchData}
+                  onDismiss={() => handleDismissProviderBooking(booking)}
                 />
               ))}
             </>

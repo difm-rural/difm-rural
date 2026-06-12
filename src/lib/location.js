@@ -1,12 +1,11 @@
 import * as Location from 'expo-location'
-import { GOOGLE_MAPS_API_KEY } from './constants'
+import { MAPS_PROXY_URL } from './constants'
 
 export async function reverseGeocode(lat, lng) {
   try {
-    const url  = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
-    const res  = await fetch(url)
+    const res  = await fetch(`${MAPS_PROXY_URL}/geocode?lat=${lat}&lng=${lng}`)
     const data = await res.json()
-    if (data.results?.[0]) return data.results[0].formatted_address
+    if (data.address) return data.address
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
   } catch {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`

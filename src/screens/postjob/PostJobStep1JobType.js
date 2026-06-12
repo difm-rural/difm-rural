@@ -8,12 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
-
-const CATEGORIES = [
-  'Fencing', 'Maintenance', 'Property Check', 'Landscaping',
-  'Animal Care', 'Machinery', 'Labour', 'Spraying',
-  'Water', 'General Labour', 'Other',
-]
+import { JOB_CATEGORIES as CATEGORIES } from '../../lib/categories'
 
 const SCHEDULE_OPTIONS = [
   { id: 'asap',     label: 'As soon as possible', icon: '⚡' },
@@ -188,10 +183,11 @@ export default function PostJobStep1JobType({ navigation, route }) {
                       value={scheduledDate || new Date()}
                       mode="date"
                       minimumDate={new Date()}
-                      onChange={(_, selected) => {
+                      onValueChange={(selected) => {
                         if (Platform.OS === 'android') setShowDatePicker(false)
                         if (selected) setScheduledDate(selected)
                       }}
+                      onDismiss={() => setShowDatePicker(false)}
                     />
                   </>
                 )}

@@ -10,7 +10,7 @@ import { usePostJob } from '../../context/PostJobContext'
 import { supabase } from '../../lib/supabase'
 import { trackEvent } from '../../lib/analytics'
 import { trackCategoryInterest } from '../../lib/preferences'
-import { GOOGLE_MAPS_API_KEY } from '../../lib/constants'
+import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
 import { colors } from '../../theme/tokens'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -29,20 +29,6 @@ const MATERIALS_LABELS = {
 const ACCESS_LABELS = {
   park_and_walk: 'Park and walk in',
   '4wd_required': '4WD required',
-}
-
-function staticMapUrl(lat, lng) {
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=14&size=600x240&scale=2&markers=color:red|${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
-}
-
-function staticMapUrlPolygon(points) {
-  if (!points?.length) return ''
-  const center = points.reduce(
-    (acc, p) => ({ lat: acc.lat + p.latitude / points.length, lng: acc.lng + p.longitude / points.length }),
-    { lat: 0, lng: 0 }
-  )
-  const path = [...points, points[0]].map(p => `${p.latitude},${p.longitude}`).join('|')
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${center.lat},${center.lng}&zoom=14&size=600x240&scale=2&path=color:0x2d6a4fff|weight:2|fillcolor:0x2d6a4f50|${path}&key=${GOOGLE_MAPS_API_KEY}`
 }
 
 function formatDate(iso) {
@@ -66,7 +52,7 @@ function base64ToArrayBuffer(base64) {
   return new Uint8Array(bytes).buffer
 }
 
-function AuthSheet({ onDismiss, onLogin, onRegister }) {
+function AuthSheet({ onDismiss, onLogin }) {
   const translateY      = useRef(new Animated.Value(SCREEN_HEIGHT)).current
   const backdropOpacity = useRef(new Animated.Value(0)).current
 
@@ -96,19 +82,14 @@ function AuthSheet({ onDismiss, onLogin, onRegister }) {
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
         <Text style={styles.sheetTitle}>Almost there!</Text>
         <Text style={styles.sheetMessage}>
-          Create a free account to post your job. Your details have been saved.
+          Sign in to post your job. Your details have been saved.{'\n'}
+          New? Just enter your email — we'll create your account automatically.
         </Text>
         <TouchableOpacity
           style={styles.sheetPrimary}
-          onPress={() => { dismiss(); setTimeout(onRegister, 280) }}
-          accessibilityRole="button">
-          <Text style={styles.sheetPrimaryText}>Create account</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sheetSecondary}
           onPress={() => { dismiss(); setTimeout(onLogin, 280) }}
           accessibilityRole="button">
-          <Text style={styles.sheetSecondaryText}>I already have an account</Text>
+          <Text style={styles.sheetPrimaryText}>Sign in / Create account</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -148,7 +129,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   const budgetDisplay   = priceType === 'fixed' ? `$${price} NZD (fixed price)` : 'Open to bids'
 
   const mapImgUri = areaPolygon.length > 0
-    ? staticMapUrlPolygon(areaPolygon)
+    ? staticMapPolygonUrl(areaPolygon)
     : (latitude ? staticMapUrl(latitude, longitude) : null)
 
   // Step order: 1=JobType, 2=Location, 3=Details, 4=Budget, 5=Review
@@ -365,7 +346,6 @@ export default function PostJobStep5Review({ navigation, route }) {
         <AuthSheet
           onDismiss={() => setShowAuthSheet(false)}
           onLogin={() => navigation.navigate('Login')}
-          onRegister={() => navigation.navigate('Register')}
         />
       </Modal>
     </View>

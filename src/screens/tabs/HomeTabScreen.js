@@ -1,8 +1,6 @@
 import React, { useCallback, useState } from 'react'
-import { useFocusEffect } from '@react-navigation/native'
 import {
-  Alert,
-  FlatList,
+  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -11,32 +9,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
-import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
+import {
+  NOTIFICATION_ICONS,
+  fetchNotifications,
+  notificationTimeAgo,
+  openNotificationTarget,
+} from '../../lib/notifications'
 
 function getInitials(name) {
   if (!name) return '?'
   return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
-}
-
-function formatMoney(amount) {
-  if (amount == null || amount === '') return null
-  return `$${amount} NZD`
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'pending': return 'Waiting for provider to confirm acceptance'
-    case 'confirmed': return 'Confirmed'
-    case 'in_progress': return 'In progress'
-    case 'awaiting_completion': return 'Ready to confirm'
-    case 'cancellation_requested': return 'Cancellation requested'
-    case 'completed': return 'Completed'
-    case 'cancelled': return 'Cancelled'
-    default: return status || 'Active'
-  }
 }
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
@@ -58,506 +44,91 @@ function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   )
 }
 
-function AttentionRow({ title, detail, tone = 'default', onPress }) {
+function SummaryRow({ label, count, onPress, last }) {
   return (
     <TouchableOpacity
-      style={styles.attentionRow}
+      style={[styles.summaryRow, !last && styles.summaryRowBorder]}
       onPress={onPress}
-      activeOpacity={0.82}
+      activeOpacity={0.75}
       accessibilityRole="button"
-      accessibilityLabel={title}>
-      <View style={[styles.attentionDot, tone === 'warning' && styles.attentionDotWarning]} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.attentionTitle}>{title}</Text>
-        {!!detail && <Text style={styles.attentionDetail}>{detail}</Text>}
+      accessibilityLabel={`${count} ${label}`}>
+      <View style={styles.summaryCount}>
+        <Text style={styles.summaryCountText}>{count}</Text>
       </View>
-      <Text style={styles.attentionArrow}>View</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryChevron}>›</Text>
     </TouchableOpacity>
-  )
-}
-
-function BookingCard({ booking, viewerRole, navigation, onConfirm, onDecline, onSendForConfirm, onConfirmComplete, onCancelRequest }) {
-  const service = booking.service || {}
-  const otherParty = viewerRole === 'provider' ? booking.requester : booking.provider
-  const isPending = booking.status === 'pending'
-  const isProviderActive = viewerRole === 'provider' && ['confirmed', 'in_progress'].includes(booking.status)
-  const isRequesterReady = viewerRole === 'requester' && booking.status === 'awaiting_completion'
-  const canRequesterCancel = viewerRole === 'requester' && ['pending', 'confirmed', 'in_progress', 'awaiting_completion'].includes(booking.status)
-  const isCancellationRequested = viewerRole === 'provider' && booking.status === 'cancellation_requested'
-
-  return (
-    <View style={styles.workCard}>
-      <View style={styles.workCardTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.workEyebrow}>Service booking</Text>
-          <Text style={styles.workTitle} numberOfLines={2}>{service.title || 'Service booking'}</Text>
-        </View>
-        <View style={styles.statusPill}>
-          <Text style={styles.statusPillText}>{statusLabel(booking.status)}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.workMeta}>
-        {viewerRole === 'provider' ? 'Requester' : 'Provider'}: {otherParty?.full_name || 'Not available'}
-      </Text>
-      {!!booking.location_name && <Text style={styles.workMeta}>{booking.location_name}</Text>}
-      {!!booking.total_amount && <Text style={styles.workMeta}>{formatMoney(booking.total_amount)}</Text>}
-
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.outlineBtn}
-          onPress={() => navigation.navigate('ServiceDetail', { service })}
-          accessibilityRole="button"
-          accessibilityLabel="View service booking">
-          <Text style={styles.outlineBtnText}>View</Text>
-        </TouchableOpacity>
-
-        {viewerRole === 'provider' && isPending && (
-          <>
-            <TouchableOpacity
-              style={styles.dangerBtn}
-              onPress={() => onDecline(booking)}
-              accessibilityRole="button"
-              accessibilityLabel="Decline booking">
-              <Text style={styles.dangerBtnText}>Decline</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.solidBtn}
-              onPress={() => onConfirm(booking)}
-              accessibilityRole="button"
-              accessibilityLabel="Confirm booking">
-              <Text style={styles.solidBtnText}>Confirm</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {isProviderActive && (
-          <TouchableOpacity
-            style={styles.solidBtn}
-            onPress={() => onSendForConfirm(booking)}
-            accessibilityRole="button"
-            accessibilityLabel="Send booking for confirmation">
-            <Text style={styles.solidBtnText}>Ready</Text>
-          </TouchableOpacity>
-        )}
-
-        {isCancellationRequested && (
-          <TouchableOpacity
-            style={styles.solidBtn}
-            onPress={() => onSendForConfirm({ ...booking, _action: 'confirm_cancellation' })}
-            accessibilityRole="button"
-            accessibilityLabel="Confirm cancellation">
-            <Text style={styles.solidBtnText}>Confirm cancellation</Text>
-          </TouchableOpacity>
-        )}
-
-        {isRequesterReady && (
-          <TouchableOpacity
-            style={styles.solidBtn}
-            onPress={() => onConfirmComplete(booking)}
-            accessibilityRole="button"
-            accessibilityLabel="Confirm booking complete">
-            <Text style={styles.solidBtnText}>Confirm</Text>
-          </TouchableOpacity>
-        )}
-
-        {canRequesterCancel && (
-          <TouchableOpacity
-            style={styles.dangerBtn}
-            onPress={() => onCancelRequest(booking)}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel order">
-            <Text style={styles.dangerBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  )
-}
-
-function BookingWorkCard({
-  booking,
-  viewerRole,
-  onPress,
-  onConfirm,
-  onDecline,
-  onReady,
-  onConfirmComplete,
-  onCancelRequest,
-  onConfirmCancellation,
-}) {
-  const serviceItem = {
-    ...(booking.service || {}),
-    _type: 'service',
-    location_name: booking.location_name,
-    profile: viewerRole === 'provider' ? booking.requester : booking.provider,
-  }
-  const canRequesterCancel = viewerRole === 'requester'
-    && ['pending', 'confirmed', 'in_progress', 'awaiting_completion'].includes(booking.status)
-  const requesterNeedsConfirm = viewerRole === 'requester' && booking.status === 'awaiting_completion'
-  const providerPending = viewerRole === 'provider' && booking.status === 'pending'
-  const providerActive = viewerRole === 'provider' && ['confirmed', 'in_progress'].includes(booking.status)
-  const providerCanConfirmCancellation = viewerRole === 'provider' && booking.status === 'cancellation_requested'
-
-  return (
-    <View style={styles.bookingWorkWrap}>
-      <JobServiceCard
-        item={serviceItem}
-        showStatusBadge
-        status={booking.status}
-        onPress={onPress}
-      />
-
-      {providerPending && (
-        <View style={styles.miniActionRow}>
-          <TouchableOpacity
-            style={styles.miniDangerBtn}
-            onPress={onDecline}
-            accessibilityRole="button"
-            accessibilityLabel="Decline booking">
-            <Text style={styles.miniDangerText}>Decline</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.miniPrimaryBtn}
-            onPress={onConfirm}
-            accessibilityRole="button"
-            accessibilityLabel="Confirm booking">
-            <Text style={styles.miniPrimaryText}>Confirm</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {providerActive && (
-        <TouchableOpacity
-          style={styles.miniPrimaryBtn}
-          onPress={onReady}
-          accessibilityRole="button"
-          accessibilityLabel="Send booking for requester confirmation">
-          <Text style={styles.miniPrimaryText}>Ready</Text>
-        </TouchableOpacity>
-      )}
-
-      {providerCanConfirmCancellation && (
-        <TouchableOpacity
-          style={styles.miniDangerBtn}
-          onPress={onConfirmCancellation}
-          accessibilityRole="button"
-          accessibilityLabel="Confirm cancellation">
-          <Text style={styles.miniDangerText}>Confirm cancel</Text>
-        </TouchableOpacity>
-      )}
-
-      {requesterNeedsConfirm && (
-        <TouchableOpacity
-          style={styles.miniPrimaryBtn}
-          onPress={onConfirmComplete}
-          accessibilityRole="button"
-          accessibilityLabel="Confirm booking complete">
-          <Text style={styles.miniPrimaryText}>Complete</Text>
-        </TouchableOpacity>
-      )}
-
-      {canRequesterCancel && (
-        <TouchableOpacity
-          style={styles.miniDangerBtn}
-          onPress={onCancelRequest}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel service booking">
-          <Text style={styles.miniDangerText}>
-            {booking.status === 'pending' ? 'Cancel' : 'Request cancel'}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {viewerRole === 'requester' && booking.status === 'cancellation_requested' && (
-        <Text style={styles.bookingHint}>Waiting for provider</Text>
-      )}
-    </View>
   )
 }
 
 export default function HomeTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
-  const [userId, setUserId] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-
-  const [postedJobs, setPostedJobs] = useState([])
-  const [requesterBookings, setRequesterBookings] = useState([])
-  const [pendingBids, setPendingBids] = useState([])
-  const [activeBidJobs, setActiveBidJobs] = useState([])
-  const [pendingBookings, setPendingBookings] = useState([])
-  const [activeBookings, setActiveBookings] = useState([])
-  const [openJobs, setOpenJobs] = useState([])
+  const [userId, setUserId]             = useState(null)
+  const [profile, setProfile]           = useState(null)
+  const [notifications, setNotifications] = useState([])
+  const [summary, setSummary]           = useState({})
+  const [loading, setLoading]           = useState(true)
+  const [refreshing, setRefreshing]     = useState(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoading(false)
-      setRefreshing(false)
-      return
-    }
-
+    if (!user) { setLoading(false); setRefreshing(false); return }
     setUserId(user.id)
+
     const { data: prof } = await supabase
       .from('profiles')
       .select('id, full_name, avatar_url, primary_role, role')
       .eq('id', user.id)
       .single()
-
     setProfile(prof)
-    const role = prof?.primary_role || prof?.role || 'requester'
-    await Promise.all([
-      (role === 'requester' || role === 'both') ? fetchRequesterData(user.id) : Promise.resolve(),
-      (role === 'provider' || role === 'both') ? fetchProviderData(user.id) : Promise.resolve(),
+
+    const role        = prof?.primary_role || prof?.role || 'requester'
+    const isRequester = role === 'requester' || role === 'both'
+    const isProvider  = role === 'provider'  || role === 'both'
+
+    const [notifs, counts] = await Promise.all([
+      fetchNotifications(8),
+      fetchSummary(user.id, isRequester, isProvider),
     ])
+    setNotifications(notifs)
+    setSummary(counts)
     setLoading(false)
     setRefreshing(false)
   }
 
-  async function fetchRequesterData(uid) {
-    const { data: jobsData } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('requester_id', uid)
-      .order('created_at', { ascending: false })
+  async function fetchSummary(uid, isRequester, isProvider) {
+    const activeBookingStatuses = ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested']
+    const tasks = []
 
-    const jobs = jobsData || []
-    const openIds = jobs.filter(j => j.status === 'open').map(j => j.id)
-    let bidMap = {}
-    if (openIds.length > 0) {
-      const { data: bids } = await supabase
-        .from('bids')
-        .select('job_id')
-        .in('job_id', openIds)
-        .eq('status', 'pending')
-      bids?.forEach(b => { bidMap[b.job_id] = (bidMap[b.job_id] || 0) + 1 })
+    tasks.push(isRequester
+      ? supabase.from('jobs').select('id', { count: 'exact', head: true })
+          .eq('requester_id', uid).in('status', ['open', 'accepted', 'in_progress'])
+      : Promise.resolve({ count: 0 }))
+    tasks.push(isRequester
+      ? supabase.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('requester_id', uid).in('status', activeBookingStatuses)
+      : Promise.resolve({ count: 0 }))
+    tasks.push(isProvider
+      ? supabase.from('bids').select('id, jobs!inner(status)')
+          .eq('provider_id', uid).in('status', ['pending', 'accepted'])
+      : Promise.resolve({ data: [] }))
+    tasks.push(isProvider
+      ? supabase.from('bookings').select('id', { count: 'exact', head: true })
+          .eq('provider_id', uid).in('status', activeBookingStatuses)
+      : Promise.resolve({ count: 0 }))
+
+    const [jobsRes, reqBookingsRes, bidsRes, provBookingsRes] = await Promise.all(tasks)
+
+    const bids = bidsRes.data || []
+    return {
+      activeJobs:      jobsRes.count || 0,
+      reqBookings:     reqBookingsRes.count || 0,
+      pendingBids:     bids.filter(b => b.jobs?.status === 'open').length,
+      jobsDoing:       bids.filter(b => ['accepted', 'in_progress'].includes(b.jobs?.status)).length,
+      provBookings:    provBookingsRes.count || 0,
     }
-
-    const { data: profData } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .eq('id', uid)
-      .single()
-    setPostedJobs(jobs.map(j => ({ ...j, profiles: profData, bidCount: bidMap[j.id] || 0 })))
-
-    const { data: bookingData } = await supabase
-      .from('bookings')
-      .select('*, service:service_id(*)')
-      .eq('requester_id', uid)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'])
-      .order('created_at', { ascending: false })
-
-    const bookings = bookingData || []
-    if (bookings.length === 0) {
-      setRequesterBookings([])
-      return
-    }
-
-    const providerIds = [...new Set(bookings.map(b => b.provider_id).filter(Boolean))]
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .in('id', providerIds)
-    const profileMap = {}
-    profiles?.forEach(p => { profileMap[p.id] = p })
-    setRequesterBookings(bookings.map(b => ({ ...b, provider: profileMap[b.provider_id] || null })))
-  }
-
-  async function fetchProviderData(uid) {
-    const { data: bidsData } = await supabase
-      .from('bids')
-      .select('*, jobs(*)')
-      .eq('provider_id', uid)
-      .in('status', ['pending', 'accepted'])
-      .order('created_at', { ascending: false })
-
-    const bids = bidsData || []
-    setPendingBids(bids.filter(b => b.status === 'pending' && b.jobs?.status === 'open'))
-    setActiveBidJobs(bids.filter(b => b.status === 'accepted' && ['accepted', 'in_progress'].includes(b.jobs?.status)))
-
-    const { data: bookingData } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('provider_id', uid)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'cancelled'])
-      .order('created_at', { ascending: false })
-
-    const bookings = bookingData || []
-    if (bookings.length === 0) {
-      setPendingBookings([])
-      setActiveBookings([])
-      return
-    }
-
-    const serviceIds = [...new Set(bookings.map(b => b.service_id).filter(Boolean))]
-    const requesterIds = [...new Set(bookings.map(b => b.requester_id).filter(Boolean))]
-    const [servicesResult, profilesResult] = await Promise.all([
-      supabase.from('services').select('*').in('id', serviceIds),
-      supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
-    ])
-    const serviceMap = {}
-    const profileMap = {}
-    servicesResult.data?.forEach(s => { serviceMap[s.id] = s })
-    profilesResult.data?.forEach(p => { profileMap[p.id] = p })
-
-    const enriched = bookings.map(b => ({
-      ...b,
-      service: serviceMap[b.service_id] || null,
-      requester: profileMap[b.requester_id] || null,
-    }))
-    setPendingBookings(enriched.filter(b => b.status === 'pending'))
-    setActiveBookings(enriched.filter(b => ['confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'cancelled'].includes(b.status)))
-
-    const { data: openJobsData } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('status', 'open')
-      .neq('requester_id', uid)
-      .order('created_at', { ascending: false })
-      .limit(5)
-
-    if (openJobsData?.length > 0) {
-      const rIds = [...new Set(openJobsData.map(j => j.requester_id))]
-      const { data: rProfiles } = await supabase
-        .from('profiles').select('id, full_name, avatar_url').in('id', rIds)
-      const rMap = {}
-      rProfiles?.forEach(p => { rMap[p.id] = p })
-      setOpenJobs(openJobsData.map(j => ({ ...j, profiles: rMap[j.requester_id] || null, bidCount: 0 })))
-    } else {
-      setOpenJobs([])
-    }
-  }
-
-  async function confirmBooking(booking) {
-    const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', booking.id)
-    if (error) {
-      Alert.alert('Error', error.message)
-      return
-    }
-    await fetchProviderData(userId)
-  }
-
-  function declineBooking(booking) {
-    Alert.alert('Decline booking', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Decline',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', booking.id)
-          if (error) {
-            Alert.alert('Error', error.message)
-            return
-          }
-          await fetchProviderData(userId)
-        },
-      },
-    ])
-  }
-
-  function sendBookingForConfirmation(booking) {
-    if (booking._action === 'confirm_cancellation') {
-      Alert.alert('Confirm cancellation', 'Confirm this service order has been cancelled?', [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Confirm',
-          style: 'destructive',
-          onPress: async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-            const { error } = await supabase
-              .from('bookings')
-              .update({ status: 'cancelled' })
-              .eq('id', booking.id)
-              .eq('provider_id', user.id)
-              .eq('status', 'cancellation_requested')
-            if (error) {
-              Alert.alert('Could not confirm cancellation', error.message)
-              return
-            }
-            await fetchProviderData(userId)
-          },
-        },
-      ])
-      return
-    }
-
-    Alert.alert('Send for confirmation', 'Tell the requester this service is ready to confirm?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Send',
-        onPress: async () => {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) return
-
-          const { error } = await supabase
-            .from('bookings')
-            .update({ status: 'awaiting_completion' })
-            .eq('id', booking.id)
-            .eq('provider_id', user.id)
-            .in('status', ['confirmed', 'in_progress'])
-
-          if (error) {
-            Alert.alert('Could not send for confirmation', error.message)
-            return
-          }
-          await fetchProviderData(userId)
-        },
-      },
-    ])
-  }
-
-  function confirmBookingComplete(booking) {
-    Alert.alert('Confirm complete', 'Mark this service booking as completed?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Complete',
-        onPress: async () => {
-          const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', booking.id)
-          if (error) {
-            Alert.alert('Error', error.message)
-            return
-          }
-          await fetchRequesterData(userId)
-        },
-      },
-    ])
-  }
-
-  function cancelRequesterBooking(booking) {
-    const isPendingBooking = booking.status === 'pending'
-    const message = isPendingBooking
-      ? 'Cancel this service order before the provider accepts it?'
-      : 'Ask the provider to confirm this service order has been cancelled?'
-
-    Alert.alert('Cancel order', message, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: isPendingBooking ? 'Cancel order' : 'Request cancellation',
-        style: 'destructive',
-        onPress: async () => {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) return
-
-          const nextStatus = isPendingBooking ? 'cancelled' : 'cancellation_requested'
-          const { error } = await supabase
-            .from('bookings')
-            .update({ status: nextStatus })
-            .eq('id', booking.id)
-            .eq('requester_id', user.id)
-
-          if (error) {
-            Alert.alert('Could not cancel order', error.message)
-            return
-          }
-          await fetchRequesterData(user.id)
-        },
-      },
-    ])
   }
 
   function onRefresh() {
@@ -565,26 +136,20 @@ export default function HomeTabScreen({ navigation }) {
     load()
   }
 
-  const role = profile?.primary_role || profile?.role || 'requester'
+  const role        = profile?.primary_role || profile?.role || 'requester'
   const isRequester = role === 'requester' || role === 'both'
-  const isProvider = role === 'provider' || role === 'both'
-  const firstName = profile?.full_name?.split(' ')[0] || 'there'
-  const initials = getInitials(profile?.full_name)
-
-  const activePosted = postedJobs.filter(j => ['open', 'accepted', 'in_progress'].includes(j.status))
-  const jobsWithBids = activePosted.filter(j => (j.bidCount || 0) > 0)
-  const requesterReadyBookings = requesterBookings.filter(b => b.status === 'awaiting_completion')
-  const providerAttention = pendingBids.length + pendingBookings.length
-  const requesterAttention = jobsWithBids.length + requesterReadyBookings.length
-  const activeWorkCount = activePosted.length + requesterBookings.length + activeBidJobs.length + activeBookings.length
+  const isProvider  = role === 'provider'  || role === 'both'
+  const firstName   = profile?.full_name?.split(' ')[0] || 'there'
+  const initials    = getInitials(profile?.full_name)
+  const unread      = notifications.filter(n => !n.read)
+  const attention   = unread.slice(0, 5)
+  const totalActive = (summary.activeJobs || 0) + (summary.reqBookings || 0)
+    + (summary.pendingBids || 0) + (summary.jobsDoing || 0) + (summary.provBookings || 0)
 
   if (loading) {
     return (
-      <View style={styles.screen}>
-        <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
-          <Text style={styles.kicker}>DIFM Rural</Text>
-          <Text style={styles.title}>Loading your work</Text>
-        </View>
+      <View style={[styles.screen, styles.center]}>
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     )
   }
@@ -596,6 +161,8 @@ export default function HomeTabScreen({ navigation }) {
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 88 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
+
+        {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>DIFM Rural</Text>
@@ -603,8 +170,8 @@ export default function HomeTabScreen({ navigation }) {
               {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
             </Text>
             <Text style={styles.subtitle}>
-              {activeWorkCount > 0
-                ? `${activeWorkCount} active item${activeWorkCount === 1 ? '' : 's'} on the go`
+              {totalActive > 0
+                ? `${totalActive} active item${totalActive === 1 ? '' : 's'} on the go`
                 : `Good to see you, ${firstName}`}
             </Text>
           </View>
@@ -621,19 +188,20 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* Shortcuts */}
         <View style={styles.actionsGrid}>
           {isRequester && (
             <PrimaryAction
               title="Post a job"
               subtitle="Describe the work and get local help"
-              onPress={() => navigation.navigate('PostJob')}
+              onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob' })}
             />
           )}
           {isProvider && !isRequester && (
             <PrimaryAction
               title="Find jobs"
               subtitle="Browse open rural work nearby"
-              onPress={() => navigation.navigate('JobFeed')}
+              onPress={() => navigation.getParent()?.navigate('Jobs')}
             />
           )}
           {isProvider && (
@@ -654,237 +222,94 @@ export default function HomeTabScreen({ navigation }) {
           )}
         </View>
 
-        {(requesterAttention > 0 || providerAttention > 0) && (
-          <View style={styles.section}>
+        {/* Needs attention — unread notifications */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Needs attention</Text>
-            {jobsWithBids.map(job => (
-              <AttentionRow
-                key={`bid-${job.id}`}
-                title={`${job.bidCount} bid${job.bidCount === 1 ? '' : 's'} to review`}
-                detail={job.title}
-                tone="warning"
-                onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
-              />
-            ))}
-            {requesterReadyBookings.map(booking => (
-              <AttentionRow
-                key={`ready-${booking.id}`}
-                title="Service ready to confirm"
-                detail={booking.service?.title || 'Service booking'}
-                tone="warning"
-                onPress={() => confirmBookingComplete(booking)}
-              />
-            ))}
-            {pendingBookings.map(booking => (
-              <AttentionRow
-                key={`booking-${booking.id}`}
-                title="New service booking"
-                detail={booking.service?.title || 'Service booking'}
-                tone="warning"
-                onPress={() => confirmBooking(booking)}
-              />
-            ))}
-            {pendingBids.map(bid => (
-              <AttentionRow
-                key={`pending-bid-${bid.id}`}
-                title="Bid awaiting response"
-                detail={bid.jobs?.title || 'Posted job'}
-                onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
-              />
-            ))}
-          </View>
-        )}
-
-        {activeWorkCount === 0 ? (
-          <View style={styles.section}>
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No active work yet</Text>
-              <Text style={styles.emptyBody}>
-                {isProvider && !isRequester
-                  ? 'Find jobs or advertise a service when you are ready.'
-                  : 'Post a job or browse services to get started.'}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Notifications')}
+              accessibilityRole="button"
+              accessibilityLabel="See all notifications">
+              <Text style={styles.sectionLink}>
+                {unread.length > 0 ? `See all (${unread.length})` : 'See all'}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
-        ) : null}
-
-        {/* My active tasks (posted jobs) */}
-        {activePosted.length > 0 && (
-          <View style={styles.cardSection}>
-            <View style={styles.cardSectionHeader}>
-              <Text style={styles.cardSectionTitle}>My active tasks</Text>
-              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Activity')} accessibilityRole="button">
-                <Text style={styles.sectionLink}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              horizontal
-              data={activePosted}
-              keyExtractor={job => `posted-${job.id}`}
-              renderItem={({ item: job }) => (
-                <JobServiceCard
-                  item={job}
-                  showStatusBadge
-                  status={job.status === 'open' ? 'open' : job.status}
-                  onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
-                />
-              )}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-            />
-          </View>
-        )}
-
-        {/* Jobs I'm doing (provider active bids) */}
-        {activeBidJobs.length > 0 && (
-          <View style={styles.cardSection}>
-            <View style={styles.cardSectionHeader}>
-              <Text style={styles.cardSectionTitle}>Jobs I'm doing</Text>
-              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Activity')} accessibilityRole="button">
-                <Text style={styles.sectionLink}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              horizontal
-              data={activeBidJobs}
-              keyExtractor={bid => `active-bid-${bid.id}`}
-              renderItem={({ item: bid }) => (
-                <JobServiceCard
-                  item={bid.jobs}
-                  showStatusBadge
-                  status={bid.jobs?.status}
-                  onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
-                />
-              )}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-            />
-          </View>
-        )}
-
-        {/* My bookings (requester service bookings) */}
-        {requesterBookings.length > 0 && (
-          <View style={styles.cardSection}>
-            <View style={styles.cardSectionHeader}>
-              <Text style={styles.cardSectionTitle}>My bookings</Text>
-              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Activity')} accessibilityRole="button">
-                <Text style={styles.sectionLink}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              horizontal
-              data={requesterBookings}
-              keyExtractor={b => `req-booking-${b.id}`}
-              renderItem={({ item: booking }) => (
-                <BookingWorkCard
-                  booking={booking}
-                  viewerRole="requester"
-                  onPress={() => navigation.navigate('ServiceDetail', { service: booking.service })}
-                  onConfirmComplete={() => confirmBookingComplete(booking)}
-                  onCancelRequest={() => cancelRequesterBooking(booking)}
-                />
-              )}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-            />
-          </View>
-        )}
-
-        {/* Provider bookings */}
-        {activeBookings.length > 0 && (
-          <View style={styles.cardSection}>
-            <View style={styles.cardSectionHeader}>
-              <Text style={styles.cardSectionTitle}>Service bookings</Text>
-              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Activity')} accessibilityRole="button">
-                <Text style={styles.sectionLink}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              horizontal
-              data={activeBookings}
-              keyExtractor={b => `prov-booking-${b.id}`}
-              renderItem={({ item: booking }) => (
-                <BookingWorkCard
-                  booking={booking}
-                  viewerRole="provider"
-                  onPress={() => navigation.navigate('ServiceDetail', { service: booking.service })}
-                  onConfirm={() => confirmBooking(booking)}
-                  onDecline={() => declineBooking(booking)}
-                  onReady={() => sendBookingForConfirmation(booking)}
-                  onConfirmCancellation={() => sendBookingForConfirmation({ ...booking, _action: 'confirm_cancellation' })}
-                />
-              )}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-            />
-          </View>
-        )}
-
-        {/* Available jobs — provider only */}
-        {isProvider && (
-          <View style={styles.cardSection}>
-            <View style={styles.cardSectionHeader}>
-              <Text style={styles.cardSectionTitle}>Available jobs</Text>
+          {attention.length === 0 ? (
+            <Text style={styles.allClearText}>All caught up — nothing waiting on you.</Text>
+          ) : (
+            attention.map((n, i) => (
               <TouchableOpacity
-                onPress={() => navigation.navigate('JobFeed')}
+                key={n.id}
+                style={[styles.notifRow, i < attention.length - 1 && styles.notifRowBorder]}
+                onPress={() => openNotificationTarget(navigation, userId, n)}
+                activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel="See all available jobs">
-                <Text style={styles.sectionLink}>See all →</Text>
+                accessibilityLabel={n.body}>
+                <Text style={styles.notifIcon}>{NOTIFICATION_ICONS[n.type] || '🔔'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.notifBody} numberOfLines={2}>{n.body}</Text>
+                  <Text style={styles.notifTime}>{notificationTimeAgo(n.created_at)}</Text>
+                </View>
+                <View style={styles.notifDot} />
               </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        {/* Active work summary */}
+        {totalActive > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your activity</Text>
             </View>
-            {openJobs.length > 0 ? (
-              <FlatList
-                horizontal
-                data={openJobs}
-                keyExtractor={job => `open-${job.id}`}
-                renderItem={({ item: job }) => (
-                  <JobServiceCard
-                    item={job}
-                    onPress={() => navigation.navigate('JobDetail', { job })}
-                  />
-                )}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.hListContent}
-                ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-                ListFooterComponent={
-                  <TouchableOpacity
-                    style={styles.seeAllCard}
-                    onPress={() => navigation.navigate('JobFeed')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Browse all jobs">
-                    <Text style={styles.seeAllCardText}>Browse{'\n'}all →</Text>
-                  </TouchableOpacity>
-                }
-                snapToInterval={SNAP_INTERVAL}
-                decelerationRate="fast"
+            {summary.activeJobs > 0 && (
+              <SummaryRow
+                label={`active job post${summary.activeJobs === 1 ? '' : 's'}`}
+                count={summary.activeJobs}
+                onPress={() => navigation.getParent()?.navigate('Activity')}
               />
-            ) : (
-              <View style={[styles.emptyState, { marginHorizontal: 20 }]}>
-                <Text style={styles.emptyBody}>No open jobs right now. Check back soon.</Text>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('JobFeed')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Browse all jobs">
-                  <Text style={[styles.sectionLink, { marginTop: 10 }]}>Browse all jobs →</Text>
-                </TouchableOpacity>
-              </View>
             )}
+            {summary.reqBookings > 0 && (
+              <SummaryRow
+                label={`service booking${summary.reqBookings === 1 ? '' : 's'}`}
+                count={summary.reqBookings}
+                onPress={() => navigation.getParent()?.navigate('Activity')}
+              />
+            )}
+            {summary.pendingBids > 0 && (
+              <SummaryRow
+                label={`bid${summary.pendingBids === 1 ? '' : 's'} awaiting an answer`}
+                count={summary.pendingBids}
+                onPress={() => navigation.getParent()?.navigate('Jobs')}
+              />
+            )}
+            {summary.jobsDoing > 0 && (
+              <SummaryRow
+                label={`job${summary.jobsDoing === 1 ? '' : 's'} you're doing`}
+                count={summary.jobsDoing}
+                onPress={() => navigation.getParent()?.navigate('Activity')}
+              />
+            )}
+            {summary.provBookings > 0 && (
+              <SummaryRow
+                label={`booking${summary.provBookings === 1 ? '' : 's'} for your services`}
+                count={summary.provBookings}
+                onPress={() => navigation.getParent()?.navigate('Activity')}
+                last
+              />
+            )}
+          </View>
+        )}
+
+        {totalActive === 0 && (
+          <View style={styles.section}>
+            <Text style={styles.emptyTitle}>No active work yet</Text>
+            <Text style={styles.emptyBody}>
+              {isProvider && !isRequester
+                ? 'Find jobs on the board or advertise a service when you are ready.'
+                : 'Post a job or browse services to get started.'}
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -894,224 +319,88 @@ export default function HomeTabScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-    marginBottom: 22,
-  },
-  kicker: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#95d5b2',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    letterSpacing: 0,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.textSecondary,
-    marginTop: 8,
-  },
+  center: { alignItems: 'center', justifyContent: 'center' },
+
+  header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
+  kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.primary, textTransform: 'uppercase', marginBottom: 6 },
+  title:    { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary },
+  subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
+
   avatarButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    overflow: 'hidden',
+    marginLeft: 12,
   },
-  avatar: { width: 48, height: 48, borderRadius: 24 },
-  avatarText: { fontSize: 15, fontWeight: '700', color: colors.primary },
-  actionsGrid: { gap: 12, marginBottom: 26 },
-  actionCard: {
-    borderRadius: 16,
-    padding: 18,
-    minHeight: 104,
-    justifyContent: 'center',
-  },
-  primaryAction: { backgroundColor: colors.primary },
-  secondaryAction: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  actionTitle: { fontSize: 21, fontWeight: '700', letterSpacing: 0, marginBottom: 8 },
-  primaryActionText: { color: colors.white },
+  avatar:     { width: 44, height: 44 },
+  avatarText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
+
+  actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  actionCard:  { flex: 1, borderRadius: 14, padding: 16, minHeight: 104 },
+  primaryAction:   { backgroundColor: colors.primary },
+  secondaryAction: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  actionTitle:    { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  actionSubtitle: { fontSize: 12, lineHeight: 17 },
+  primaryActionText:   { color: colors.white },
+  primaryActionSub:    { color: 'rgba(255,255,255,0.85)' },
   secondaryActionText: { color: colors.textPrimary },
-  actionSubtitle: { fontSize: 14, lineHeight: 20 },
-  primaryActionSub: { color: 'rgba(255,255,255,0.82)' },
-  secondaryActionSub: { color: colors.textSecondary },
-  section: { marginBottom: 26 },
+  secondaryActionSub:  { color: colors.textMuted },
+
+  section: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 12,
-    letterSpacing: 0,
-  },
-  sectionLink: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  cardSection: { marginBottom: 24 },
-  cardSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 10,
-    paddingHorizontal: 20,
   },
-  cardSectionTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-  hListContent: { paddingLeft: 20 },
-  bookingWorkWrap: { width: CARD_WIDTH, gap: 8 },
-  miniActionRow: { flexDirection: 'row', gap: 6 },
-  miniPrimaryBtn: {
-    flex: 1,
-    minHeight: 36,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  miniPrimaryText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  miniDangerBtn: {
-    flex: 1,
-    minHeight: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.danger,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  miniDangerText: {
-    color: colors.danger,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  bookingHint: {
-    fontSize: 11,
-    lineHeight: 15,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  attentionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  attentionDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-  },
-  attentionDotWarning: { backgroundColor: colors.warning },
-  attentionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
-  attentionDetail: { fontSize: 13, color: colors.textSecondary },
-  attentionArrow: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  emptyState: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
-  emptyBody: { fontSize: 14, lineHeight: 21, color: colors.textSecondary },
-  workCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  workCardTop: {
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
+
+  allClearText: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
+
+  notifRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    marginBottom: 10,
+    paddingVertical: 12,
   },
-  workEyebrow: { fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 5 },
-  workTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, lineHeight: 21 },
-  workMeta: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
-  statusPill: {
+  notifRowBorder: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  notifIcon: { fontSize: 18, lineHeight: 22 },
+  notifBody: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
+  notifTime: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  notifDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 6 },
+
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  summaryRowBorder: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  summaryCount: {
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.primaryLight,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  statusPillText: { fontSize: 11, color: colors.primary, fontWeight: '700' },
-  cardActions: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  outlineBtn: {
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 8,
   },
-  outlineBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  solidBtn: {
-    flex: 1,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  solidBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
-  dangerBtn: {
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.danger,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dangerBtnText: { fontSize: 14, fontWeight: '700', color: colors.danger },
-  seeAllCard: {
-    width: 72,
-    alignSelf: 'stretch',
-    marginLeft: CARD_GAP,
-    marginRight: 20,
-    borderRadius: 12,
-    backgroundColor: colors.primaryLight,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  seeAllCardText: { fontSize: 13, fontWeight: '700', color: colors.primary, textAlign: 'center' },
+  summaryCountText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  summaryLabel:     { flex: 1, fontSize: 14, color: colors.textPrimary },
+  summaryChevron:   { fontSize: 20, color: colors.textMuted },
+
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  emptyBody:  { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
 })

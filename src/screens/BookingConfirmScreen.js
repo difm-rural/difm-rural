@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { CommonActions } from '@react-navigation/native'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import AddressAutocomplete from '../components/AddressAutocomplete'
 
 function formatDisplayDate(d) {
   return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -73,26 +75,42 @@ function AuthSheet({ onDismiss, onLogin, onRegister }) {
 
 export default function BookingConfirmScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
-  const { service, quantity: initialQty } = route.params
+  const { service, quantity: initialQty } = route.params || {}
   const qty = initialQty || 1
   const rate = asNumber(service?.rate)
+  const isQuoteRequired = service?.pricing_type === 'quote_required'
   const total = (qty * rate).toFixed(2)
 
-  const unitLabel = service.pricing_type === 'hourly' ? 'hour'
-    : service.pricing_type === 'day_rate' ? 'day'
-    : (service.unit_label || 'unit')
+  const unitLabel = service?.pricing_type === 'hourly' ? 'hour'
+    : service?.pricing_type === 'day_rate' ? 'day'
+    : (service?.unit_label || 'unit')
 
   const [scheduleType,   setScheduleType]   = useState('asap')
   const [date,           setDate]           = useState(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [location, setLocation] = useState('')
+  const [latitude, setLatitude] = useState(null)
+  const [longitude, setLongitude] = useState(null)
+  const [locationNote, setLocationNote] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
-  const paymentExplanation = service.payment_timing === 'upfront'
+  const paymentExplanation = isQuoteRequired
+    ? 'The provider will confirm pricing before the work goes ahead.'
+    : service?.payment_timing === 'upfront'
     ? 'Payment will be taken now and held securely until the service is confirmed.'
     : 'Payment will be taken after you confirm the service is complete.'
+
+  useEffect(() => {
+    const result = route.params?.locationResult
+    if (!result) return
+    if (result.address) setLocation(result.address)
+    if (result.latitude != null) setLatitude(result.latitude)
+    if (result.longitude != null) setLongitude(result.longitude)
+    if (result.locationNote != null) setLocationNote(result.locationNote)
+    navigation.setParams({ locationResult: null })
+  }, [route.params?.locationResult])
 
   function buildBookingPayload(requesterId) {
     return {
@@ -100,13 +118,54 @@ export default function BookingConfirmScreen({ route, navigation }) {
       requester_id:   requesterId,
       provider_id:    service.provider_id,
       quantity:       qty,
-      total_amount:   parseFloat(total),
+      total_amount:   isQuoteRequired ? 0 : parseFloat(total),
       payment_timing: service.payment_timing,
       status:         'pending',
       scheduled_date: scheduleType === 'specific' ? (date ? date.toISOString().split('T')[0] : null) : scheduleType,
       location_name:  location.trim(),
+      latitude,
+      longitude,
+      location_note: locationNote.trim() || null,
       notes:          notes.trim() || null,
     }
+  }
+
+  function openPinPicker() {
+    if (!location.trim()) {
+      Alert.alert('Add address first', 'Start with an address or property location, then place the exact pin.')
+      return
+    }
+    navigation.navigate('LocationPicker', {
+      returnTo: 'BookingConfirm',
+      returnParams: { service, quantity: qty },
+      title: 'Pin service location',
+      subtitle: 'Tap the map or drag the pin to the exact spot for this service',
+      initialLatitude: latitude,
+      initialLongitude: longitude,
+      initialLocationNote: locationNote,
+    })
+  }
+
+  if (!service) {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
+            <Text style={styles.backBtnText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.kicker}>Booking</Text>
+          <Text style={styles.headerTitle} accessibilityRole="header">Booking unavailable</Text>
+        </View>
+        <View style={styles.centerState}>
+          <Text style={styles.centerTitle}>We couldn't reload this booking.</Text>
+          <Text style={styles.centerBody}>Please go back to the service and start the booking again.</Text>
+        </View>
+      </View>
+    )
   }
 
   async function savePendingBooking() {
@@ -130,11 +189,17 @@ export default function BookingConfirmScreen({ route, navigation }) {
   function navigateToServices() {
     const routeNames = navigation.getState()?.routeNames || []
     if (routeNames.includes('BrowseMain')) {
-      navigation.navigate('BrowseMain', { refresh: true })
+      navigation.dispatch(CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'BrowseMain', params: { refresh: true } }],
+      }))
       return
     }
     if (routeNames.includes('ServicesList')) {
-      navigation.navigate('ServicesList', { refresh: true })
+      navigation.dispatch(CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'ServicesList', params: { refresh: true } }],
+      }))
       return
     }
     navigation.getParent()?.navigate('Browse', {
@@ -175,7 +240,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -193,18 +259,19 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 90 }]}
-        keyboardShouldPersistTaps="handled">
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 170 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive">
 
         {/* Booking summary */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Booking summary</Text>
           <SummaryRow label="Service" value={service.title} />
           <SummaryRow label="Provider" value={service.profile?.full_name || 'Provider'} />
-          {service.pricing_type !== 'fixed' && (
+          {service.pricing_type !== 'fixed' && !isQuoteRequired && (
             <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
           )}
-          <SummaryRow label="Total" value={`$${total} NZD`} />
+          <SummaryRow label="Total" value={isQuoteRequired ? 'Quote to be confirmed' : `$${total} NZD`} />
           <SummaryRow
             label="Payment"
             value={service.payment_timing === 'upfront' ? 'Upfront' : 'On completion'}
@@ -255,10 +322,11 @@ export default function BookingConfirmScreen({ route, navigation }) {
                     value={date || new Date()}
                     mode="date"
                     minimumDate={new Date()}
-                    onChange={(event, selected) => {
+                    onValueChange={(selected) => {
                       if (Platform.OS === 'android') setShowDatePicker(false)
                       if (selected) setDate(selected)
                     }}
+                    onDismiss={() => setShowDatePicker(false)}
                   />
                 </>
               )}
@@ -267,18 +335,41 @@ export default function BookingConfirmScreen({ route, navigation }) {
         </View>
 
         {/* Location */}
-        <View style={styles.card}>
+        <View style={[styles.card, styles.locationCard]}>
           <Text style={styles.cardLabel}>Where?</Text>
           <View style={styles.inputWrap}>
-            <TextInput
-              style={styles.input}
-              placeholder="Your address or property location"
-              placeholderTextColor={colors.textMuted}
+            <AddressAutocomplete
               value={location}
-              onChangeText={setLocation}
-              autoCapitalize="words"
-              accessibilityLabel="Location"
+              placeholder="Your address or property location"
+              onChangeText={(text) => {
+                setLocation(text)
+                setLatitude(null)
+                setLongitude(null)
+              }}
+              onSelect={({ address, latitude: lat, longitude: lng }) => {
+                setLocation(address || '')
+                setLatitude(lat || null)
+                setLongitude(lng || null)
+              }}
             />
+          </View>
+          <View style={styles.pinBox}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pinTitle}>{latitude && longitude ? 'Exact pin set' : 'Add exact pin'}</Text>
+              <Text style={styles.pinBody}>
+                {latitude && longitude
+                  ? `${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}`
+                  : 'Mark the gate, shed, tank, paddock, or work area.'}
+              </Text>
+              {!!locationNote && <Text style={styles.pinNote} numberOfLines={2}>{locationNote}</Text>}
+            </View>
+            <TouchableOpacity
+              style={styles.pinBtn}
+              onPress={openPinPicker}
+              accessibilityRole="button"
+              accessibilityLabel={latitude && longitude ? 'Edit exact pin' : 'Drop exact pin'}>
+              <Text style={styles.pinBtnText}>{latitude && longitude ? 'Edit pin' : 'Drop pin'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -305,7 +396,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>${total} NZD</Text>
+            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `$${total} NZD`}</Text>
           </View>
           <View style={styles.paymentInfoBox}>
             <Text style={styles.paymentInfoText}>{paymentExplanation}</Text>
@@ -354,6 +445,9 @@ const styles = StyleSheet.create({
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
   kicker:      { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  centerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  centerBody: { fontSize: 14, lineHeight: 21, color: colors.textSecondary, textAlign: 'center' },
 
   scroll:        { flex: 1 },
   scrollContent: { padding: 16 },
@@ -367,6 +461,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingTop: 14,
   },
+  locationCard: { overflow: 'visible', zIndex: 20, elevation: 20 },
   cardLabel: {
     fontSize: 11,
     fontWeight: '700',
@@ -445,6 +540,28 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   multiline: { height: 100, textAlignVertical: 'top' },
+  pinBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f2f2f2',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  pinTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
+  pinBody: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
+  pinNote: { fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 5 },
+  pinBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 42,
+    justifyContent: 'center',
+  },
+  pinBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 
   totalCard: {
     backgroundColor: colors.white,

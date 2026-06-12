@@ -17,6 +17,7 @@ import { colors } from '../theme/tokens'
 function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
   switch (pricing_type) {
+    case 'quote_required': return 'Quote required'
     case 'hourly':   return `$${rate}/hr`
     case 'day_rate': return `$${rate}/day`
     case 'per_unit': return `$${rate}/${unit_label || 'unit'}`
@@ -57,11 +58,15 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           style={[styles.toggleSwitch, service.is_active && styles.toggleSwitchOn]}
           onPress={() => onToggleActive(service)}
           accessibilityRole="switch"
-          accessibilityLabel={service.is_active ? 'Deactivate service' : 'Activate service'}
+          accessibilityLabel={service.is_active ? 'Pause service advertising' : 'Resume service advertising'}
           accessibilityState={{ checked: service.is_active }}>
           <View style={[styles.toggleThumb, service.is_active && styles.toggleThumbOn]} />
         </TouchableOpacity>
       </View>
+
+      <Text style={[styles.statusText, !service.is_active && styles.statusTextPaused]}>
+        {service.is_active ? 'Advertising live' : 'Advertising paused'}
+      </Text>
 
       <Text style={styles.rowMeta}>
         {service.category}  ·  📍 {service.location_name || '—'}
@@ -162,12 +167,25 @@ export default function MyServicesScreen({ navigation, route }) {
   }
 
   async function handleToggleActive(service) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const providerId = user?.id || userId
+    if (!providerId) {
+      Alert.alert('Sign in required', 'Please sign in again to update this service.')
+      return
+    }
+
+    if (service.provider_id && service.provider_id !== providerId) {
+      Alert.alert('Cannot update service', 'Only the provider who owns this service can change its advertising status.')
+      return
+    }
+
     const newVal = !service.is_active
     setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: newVal } : s))
     const { error } = await supabase
       .from('services')
       .update({ is_active: newVal })
       .eq('id', service.id)
+      .eq('provider_id', providerId)
     if (error) {
       setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: !newVal } : s))
       Alert.alert('Error', error.message)
@@ -178,7 +196,26 @@ export default function MyServicesScreen({ navigation, route }) {
     navigation.navigate('CreateService', { service })
   }
 
-  function handleDelete(service) {
+  async function handleDelete(service) {
+    const { data: bookingsData, error: bookingError } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('service_id', service.id)
+      .limit(1)
+
+    if (bookingError) {
+      Alert.alert('Could not check bookings', bookingError.message)
+      return
+    }
+
+    if (bookingsData?.length > 0) {
+      Alert.alert(
+        'Cannot delete this service',
+        'This service has booking history. Pause advertising instead so it stops showing to requesters while existing jobs and records remain available.'
+      )
+      return
+    }
+
     Alert.alert(
       'Delete service',
       `Delete "${service.title}"? This cannot be undone.`,
@@ -341,6 +378,8 @@ const styles = StyleSheet.create({
   toggleThumbOn:   { alignSelf: 'flex-end' },
 
   rowMeta:  { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+  statusText: { fontSize: 12, color: colors.primary, fontWeight: '700', marginBottom: 6 },
+  statusTextPaused: { color: colors.textMuted },
   rowDate:  { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
   rowRate:  { fontSize: 14, fontWeight: '600', color: colors.primary, marginBottom: 8 },
 

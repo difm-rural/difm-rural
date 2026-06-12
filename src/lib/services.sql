@@ -6,7 +6,7 @@ create table if not exists public.services (
   category text not null,
   location_name text not null,
   travel_range_km numeric,
-  pricing_type text not null check (pricing_type in ('hourly', 'fixed', 'per_unit', 'day_rate')),
+  pricing_type text not null check (pricing_type in ('hourly', 'fixed', 'per_unit', 'day_rate', 'quote_required')),
   rate numeric not null check (rate >= 0),
   unit_label text,
   minimum_units numeric not null default 1 check (minimum_units > 0),
@@ -26,9 +26,12 @@ create table if not exists public.bookings (
   quantity numeric not null default 1 check (quantity > 0),
   total_amount numeric not null check (total_amount >= 0),
   payment_timing text not null check (payment_timing in ('upfront', 'on_completion')),
-  status text not null default 'pending' check (status in ('pending', 'confirmed', 'in_progress', 'awaiting_completion', 'completed', 'cancelled', 'declined')),
+  status text not null default 'pending' check (status in ('pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'completed', 'withdrawn', 'cancelled', 'declined')),
   scheduled_date text,
   location_name text not null,
+  latitude numeric,
+  longitude numeric,
+  location_note text,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -56,11 +59,13 @@ begin
     add constraint bookings_status_check
     check (status in (
       'pending',
+      'quote_sent',
       'confirmed',
       'in_progress',
       'awaiting_completion',
       'cancellation_requested',
       'completed',
+      'withdrawn',
       'cancelled',
       'declined'
     ));

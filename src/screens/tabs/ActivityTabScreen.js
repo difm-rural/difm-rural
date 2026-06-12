@@ -15,7 +15,12 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import ReviewModal from '../../components/ReviewModal'
+import CancelModal from '../../components/CancelModal'
 import { loadReview, saveReview } from '../../lib/reviews'
+
+function bookingNeedsQuote(booking) {
+  return (booking?.service || booking?.services)?.pricing_type === 'quote_required'
+}
 
 function BookingWorkCard({
   booking,
@@ -27,6 +32,7 @@ function BookingWorkCard({
   onConfirmComplete,
   onCancelRequest,
   onConfirmCancellation,
+  onDismiss,
   onReview,
 }) {
   const serviceItem = {
@@ -38,11 +44,13 @@ function BookingWorkCard({
     },
   }
   const canRequesterCancel = viewerRole === 'requester'
-    && ['pending', 'confirmed', 'in_progress', 'awaiting_completion'].includes(booking.status)
+    && ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion'].includes(booking.status)
   const requesterNeedsConfirm = viewerRole === 'requester' && booking.status === 'awaiting_completion'
-  const providerPending = viewerRole === 'provider' && booking.status === 'pending'
+  const providerNeedsQuote = viewerRole === 'provider' && booking.status === 'pending' && serviceItem.pricing_type === 'quote_required'
+  const providerPending = viewerRole === 'provider' && booking.status === 'pending' && !providerNeedsQuote
   const providerActive = viewerRole === 'provider' && ['confirmed', 'in_progress'].includes(booking.status)
   const providerCanConfirmCancellation = viewerRole === 'provider' && booking.status === 'cancellation_requested'
+  const providerCanDismiss = viewerRole === 'provider' && ['withdrawn', 'cancelled'].includes(booking.status)
   const canReview = booking.status === 'completed' && !!onReview
 
   return (
@@ -73,13 +81,32 @@ function BookingWorkCard({
         </View>
       )}
 
+      {providerNeedsQuote && (
+        <View style={styles.miniActionRow}>
+          <TouchableOpacity
+            style={styles.miniDangerBtn}
+            onPress={onDecline}
+            accessibilityRole="button"
+            accessibilityLabel="Decline booking">
+            <Text style={styles.miniDangerText}>Decline</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.miniPrimaryBtn}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel="Send quote">
+            <Text style={styles.miniPrimaryText}>Quote</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {providerActive && (
         <TouchableOpacity
           style={styles.miniPrimaryBtn}
           onPress={onReady}
           accessibilityRole="button"
           accessibilityLabel="Send booking for requester confirmation">
-          <Text style={styles.miniPrimaryText}>Ready</Text>
+          <Text style={styles.miniPrimaryText}>Tell requester</Text>
         </TouchableOpacity>
       )}
 
@@ -90,6 +117,16 @@ function BookingWorkCard({
           accessibilityRole="button"
           accessibilityLabel="Confirm cancellation">
           <Text style={styles.miniDangerText}>Confirm cancel</Text>
+        </TouchableOpacity>
+      )}
+
+      {providerCanDismiss && (
+        <TouchableOpacity
+          style={styles.miniPrimaryBtn}
+          onPress={onDismiss}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss service booking">
+          <Text style={styles.miniPrimaryText}>Dismiss</Text>
         </TouchableOpacity>
       )}
 
@@ -110,7 +147,7 @@ function BookingWorkCard({
           accessibilityRole="button"
           accessibilityLabel="Cancel service booking">
           <Text style={styles.miniDangerText}>
-            {booking.status === 'pending' ? 'Cancel' : 'Request cancel'}
+            {['pending', 'quote_sent'].includes(booking.status) ? 'Withdraw' : 'Request cancel'}
           </Text>
         </TouchableOpacity>
       )}
@@ -154,6 +191,7 @@ export default function ActivityTabScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false)
   const [reviewContext, setReviewContext] = useState(null)
   const [savingReview, setSavingReview] = useState(false)
+  const [cancelBookingTarget, setCancelBookingTarget] = useState(null)
 
   useFocusEffect(useCallback(() => { load() }, []))
 
@@ -207,7 +245,7 @@ export default function ActivityTabScreen({ navigation }) {
       .from('bookings')
       .select('*, services(*)')
       .eq('requester_id', uid)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'])
+      .in('status', ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'])
       .order('created_at', { ascending: false })
 
     const rawBookings = bookingsData || []
@@ -246,7 +284,7 @@ export default function ActivityTabScreen({ navigation }) {
       .from('bookings')
       .select('*, services(*)')
       .eq('provider_id', uid)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'cancelled'])
+      .in('status', ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'withdrawn', 'cancelled'])
       .order('created_at', { ascending: false })
 
     const rawBookings = bookingsData || []
@@ -256,7 +294,10 @@ export default function ActivityTabScreen({ navigation }) {
         .from('profiles').select('id, full_name').in('id', requesterIds)
       const profileMap = {}
       reqProfiles?.forEach(p => { profileMap[p.id] = p })
-      setProviderBookings(rawBookings.map(b => ({
+      const visibleBookings = rawBookings.filter(b =>
+        !(['withdrawn', 'cancelled'].includes(b.status) && b.provider_archive_at)
+      )
+      setProviderBookings(visibleBookings.map(b => ({
         ...b,
         service: b.services,
         requesterName: profileMap[b.requester_id]?.full_name || '—',
@@ -339,8 +380,12 @@ export default function ActivityTabScreen({ navigation }) {
     setCompletedCount(jobs.length + bookings.length)
   }
 
-  async function confirmBooking(bookingId) {
-    const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', bookingId)
+  async function confirmBooking(booking) {
+    if (bookingNeedsQuote(booking)) {
+      navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })
+      return
+    }
+    const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', booking.id)
     if (!error) load()
     else Alert.alert('Error', 'Could not confirm booking.')
   }
@@ -360,6 +405,21 @@ export default function ActivityTabScreen({ navigation }) {
     ])
   }
 
+  async function dismissProviderBooking(booking) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { error } = await supabase
+      .from('bookings')
+      .update({ provider_archive_at: new Date().toISOString() })
+      .eq('id', booking.id)
+      .eq('provider_id', user.id)
+      .in('status', ['withdrawn', 'cancelled'])
+
+    if (error) Alert.alert('Could not dismiss booking', error.message)
+    else load()
+  }
+
   async function completeBooking(bookingId) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -375,30 +435,38 @@ export default function ActivityTabScreen({ navigation }) {
     else Alert.alert('Could not send for confirmation', error.message)
   }
 
-  async function cancelRequesterBooking(booking) {
+  function cancelRequesterBooking(booking) {
+    setCancelBookingTarget(booking)
+  }
+
+  async function handleBookingCancelConfirm(reason, note) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const nextStatus = booking.status === 'pending' ? 'cancelled' : 'cancellation_requested'
-    const message = booking.status === 'pending'
-      ? 'Cancel this service order? The provider has not accepted it yet.'
-      : 'Request cancellation? The provider will be asked to confirm.'
+    const booking = cancelBookingTarget
+    const isPendingBooking = ['pending', 'quote_sent'].includes(booking.status)
+    const nextStatus = isPendingBooking ? 'withdrawn' : 'cancellation_requested'
 
-    Alert.alert('Cancel order', message, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: booking.status === 'pending' ? 'Cancel order' : 'Request cancellation',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase
-            .from('bookings')
-            .update({ status: nextStatus })
-            .eq('id', booking.id)
-            .eq('requester_id', user.id)
-          if (error) Alert.alert('Could not cancel order', error.message)
-          else load()
-        },
-      },
-    ])
+    const { error } = await supabase
+      .from('bookings')
+      .update({
+        status: nextStatus,
+        cancellation_reason: reason,
+        cancellation_note: note,
+      })
+      .eq('id', booking.id)
+      .eq('requester_id', user.id)
+      .eq('status', booking.status)
+
+    if (error) {
+      Alert.alert(
+        isPendingBooking ? 'Could not withdraw request' : 'Could not request cancellation',
+        error.message
+      )
+      return
+    }
+
+    setCancelBookingTarget(null)
+    load()
   }
 
   async function confirmCancellation(bookingId) {
@@ -535,7 +603,7 @@ export default function ActivityTabScreen({ navigation }) {
             {isProvider && (
               <TouchableOpacity
                 style={styles.browseBtn}
-                onPress={() => navigation.getParent()?.navigate('Browse')}
+                onPress={() => navigation.getParent()?.navigate('Jobs')}
                 accessibilityRole="button">
                 <Text style={styles.browseBtnText}>Browse jobs</Text>
               </TouchableOpacity>
@@ -581,7 +649,7 @@ export default function ActivityTabScreen({ navigation }) {
                 <BookingWorkCard
                   booking={b}
                   viewerRole="requester"
-                  onPress={() => navigation.navigate('ServiceDetail', { service: b.service })}
+                  onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: 'requester' })}
                   onConfirmComplete={() => confirmBookingComplete(b.id)}
                   onCancelRequest={() => cancelRequesterBooking(b)}
                 />
@@ -634,11 +702,12 @@ export default function ActivityTabScreen({ navigation }) {
                 <BookingWorkCard
                   booking={b}
                   viewerRole="provider"
-                  onPress={() => navigation.navigate('ServiceDetail', { service: b.service })}
-                  onConfirm={() => confirmBooking(b.id)}
+                  onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: 'provider' })}
+                  onConfirm={() => confirmBooking(b)}
                   onDecline={() => declineBooking(b.id)}
                   onReady={() => completeBooking(b.id)}
                   onConfirmCancellation={() => confirmCancellation(b.id)}
+                  onDismiss={() => dismissProviderBooking(b)}
                 />
               )}
               showsHorizontalScrollIndicator={false}
@@ -705,7 +774,7 @@ export default function ActivityTabScreen({ navigation }) {
                         <BookingWorkCard
                           booking={{ ...b, status: 'completed' }}
                           viewerRole={b._viewerRole}
-                          onPress={() => navigation.navigate('ServiceDetail', { service: b.service })}
+                          onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: b._viewerRole })}
                           onReview={() => openBookingReview(b)}
                         />
                       )}
@@ -723,6 +792,14 @@ export default function ActivityTabScreen({ navigation }) {
           </>
         )}
       </ScrollView>
+      <CancelModal
+        visible={!!cancelBookingTarget}
+        onClose={() => setCancelBookingTarget(null)}
+        onConfirm={handleBookingCancelConfirm}
+        title="Cancel booking"
+        subtitle={cancelBookingTarget?.service?.title || 'Service booking'}
+        type="booking"
+      />
       <ReviewModal
         visible={!!reviewContext}
         title={reviewContext?.reviewerRole === 'requester' ? 'Review provider' : 'Review requester'}

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
+import CancelModal from '../components/CancelModal'
 import { loadReview, saveReview } from '../lib/reviews'
 
 function timeAgo(isoString) {
@@ -65,6 +66,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const { job: initialJob, bidCount = 0 } = route.params
   const [job, setJob] = useState(initialJob)
   const [acceptedBid, setAcceptedBid] = useState(null)
+  const [requesterProfile, setRequesterProfile] = useState(null)
   const [loadingBid, setLoadingBid] = useState(false)
   const [bids, setBids] = useState([])
   const [loadingBids, setLoadingBids] = useState(false)
@@ -73,6 +75,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
 
   useEffect(() => {
     async function loadCurrentUserAndJob() {
@@ -88,6 +91,19 @@ export default function ManageTaskScreen({ navigation, route }) {
     }
     loadCurrentUserAndJob()
   }, [initialJob.id])
+
+  useEffect(() => {
+    async function fetchRequesterProfile() {
+      if (!job.requester_id) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', job.requester_id)
+        .single()
+      setRequesterProfile(data || null)
+    }
+    fetchRequesterProfile()
+  }, [job.requester_id])
 
   useEffect(() => {
     if (['accepted', 'in_progress', 'completed'].includes(job.status)) {
@@ -211,9 +227,34 @@ export default function ManageTaskScreen({ navigation, route }) {
     }
   }
 
+  const cancelModalType = ['accepted', 'in_progress'].includes(job.status) ? 'job_accepted' : 'job_open'
+  const cancelModalJSX = (
+    <CancelModal
+      visible={showCancelModal}
+      onClose={() => setShowCancelModal(false)}
+      onConfirm={async (reason, note) => {
+        const { error } = await supabase
+          .from('jobs')
+          .update({ status: 'cancelled', cancellation_reason: reason, cancellation_note: note })
+          .eq('id', job.id)
+          .eq('requester_id', currentUserId)
+        if (error) { Alert.alert('Something went wrong', error.message || 'Please try again'); return }
+        setShowCancelModal(false)
+        navigation.goBack()
+      }}
+      title="Cancel job"
+      subtitle={job.title}
+      type={cancelModalType}
+      bidCount={bidCount}
+      providerName={acceptedBid?.providerName}
+    />
+  )
+
   const badge = getBadge()
   const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
+  const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
+  const isAwarded = job.status === 'accepted' || job.status === 'in_progress'
 
   function ensureTaskOwner() {
     if (isTaskOwner) return true
@@ -231,36 +272,19 @@ export default function ManageTaskScreen({ navigation, route }) {
     try {
       const priceStr = job.price_type === 'fixed' ? `$${job.price} fixed price` : 'Open to bids'
       await Share.share({
-        message: `Check out this task on DIFM Rural: ${job.title} in ${job.location_name}. ${priceStr}`,
+        message: `Check out this job on DIFM Rural: ${job.title} in ${job.location_name}. ${priceStr}`,
       })
     } catch {}
   }
 
   function handleCancel() {
     if (!ensureTaskOwner()) return
-    let message = 'Are you sure you want to cancel this task?'
-    if (job.status === 'open' && bidCount > 0) {
-      message = `You have ${bidCount} bid${bidCount > 1 ? 's' : ''} on this task. Cancelling will notify providers their bids were unsuccessful. Continue?`
-    } else if (job.status === 'accepted' || job.status === 'in_progress') {
-      message = 'This job has been awarded to a provider. Are you sure you want to cancel? The provider will be notified.'
-    }
-    Alert.alert('Cancel task', message, [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, cancel',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('jobs').update({ status: 'cancelled' }).eq('id', job.id).eq('requester_id', currentUserId)
-          if (error) { Alert.alert('Something went wrong', error.message || 'Please try again', [{ text: 'OK' }]); return }
-          navigation.goBack()
-        },
-      },
-    ])
+    setShowCancelModal(true)
   }
 
   function handleDelete() {
     if (!ensureTaskOwner()) return
-    Alert.alert('Delete task', 'Are you sure? This cannot be undone.', [
+    Alert.alert('Delete job', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -315,11 +339,15 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   function handleChat() {
     if (!acceptedBid) return
+    const otherUserId = isAcceptedProvider ? job.requester_id : acceptedBid.providerId
+    const otherUserName = isAcceptedProvider
+      ? (requesterProfile?.full_name || 'Requester')
+      : acceptedBid.providerName
     navigation.navigate('Chat', {
       jobId: job.id,
       jobTitle: job.title,
-      otherUserId: acceptedBid.providerId,
-      otherUserName: acceptedBid.providerName,
+      otherUserId,
+      otherUserName,
     })
   }
 
@@ -327,7 +355,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     if (!ensureTaskOwner()) return
     Alert.alert(
       'Confirm complete',
-      'Mark this task as complete? This confirms the work is done.',
+      'Mark this job as complete? This confirms the work is done.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -339,6 +367,11 @@ export default function ManageTaskScreen({ navigation, route }) {
               return
             }
             setJob(prev => ({ ...prev, status: 'completed' }))
+            if (acceptedBid?.providerId) {
+              setReviewVisible(true)
+            } else {
+              Alert.alert('Job completed', 'This job has been marked complete.')
+            }
           },
         },
       ]
@@ -370,8 +403,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         accessibilityLabel="Go back">
         <Text style={styles.backBtnText}>← Back</Text>
       </TouchableOpacity>
-      <Text style={styles.kicker}>Task</Text>
-      <Text style={styles.headerTitle} accessibilityRole="header">Manage task</Text>
+      <Text style={styles.kicker}>Job</Text>
+      <Text style={styles.headerTitle} accessibilityRole="header">Manage job</Text>
       <Text style={styles.headerSubtitle} numberOfLines={2}>{job.title}</Text>
     </View>
   )
@@ -381,13 +414,13 @@ export default function ManageTaskScreen({ navigation, route }) {
       <View style={styles.screen}>
         {headerJSX}
         <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading task...</Text>
+          <Text style={styles.loadingText}>Loading job...</Text>
         </View>
       </View>
     )
   }
 
-  if (currentUserId && !isTaskOwner) {
+  if (currentUserId && !isTaskOwner && !isAcceptedProvider && !(isAwarded && (loadingBid || !acceptedBid))) {
     return (
       <View style={styles.screen}>
         {headerJSX}
@@ -420,11 +453,18 @@ export default function ManageTaskScreen({ navigation, route }) {
   // ─────────────────────────────────────────────────────────────────
   //  ACCEPTED / IN-PROGRESS LAYOUT
   // ─────────────────────────────────────────────────────────────────
-  const isAwarded = job.status === 'accepted' || job.status === 'in_progress'
-
   if (isAwarded) {
-    const providerFirstName = acceptedBid?.providerName?.split(' ')[0] || 'Provider'
-    const initials = getInitials(acceptedBid?.providerName)
+    const otherPartyName = isAcceptedProvider
+      ? (requesterProfile?.full_name || 'Requester')
+      : (acceptedBid?.providerName || 'Provider')
+    const otherPartyFirstName = otherPartyName.split(' ')[0] || (isAcceptedProvider ? 'Requester' : 'Provider')
+    const otherPartyAvatar = isAcceptedProvider ? requesterProfile?.avatar_url : acceptedBid?.avatarUrl
+    const otherPartyInitials = getInitials(otherPartyName)
+    const otherPartyRouteName = isAcceptedProvider ? 'RequesterProfile' : 'ProviderProfile'
+    const otherPartyRouteParams = isAcceptedProvider
+      ? { requesterId: job.requester_id }
+      : { providerId: acceptedBid?.providerId }
+    const otherPartyRoleLabel = isAcceptedProvider ? 'Requester' : 'Assigned provider'
 
     return (
       <View style={styles.screen}>
@@ -432,10 +472,10 @@ export default function ManageTaskScreen({ navigation, route }) {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
           showsVerticalScrollIndicator={false}>
 
-          {/* Task overview */}
+          {/* Job overview */}
           <View style={styles.card}>
             <View style={styles.acceptedHeaderRow}>
               <Text style={styles.acceptedJobTitle} numberOfLines={3}>{job.title}</Text>
@@ -448,35 +488,35 @@ export default function ManageTaskScreen({ navigation, route }) {
             <SummaryRow icon="🏷️" label="Category" value={job.category} last />
           </View>
 
-          {/* Assigned provider */}
+          {/* Job participant */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Assigned provider</Text>
+            <Text style={styles.cardTitle}>{otherPartyRoleLabel}</Text>
             {loadingBid ? (
               <Text style={styles.loadingText}>Loading…</Text>
             ) : acceptedBid ? (
               <>
                 <TouchableOpacity
                   style={styles.providerRow}
-                  onPress={() => navigation.navigate('ProviderProfile', { providerId: acceptedBid.providerId })}
+                  onPress={() => navigation.navigate(otherPartyRouteName, otherPartyRouteParams)}
                   activeOpacity={0.75}
                   accessibilityRole="button"
-                  accessibilityLabel={`View ${acceptedBid.providerName}'s profile`}>
-                  {acceptedBid.avatarUrl ? (
-                    <Image source={{ uri: acceptedBid.avatarUrl }} style={styles.providerAvatar} />
+                  accessibilityLabel={`View ${otherPartyName}'s profile`}>
+                  {otherPartyAvatar ? (
+                    <Image source={{ uri: otherPartyAvatar }} style={styles.providerAvatar} />
                   ) : (
                     <View style={styles.providerAvatarFallback}>
-                      <Text style={styles.providerAvatarInitials}>{initials}</Text>
+                      <Text style={styles.providerAvatarInitials}>{otherPartyInitials}</Text>
                     </View>
                   )}
                   <View style={styles.providerInfo}>
-                    <Text style={styles.providerName}>{acceptedBid.providerName}</Text>
-                    <Text style={styles.providerMeta}>★ 0.0 · New provider</Text>
+                    <Text style={styles.providerName}>{otherPartyName}</Text>
+                    <Text style={styles.providerMeta}>{isAcceptedProvider ? 'Requester' : 'Provider'}</Text>
                   </View>
                   <Text style={styles.actionChevron}>›</Text>
                 </TouchableOpacity>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxText}>
-                    Awarded · ${acceptedBid.bidAmount} NZD · Use chat with {providerFirstName} to confirm timing and details
+                    Awarded · ${acceptedBid.bidAmount} NZD · Use chat with {otherPartyFirstName} to confirm timing and details
                   </Text>
                 </View>
               </>
@@ -490,10 +530,10 @@ export default function ManageTaskScreen({ navigation, route }) {
               onPress={handleChat}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel={`Chat with ${providerFirstName}`}>
+              accessibilityLabel={`Chat with ${otherPartyFirstName}`}>
               <Text style={styles.chatBannerIcon}>💬</Text>
               <View style={styles.chatBannerContent}>
-                <Text style={styles.chatBannerTitle}>Chat with {providerFirstName}</Text>
+                <Text style={styles.chatBannerTitle}>Chat with {otherPartyFirstName}</Text>
                 <Text style={styles.chatBannerSubtitle}>Discuss job details and start time</Text>
               </View>
               <Text style={styles.chatBannerArrow}>›</Text>
@@ -501,6 +541,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           ) : null}
 
           {/* Actions */}
+          {isTaskOwner && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Actions</Text>
             <View style={styles.actionBtns}>
@@ -515,15 +556,16 @@ export default function ManageTaskScreen({ navigation, route }) {
                 style={styles.btnDangerOutline}
                 onPress={handleCancel}
                 accessibilityRole="button"
-                accessibilityLabel="Cancel task">
-                <Text style={styles.btnDangerOutlineText}>Cancel task</Text>
+                accessibilityLabel="Cancel job">
+                <Text style={styles.btnDangerOutlineText}>Cancel job</Text>
               </TouchableOpacity>
             </View>
           </View>
+          )}
 
-          {/* Task details */}
+          {/* Job details */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Task details</Text>
+            <Text style={styles.cardTitle}>Job details</Text>
             <SummaryRow icon="🏷️" label="Category" value={job.category} />
             <SummaryRow icon="📍" label="Location"  value={job.location_name} />
             <SummaryRow icon="💰" label="Budget"    value={budgetText} />
@@ -534,6 +576,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           </View>
 
         </ScrollView>
+        {cancelModalJSX}
       </View>
     )
   }
@@ -583,7 +626,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       key: 'edit',
       emoji: '✏️',
       iconBg: colors.primaryLight,
-      label: 'Edit task details',
+      label: 'Edit job details',
       subtitle: 'Update title, description, budget or schedule',
       onPress: handleEdit,
     },
@@ -591,7 +634,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       key: 'share',
       emoji: '📤',
       iconBg: colors.infoLight,
-      label: 'Share task',
+      label: 'Share job',
       subtitle: 'Send to someone who might help',
       onPress: handleShare,
     },
@@ -607,16 +650,16 @@ export default function ManageTaskScreen({ navigation, route }) {
       key: 'cancel',
       emoji: '🚫',
       iconBg: colors.warningLight,
-      label: 'Cancel task',
-      subtitle: 'Close task, notify bidding providers',
+      label: 'Cancel job',
+      subtitle: 'Close job, notify bidding providers',
       onPress: handleCancel,
     },
     showDelete && {
       key: 'delete',
       emoji: '🗑️',
       iconBg: colors.dangerLight,
-      label: 'Delete task',
-      subtitle: 'Permanently remove this task',
+      label: 'Delete job',
+      subtitle: 'Permanently remove this job',
       onPress: handleDelete,
     },
   ].filter(Boolean)
@@ -627,12 +670,12 @@ export default function ManageTaskScreen({ navigation, route }) {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
         showsVerticalScrollIndicator={false}>
 
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Task summary</Text>
+            <Text style={styles.cardTitle}>Job summary</Text>
             <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
               <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.label}</Text>
             </View>
@@ -728,6 +771,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         </View>
 
       </ScrollView>
+      {cancelModalJSX}
       <ReviewModal
         visible={reviewVisible}
         title={providerReview ? 'Edit provider review' : 'Review provider'}

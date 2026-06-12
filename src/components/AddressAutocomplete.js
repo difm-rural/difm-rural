@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  FlatList,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
-import { GOOGLE_MAPS_API_KEY } from '../lib/constants'
+import { placesAutocomplete, placeDetails } from '../lib/maps'
 import { colors } from '../theme/tokens'
 
 export default function AddressAutocomplete({
@@ -17,6 +16,7 @@ export default function AddressAutocomplete({
   value,
   placeholder,
   autoFocus,
+  onChangeText,
 }) {
   const [query, setQuery]             = useState(value !== undefined ? value : (defaultValue || ''))
   const [suggestions, setSuggestions] = useState([])
@@ -25,8 +25,8 @@ export default function AddressAutocomplete({
 
   // Sync when parent updates defaultValue (e.g. after DB load)
   useEffect(() => {
-    setQuery(defaultValue || '')
-  }, [defaultValue])
+    if (value === undefined) setQuery(defaultValue || '')
+  }, [defaultValue, value])
 
   // Sync when controlled value changes externally (e.g. GPS reverse geocode)
   useEffect(() => {
@@ -35,6 +35,7 @@ export default function AddressAutocomplete({
 
   async function fetchSuggestions(text) {
     setQuery(text)
+    onChangeText?.(text)
     if (text.length < 3) {
       setSuggestions([])
       setShowList(false)
@@ -42,37 +43,12 @@ export default function AddressAutocomplete({
     }
     setLoading(true)
     try {
-      const response = await fetch(
-        'https://places.googleapis.com/v1/places:autocomplete',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
-          },
-          body: JSON.stringify({
-            input: text,
-            includedRegionCodes: ['nz'],
-            languageCode: 'en',
-          }),
-        }
-      )
-      const data = await response.json()
-
-      if (data.suggestions) {
-        const predictions = data.suggestions
-          .map(s => ({
-            place_id:    s.placePrediction?.placeId,
-            description: s.placePrediction?.text?.text,
-          }))
-          .filter(p => p.place_id && p.description)
-        setSuggestions(predictions)
-        setShowList(predictions.length > 0)
-      } else {
-        setSuggestions([])
-        setShowList(false)
-      }
+      const predictions = await placesAutocomplete(text)
+      setSuggestions(predictions)
+      setShowList(predictions.length > 0)
     } catch {
+      setSuggestions([])
+      setShowList(false)
     } finally {
       setLoading(false)
     }
@@ -83,21 +59,12 @@ export default function AddressAutocomplete({
     setShowList(false)
     setSuggestions([])
     try {
-      const response = await fetch(
-        `https://places.googleapis.com/v1/places/${prediction.place_id}`,
-        {
-          headers: {
-            'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
-            'X-Goog-FieldMask': 'location,formattedAddress,displayName',
-          },
-        }
-      )
-      const data = await response.json()
+      const data = await placeDetails(prediction.place_id)
 
       onSelect({
         address:   prediction.description,
-        latitude:  data.location?.latitude  || null,
-        longitude: data.location?.longitude || null,
+        latitude:  data.latitude  || null,
+        longitude: data.longitude || null,
       })
     } catch {
       onSelect({ address: prediction.description })
@@ -125,23 +92,21 @@ export default function AddressAutocomplete({
 
       {showList && suggestions.length > 0 && (
         <View style={styles.list}>
-          <FlatList
-            data={suggestions}
-            keyExtractor={item => item.place_id}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
-                style={[
-                  styles.listRow,
-                  index < suggestions.length - 1 && styles.listRowBorder,
-                ]}
-                onPress={() => handleSelect(item)}>
-                <Text style={styles.listRowText} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
+          {suggestions.map((item, index) => (
+            <TouchableOpacity
+              key={item.place_id}
+              style={[
+                styles.listRow,
+                index < suggestions.length - 1 && styles.listRowBorder,
+              ]}
+              onPress={() => handleSelect(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Use address ${item.description}`}>
+              <Text style={styles.listRowText} numberOfLines={2}>
+                {item.description}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </View>

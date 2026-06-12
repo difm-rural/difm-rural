@@ -84,13 +84,18 @@ export default function LocationPickerScreen({ route, navigation }) {
 
   function handleConfirm() {
     if (!pinLocation) return
-    navigation.navigate(route.params?.returnTo || 'PostJob', {
-      locationResult: {
-        latitude:     pinLocation.latitude,
-        longitude:    pinLocation.longitude,
-        locationNote: locationNote.trim(),
-        address,
+    navigation.navigate({
+      name: route.params?.returnTo || 'PostJob',
+      params: {
+        ...(route.params?.returnParams || {}),
+        locationResult: {
+          latitude:     pinLocation.latitude,
+          longitude:    pinLocation.longitude,
+          locationNote: locationNote.trim(),
+          address,
+        },
       },
+      merge: true,
     })
   }
 
@@ -113,8 +118,8 @@ export default function LocationPickerScreen({ route, navigation }) {
           accessibilityLabel="Go back">
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Pin the job location</Text>
-        <Text style={styles.subtitle}>Tap the map or drag the pin to the exact spot</Text>
+        <Text style={styles.title}>{route.params?.title || 'Pin the job location'}</Text>
+        <Text style={styles.subtitle}>{route.params?.subtitle || 'Tap the map or drag the pin to the exact spot'}</Text>
       </View>
 
       {/* Map */}

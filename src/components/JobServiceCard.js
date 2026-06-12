@@ -41,6 +41,7 @@ function formatPrice(item) {
   }
   const { pricing_type, rate, unit_label } = item
   switch (pricing_type) {
+    case 'quote_required': return 'Quote required'
     case 'hourly':   return `$${rate}/hr`
     case 'day_rate': return `$${rate}/day`
     case 'per_unit': return `$${rate}/${unit_label || 'unit'}`
@@ -75,6 +76,8 @@ function statusBadgeProps(status, bidCount) {
       return { label: 'In progress', bg: '#e3f2fd', fg: '#1565c0' }
     case 'pending':
       return { label: 'Booked', bg: '#f3e5f5', fg: '#9c27b0' }
+    case 'quote_sent':
+      return { label: 'Quote sent', bg: '#fff3e0', fg: '#fb8c00' }
     case 'confirmed':
       return { label: 'Confirmed', bg: '#f3e5f5', fg: '#9c27b0' }
     case 'awaiting_completion':
@@ -83,6 +86,8 @@ function statusBadgeProps(status, bidCount) {
       return { label: 'Cancel requested', bg: '#fff3e0', fg: '#fb8c00' }
     case 'completed':
       return { label: 'Completed', bg: '#f5f5f5', fg: '#757575' }
+    case 'withdrawn':
+      return { label: 'Withdrawn', bg: '#f5f5f5', fg: '#757575' }
     case 'cancelled':
       return { label: 'Cancelled', bg: '#fdecea', fg: colors.danger }
     default:

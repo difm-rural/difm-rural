@@ -9,7 +9,7 @@ import ReviewModal from '../components/ReviewModal'
 import { trackEvent } from '../lib/analytics'
 import { addToWatchlist, removeFromWatchlist } from '../lib/watchlist'
 import { loadReview, saveReview } from '../lib/reviews'
-import { GOOGLE_MAPS_API_KEY } from '../lib/constants'
+import { staticMapUrl, staticMapPolygonUrl } from '../lib/maps'
 
 const MATERIALS_LABELS = {
   none:      'No materials needed',
@@ -22,17 +22,10 @@ const ACCESS_LABELS = {
 }
 
 function jobStaticMapUrl(job) {
-  const lat = parseFloat(job.latitude)
-  const lng = parseFloat(job.longitude)
   if (job.area_polygon?.length >= 3) {
-    const path = [...job.area_polygon, job.area_polygon[0]].map(p => `${p.latitude},${p.longitude}`).join('|')
-    const center = job.area_polygon.reduce(
-      (a, p) => ({ lat: a.lat + p.latitude / job.area_polygon.length, lng: a.lng + p.longitude / job.area_polygon.length }),
-      { lat: 0, lng: 0 }
-    )
-    return `https://maps.googleapis.com/maps/api/staticmap?center=${center.lat},${center.lng}&zoom=13&size=700x200&scale=2&path=color:0x2d6a4fff|weight:2|fillcolor:0x2d6a4f50|${path}&key=${GOOGLE_MAPS_API_KEY}`
+    return staticMapPolygonUrl(job.area_polygon, { zoom: 13, width: 700, height: 200 })
   }
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=13&size=700x200&scale=2&markers=color:red|${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`
+  return staticMapUrl(parseFloat(job.latitude), parseFloat(job.longitude), { zoom: 13, width: 700, height: 200 })
 }
 
 export default function JobDetailScreen({ route, navigation }) {
@@ -249,12 +242,7 @@ export default function JobDetailScreen({ route, navigation }) {
         question: askText.trim(),
       })
       if (error) { Alert.alert('Error', error.message); return }
-      supabase.from('notifications').insert({
-        user_id:  job.requester_id,
-        type:     'new_question',
-        body:     `New question on your job "${job.title}"`,
-        metadata: { job_id: job.id },
-      }).then(() => {})
+      // The job owner is notified by a database trigger.
       setAskText('')
       setShowAskInput(false)
       fetchData()
@@ -267,20 +255,12 @@ export default function JobDetailScreen({ route, navigation }) {
     if (!answerText.trim()) return
     setSubmittingQ(true)
     try {
-      const question = questions.find(q => q.id === questionId)
       const { error } = await supabase.from('job_questions').update({
         answer:      answerText.trim(),
         answered_at: new Date().toISOString(),
       }).eq('id', questionId)
       if (error) { Alert.alert('Error', error.message); return }
-      if (question?.asker_id) {
-        supabase.from('notifications').insert({
-          user_id:  question.asker_id,
-          type:     'question_answered',
-          body:     `Your question on "${job.title}" has been answered`,
-          metadata: { job_id: job.id },
-        }).then(() => {})
-      }
+      // The asker is notified by a database trigger.
       setAnsweringId(null)
       setAnswerText('')
       fetchData()
@@ -561,10 +541,11 @@ export default function JobDetailScreen({ route, navigation }) {
           mode="date"
           display="default"
           minimumDate={new Date()}
-          onChange={(event, date) => {
-            setShowDatePicker(Platform.OS === 'ios')
-            if (date) setAvailableFrom(date)
+          onValueChange={(selected) => {
+            if (Platform.OS === 'android') setShowDatePicker(false)
+            if (selected) setAvailableFrom(selected)
           }}
+          onDismiss={() => setShowDatePicker(false)}
         />
       )}
 
