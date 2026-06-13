@@ -9,7 +9,7 @@ export async function loadUserPreferences() {
       .from('user_preferences')
       .select('*')
       .eq('user_id', session.user.id)
-      .single()
+      .maybeSingle()
 
     return data
   } catch {
@@ -40,7 +40,7 @@ export async function trackCategoryInterest(category) {
       .from('user_preferences')
       .select('preferred_categories')
       .eq('user_id', session.user.id)
-      .single()
+      .maybeSingle()
 
     const current = existing?.preferred_categories ?? []
     if (current.includes(category)) return

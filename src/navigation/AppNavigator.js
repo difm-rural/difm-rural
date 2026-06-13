@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { updateLastSeen } from '../lib/preferences'
 import { clearSessionTokens, isBiometricEnabled, saveSession } from '../lib/biometrics'
+import { uploadJobPhotos } from '../lib/jobPhotos'
 
 // ─── Tab screens ──────────────────────────────────────────────────────────────
 import HomeTabScreen     from '../screens/tabs/HomeTabScreen'
@@ -369,35 +370,42 @@ export default function AppNavigator() {
   useEffect(() => { profileRef.current = profile }, [profile])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else setLoading(false)
-    })
-
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      // Keep stored biometric tokens current whenever Supabase refreshes them
-      if (event === 'TOKEN_REFRESHED' && session) {
-        const enabled = await isBiometricEnabled()
-        if (enabled) await saveSession(session.access_token, session.refresh_token)
+    // onAuthStateChange fires INITIAL_SESSION on subscribe with the restored
+    // session, so it covers cold start — no separate getSession() needed.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Token refresh: just keep biometric tokens current, nothing else.
+      if (event === 'TOKEN_REFRESHED') {
+        if (session) {
+          const enabled = await isBiometricEnabled()
+          if (enabled) await saveSession(session.access_token, session.refresh_token)
+        }
+        return
       }
 
       // Clear only tokens on sign-out — keep the enabled flag so the next
       // OTP login silently refreshes them and biometric works on cold start.
       if (event === 'SIGNED_OUT') {
         await clearSessionTokens()
-      }
-
-      setSession(session)
-      if (session) {
-        await postPendingJobIfAny(session.user.id)
-        await postPendingBookingIfAny(session.user.id)
-        fetchProfile(session.user.id)
-      } else {
+        setSession(null)
         setProfile(null)
         setActivityBadge(0)
         setJobsBadge(0)
         setServicesBadge(0)
+        setLoading(false)
+        return
+      }
+
+      // INITIAL_SESSION (cold start), SIGNED_IN (just logged in), USER_UPDATED
+      setSession(session)
+      if (session) {
+        // Only a brand-new sign-in can have a pending guest draft to flush.
+        if (event === 'SIGNED_IN') {
+          await postPendingJobIfAny(session.user.id)
+          await postPendingBookingIfAny(session.user.id)
+        }
+        fetchProfile(session.user.id)
+      } else {
+        setProfile(null)
         setLoading(false)
       }
     })
@@ -414,6 +422,7 @@ export default function AppNavigator() {
       }
     })
     return () => {
+      subscription?.unsubscribe()
       appStateSub.remove()
       unsubscribeBadges()
     }
@@ -423,11 +432,30 @@ export default function AppNavigator() {
     try {
       const raw = await AsyncStorage.getItem('pendingJob')
       if (!raw) return
-      const job = JSON.parse(raw)
-      const { error } = await supabase
-        .from('jobs').insert({ ...job, requester_id: userId, status: 'open' })
+      const { _photos = [], ...job } = JSON.parse(raw)
+
+      const { data: newJob, error } = await supabase
+        .from('jobs')
+        .insert({ ...job, requester_id: userId, status: 'open' })
+        .select('id')
+        .single()
+
+      if (error) {
+        // Keep the draft so the user can retry — don't silently lose their work.
+        Alert.alert('Job not posted', `${error.message}\n\nYour details are saved — please try posting again from your jobs.`)
+        return
+      }
+
       await AsyncStorage.removeItem('pendingJob')
-      if (!error) Alert.alert('Job posted!', 'Your job has been posted successfully.')
+
+      if (_photos.length > 0) {
+        const urls = await uploadJobPhotos(newJob.id, _photos)
+        if (urls.length > 0) {
+          await supabase.from('jobs').update({ photos: urls }).eq('id', newJob.id)
+        }
+      }
+
+      Alert.alert('Job posted!', 'Your job has been posted successfully.')
     } catch (error) {
       console.log('Error posting pending job:', error)
     }

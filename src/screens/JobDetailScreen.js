@@ -340,6 +340,7 @@ export default function JobDetailScreen({ route, navigation }) {
     const otherBidCount = Math.max(0, bids.length - 1)
     const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
     const isCompleted = job.status === 'completed'
+    const isCancelled = job.status === 'cancelled'
 
     function handleChat() {
       navigation.navigate('Chat', {
@@ -358,22 +359,36 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
               <Text style={styles.category}>{job.category}</Text>
-              <View style={styles.acceptedBadge}>
-                <Text style={styles.acceptedBadgeText}>{isCompleted ? 'Completed' : 'Awarded'}</Text>
+              <View style={[styles.acceptedBadge, isCancelled && styles.cancelledBadge]}>
+                <Text style={[styles.acceptedBadgeText, isCancelled && styles.cancelledBadgeText]}>
+                  {isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : 'Awarded'}
+                </Text>
               </View>
             </View>
             <Text style={styles.title}>{job.title}</Text>
             <Text style={styles.location}>📍 {job.location_name}</Text>
-            <View style={styles.infoBoxGreen}>
-              <Text style={styles.infoBoxGreenText}>
-                {isCompleted
-                  ? `This job is complete. You can now review ${requesterFirstName}.`
-                  : `This job has been awarded to you for $${myBid.amount} NZD. Use chat to confirm timing and details with ${requesterFirstName}.`}
-              </Text>
-            </View>
+            {isCancelled ? (
+              <View style={styles.cancelBox}>
+                <Text style={styles.cancelBoxTitle}>This job was cancelled by the requester</Text>
+                {job.cancellation_reason ? (
+                  <Text style={styles.cancelBoxText}>Reason: {job.cancellation_reason}</Text>
+                ) : null}
+                {job.cancellation_note ? (
+                  <Text style={styles.cancelBoxNote}>“{job.cancellation_note}”</Text>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.infoBoxGreen}>
+                <Text style={styles.infoBoxGreenText}>
+                  {isCompleted
+                    ? `This job is complete. You can now review ${requesterFirstName}.`
+                    : `This job has been awarded to you for $${myBid.amount} NZD. Use chat to confirm timing and details with ${requesterFirstName}.`}
+                </Text>
+              </View>
+            )}
           </View>
 
-          {!isCompleted ? (
+          {(!isCompleted && !isCancelled) ? (
             <TouchableOpacity style={styles.chatBanner} onPress={handleChat} activeOpacity={0.85}
               accessibilityRole="button" accessibilityLabel={`Chat with ${requesterFirstName}`}>
               <Text style={styles.chatBannerIcon}>💬</Text>
@@ -443,13 +458,15 @@ export default function JobDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.infoBoxBlue}>
-            <Text style={styles.infoBoxBlueText}>
-              {otherBidCount > 0
-                ? `${otherBidCount} other bid${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your bid of $${myBid.amount} NZD was the winning bid.`
-                : `Your bid of $${myBid.amount} NZD was the only bid — you got it!`}
-            </Text>
-          </View>
+          {!isCancelled && (
+            <View style={styles.infoBoxBlue}>
+              <Text style={styles.infoBoxBlueText}>
+                {otherBidCount > 0
+                  ? `${otherBidCount} other bid${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your bid of $${myBid.amount} NZD was the winning bid.`
+                  : `Your bid of $${myBid.amount} NZD was the only bid — you got it!`}
+              </Text>
+            </View>
+          )}
           <View style={{ height: insets.bottom + 24 }} />
         </ScrollView>
         <ReviewModal
@@ -963,6 +980,13 @@ const styles = StyleSheet.create({
   acceptedBadgeText:  { fontSize: 12, fontWeight: '700', color: colors.primary },
   infoBoxGreen:       { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 12, marginTop: 10 },
   infoBoxGreenText:   { fontSize: 14, color: colors.primary, lineHeight: 20 },
+
+  cancelledBadge:     { backgroundColor: '#fee2e2' },
+  cancelledBadgeText: { color: '#991b1b' },
+  cancelBox:          { backgroundColor: '#fef2f2', borderRadius: 8, padding: 12, marginTop: 10, borderWidth: 1, borderColor: '#fecaca' },
+  cancelBoxTitle:     { fontSize: 14, fontWeight: '700', color: '#991b1b', marginBottom: 4 },
+  cancelBoxText:      { fontSize: 14, color: '#7f1d1d', lineHeight: 20, marginTop: 2 },
+  cancelBoxNote:      { fontSize: 14, color: '#7f1d1d', lineHeight: 20, marginTop: 4, fontStyle: 'italic' },
 
   chatBanner:         { backgroundColor: colors.primary, borderRadius: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', paddingVertical: 18, paddingHorizontal: 18, minHeight: 72 },
   chatBannerIcon:     { fontSize: 26, marginRight: 14 },

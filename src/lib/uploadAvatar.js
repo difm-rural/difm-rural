@@ -54,6 +54,15 @@ export async function pickAndUploadAvatar(userId, useCamera) {
       return null
     }
 
+    // Remove the user's previous avatars so old files don't orphan in storage.
+    try {
+      const { data: existing } = await supabase.storage.from('avatars').list(userId)
+      const stale = (existing || [])
+        .filter(f => f.name !== fileName)
+        .map(f => `${userId}/${f.name}`)
+      if (stale.length > 0) await supabase.storage.from('avatars').remove(stale)
+    } catch { /* best-effort cleanup — never block on it */ }
+
     return publicUrl
   } catch (err) {
     Alert.alert('Error', err.message || 'Could not upload photo.')

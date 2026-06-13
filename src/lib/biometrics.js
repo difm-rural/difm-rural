@@ -52,6 +52,27 @@ export async function saveSession(accessToken, refreshToken) {
   }
 }
 
+// Stores tokens WITHOUT enabling biometric login. Used before the user has
+// consented, so getSavedSession() still returns null until enableBiometric()
+// is called — a kill before answering the prompt won't silently turn it on.
+export async function saveSessionTokens(accessToken, refreshToken) {
+  try {
+    await SecureStore.setItemAsync(KEYS.accessToken,  accessToken)
+    await SecureStore.setItemAsync(KEYS.refreshToken, refreshToken)
+  } catch (e) {
+    console.warn('biometrics saveSessionTokens error:', e)
+  }
+}
+
+// Flips the enabled flag on after the user explicitly opts in.
+export async function enableBiometric() {
+  try {
+    await SecureStore.setItemAsync(KEYS.enabled, 'true')
+  } catch (e) {
+    console.warn('biometrics enableBiometric error:', e)
+  }
+}
+
 export async function getSavedSession() {
   try {
     const enabled = await SecureStore.getItemAsync(KEYS.enabled)

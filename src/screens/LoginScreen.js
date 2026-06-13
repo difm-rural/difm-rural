@@ -17,13 +17,14 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import {
   authenticate,
-  clearSession,
   clearSessionTokens,
+  enableBiometric,
   getBiometricType,
   getSavedSession,
   isBiometricAvailable,
   isBiometricEnabled,
   saveSession,
+  saveSessionTokens,
 } from '../lib/biometrics'
 
 function getBiometricLabel(type) {
@@ -168,9 +169,10 @@ export default function LoginScreen({ navigation }) {
           // Silently refresh stored tokens — biometric button will work on next cold start
           await saveSession(data.session.access_token, data.session.refresh_token)
         } else {
-          // Save tokens now (before the Alert, to avoid race with navigation),
-          // then offer the user a choice. "Not now" clears everything.
-          await saveSession(data.session.access_token, data.session.refresh_token)
+          // Store tokens but DON'T enable yet (before the Alert, to avoid a race
+          // with navigation). Biometric only turns on if the user taps "Enable",
+          // so killing the app at the prompt leaves it off.
+          await saveSessionTokens(data.session.access_token, data.session.refresh_token)
           setTimeout(() => {
             Alert.alert(
               'Sign in faster next time',
@@ -179,6 +181,7 @@ export default function LoginScreen({ navigation }) {
                 {
                   text: 'Enable',
                   onPress: async () => {
+                    await enableBiometric()
                     const type = await getBiometricType()
                     setBiometricReady(true)
                     setBiometricType(type)
@@ -188,7 +191,7 @@ export default function LoginScreen({ navigation }) {
                   text: 'Not now',
                   style: 'cancel',
                   onPress: async () => {
-                    await clearSession() // declined — remove everything
+                    await clearSessionTokens() // declined — remove the stored tokens
                   },
                 },
               ]

@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { trackEvent } from '../../lib/analytics'
 import { trackCategoryInterest } from '../../lib/preferences'
 import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
+import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { colors } from '../../theme/tokens'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -34,22 +35,6 @@ const ACCESS_LABELS = {
 function formatDate(iso) {
   if (!iso) return null
   return new Date(iso).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function getPhotoUri(photo) { return typeof photo === 'string' ? photo : photo?.uri }
-function isRemotePhoto(photo) { return typeof photo === 'string' && photo.startsWith('http') }
-
-function base64ToArrayBuffer(base64) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  const clean = base64.replace(/=+$/, '')
-  const bytes = []; let buffer = 0; let bits = 0
-  for (let i = 0; i < clean.length; i++) {
-    const value = chars.indexOf(clean[i])
-    if (value < 0) continue
-    buffer = (buffer << 6) | value; bits += 6
-    if (bits >= 8) { bits -= 8; bytes.push((buffer >> bits) & 0xff) }
-  }
-  return new Uint8Array(bytes).buffer
 }
 
 function AuthSheet({ onDismiss, onLogin }) {
@@ -159,30 +144,6 @@ export default function PostJobStep5Review({ navigation, route }) {
     navigation.pop(popCount)
   }
 
-  async function uploadPhotos(jobId) {
-    const localPhotos = photos.filter(p => !isRemotePhoto(p))
-    if (!localPhotos.length) return photos.filter(isRemotePhoto)
-    const urls = photos.filter(isRemotePhoto)
-    for (let i = 0; i < localPhotos.length; i++) {
-      try {
-        const photo    = localPhotos[i]
-        const uri      = getPhotoUri(photo)
-        const mimeType = typeof photo === 'string' ? 'image/jpeg' : (photo.mimeType || 'image/jpeg')
-        const ext      = (photo.fileName || uri)?.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg'
-        const path     = `${jobId}/${Date.now()}_${i}.${ext}`
-        const fileData = photo.base64
-          ? base64ToArrayBuffer(photo.base64)
-          : await (await fetch(uri)).arrayBuffer()
-        const { error } = await supabase.storage.from('job-photos').upload(path, fileData, { contentType: mimeType, upsert: false })
-        if (!error) {
-          const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path)
-          urls.push(publicUrl)
-        }
-      } catch { /* skip failed photo */ }
-    }
-    return urls
-  }
-
   async function handleSubmit() {
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -207,7 +168,9 @@ export default function PostJobStep5Review({ navigation, route }) {
     }
 
     if (!user) {
-      await AsyncStorage.setItem('pendingJob', JSON.stringify(payload))
+      // Save photos with the draft so they survive the login round-trip.
+      const pendingPhotos = (photos || []).map(toStorablePhoto)
+      await AsyncStorage.setItem('pendingJob', JSON.stringify({ ...payload, _photos: pendingPhotos }))
       setShowAuthSheet(true)
       return
     }
@@ -220,7 +183,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       if (error) { setUploadStatus(''); Alert.alert('Error', error.message); return }
 
       setUploadStatus('Uploading photos...')
-      const finalUrls = await uploadPhotos(editJob.id)
+      const finalUrls = await uploadJobPhotos(editJob.id, photos)
       await supabase.from('jobs').update({ photos: finalUrls }).eq('id', editJob.id)
 
       setUploadStatus('')
@@ -240,7 +203,7 @@ export default function PostJobStep5Review({ navigation, route }) {
 
     if (photos.length > 0) {
       setUploadStatus('Uploading photos...')
-      const finalUrls = await uploadPhotos(newJob.id)
+      const finalUrls = await uploadJobPhotos(newJob.id, photos)
       if (finalUrls.length > 0) {
         await supabase.from('jobs').update({ photos: finalUrls }).eq('id', newJob.id)
       }

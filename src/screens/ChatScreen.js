@@ -68,11 +68,12 @@ export default function ChatScreen({ route, navigation }) {
         setJobStatus(jobData?.status || null)
       }
 
+      // Stored newest-first to match the inverted FlatList (no per-render copy).
       const { data } = await supabase
         .from(messageTable)
         .select('*')
         .eq(idColumn, chatId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
 
       setMessages(data || [])
 
@@ -84,7 +85,7 @@ export default function ChatScreen({ route, navigation }) {
           payload => {
             setMessages(prev => {
               if (prev.some(m => m.id === payload.new.id)) return prev
-              return [...prev, payload.new]
+              return [payload.new, ...prev]
             })
           }
         )
@@ -145,12 +146,30 @@ export default function ChatScreen({ route, navigation }) {
     if (data) {
       setMessages(prev => {
         if (prev.some(m => m.id === data.id)) return prev
-        return [...prev, data]
+        return [data, ...prev]
       })
     }
   }
 
   const isChatClosed = jobStatus === 'completed'
+
+  // Inserts a message, appends the returned row to local state so the sender
+  // sees it immediately (not just via realtime), and surfaces any error.
+  async function insertChatMessage(content) {
+    const { data, error } = await supabase
+      .from(messageTable)
+      .insert({ [idColumn]: chatId, sender_id: currentUserId, receiver_id: otherUserId, content })
+      .select()
+      .single()
+    if (error) {
+      Alert.alert('Could not send', error.message || 'Please try again', [{ text: 'OK' }])
+      return false
+    }
+    if (data) {
+      setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [data, ...prev]))
+    }
+    return true
+  }
 
   async function sendLocationMessage() {
     const coords = await getCurrentLocation()
@@ -164,9 +183,7 @@ export default function ChatScreen({ route, navigation }) {
       longitude: coords.longitude,
       text: '📍 Shared location',
     })
-    await supabase
-      .from(messageTable)
-      .insert({ [idColumn]: chatId, sender_id: currentUserId, receiver_id: otherUserId, content })
+    await insertChatMessage(content)
   }
 
   async function sendProgressPhoto() {
@@ -191,7 +208,13 @@ export default function ChatScreen({ route, navigation }) {
         const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path)
         photoUrl = publicUrl
       }
-    } catch { /* upload failed — still send with empty url */ }
+    } catch { /* handled below */ }
+
+    // Don't send a local file:// uri the recipient can never load — fail clearly.
+    if (!photoUrl) {
+      Alert.alert('Photo not sent', 'The photo could not be uploaded. Please check your connection and try again.')
+      return
+    }
 
     let caption = '📷 Progress photo'
     if (coords) {
@@ -206,15 +229,13 @@ export default function ChatScreen({ route, navigation }) {
           latitude:     coords.latitude,
           longitude:    coords.longitude,
           checkin_type: 'progress_photo',
-          photo_url:    photoUrl || null,
+          photo_url:    photoUrl,
         })
       }
     }
 
-    const content = JSON.stringify({ type: 'photo', url: photoUrl || uri, caption })
-    await supabase
-      .from(messageTable)
-      .insert({ [idColumn]: chatId, sender_id: currentUserId, receiver_id: otherUserId, content })
+    const content = JSON.stringify({ type: 'photo', url: photoUrl, caption })
+    await insertChatMessage(content)
   }
 
   function renderMessage({ item }) {
@@ -320,7 +341,7 @@ export default function ChatScreen({ route, navigation }) {
         <FlatList
           ref={flatListRef}
           style={{ flex: 1 }}
-          data={[...messages].reverse()}
+          data={messages}
           renderItem={renderMessage}
           keyExtractor={item => item.id}
           inverted
