@@ -9,6 +9,7 @@ export const NOTIFICATION_ICONS = {
   job_completed:                   '✅',
   new_question:                    '❓',
   question_answered:               '💬',
+  new_message:                     '💬',
   service_quote_sent:              '📄',
   service_quote_accepted:          '🎉',
   booking_confirmed:               '✅',
@@ -51,6 +52,35 @@ export async function markAllNotificationsRead() {
 export async function openNotificationTarget(navigation, userId, notification) {
   const meta = notification.metadata || {}
   try {
+    // Chat-message notifications open the conversation directly.
+    if (notification.type === 'new_message' && meta.sender_id) {
+      const { data: sender } = await supabase
+        .from('profiles').select('full_name').eq('id', meta.sender_id).maybeSingle()
+      const otherUserName = sender?.full_name || 'Chat'
+      if (meta.booking_id) {
+        const { data: booking } = await supabase
+          .from('bookings').select('service:service_id(title)').eq('id', meta.booking_id).maybeSingle()
+        navigation.navigate('Chat', {
+          bookingId:     meta.booking_id,
+          jobTitle:      booking?.service?.title || 'Service booking',
+          otherUserId:   meta.sender_id,
+          otherUserName,
+        })
+        return
+      }
+      if (meta.job_id) {
+        const { data: job } = await supabase
+          .from('jobs').select('title').eq('id', meta.job_id).maybeSingle()
+        navigation.navigate('Chat', {
+          jobId:         meta.job_id,
+          jobTitle:      job?.title || 'Job',
+          otherUserId:   meta.sender_id,
+          otherUserName,
+        })
+        return
+      }
+    }
+
     if (meta.booking_id) {
       const { data: booking } = await supabase
         .from('bookings')

@@ -18,6 +18,7 @@ const TITLES: Record<string, string> = {
   job_completed:                  'Job completed',
   new_question:                   'New question',
   question_answered:              'Question answered',
+  new_message:                    'New message',
   service_quote_sent:             'Quote received',
   service_quote_accepted:         'Quote accepted',
   booking_confirmed:              'Booking confirmed',
