@@ -1,4 +1,4 @@
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import React, { useEffect, useRef, useState } from 'react'
@@ -10,6 +10,7 @@ import { colors } from '../theme/tokens'
 import { updateLastSeen } from '../lib/preferences'
 import { clearSessionTokens, isBiometricEnabled, saveSession } from '../lib/biometrics'
 import { uploadJobPhotos } from '../lib/jobPhotos'
+import { registerForPushNotifications, addPushResponseListener } from '../lib/push'
 
 // ─── Tab screens ──────────────────────────────────────────────────────────────
 import HomeTabScreen     from '../screens/tabs/HomeTabScreen'
@@ -364,10 +365,21 @@ export default function AppNavigator() {
   const [jobsBadge,        setJobsBadge]        = useState(0)
   const [servicesBadge,    setServicesBadge]    = useState(0)
 
+  const navigationRef = useNavigationContainerRef()
   const sessionRef = useRef(null)
   const profileRef = useRef(null)
   useEffect(() => { sessionRef.current = session }, [session])
   useEffect(() => { profileRef.current = profile }, [profile])
+
+  // Tapping a push opens the notifications inbox (each row deep-links from there).
+  useEffect(() => {
+    const sub = addPushResponseListener(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('Activity', { screen: 'Notifications' })
+      }
+    })
+    return () => sub.remove()
+  }, [])
 
   useEffect(() => {
     // onAuthStateChange fires INITIAL_SESSION on subscribe with the restored
@@ -403,6 +415,7 @@ export default function AppNavigator() {
           await postPendingJobIfAny(session.user.id)
           await postPendingBookingIfAny(session.user.id)
         }
+        registerForPushNotifications() // fire-and-forget; reassigns this device to the current user
         fetchProfile(session.user.id)
       } else {
         setProfile(null)
@@ -562,7 +575,7 @@ export default function AppNavigator() {
 
   return (
     <PostJobProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         {session && showOnboarding
           ? <OnboardingApp profile={profile} onComplete={handleOnboardingComplete} />
           : session

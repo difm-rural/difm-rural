@@ -45,6 +45,12 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "color": "#2d6a4f"
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "DIFM Rural uses your location to find nearby jobs and verify job completion.",
