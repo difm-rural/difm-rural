@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "357830373267",
+    "project_id": "difm-rural",
+    "storage_bucket": "difm-rural.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:357830373267:android:51cb1405e4b8ffb0034266",
+        "android_client_info": {
+          "package_name": "nz.co.difmrural.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDx5LHMonr4-PDW3LOVgSgaRnx5blqjnaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -18,6 +18,11 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Firebase service-account key (FCM V1) — secret, never commit
+*firebase-adminsdk*.json
+google-service-account*.json
+service-account*.json
+
 # Metro
 .metro-health-check*
 
