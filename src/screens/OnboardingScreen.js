@@ -25,10 +25,11 @@ const SKILLS = [
   'Trucking', 'Shearing', 'Chainsaw', 'Tractor operation', 'Other',
 ]
 
+// Everyone can request (post jobs, book services). "I also provide" adds the
+// provider tools on top — it never removes the ability to request.
 const ROLE_OPTIONS = [
-  { key: 'requester', emoji: '🏡', label: 'Post jobs',  sub: 'I need jobs done on my property' },
-  { key: 'provider',  emoji: '🔧', label: 'Do jobs',   sub: 'I provide rural services' },
-  { key: 'both',      emoji: '🔄', label: 'Both',       sub: 'I do both' },
+  { key: 'requester', emoji: '🏡', label: 'I need help',    sub: 'Post jobs and book local services' },
+  { key: 'both',      emoji: '🔧', label: 'I also provide', sub: 'Advertise services and take on jobs too' },
 ]
 
 // Step meta indexed by step number (0–4)

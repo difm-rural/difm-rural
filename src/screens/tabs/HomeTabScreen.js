@@ -19,6 +19,7 @@ import {
   notificationTimeAgo,
   openNotificationTarget,
 } from '../../lib/notifications'
+import { canProvide } from '../../lib/roles'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -84,9 +85,8 @@ export default function HomeTabScreen({ navigation }) {
       .single()
     setProfile(prof)
 
-    const role        = prof?.primary_role || prof?.role || 'requester'
-    const isRequester = role === 'requester' || role === 'both'
-    const isProvider  = role === 'provider'  || role === 'both'
+    const isRequester = true              // everyone can request
+    const isProvider  = canProvide(prof)  // providing is additive
 
     const [notifs, counts] = await Promise.all([
       fetchNotifications(8),
@@ -136,9 +136,8 @@ export default function HomeTabScreen({ navigation }) {
     load()
   }
 
-  const role        = profile?.primary_role || profile?.role || 'requester'
-  const isRequester = role === 'requester' || role === 'both'
-  const isProvider  = role === 'provider'  || role === 'both'
+  const isRequester = true
+  const isProvider  = canProvide(profile)
   const firstName   = profile?.full_name?.split(' ')[0] || 'there'
   const initials    = getInitials(profile?.full_name)
   const unread      = notifications.filter(n => !n.read)
@@ -188,39 +187,37 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Shortcuts */}
+        {/* Request — everyone can do this */}
         <View style={styles.actionsGrid}>
-          {isRequester && (
-            <PrimaryAction
-              title="Post a job"
-              subtitle="Describe the work and get local help"
-              onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob' })}
-            />
-          )}
-          {isProvider && !isRequester && (
+          <PrimaryAction
+            title="Post a job"
+            subtitle="Describe the work and get local help"
+            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob' })}
+          />
+          <PrimaryAction
+            title="Browse services"
+            subtitle="Book advertised rural services"
+            variant="secondary"
+            onPress={() => navigation.getParent()?.navigate('Browse')}
+          />
+        </View>
+
+        {/* Provide — only if the user offers services / does jobs */}
+        {isProvider && (
+          <View style={styles.actionsGrid}>
             <PrimaryAction
               title="Find jobs"
               subtitle="Browse open rural work nearby"
               onPress={() => navigation.getParent()?.navigate('Jobs')}
             />
-          )}
-          {isProvider && (
             <PrimaryAction
               title="Advertise a service"
               subtitle="Offer your skills, gear, or delivery run"
               variant="secondary"
               onPress={() => navigation.getParent()?.navigate('Account', { screen: 'CreateService' })}
             />
-          )}
-          {isRequester && (
-            <PrimaryAction
-              title="Browse services"
-              subtitle="Book advertised rural services"
-              variant="secondary"
-              onPress={() => navigation.getParent()?.navigate('Browse')}
-            />
-          )}
-        </View>
+          </View>
+        )}
 
         {/* Needs attention — unread notifications */}
         <View style={styles.section}>

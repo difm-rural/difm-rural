@@ -224,12 +224,15 @@ export default function AccountTabScreen({ navigation }) {
   // ─── Role ──────────────────────────────────────────────────────────────────
 
   function handleRoleChange() {
-    Alert.alert('Dashboard mode', 'Choose how you primarily use the app:', [
-      { text: '🏡 Requester — Post tasks', onPress: () => updateRole('requester') },
-      { text: '🔧 Provider — Do jobs',     onPress: () => updateRole('provider') },
-      { text: '🔄 Both — Post & do jobs',  onPress: () => updateRole('both') },
-      { text: 'Cancel', style: 'cancel' },
-    ])
+    Alert.alert(
+      'How do you use DIFM Rural?',
+      'You can always post jobs and book services. Providing adds tools to advertise services and take on jobs.',
+      [
+        { text: '🏡 I just need help', onPress: () => updateRole('requester') },
+        { text: '🔧 I also provide',   onPress: () => updateRole('both') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    )
   }
 
   async function updateRole(newRole) {
@@ -340,8 +343,8 @@ export default function AccountTabScreen({ navigation }) {
   const ratingText = ratingSummary.count > 0
     ? `${Number(ratingSummary.average || 0).toFixed(1)} / 5 · ${ratingSummary.count} review${ratingSummary.count === 1 ? '' : 's'}`
     : 'No reviews yet'
-  const roleLabel  = profile.primary_role === 'provider' ? 'Provider'
-    : profile.primary_role === 'both' ? 'Both' : 'Requester'
+  const roleLabel  = (profile.primary_role === 'provider' || profile.primary_role === 'both')
+    ? 'Provider' : 'Requester'
   const isProvider = profile.primary_role === 'provider' || profile.primary_role === 'both'
   const locationDisplay = getDisplayLocation(profile.address) || profile.address || '—'
 

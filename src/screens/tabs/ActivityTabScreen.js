@@ -17,6 +17,7 @@ import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../compo
 import ReviewModal from '../../components/ReviewModal'
 import CancelModal from '../../components/CancelModal'
 import { loadReview, saveReview } from '../../lib/reviews'
+import { canProvide } from '../../lib/roles'
 
 function bookingNeedsQuote(booking) {
   return (booking?.service || booking?.services)?.pricing_type === 'quote_required'
@@ -207,9 +208,8 @@ export default function ActivityTabScreen({ navigation }) {
     setProfile(prof)
 
     const role = prof?.primary_role || prof?.role || 'requester'
-    const tasks = []
-    if (role === 'requester' || role === 'both') tasks.push(fetchRequesterData(user.id))
-    if (role === 'provider'  || role === 'both') tasks.push(fetchProviderData(user.id))
+    const tasks = [fetchRequesterData(user.id)] // everyone can request
+    if (canProvide(prof)) tasks.push(fetchProviderData(user.id))
     tasks.push(fetchCompletedData(user.id, role))
 
     await Promise.all(tasks)
@@ -312,7 +312,8 @@ export default function ActivityTabScreen({ navigation }) {
     const bookings = []
     const promises = []
 
-    if (role === 'requester' || role === 'both') {
+    // Everyone can request, so always include completed requester history.
+    {
       promises.push(
         supabase.from('jobs').select('*')
           .eq('requester_id', uid).eq('status', 'completed')
@@ -341,7 +342,7 @@ export default function ActivityTabScreen({ navigation }) {
       )
     }
 
-    if (role === 'provider' || role === 'both') {
+    if (role === 'provider' || role === 'both') { // provider history is additive
       promises.push(
         supabase.from('bids').select('*, jobs(*)')
           .eq('provider_id', uid).eq('status', 'accepted')
@@ -534,9 +535,8 @@ export default function ActivityTabScreen({ navigation }) {
 
   function onRefresh() { setRefreshing(true); load() }
 
-  const role        = profile?.primary_role || profile?.role || 'requester'
-  const isRequester = role === 'requester' || role === 'both'
-  const isProvider  = role === 'provider'  || role === 'both'
+  const isRequester = true
+  const isProvider  = canProvide(profile)
   const totalActive = activeJobs.length + myBookings.length + activeBidJobs.length + providerBookings.length
 
   if (loading) {

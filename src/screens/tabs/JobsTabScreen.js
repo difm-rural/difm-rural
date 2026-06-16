@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import { useUser } from '../../context/UserContext'
 import { JOB_CATEGORIES } from '../../lib/categories'
+import { canProvide } from '../../lib/roles'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../../lib/watchlist'
 import JobCard from '../../components/JobCard'
@@ -36,9 +37,8 @@ function jobMatchesSearch(job, query) {
 export default function JobsTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const { profile } = useUser()
-  const role        = profile?.primary_role || profile?.role || 'requester'
-  const isRequester = role === 'requester' || role === 'both'
-  const isProvider  = role === 'provider'  || role === 'both'
+  const isRequester = true
+  const isProvider  = canProvide(profile)
 
   const [userId, setUserId]           = useState(null)
   const [boardJobs, setBoardJobs]     = useState([])
