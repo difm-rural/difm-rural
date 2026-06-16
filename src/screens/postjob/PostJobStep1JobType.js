@@ -183,11 +183,10 @@ export default function PostJobStep1JobType({ navigation, route }) {
                       value={scheduledDate || new Date()}
                       mode="date"
                       minimumDate={new Date()}
-                      onValueChange={(selected) => {
+                      onChange={(event, selected) => {
                         if (Platform.OS === 'android') setShowDatePicker(false)
-                        if (selected) setScheduledDate(selected)
+                        if (event?.type !== 'dismissed' && selected) setScheduledDate(selected)
                       }}
-                      onDismiss={() => setShowDatePicker(false)}
                     />
                   </>
                 )}

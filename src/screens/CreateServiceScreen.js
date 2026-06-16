@@ -832,12 +832,13 @@ export default function CreateServiceScreen({ navigation, route }) {
               value={toDateValue(availableFrom) || new Date()}
               mode="date"
               minimumDate={new Date()}
-              onValueChange={(selected) => {
+              onChange={(event, selected) => {
                 if (Platform.OS === 'android') setShowDatePicker(false)
-                const nextDate = toDateValue(selected)
-                if (nextDate) setAvailableFrom(nextDate)
+                if (event?.type !== 'dismissed') {
+                  const nextDate = toDateValue(selected)
+                  if (nextDate) setAvailableFrom(nextDate)
+                }
               }}
-              onDismiss={() => setShowDatePicker(false)}
             />
           </>
         )}

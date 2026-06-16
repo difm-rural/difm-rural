@@ -282,7 +282,7 @@ export default function JobDetailScreen({ route, navigation }) {
           if (e3) { Alert.alert('Error', e3.message); return }
           trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
           Alert.alert('Job awarded!', 'You can now chat with the provider.', [
-            { text: 'OK', onPress: () => navigation.navigate('Dashboard') },
+            { text: 'OK', onPress: () => navigation.goBack() },
           ])
         },
       },
@@ -558,11 +558,10 @@ export default function JobDetailScreen({ route, navigation }) {
           mode="date"
           display="default"
           minimumDate={new Date()}
-          onValueChange={(selected) => {
+          onChange={(event, selected) => {
             if (Platform.OS === 'android') setShowDatePicker(false)
-            if (selected) setAvailableFrom(selected)
+            if (event?.type !== 'dismissed' && selected) setAvailableFrom(selected)
           }}
-          onDismiss={() => setShowDatePicker(false)}
         />
       )}
 

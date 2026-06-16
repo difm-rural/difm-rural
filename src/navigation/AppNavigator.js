@@ -147,6 +147,11 @@ function ActivityStackNav() {
     <ActivityNav.Navigator screenOptions={STACK_OPTS}>
       <ActivityNav.Screen name="ActivityMain"  component={ActivityTabScreen}   />
       <ActivityNav.Screen name="ManageTask"    component={ManageTaskScreen}    />
+      <ActivityNav.Screen name="PostJob"              component={PostJobStep1JobType}  />
+      <ActivityNav.Screen name="PostJobStep2Location" component={PostJobStep2Location} />
+      <ActivityNav.Screen name="PostJobStep3Details"  component={PostJobStep3Details}  />
+      <ActivityNav.Screen name="PostJobStep4Budget"   component={PostJobStep4Budget}   />
+      <ActivityNav.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
       <ActivityNav.Screen name="MyJobs"        component={MyJobsScreen}        />
       <ActivityNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <ActivityNav.Screen name="Chat"          component={ChatScreen}          />
@@ -174,6 +179,7 @@ function AccountStackNav() {
       <AccountNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <AccountNav.Screen name="BookingConfirm" component={BookingConfirmScreen} />
       <AccountNav.Screen name="LocationPicker" component={LocationPickerScreen} />
+      <AccountNav.Screen name="Chat"            component={ChatScreen}            />
       <AccountNav.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       <AccountNav.Screen name="ReviewsList"     component={ReviewsListScreen}     />
     </AccountNav.Navigator>
@@ -348,6 +354,8 @@ function GuestApp() {
       <GuestStack.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
       <GuestStack.Screen name="ServicesList"        component={BrowseTabScreen}      />
       <GuestStack.Screen name="ServiceDetail"   component={ServiceDetailScreen}  />
+      <GuestStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
+      <GuestStack.Screen name="ReviewsList"     component={ReviewsListScreen}     />
       <GuestStack.Screen name="BookingConfirm"  component={BookingConfirmScreen} />
       <GuestStack.Screen name="LocationPicker"  component={LocationPickerScreen} />
       <GuestStack.Screen name="AreaTracer"      component={AreaTracerScreen}     />

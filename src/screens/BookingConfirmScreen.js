@@ -322,11 +322,10 @@ export default function BookingConfirmScreen({ route, navigation }) {
                     value={date || new Date()}
                     mode="date"
                     minimumDate={new Date()}
-                    onValueChange={(selected) => {
+                    onChange={(event, selected) => {
                       if (Platform.OS === 'android') setShowDatePicker(false)
-                      if (selected) setDate(selected)
+                      if (event?.type !== 'dismissed' && selected) setDate(selected)
                     }}
-                    onDismiss={() => setShowDatePicker(false)}
                   />
                 </>
               )}
