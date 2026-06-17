@@ -174,7 +174,7 @@ export default function GuestJobFeedScreen({ navigation }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.brandLabel}>DIFM RURAL</Text>
+        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
         <Text style={styles.title}>Available jobs</Text>
         <TextInput
           style={styles.searchInput}

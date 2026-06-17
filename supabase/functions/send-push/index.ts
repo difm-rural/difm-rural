@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   const recipients = (tokens ?? []).map((t: { token: string }) => t.token).filter(Boolean)
   if (recipients.length === 0) return new Response('ok', { status: 200 })
 
-  const title = TITLES[record.type] ?? 'DIFM Rural'
+  const title = TITLES[record.type] ?? 'Rural Services'
   const messages = recipients.map((to: string) => ({
     to,
     sound: 'default',

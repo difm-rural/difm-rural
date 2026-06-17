@@ -272,7 +272,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     try {
       const priceStr = job.price_type === 'fixed' ? `$${job.price} fixed price` : 'Open to bids'
       await Share.share({
-        message: `Check out this job on DIFM Rural: ${job.title} in ${job.location_name}. ${priceStr}`,
+        message: `Check out this job on Rural Services: ${job.title} in ${job.location_name}. ${priceStr}`,
       })
     } catch {}
   }

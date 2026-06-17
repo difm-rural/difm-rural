@@ -237,7 +237,7 @@ export default function BrowseTabScreen({ navigation }) {
     <View style={styles.screen}>
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.brandLabel}>DIFM RURAL</Text>
+        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
         <Text style={styles.title}>Services</Text>
         <Text style={styles.subtitle}>Book rural service providers</Text>
         <TextInput

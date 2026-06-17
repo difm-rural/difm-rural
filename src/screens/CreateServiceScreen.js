@@ -294,7 +294,7 @@ export default function CreateServiceScreen({ navigation, route }) {
             accessibilityLabel="Cancel and go back">
             <Text style={styles.headerBackBtnText}>Back</Text>
           </TouchableOpacity>
-          <Text style={styles.kicker}>DIFM Rural</Text>
+          <Text style={styles.kicker}>Rural Services</Text>
           <Text style={styles.headerTitle} accessibilityRole="header">Advertise a service</Text>
           <Text style={styles.headerSub}>How would you like to start?</Text>
         </View>
@@ -1003,7 +1003,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           accessibilityLabel="Cancel and go back">
           <Text style={styles.headerBackBtnText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>DIFM Rural</Text>
+        <Text style={styles.kicker}>Rural Services</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit service' : 'Advertise a service'}</Text>
         <Text style={styles.headerSub}>{STEP_LABELS[step - 1]}</Text>
         {renderProgress()}

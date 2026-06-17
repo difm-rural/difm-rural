@@ -164,7 +164,7 @@ export default function HomeTabScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>DIFM Rural</Text>
+            <Text style={styles.kicker}>Rural Services</Text>
             <Text style={styles.title}>
               {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
             </Text>

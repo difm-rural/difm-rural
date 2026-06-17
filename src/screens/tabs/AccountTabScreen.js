@@ -225,7 +225,7 @@ export default function AccountTabScreen({ navigation }) {
 
   function handleRoleChange() {
     Alert.alert(
-      'How do you use DIFM Rural?',
+      'How do you use Rural Services?',
       'You can always post jobs and book services. Providing adds tools to advertise services and take on jobs.',
       [
         { text: '🏡 I just need help', onPress: () => updateRole('requester') },
@@ -352,7 +352,7 @@ export default function AccountTabScreen({ navigation }) {
     <View style={styles.screen}>
       {/* ── Fixed green header ──────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.brandLabel}>DIFM RURAL</Text>
+        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
         <Text style={styles.headerLabel} accessibilityRole="header">Account</Text>
       </View>
 

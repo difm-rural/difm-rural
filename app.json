@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DIFM Rural",
+    "name": "Rural Services",
     "slug": "difm-rural",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -54,15 +54,15 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "DIFM Rural uses your location to find nearby jobs and verify job completion.",
-          "locationWhenInUsePermission": "DIFM Rural uses your location to find nearby jobs and services."
+          "locationAlwaysAndWhenInUsePermission": "Rural Services uses your location to find nearby jobs and verify job completion.",
+          "locationWhenInUsePermission": "Rural Services uses your location to find nearby jobs and services."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "DIFM Rural lets providers choose service photos and create service drafts from flyers or screenshots.",
-          "cameraPermission": "DIFM Rural lets providers take photos of service flyers, signs, and notes to create draft listings.",
+          "photosPermission": "Rural Services lets providers choose service photos and create service drafts from flyers or screenshots.",
+          "cameraPermission": "Rural Services lets providers take photos of service flyers, signs, and notes to create draft listings.",
           "microphonePermission": false
         }
       ]

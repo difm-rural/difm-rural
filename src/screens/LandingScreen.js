@@ -142,7 +142,7 @@ export default function LandingScreen({ navigation }) {
     <View style={styles.screen}>
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <View style={styles.topBarInner}>
-          <Text style={styles.wordmark}>DIFM Rural</Text>
+          <Text style={styles.wordmark}>Rural Services</Text>
           <Text style={styles.tagline}>GET JOBS DONE</Text>
         </View>
       </View>

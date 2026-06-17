@@ -231,7 +231,7 @@ export default function LoginScreen({ navigation }) {
               accessibilityLabel="Back to email entry">
               <Text style={styles.backArrow}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.wordmark}>DIFM RURAL</Text>
+            <Text style={styles.wordmark}>RURAL SERVICES</Text>
             <View style={{ width: 32 }} />
           </View>
         </View>
@@ -302,7 +302,7 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <View style={styles.topBarInner}>
-          <Text style={styles.wordmark}>DIFM RURAL</Text>
+          <Text style={styles.wordmark}>RURAL SERVICES</Text>
           <Text style={styles.tagline}>GET JOBS DONE</Text>
         </View>
       </View>
@@ -366,7 +366,7 @@ export default function LoginScreen({ navigation }) {
         </TouchableOpacity>
 
         <Text style={styles.footerText}>
-          New to DIFM Rural? Just enter your email —{'\n'}
+          New to Rural Services? Just enter your email —{'\n'}
           we'll create your account automatically.
         </Text>
       </ScrollView>

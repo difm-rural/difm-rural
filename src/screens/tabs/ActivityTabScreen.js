@@ -543,7 +543,7 @@ export default function ActivityTabScreen({ navigation }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
-          <Text style={styles.brandLabel}>DIFM RURAL</Text>
+          <Text style={styles.brandLabel}>RURAL SERVICES</Text>
           <Text style={styles.headerTitle}>Activity</Text>
         </View>
         <View style={styles.center}>
@@ -558,7 +558,7 @@ export default function ActivityTabScreen({ navigation }) {
       <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.brandLabel}>DIFM RURAL</Text>
+            <Text style={styles.brandLabel}>RURAL SERVICES</Text>
             <Text style={styles.headerTitle} accessibilityRole="header">Activity</Text>
             <Text style={styles.headerSub}>
               {totalActive > 0

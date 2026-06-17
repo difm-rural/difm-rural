@@ -275,7 +275,7 @@ export default function JobsTabScreen({ navigation }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <Text style={styles.brandLabel}>DIFM RURAL</Text>
+          <Text style={styles.brandLabel}>RURAL SERVICES</Text>
           <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         </View>
         <View style={{ padding: 16 }}>
@@ -288,7 +288,7 @@ export default function JobsTabScreen({ navigation }) {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.brandLabel}>DIFM RURAL</Text>
+        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         <Text style={styles.headerSub}>The community job board</Text>
         <TextInput
