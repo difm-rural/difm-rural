@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/do-it-for-me-rural-app-icon-1024.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2d6a4f"
+      "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -22,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/do-it-for-me-rural-app-icon-1024.png",
-        "backgroundColor": "#2d6a4f"
+        "backgroundColor": "#ffffff"
       },
       "package": "nz.co.difmrural.app",
       "versionCode": 1,
