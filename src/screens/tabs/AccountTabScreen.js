@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -19,6 +20,7 @@ import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../../l
 import { useUser } from '../../context/UserContext'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
+import { canProvide } from '../../lib/roles'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import {
   authenticate,
@@ -41,6 +43,13 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
+
+const SECTION_TITLES = {
+  hub:     'Account',
+  profile: 'Profile',
+  account: 'Account settings',
+  privacy: 'Privacy',
+}
 
 function getDisplayLocation(addr) {
   if (!addr) return ''
@@ -71,10 +80,38 @@ function MenuRow({ icon, label, value, onPress, last, danger }) {
   )
 }
 
+function HubButton({ icon, label, sub, onPress }) {
+  return (
+    <TouchableOpacity
+      style={styles.hubButton}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}>
+      <Text style={styles.hubIcon}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.hubLabel}>{label}</Text>
+        <Text style={styles.hubSub}>{sub}</Text>
+      </View>
+      <Text style={styles.hubChevron}>›</Text>
+    </TouchableOpacity>
+  )
+}
+
+function Stat({ number, label }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statNum}>{number}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  )
+}
+
 export default function AccountTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const { refreshProfile } = useUser()
 
+  const [section, setSection]               = useState('hub')
   const [loading, setLoading]               = useState(true)
   const [saving, setSaving]                 = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -82,6 +119,8 @@ export default function AccountTabScreen({ navigation }) {
   const [userId, setUserId]                 = useState(null)
   const [email, setEmail]                   = useState('')
   const [memberSince, setMemberSince]       = useState('')
+  const [monthsOnboard, setMonthsOnboard]   = useState(0)
+  const [jobsAndServices, setJobsAndServices] = useState(0)
   const [profile, setProfile]               = useState({
     full_name: '', phone: '', region: '', avatar_url: '', primary_role: 'requester',
     display_name: '', bio: '', skills: [], qualifications: [],
@@ -102,21 +141,34 @@ export default function AccountTabScreen({ navigation }) {
 
   useFocusEffect(useCallback(() => { loadProfile() }, []))
 
+  // Hardware back returns to the hub before leaving the tab.
+  useEffect(() => {
+    const onBack = () => {
+      if (section !== 'hub') { setSection('hub'); return true }
+      return false
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack)
+    return () => sub.remove()
+  }, [section])
+
   async function loadProfile() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
     setUserId(user.id)
     setEmail(user.email || '')
-    const d = new Date(user.created_at)
-    setMemberSince(`${MONTHS[d.getMonth()]} ${d.getFullYear()}`)
+    const created = new Date(user.created_at)
+    setMemberSince(`${MONTHS[created.getMonth()]} ${created.getFullYear()}`)
+    setMonthsOnboard(Math.max(0, Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24 * 30.44))))
 
-    const [{ data: profileData }, { data: reviewsData }] = await Promise.all([
+    const [{ data: profileData }, { data: reviewsData }, { count: jobCount }, { count: serviceCount }] = await Promise.all([
       supabase.from('profiles')
         .select('full_name, phone, region, avatar_url, primary_role, role, display_name, bio, skills, qualifications, address, latitude, longitude')
         .eq('id', user.id)
         .single(),
       supabase.from('reviews').select('rating').eq('reviewee_id', user.id),
+      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('requester_id', user.id),
+      supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', user.id),
     ])
 
     if (profileData) {
@@ -125,6 +177,7 @@ export default function AccountTabScreen({ navigation }) {
       setSkills(profileData.skills || [])
       setQualifications(profileData.qualifications || [])
     }
+    setJobsAndServices((jobCount || 0) + (serviceCount || 0))
 
     const ratings = reviewsData || []
     if (ratings.length > 0) {
@@ -243,7 +296,7 @@ export default function AccountTabScreen({ navigation }) {
       .eq('id', userId)
     if (!error) {
       setProfile(p => ({ ...p, primary_role: newRole, role: newRole }))
-      Alert.alert('Dashboard updated', 'Your dashboard will update next time you open the app.')
+      Alert.alert('Updated', 'Your tabs will update next time you open the app.')
     }
   }
 
@@ -313,10 +366,10 @@ export default function AccountTabScreen({ navigation }) {
   // ─── Sign out ──────────────────────────────────────────────────────────────
 
   function handleSignOut() {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+    Alert.alert('Log out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Sign out',
+        text: 'Log out',
         style: 'destructive',
         onPress: async () => {
           // Keep the enabled flag so biometric is re-activated after next OTP login
@@ -343,256 +396,311 @@ export default function AccountTabScreen({ navigation }) {
   const ratingText = ratingSummary.count > 0
     ? `${Number(ratingSummary.average || 0).toFixed(1)} / 5 · ${ratingSummary.count} review${ratingSummary.count === 1 ? '' : 's'}`
     : 'No reviews yet'
-  const roleLabel  = (profile.primary_role === 'provider' || profile.primary_role === 'both')
-    ? 'Provider' : 'Requester'
-  const isProvider = profile.primary_role === 'provider' || profile.primary_role === 'both'
+  const roleLabel  = canProvide(profile) ? 'Provider' : 'Requester'
+  const isProvider = canProvide(profile)
   const locationDisplay = getDisplayLocation(profile.address) || profile.address || '—'
+
+  const onboardYears = Math.floor(monthsOnboard / 12)
+  const onboardValue = onboardYears >= 1 ? onboardYears : monthsOnboard
+  const onboardLabel = onboardYears >= 1
+    ? (onboardYears === 1 ? 'Year onboard' : 'Years onboard')
+    : 'Months onboard'
+
+  // ─── Avatar element (shared by hub) ─────────────────────────────────────────
+  const avatarEl = (
+    <TouchableOpacity
+      style={styles.avatarWrap}
+      onPress={handleAvatarPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel="Change profile photo">
+      <View style={[styles.avatarCircle, !hasPhoto && styles.avatarBg]}>
+        {uploadingAvatar ? (
+          <ActivityIndicator color={colors.primary} size="large" />
+        ) : hasPhoto ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+        ) : (
+          <Text style={styles.avatarInitials}>{initials}</Text>
+        )}
+      </View>
+      <View style={styles.cameraBtn}>
+        <Text style={styles.cameraBtnText}>📷</Text>
+      </View>
+    </TouchableOpacity>
+  )
+
+  // ─── Hub ────────────────────────────────────────────────────────────────────
+  const hubContent = (
+    <>
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryLeft}>
+          {avatarEl}
+          <Text style={styles.summaryName} numberOfLines={1}>{profile.full_name || 'User'}</Text>
+          <Text style={styles.summaryLocation} numberOfLines={1}>{locationDisplay}</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryRight}>
+          <Stat number={jobsAndServices} label="Jobs and Services" />
+          <Stat number={ratingSummary.count} label="Reviews" />
+          <Stat number={onboardValue} label={onboardLabel} />
+        </View>
+      </View>
+
+      <View style={styles.hubButtons}>
+        <HubButton
+          icon="👤" label="Profile" sub="Photo, name, bio, skills"
+          onPress={() => setSection('profile')}
+        />
+        <HubButton
+          icon="⚙️" label="Account settings" sub="Contact details, mode, notifications"
+          onPress={() => setSection('account')}
+        />
+        <HubButton
+          icon="🔒" label="Privacy" sub="Security, terms, support"
+          onPress={() => setSection('privacy')}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.signOutBtn, { marginHorizontal: 16, marginTop: 20 }]}
+        onPress={handleSignOut}
+        accessibilityRole="button"
+        accessibilityLabel="Log out">
+        <Text style={styles.signOutText}>Log out</Text>
+      </TouchableOpacity>
+    </>
+  )
+
+  // ─── Profile section ────────────────────────────────────────────────────────
+  const profileContent = (
+    <View style={styles.body}>
+      <Text style={styles.sectionLabel}>Your role</Text>
+      <TouchableOpacity
+        style={styles.roleCard}
+        onPress={handleRoleChange}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Role: ${roleLabel}. Tap to change`}>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={styles.roleCardTitle}>{isProvider ? '🔧 Provider' : '🏡 Requester'}</Text>
+          <Text style={styles.roleCardSub}>
+            {isProvider
+              ? 'You can post jobs, book services, and advertise your own services.'
+              : 'You can post jobs and book services. Tap to also offer your own.'}
+          </Text>
+        </View>
+        <Text style={styles.roleCardAction}>Change</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.sectionLabel}>About you</Text>
+      <View style={styles.card}>
+        <MenuRow
+          icon="👤" label="Full name" value={profile.full_name || '—'}
+          onPress={() => openEdit('full_name', 'Full name', profile.full_name)}
+        />
+        <MenuRow
+          icon="🏷️" label="Display name" value={profile.display_name || '—'}
+          onPress={() => openEdit('display_name', 'Display name', profile.display_name)}
+        />
+        <MenuRow
+          icon="📍" label="Location" value={locationDisplay}
+          onPress={openLocationModal}
+        />
+        <MenuRow
+          icon="📝" label="Bio" value={profile.bio ? profile.bio.slice(0, 30) + (profile.bio.length > 30 ? '…' : '') : '—'} last
+          onPress={() => openEdit('bio', 'Short bio', profile.bio)}
+        />
+      </View>
+
+      {isProvider && (
+        <>
+          <Text style={styles.sectionLabel}>Skills</Text>
+          <View style={[styles.card, { padding: 14 }]}>
+            {savingSkills && <Text style={styles.savingText}>Saving…</Text>}
+            <View style={styles.chipGrid}>
+              {ALL_SKILLS.map(skill => {
+                const selected = skills.includes(skill)
+                return (
+                  <TouchableOpacity
+                    key={skill}
+                    style={[styles.chip, selected && styles.chipSelected]}
+                    onPress={() => toggleSkill(skill)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={skill}>
+                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                      {skill}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Qualifications</Text>
+          <View style={styles.card}>
+            {qualifications.length === 0 && !showQualInput && (
+              <View style={[styles.row, styles.rowBorder]}>
+                <Text style={{ fontSize: 13, color: colors.textMuted, paddingVertical: 4 }}>
+                  No qualifications added yet
+                </Text>
+              </View>
+            )}
+            {qualifications.map((q, i) => (
+              <View key={i} style={[styles.row, styles.rowBorder]}>
+                <View style={styles.rowLeft}>
+                  <Text style={styles.rowIcon}>🎓</Text>
+                  <Text style={[styles.rowLabel, { flex: 1 }]} numberOfLines={2}>{q}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => removeQual(i)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${q}`}>
+                  <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', padding: 4 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {showQualInput && (
+              <View style={[styles.row, styles.rowBorder, { gap: 8 }]}>
+                <TextInput
+                  style={styles.qualInlineInput}
+                  value={qualInput}
+                  onChangeText={setQualInput}
+                  placeholder="e.g. Growsafe certified"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={confirmAddQual}
+                  accessibilityLabel="Qualification"
+                />
+                <TouchableOpacity
+                  style={styles.qualConfirmBtn}
+                  onPress={confirmAddQual}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add">
+                  <Text style={styles.qualConfirmText}>Add</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { setShowQualInput(false); setQualInput('') }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: '600' }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => setShowQualInput(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Add a qualification">
+              <View style={styles.rowLeft}>
+                <Text style={[styles.rowIcon, { color: colors.primary }]}>＋</Text>
+                <Text style={[styles.rowLabel, { color: colors.primary }]}>Add a qualification</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.sectionLabel}>Provider tools</Text>
+          <View style={styles.card}>
+            <MenuRow
+              icon="🛠️" label="My services"
+              onPress={() => navigation.navigate('MyServices')}
+            />
+            <MenuRow
+              icon="⭐" label="My ratings" value={ratingText} last
+              onPress={() => Alert.alert('My ratings', ratingText)}
+            />
+          </View>
+        </>
+      )}
+    </View>
+  )
+
+  // ─── Account settings section ───────────────────────────────────────────────
+  const accountContent = (
+    <View style={styles.body}>
+      <Text style={styles.sectionLabel}>Contact</Text>
+      <View style={styles.card}>
+        <MenuRow
+          icon="✉️" label="Email" value={email}
+          onPress={() => Alert.alert('Email', 'To change your email, please contact support.')}
+        />
+        <MenuRow
+          icon="📞" label="Phone" value={profile.phone || '—'} last
+          onPress={() => openEdit('phone', 'Phone number', profile.phone, 'phone-pad')}
+        />
+      </View>
+
+      <Text style={styles.sectionLabel}>App</Text>
+      <View style={styles.card}>
+        <MenuRow
+          icon="🔔" label="Notifications" value="Enabled" last
+          onPress={() => Alert.alert('Notifications', 'Notification preferences coming soon.')}
+        />
+      </View>
+    </View>
+  )
+
+  // ─── Privacy section ────────────────────────────────────────────────────────
+  const privacyContent = (
+    <View style={styles.body}>
+      <Text style={styles.sectionLabel}>Security</Text>
+      <View style={styles.card}>
+        {biometricAvailable && (
+          <MenuRow
+            icon="🔐"
+            label="Biometric login"
+            value={biometricEnabled ? 'Enabled' : 'Disabled'}
+            onPress={handleBiometricToggle}
+          />
+        )}
+        <MenuRow
+          icon="📄" label="Terms & privacy" last
+          onPress={() => Alert.alert('Terms & privacy', 'Terms and privacy policy coming soon.')}
+        />
+      </View>
+
+      <Text style={styles.sectionLabel}>Support</Text>
+      <View style={styles.card}>
+        <MenuRow
+          icon="❓" label="Help & FAQ"
+          onPress={() => Alert.alert('Help', 'Help documentation coming soon.')}
+        />
+        <MenuRow
+          icon="✉️" label="Contact us" last
+          onPress={() => Alert.alert('Contact us', 'support@difmrural.co.nz')}
+        />
+      </View>
+    </View>
+  )
 
   return (
     <View style={styles.screen}>
       {/* ── Fixed green header ──────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
-        <Text style={styles.headerLabel} accessibilityRole="header">Account</Text>
+        {section === 'hub' ? (
+          <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+        ) : (
+          <TouchableOpacity
+            onPress={() => setSection('hub')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Back to account">
+            <Text style={styles.headerBack}>← Account</Text>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.headerLabel} accessibilityRole="header">{SECTION_TITLES[section]}</Text>
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-
-        {/* ── White hero section ──────────────────────────────────────────── */}
-        <View style={styles.hero}>
-          <TouchableOpacity
-            style={styles.avatarWrap}
-            onPress={handleAvatarPress}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Change profile photo">
-            <View style={[styles.avatarCircle, !hasPhoto && styles.avatarBg]}>
-              {uploadingAvatar ? (
-                <ActivityIndicator color={colors.primary} size="large" />
-              ) : hasPhoto ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
-              ) : (
-                <Text style={styles.avatarInitials}>{initials}</Text>
-              )}
-            </View>
-            <View style={styles.cameraBtn}>
-              <Text style={styles.cameraBtnText}>📷</Text>
-            </View>
-          </TouchableOpacity>
-
-          <Text style={styles.heroName}>{profile.full_name || 'User'}</Text>
-          <Text style={styles.heroSince}>Member since {memberSince}</Text>
-
-          <View style={styles.pillRow}>
-            <View style={styles.ratingPill}>
-              <Text style={styles.ratingText}>⭐ {ratingText}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.rolePill}
-              onPress={handleRoleChange}
-              accessibilityRole="button"
-              accessibilityLabel={`Dashboard mode: ${roleLabel}. Tap to change`}>
-              <Text style={styles.roleText}>{roleLabel}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ── Body ───────────────────────────────────────────────────────── */}
-        <View style={styles.body}>
-
-          {/* My account */}
-          <Text style={styles.sectionLabel}>My account</Text>
-          <View style={styles.card}>
-            <MenuRow
-              icon="👤" label="Full name" value={profile.full_name || '—'}
-              onPress={() => openEdit('full_name', 'Full name', profile.full_name)}
-            />
-            <MenuRow
-              icon="🏷️" label="Display name" value={profile.display_name || '—'}
-              onPress={() => openEdit('display_name', 'Display name', profile.display_name)}
-            />
-            <MenuRow
-              icon="✉️" label="Email" value={email}
-              onPress={() => Alert.alert('Email', 'To change your email, please contact support.')}
-            />
-            <MenuRow
-              icon="📞" label="Phone" value={profile.phone || '—'}
-              onPress={() => openEdit('phone', 'Phone number', profile.phone, 'phone-pad')}
-            />
-            <MenuRow
-              icon="📍" label="Location" value={locationDisplay}
-              onPress={openLocationModal}
-            />
-            <MenuRow
-              icon="📝" label="Bio" value={profile.bio ? profile.bio.slice(0, 30) + (profile.bio.length > 30 ? '…' : '') : '—'} last
-              onPress={() => openEdit('bio', 'Short bio', profile.bio)}
-            />
-          </View>
-
-          {/* Skills — providers and both only */}
-          {isProvider && (
-            <>
-              <Text style={styles.sectionLabel}>Skills</Text>
-              <View style={[styles.card, { padding: 14 }]}>
-                {savingSkills && (
-                  <Text style={styles.savingText}>Saving…</Text>
-                )}
-                <View style={styles.chipGrid}>
-                  {ALL_SKILLS.map(skill => {
-                    const selected = skills.includes(skill)
-                    return (
-                      <TouchableOpacity
-                        key={skill}
-                        style={[styles.chip, selected && styles.chipSelected]}
-                        onPress={() => toggleSkill(skill)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        accessibilityLabel={skill}>
-                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                          {skill}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              </View>
-
-              {/* Qualifications */}
-              <Text style={styles.sectionLabel}>Qualifications</Text>
-              <View style={styles.card}>
-                {qualifications.length === 0 && !showQualInput && (
-                  <View style={[styles.row, styles.rowBorder]}>
-                    <Text style={{ fontSize: 13, color: colors.textMuted, paddingVertical: 4 }}>
-                      No qualifications added yet
-                    </Text>
-                  </View>
-                )}
-                {qualifications.map((q, i) => (
-                  <View key={i} style={[styles.row, styles.rowBorder]}>
-                    <View style={styles.rowLeft}>
-                      <Text style={styles.rowIcon}>🎓</Text>
-                      <Text style={[styles.rowLabel, { flex: 1 }]} numberOfLines={2}>{q}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => removeQual(i)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove ${q}`}>
-                      <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', padding: 4 }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {showQualInput && (
-                  <View style={[styles.row, styles.rowBorder, { gap: 8 }]}>
-                    <TextInput
-                      style={styles.qualInlineInput}
-                      value={qualInput}
-                      onChangeText={setQualInput}
-                      placeholder="e.g. Growsafe certified"
-                      placeholderTextColor={colors.textMuted}
-                      autoFocus
-                      returnKeyType="done"
-                      onSubmitEditing={confirmAddQual}
-                      accessibilityLabel="Qualification"
-                    />
-                    <TouchableOpacity
-                      style={styles.qualConfirmBtn}
-                      onPress={confirmAddQual}
-                      accessibilityRole="button"
-                      accessibilityLabel="Add">
-                      <Text style={styles.qualConfirmText}>Add</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => { setShowQualInput(false); setQualInput('') }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: '600' }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={styles.row}
-                  onPress={() => setShowQualInput(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Add a qualification">
-                  <View style={styles.rowLeft}>
-                    <Text style={[styles.rowIcon, { color: colors.primary }]}>＋</Text>
-                    <Text style={[styles.rowLabel, { color: colors.primary }]}>Add a qualification</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          {/* Provider tools */}
-          {isProvider && (
-            <>
-              <Text style={styles.sectionLabel}>Provider tools</Text>
-              <View style={styles.card}>
-                <MenuRow
-                  icon="🛠️" label="My services"
-                  onPress={() => navigation.navigate('MyServices')}
-                />
-                <MenuRow
-                  icon="⭐" label="My ratings" value={ratingText} last
-                  onPress={() => Alert.alert('My ratings', ratingText)}
-                />
-              </View>
-            </>
-          )}
-
-          {/* Preferences */}
-          <Text style={styles.sectionLabel}>Preferences</Text>
-          <View style={styles.card}>
-            <MenuRow
-              icon="🔔" label="Notifications" value="Enabled"
-              onPress={() => Alert.alert('Notifications', 'Notification preferences coming soon.')}
-            />
-            <MenuRow
-              icon="🔄" label="Dashboard mode" value={roleLabel}
-              last={!biometricAvailable}
-              onPress={handleRoleChange}
-            />
-            {biometricAvailable && (
-              <MenuRow
-                icon="🔐"
-                label="Biometric login"
-                value={biometricEnabled ? 'Enabled' : 'Disabled'}
-                last
-                onPress={handleBiometricToggle}
-              />
-            )}
-          </View>
-
-          {/* Support */}
-          <Text style={styles.sectionLabel}>Support</Text>
-          <View style={styles.card}>
-            <MenuRow
-              icon="❓" label="Help & FAQ"
-              onPress={() => Alert.alert('Help', 'Help documentation coming soon.')}
-            />
-            <MenuRow
-              icon="✉️" label="Contact us"
-              onPress={() => Alert.alert('Contact us', 'support@difmrural.co.nz')}
-            />
-            <MenuRow
-              icon="📄" label="Terms & privacy" last
-              onPress={() => Alert.alert('Terms & privacy', 'Terms and privacy policy coming soon.')}
-            />
-          </View>
-
-          {/* Sign out */}
-          <TouchableOpacity
-            style={styles.signOutBtn}
-            onPress={handleSignOut}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out">
-            <Text style={styles.signOutText}>Sign out</Text>
-          </TouchableOpacity>
-        </View>
+        {section === 'hub'     && hubContent}
+        {section === 'profile' && profileContent}
+        {section === 'account' && accountContent}
+        {section === 'privacy' && privacyContent}
       </ScrollView>
 
       {/* ── Location modal ──────────────────────────────────────────────────── */}
@@ -695,29 +803,56 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   brandLabel:  { fontSize: 11, fontWeight: '600', color: '#95d5b2', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 },
+  headerBack:  { fontSize: 15, fontWeight: '600', color: '#d8f3e3', marginBottom: 6 },
   headerLabel: {
     fontSize: 26,
     fontWeight: 'bold',
     color: colors.white,
   },
 
-  // ─── White hero card (scrolls with content) ───────────────────────────────
-  hero: {
+  // ─── Hub summary card ──────────────────────────────────────────────────────
+  summaryCard: {
+    flexDirection: 'row',
     backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ececec',
+    marginHorizontal: 16,
+    padding: 18,
     alignItems: 'center',
-    paddingTop: 28,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: 4,
   },
+  summaryLeft:    { flex: 1, alignItems: 'center', paddingRight: 12 },
+  summaryDivider: { width: 1, alignSelf: 'stretch', backgroundColor: '#ececec', marginVertical: 4 },
+  summaryRight:   { flex: 1, paddingLeft: 18, gap: 14 },
+  summaryName:     { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: 10, textAlign: 'center' },
+  summaryLocation: { fontSize: 12, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
+  stat:      {},
+  statNum:   { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
+  statLabel: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
 
-  avatarWrap: { position: 'relative', marginBottom: 14 },
+  // ─── Hub buttons ───────────────────────────────────────────────────────────
+  hubButtons: { paddingHorizontal: 16, gap: 12, marginTop: 20 },
+  hubButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#ececec',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  hubIcon:    { fontSize: 22, width: 36 },
+  hubLabel:   { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  hubSub:     { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  hubChevron: { fontSize: 24, color: colors.textMuted, fontWeight: '300' },
+
+  // ─── Avatar ────────────────────────────────────────────────────────────────
+  avatarWrap: { position: 'relative' },
   avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     borderWidth: 3,
     borderColor: colors.primary,
     overflow: 'hidden',
@@ -731,9 +866,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: -2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
@@ -742,29 +877,10 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
   },
-  cameraBtnText: { fontSize: 13 },
+  cameraBtnText: { fontSize: 12 },
 
-  heroName:  { fontSize: 22, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 4, textAlign: 'center' },
-  heroSince: { fontSize: 13, color: colors.textMuted, marginBottom: 14 },
-
-  pillRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  ratingPill: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  ratingText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  rolePill: {
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  roleText: { color: colors.white, fontSize: 13, fontWeight: '700' },
-
-  // ─── Body ────────────────────────────────────────────────────────────────
-  body: { padding: 16, paddingTop: 20 },
+  // ─── Body / sections ───────────────────────────────────────────────────────
+  body: { padding: 16, paddingTop: 4 },
 
   sectionLabel: {
     fontSize: 12,
@@ -824,13 +940,26 @@ const styles = StyleSheet.create({
   },
   qualConfirmText: { color: colors.white, fontWeight: '700', fontSize: 13 },
 
+  roleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#ececec',
+    padding: 16,
+    marginBottom: 22,
+  },
+  roleCardTitle:  { fontSize: 16, fontWeight: '700', color: colors.primary },
+  roleCardSub:    { fontSize: 12, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
+  roleCardAction: { fontSize: 14, fontWeight: '700', color: colors.primary },
+
   signOutBtn: {
     borderWidth: 1.5,
     borderColor: colors.danger,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 8,
   },
   signOutText: { fontSize: 15, fontWeight: '700', color: colors.danger },
 
