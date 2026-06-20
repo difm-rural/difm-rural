@@ -195,6 +195,15 @@ const TAB_DEFS = [
   { name: 'Account',  label: 'Account'  },
 ]
 
+// Root screen of each tab's stack — tapping a tab returns here.
+const TAB_ROOT = {
+  Home:     'Dashboard',
+  Jobs:     'JobsBoard',
+  Browse:   'BrowseMain',
+  Activity: 'ActivityMain',
+  Account:  'AccountMain',
+}
+
 function TabIcon({ name, active, avatarUrl }) {
   const inactive = colors.textMuted
   const c = active ? colors.primary : inactive
@@ -245,7 +254,8 @@ function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBad
             onPress={() => {
               if (route.name === 'Jobs') clearJobsBadge?.()
               if (route.name === 'Browse') clearServicesBadge?.()
-              if (!isFocused) navigation.navigate(route.name)
+              // Always land on the tab's root screen (pops Notifications etc.)
+              navigation.navigate(route.name, { screen: TAB_ROOT[route.name] })
             }}
             activeOpacity={0.7}
             accessibilityRole="tab"

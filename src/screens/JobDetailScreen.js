@@ -9,6 +9,7 @@ import ReviewModal from '../components/ReviewModal'
 import { trackEvent } from '../lib/analytics'
 import { addToWatchlist, removeFromWatchlist } from '../lib/watchlist'
 import { loadReview, saveReview } from '../lib/reviews'
+import { fetchProviderStats } from '../lib/providerStats'
 import { staticMapUrl, staticMapPolygonUrl } from '../lib/maps'
 
 const MATERIALS_LABELS = {
@@ -89,12 +90,15 @@ export default function JobDetailScreen({ route, navigation }) {
       .order('created_at', { ascending: false })
 
     if (bidsData && bidsData.length > 0) {
-      const providerIds = bidsData.map(b => b.provider_id)
-      const { data: providerProfiles } = await supabase
-        .from('profiles').select('id, full_name').in('id', providerIds)
+      const providerIds = [...new Set(bidsData.map(b => b.provider_id))]
+      const [{ data: providerProfiles }, stats] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds),
+        fetchProviderStats(providerIds),
+      ])
       setBids(bidsData.map(bid => ({
         ...bid,
         profiles: providerProfiles?.find(p => p.id === bid.provider_id),
+        stats: stats[bid.provider_id] || { ratingAvg: 0, ratingCount: 0, jobsDone: 0 },
       })))
     } else {
       setBids([])
@@ -795,7 +799,30 @@ export default function JobDetailScreen({ route, navigation }) {
             {bids.map(bid => (
               <PressableCard key={bid.id} style={styles.bidCard}>
                 <View style={styles.bidHeader}>
-                  <Text style={styles.bidName}>{bid.profiles?.full_name}</Text>
+                  <TouchableOpacity
+                    style={styles.bidProvider}
+                    onPress={() => navigation.navigate('ProviderProfile', { providerId: bid.provider_id })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${bid.profiles?.full_name || 'provider'}'s profile`}>
+                    {bid.profiles?.avatar_url ? (
+                      <Image source={{ uri: bid.profiles.avatar_url }} style={styles.bidAvatar} />
+                    ) : (
+                      <View style={styles.bidAvatarFallback}>
+                        <Text style={styles.bidAvatarInitials}>
+                          {(bid.profiles?.full_name || '?').trim().charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bidName} numberOfLines={1}>{bid.profiles?.full_name || 'Provider'}</Text>
+                      <Text style={styles.bidProviderMeta} numberOfLines={1}>
+                        {bid.stats?.ratingCount > 0
+                          ? `⭐ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
+                          : 'New provider'}
+                        {bid.stats?.jobsDone > 0 ? ` · ${bid.stats.jobsDone} done` : ''}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
                   <Text style={styles.bidAmount}>${bid.amount} NZD</Text>
                 </View>
                 {bid.line_items?.length > 1 && (
@@ -925,7 +952,12 @@ const styles = StyleSheet.create({
 
   // Bids list
   bidCard:    { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
-  bidHeader:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  bidHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  bidProvider: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
+  bidAvatar:   { width: 38, height: 38, borderRadius: 19, marginRight: 10, backgroundColor: '#eee' },
+  bidAvatarFallback: { width: 38, height: 38, borderRadius: 19, marginRight: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  bidAvatarInitials: { color: colors.primary, fontWeight: '700', fontSize: 15 },
+  bidProviderMeta:   { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   bidName:    { fontWeight: 'bold', fontSize: 16, color: colors.textPrimary },
   bidAmount:  { fontWeight: 'bold', fontSize: 16, color: colors.primary },
   bidMessage: { color: colors.textSecondary, fontSize: 14, marginBottom: 6 },

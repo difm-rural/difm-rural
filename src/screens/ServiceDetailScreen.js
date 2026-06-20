@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import { fetchProviderStats } from '../lib/providerStats'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -53,6 +54,8 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const { service: initialService } = route.params
   const [service, setService] = useState(initialService)
   const [profile, setProfile] = useState(initialService.profile || null)
+  const [providerStats, setProviderStats] = useState(null)
+  const [recentReviews, setRecentReviews] = useState([])
   const [quantity, setQuantity] = useState(initialService.minimum_units || 1)
   const [isBooked, setIsBooked] = useState(false)
   const [activeBooking, setActiveBooking] = useState(null)
@@ -67,7 +70,23 @@ export default function ServiceDetailScreen({ route, navigation }) {
     fetchService()
     if (!profile) fetchProfile()
     fetchBookingStatus()
+    fetchProviderExtras()
   }, [])
+
+  async function fetchProviderExtras() {
+    if (!service.provider_id) return
+    const stats = await fetchProviderStats([service.provider_id])
+    setProviderStats(stats[service.provider_id] || null)
+    const { data } = await supabase
+      .from('reviews')
+      .select('rating, comment, created_at')
+      .eq('reviewee_id', service.provider_id)
+      .eq('reviewee_role', 'provider')
+      .not('comment', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(3)
+    setRecentReviews(data || [])
+  }
 
   async function fetchService() {
     if (!initialService?.id) return
@@ -226,7 +245,12 @@ export default function ServiceDetailScreen({ route, navigation }) {
             )}
             <View style={styles.providerInfo}>
               <Text style={styles.providerName}>{profile?.full_name || 'Provider'}</Text>
-              <Text style={styles.providerMeta}>⭐ New provider</Text>
+              <Text style={styles.providerMeta}>
+                {providerStats?.ratingCount > 0
+                  ? `⭐ ${providerStats.ratingAvg.toFixed(1)} (${providerStats.ratingCount} review${providerStats.ratingCount === 1 ? '' : 's'})`
+                  : '⭐ New provider'}
+                {providerStats?.jobsDone > 0 ? `  ·  ${providerStats.jobsDone} done` : ''}
+              </Text>
               {service.location_name ? (
                 <Text style={styles.providerMeta}>📍 {service.location_name}</Text>
               ) : null}
@@ -234,6 +258,20 @@ export default function ServiceDetailScreen({ route, navigation }) {
             <Text style={styles.providerChevron}>›</Text>
           </TouchableOpacity>
         </View>
+
+        {recentReviews.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Recent reviews</Text>
+            {recentReviews.map((r, i) => (
+              <View key={i} style={[styles.reviewItem, i < recentReviews.length - 1 && styles.reviewItemBorder]}>
+                <Text style={styles.reviewStars}>
+                  {'★'.repeat(r.rating || 0)}{'☆'.repeat(Math.max(0, 5 - (r.rating || 0)))}
+                </Text>
+                <Text style={styles.reviewComment}>{r.comment}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Service details */}
         <View style={styles.card}>
@@ -439,6 +477,11 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 14, color: colors.textPrimary, fontWeight: '500', textAlign: 'right', flex: 1 },
 
   descText: { fontSize: 14, color: colors.textSecondary, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 16 },
+
+  reviewItem:       { paddingHorizontal: 16, paddingVertical: 12 },
+  reviewItemBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
+  reviewStars:      { fontSize: 13, color: colors.amber, marginBottom: 4 },
+  reviewComment:    { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
 
   estimatorRow: {
     flexDirection: 'row',

@@ -15,6 +15,7 @@ import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
 import { loadReview, saveReview } from '../lib/reviews'
+import { fetchProviderStats } from '../lib/providerStats'
 
 function timeAgo(isoString) {
   if (!isoString) return 'Unknown'
@@ -152,14 +153,18 @@ export default function ManageTaskScreen({ navigation, route }) {
         .order('amount', { ascending: true })
       if (error) throw error
 
-      const providerIds = bidsData?.map(b => b.provider_id).filter(Boolean) || []
-      const { data: providerProfiles } = providerIds.length > 0
-        ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds)
-        : { data: [] }
+      const providerIds = [...new Set(bidsData?.map(b => b.provider_id).filter(Boolean) || [])]
+      const [{ data: providerProfiles }, stats] = await Promise.all([
+        providerIds.length > 0
+          ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds)
+          : Promise.resolve({ data: [] }),
+        fetchProviderStats(providerIds),
+      ])
 
       const bidsWithProfiles = bidsData?.map(bid => ({
         ...bid,
         provider: providerProfiles?.find(p => p.id === bid.provider_id) || null,
+        stats: stats[bid.provider_id] || { ratingAvg: 0, ratingCount: 0, jobsDone: 0 },
       })) || []
 
       setBids(bidsWithProfiles)
@@ -709,7 +714,11 @@ export default function ManageTaskScreen({ navigation, route }) {
                 const initials = getInitials(provName)
                 return (
                   <View key={bid.id} style={[styles.bidCard, idx < bids.length - 1 && styles.bidCardBorder]}>
-                    <View style={styles.bidHeader}>
+                    <TouchableOpacity
+                      style={styles.bidHeader}
+                      onPress={() => navigation.navigate('ProviderProfile', { providerId: bid.provider_id })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${provName}'s profile`}>
                       {bid.provider?.avatar_url ? (
                         <Image source={{ uri: bid.provider.avatar_url }} style={styles.bidAvatar} />
                       ) : (
@@ -719,9 +728,15 @@ export default function ManageTaskScreen({ navigation, route }) {
                       )}
                       <View style={styles.bidProviderInfo}>
                         <Text style={styles.bidProviderName}>{provName}</Text>
+                        <Text style={styles.bidProviderMeta} numberOfLines={1}>
+                          {bid.stats?.ratingCount > 0
+                            ? `⭐ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
+                            : 'New provider'}
+                          {bid.stats?.jobsDone > 0 ? ` · ${bid.stats.jobsDone} done` : ''}
+                        </Text>
                         <Text style={styles.bidAmount}>${bid.amount} NZD</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                     {bid.line_items?.length > 1 && (
                       <View style={styles.lineItemsBreakdown}>
                         {bid.line_items.map((li, i) => (
@@ -1031,6 +1046,7 @@ const styles = StyleSheet.create({
   bidAvatarInitials: { fontSize: 15, fontWeight: '700', color: colors.primary },
   bidProviderInfo: { flex: 1 },
   bidProviderName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  bidProviderMeta: { fontSize: 12, color: colors.textMuted, marginBottom: 2 },
   bidAmount: { fontSize: 17, fontWeight: 'bold', color: colors.primary },
   bidMessage: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 8, fontStyle: 'italic' },
   bidMeta:    { fontSize: 13, color: colors.textMuted, marginBottom: 4 },

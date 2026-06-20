@@ -106,8 +106,8 @@ function BookingWorkCard({
           style={styles.miniPrimaryBtn}
           onPress={onReady}
           accessibilityRole="button"
-          accessibilityLabel="Send booking for requester confirmation">
-          <Text style={styles.miniPrimaryText}>Tell requester</Text>
+          accessibilityLabel="Mark booking complete">
+          <Text style={styles.miniPrimaryText}>Mark complete</Text>
         </TouchableOpacity>
       )}
 
@@ -421,19 +421,29 @@ export default function ActivityTabScreen({ navigation }) {
     else load()
   }
 
-  async function completeBooking(bookingId) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: 'awaiting_completion' })
-      .eq('id', bookingId)
-      .eq('provider_id', user.id)
-      .in('status', ['confirmed', 'in_progress'])
-
-    if (!error) load()
-    else Alert.alert('Could not send for confirmation', error.message)
+  function completeBooking(bookingId) {
+    Alert.alert(
+      'Mark as complete?',
+      'This tells the requester the work is done and asks them to confirm completion.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark complete',
+          onPress: async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { error } = await supabase
+              .from('bookings')
+              .update({ status: 'awaiting_completion' })
+              .eq('id', bookingId)
+              .eq('provider_id', user.id)
+              .in('status', ['confirmed', 'in_progress'])
+            if (!error) load()
+            else Alert.alert('Could not mark complete', error.message)
+          },
+        },
+      ]
+    )
   }
 
   function cancelRequesterBooking(booking) {

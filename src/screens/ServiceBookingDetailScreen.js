@@ -174,7 +174,17 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }
 
   function markReady() {
-    updateStatus('awaiting_completion', ['confirmed', 'in_progress'], 'The requester has been asked to confirm completion.')
+    Alert.alert(
+      'Mark as complete?',
+      'This tells the requester the work is done and asks them to confirm completion.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark complete',
+          onPress: () => updateStatus('awaiting_completion', ['confirmed', 'in_progress'], 'The requester has been asked to confirm completion.'),
+        },
+      ]
+    )
   }
 
   function confirmCancellation() {
@@ -318,7 +328,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         )}
         {providerCanReady && (
           <TouchableOpacity style={styles.primaryBtn} onPress={markReady}>
-            <Text style={styles.primaryText}>Let requester know completed</Text>
+            <Text style={styles.primaryText}>Mark job complete</Text>
           </TouchableOpacity>
         )}
         {providerCanConfirmCancel && (
