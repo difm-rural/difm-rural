@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -36,7 +40,12 @@ export default function ReviewModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
         <View style={styles.sheet}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -96,7 +105,7 @@ export default function ReviewModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
