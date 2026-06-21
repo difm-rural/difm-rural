@@ -9,6 +9,7 @@ export const NOTIFICATION_ICONS = {
   job_cancelled:                   '⚠️',
   job_ready:                       '🔔',
   job_completed:                   '✅',
+  review_received:                 '⭐',
   new_question:                    '❓',
   question_answered:               '💬',
   new_message:                     '💬',
