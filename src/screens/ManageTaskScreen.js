@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
@@ -215,26 +216,27 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   // ─── Badge (used for non-accepted layout) ─────────────────────────
   function getBadge() {
+    const label = jobStatusLabel(job.status, bidCount)
     switch (job.status) {
       case 'open':
         return bidCount > 0
-          ? { label: `${bidCount} bid${bidCount > 1 ? 's' : ''}`, color: '#92400e', bg: '#fef3c7' }
-          : { label: 'Open', color: '#166534', bg: '#dcfce7' }
+          ? { label, color: '#92400e', bg: '#fef3c7' }
+          : { label, color: '#166534', bg: '#dcfce7' }
       case 'accepted':
       case 'in_progress':
-        return { label: 'Awarded', color: '#1e40af', bg: '#dbeafe' }
+        return { label, color: '#1e40af', bg: '#dbeafe' }
       case 'awaiting_completion':
-        return { label: 'Awaiting confirmation', color: '#92400e', bg: '#fef3c7' }
+        return { label, color: '#92400e', bg: '#fef3c7' }
       case 'completed':
-        return { label: 'Completed', color: colors.textSecondary, bg: colors.border }
+        return { label, color: colors.textSecondary, bg: colors.border }
       case 'cancelled':
-        return { label: 'Cancelled', color: '#991b1b', bg: '#fee2e2' }
+        return { label, color: '#991b1b', bg: '#fee2e2' }
       default:
-        return { label: job.status, color: colors.textSecondary, bg: colors.border }
+        return { label, color: colors.textSecondary, bg: colors.border }
     }
   }
 
-  const cancelModalType = ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status) ? 'job_accepted' : 'job_open'
+  const cancelModalType = isJobAwarded(job.status) ? 'job_accepted' : 'job_open'
   const cancelModalJSX = (
     <CancelModal
       visible={showCancelModal}
@@ -261,7 +263,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
-  const isAwarded = ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status)
+  const isAwarded = isJobAwarded(job.status)
 
   function ensureTaskOwner() {
     if (isTaskOwner) return true
@@ -487,9 +489,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             <View style={styles.acceptedHeaderRow}>
               <Text style={styles.acceptedJobTitle} numberOfLines={3}>{job.title}</Text>
               <View style={styles.greenBadge}>
-                <Text style={styles.greenBadgeText}>
-                  {job.status === 'awaiting_completion' ? 'Awaiting confirmation' : 'Awarded'}
-                </Text>
+                <Text style={styles.greenBadgeText}>{jobStatusLabel(job.status, bidCount)}</Text>
               </View>
             </View>
             <SummaryRow icon="📍" label="Location" value={job.location_name} />

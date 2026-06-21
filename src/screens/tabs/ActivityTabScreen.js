@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
+import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded } from '../../lib/lifecycle'
 import { colors } from '../../theme/tokens'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import ReviewModal from '../../components/ReviewModal'
@@ -227,7 +228,7 @@ export default function ActivityTabScreen({ navigation }) {
       .from('jobs')
       .select('*')
       .eq('requester_id', uid)
-      .in('status', ['open', 'accepted', 'in_progress', 'awaiting_completion'])
+      .in('status', JOB_ACTIVE_STATUSES)
       .order('created_at', { ascending: false })
 
     const rawJobs = jobsData || []
@@ -249,7 +250,7 @@ export default function ActivityTabScreen({ navigation }) {
       .from('bookings')
       .select('*, services(*)')
       .eq('requester_id', uid)
-      .in('status', ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'])
+      .in('status', BOOKING_ACTIVE_STATUSES)
       .order('created_at', { ascending: false })
 
     const rawBookings = bookingsData || []
@@ -279,7 +280,7 @@ export default function ActivityTabScreen({ navigation }) {
       .order('created_at', { ascending: false })
 
     const activeBids = (bidsData || []).filter(b =>
-      b.jobs && ['accepted', 'in_progress', 'awaiting_completion'].includes(b.jobs.status)
+      b.jobs && isJobAwarded(b.jobs.status)
     )
     setActiveBidJobs(activeBids.map(b => ({ ...b.jobs, _bidAmount: b.amount, bidCount: 0 })))
 
@@ -288,7 +289,7 @@ export default function ActivityTabScreen({ navigation }) {
       .from('bookings')
       .select('*, services(*)')
       .eq('provider_id', uid)
-      .in('status', ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested', 'withdrawn', 'cancelled'])
+      .in('status', [...BOOKING_ACTIVE_STATUSES, 'withdrawn', 'cancelled'])
       .order('created_at', { ascending: false })
 
     const rawBookings = bookingsData || []

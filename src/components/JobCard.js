@@ -1,6 +1,7 @@
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
+import { jobStatusLabel } from '../lib/lifecycle'
 
 function truncateWords(text, max = 30) {
   if (!text) return ''
@@ -24,15 +25,7 @@ function getInitials(fullName) {
 }
 
 function getStatusText(job, bidCount) {
-  switch (job.status) {
-    case 'open':      return bidCount > 0 ? `${bidCount} bid${bidCount > 1 ? 's' : ''}` : 'Open'
-    case 'accepted':
-    case 'in_progress': return 'Awarded'
-    case 'awaiting_completion': return 'Awaiting confirmation'
-    case 'completed': return 'Completed'
-    case 'cancelled': return 'Cancelled'
-    default:          return job.status
-  }
+  return jobStatusLabel(job.status, bidCount)
 }
 
 function postedAgo(createdAt) {

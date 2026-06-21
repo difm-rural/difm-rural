@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { isJobActive, isJobTerminal } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
@@ -136,19 +137,19 @@ export default function MyJobsScreen({ navigation, route }) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   }
 
-  const activePosted = postedJobs.filter(j => ['open', 'accepted', 'in_progress', 'awaiting_completion'].includes(j.status))
-  const pastPosted = postedJobs.filter(j => ['completed', 'cancelled'].includes(j.status))
+  const activePosted = postedJobs.filter(j => isJobActive(j.status))
+  const pastPosted = postedJobs.filter(j => isJobTerminal(j.status))
   const completedPosted = postedJobs.filter(j => j.status === 'completed')
 
   const activeBids = myBids.filter(b =>
     b.status !== 'rejected' &&
     b.jobs &&
-    !['completed', 'cancelled'].includes(b.jobs.status)
+    !isJobTerminal(b.jobs.status)
   )
   const pastBids = myBids.filter(b =>
     b.status === 'accepted' &&
     b.jobs &&
-    ['completed', 'cancelled'].includes(b.jobs.status)
+    isJobTerminal(b.jobs.status)
   )
   const completedBids = pastBids.filter(b => b.jobs.status === 'completed')
 

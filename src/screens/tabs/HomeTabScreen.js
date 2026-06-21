@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
+import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded } from '../../lib/lifecycle'
 import { colors } from '../../theme/tokens'
 import {
   NOTIFICATION_ICONS,
@@ -99,12 +100,12 @@ export default function HomeTabScreen({ navigation }) {
   }
 
   async function fetchSummary(uid, isRequester, isProvider) {
-    const activeBookingStatuses = ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested']
+    const activeBookingStatuses = BOOKING_ACTIVE_STATUSES
     const tasks = []
 
     tasks.push(isRequester
       ? supabase.from('jobs').select('id', { count: 'exact', head: true })
-          .eq('requester_id', uid).in('status', ['open', 'accepted', 'in_progress', 'awaiting_completion'])
+          .eq('requester_id', uid).in('status', JOB_ACTIVE_STATUSES)
       : Promise.resolve({ count: 0 }))
     tasks.push(isRequester
       ? supabase.from('bookings').select('id', { count: 'exact', head: true })
@@ -126,7 +127,7 @@ export default function HomeTabScreen({ navigation }) {
       activeJobs:      jobsRes.count || 0,
       reqBookings:     reqBookingsRes.count || 0,
       pendingBids:     bids.filter(b => b.jobs?.status === 'open').length,
-      jobsDoing:       bids.filter(b => ['accepted', 'in_progress', 'awaiting_completion'].includes(b.jobs?.status)).length,
+      jobsDoing:       bids.filter(b => isJobAwarded(b.jobs?.status)).length,
       provBookings:    provBookingsRes.count || 0,
     }
   }

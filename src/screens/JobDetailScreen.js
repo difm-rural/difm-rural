@@ -3,6 +3,7 @@ import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, T
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { jobStatusLabel } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import PressableCard from '../components/PressableCard'
 import ReviewModal from '../components/ReviewModal'
@@ -450,7 +451,7 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.category}>{job.category}</Text>
               <View style={[styles.acceptedBadge, isCancelled && styles.cancelledBadge]}>
                 <Text style={[styles.acceptedBadgeText, isCancelled && styles.cancelledBadgeText]}>
-                  {isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : isAwaitingCompletion ? 'Awaiting confirmation' : 'Awarded'}
+                  {jobStatusLabel(job.status)}
                 </Text>
               </View>
             </View>

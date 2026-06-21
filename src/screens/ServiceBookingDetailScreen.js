@@ -13,24 +13,10 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { bookingStatusLabel } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import { loadReview, saveReview } from '../lib/reviews'
-
-function statusLabel(status) {
-  switch (status) {
-    case 'pending': return 'Waiting for provider'
-    case 'quote_sent': return 'Quote sent'
-    case 'confirmed': return 'Confirmed'
-    case 'in_progress': return 'In progress'
-    case 'awaiting_completion': return 'Ready for requester confirmation'
-    case 'cancellation_requested': return 'Cancellation requested'
-    case 'completed': return 'Completed'
-    case 'withdrawn': return 'Withdrawn'
-    case 'cancelled': return 'Cancelled'
-    default: return status || 'Booking'
-  }
-}
 
 function formatMoney(amount, service) {
   if (amount != null) return `$${amount} NZD`
@@ -373,7 +359,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         <Text style={styles.kicker}>Service booking</Text>
         <Text style={styles.title} numberOfLines={2}>{service.title || 'Service booking'}</Text>
         <View style={styles.statusPill}>
-          <Text style={styles.statusText}>{statusLabel(booking.status)}</Text>
+          <Text style={styles.statusText}>{bookingStatusLabel(booking.status)}</Text>
         </View>
       </View>
 
