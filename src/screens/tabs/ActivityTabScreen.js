@@ -18,6 +18,7 @@ import ReviewModal from '../../components/ReviewModal'
 import CancelModal from '../../components/CancelModal'
 import { loadReview, saveReview } from '../../lib/reviews'
 import { canProvide } from '../../lib/roles'
+import { markNotificationsReadFor } from '../../lib/notifications'
 
 function bookingNeedsQuote(booking) {
   return (booking?.service || booking?.services)?.pricing_type === 'quote_required'
@@ -44,8 +45,10 @@ function BookingWorkCard({
       full_name: viewerRole === 'provider' ? booking.requesterName : booking.providerName,
     },
   }
+  // Once the provider has marked it complete (awaiting_completion), the requester
+  // confirms rather than cancels — so no cancel button at that point.
   const canRequesterCancel = viewerRole === 'requester'
-    && ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion'].includes(booking.status)
+    && ['pending', 'quote_sent', 'confirmed', 'in_progress'].includes(booking.status)
   const requesterNeedsConfirm = viewerRole === 'requester' && booking.status === 'awaiting_completion'
   const providerNeedsQuote = viewerRole === 'provider' && booking.status === 'pending' && serviceItem.pricing_type === 'quote_required'
   const providerPending = viewerRole === 'provider' && booking.status === 'pending' && !providerNeedsQuote
@@ -60,6 +63,7 @@ function BookingWorkCard({
         item={serviceItem}
         showStatusBadge
         status={booking.status}
+        statusLabel={requesterNeedsConfirm ? 'Needs action' : undefined}
         onPress={onPress}
       />
 
@@ -137,7 +141,7 @@ function BookingWorkCard({
           onPress={onConfirmComplete}
           accessibilityRole="button"
           accessibilityLabel="Confirm booking complete">
-          <Text style={styles.miniPrimaryText}>Complete</Text>
+          <Text style={styles.miniPrimaryText}>Mark as complete</Text>
         </TouchableOpacity>
       )}
 
@@ -223,7 +227,7 @@ export default function ActivityTabScreen({ navigation }) {
       .from('jobs')
       .select('*')
       .eq('requester_id', uid)
-      .in('status', ['open', 'accepted', 'in_progress'])
+      .in('status', ['open', 'accepted', 'in_progress', 'awaiting_completion'])
       .order('created_at', { ascending: false })
 
     const rawJobs = jobsData || []
@@ -275,7 +279,7 @@ export default function ActivityTabScreen({ navigation }) {
       .order('created_at', { ascending: false })
 
     const activeBids = (bidsData || []).filter(b =>
-      b.jobs && ['accepted', 'in_progress'].includes(b.jobs.status)
+      b.jobs && ['accepted', 'in_progress', 'awaiting_completion'].includes(b.jobs.status)
     )
     setActiveBidJobs(activeBids.map(b => ({ ...b.jobs, _bidAmount: b.amount, bidCount: 0 })))
 
@@ -493,10 +497,24 @@ export default function ActivityTabScreen({ navigation }) {
     else load()
   }
 
-  async function confirmBookingComplete(bookingId) {
-    const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', bookingId)
-    if (!error) load()
-    else Alert.alert('Error', 'Could not confirm booking complete.')
+  function confirmBookingComplete(bookingId) {
+    Alert.alert(
+      'Mark as complete?',
+      'Confirm the work is done. This closes the booking and you can leave a review.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark as complete',
+          onPress: async () => {
+            const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', bookingId)
+            if (!error) {
+              await markNotificationsReadFor({ bookingId })
+              load()
+            } else Alert.alert('Error', 'Could not confirm booking complete.')
+          },
+        },
+      ]
+    )
   }
 
   async function openBookingReview(booking) {

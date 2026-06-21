@@ -366,7 +366,7 @@ export default function LoginScreen({ navigation }) {
         </TouchableOpacity>
 
         <Text style={styles.footerText}>
-          New to Rural Services? Just enter your email —{'\n'}
+          New to Rural Connections? Just enter your email —{'\n'}
           we'll create your account automatically.
         </Text>
       </ScrollView>

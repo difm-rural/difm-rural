@@ -45,6 +45,11 @@ export default function JobDetailScreen({ route, navigation }) {
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
 
+  // Requester-side: confirm completion + review the provider
+  const [providerReview, setProviderReview] = useState(null)
+  const [providerReviewVisible, setProviderReviewVisible] = useState(false)
+  const [savingProviderReview, setSavingProviderReview] = useState(false)
+
   // Bid form state (Features 3 & 4)
   const [editingBid,        setEditingBid]        = useState(false)
   const [lineItems,         setLineItems]         = useState([{ label: 'Labour', amount: '' }])
@@ -69,6 +74,12 @@ export default function JobDetailScreen({ route, navigation }) {
     if (job.status !== 'completed' || !currentUser?.id || !myBid) return
     fetchRequesterReview()
   }, [job.status, currentUser?.id, myBid?.id])
+
+  useEffect(() => {
+    const isOwner = currentUser?.id === job.requester_id
+    if (!isOwner || job.status !== 'completed' || !currentUser?.id) return
+    fetchProviderReview()
+  }, [job.status, currentUser?.id])
 
   async function fetchData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -151,6 +162,54 @@ export default function JobDetailScreen({ route, navigation }) {
       const review = await loadReview({ jobId: job.id, reviewerId: currentUser.id, reviewerRole: 'provider' })
       setRequesterReview(review)
     } catch { }
+  }
+
+  async function fetchProviderReview() {
+    try {
+      const review = await loadReview({ jobId: job.id, reviewerId: currentUser.id, reviewerRole: 'requester' })
+      setProviderReview(review)
+    } catch { }
+  }
+
+  function handleConfirmComplete() {
+    Alert.alert('Confirm complete', 'Mark this job as complete? This confirms the work is done.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: async () => {
+          const { error } = await supabase.from('jobs').update({ status: 'completed' })
+            .eq('id', job.id).eq('requester_id', currentUser.id)
+          if (error) { Alert.alert('Error', error.message); return }
+          trackEvent('job_completed', { job_id: job.id })
+          setJob(prev => ({ ...prev, status: 'completed' }))
+          const accepted = bids.find(b => b.status === 'accepted')
+          if (accepted?.provider_id) {
+            setProviderReviewVisible(true)
+          } else {
+            Alert.alert('Job completed', 'This job has been marked complete.')
+          }
+        },
+      },
+    ])
+  }
+
+  async function handleSubmitProviderReview({ rating, comment }) {
+    const accepted = bids.find(b => b.status === 'accepted')
+    if (!currentUser?.id || !accepted?.provider_id) return
+    setSavingProviderReview(true)
+    try {
+      const review = await saveReview({
+        jobId: job.id, reviewerId: currentUser.id, revieweeId: accepted.provider_id,
+        reviewerRole: 'requester', revieweeRole: 'provider', rating, comment,
+      })
+      setProviderReview(review)
+      setProviderReviewVisible(false)
+      Alert.alert('Review saved', 'Thanks for your feedback.')
+    } catch (error) {
+      Alert.alert('Could not save review', error.message)
+    } finally {
+      setSavingProviderReview(false)
+    }
   }
 
   async function handleWatchToggle() {
@@ -345,6 +404,7 @@ export default function JobDetailScreen({ route, navigation }) {
     const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
     const isCompleted = job.status === 'completed'
     const isCancelled = job.status === 'cancelled'
+    const isAwaitingCompletion = job.status === 'awaiting_completion'
 
     function handleChat() {
       navigation.navigate('Chat', {
@@ -352,6 +412,31 @@ export default function JobDetailScreen({ route, navigation }) {
         otherUserId: job.requester_id,
         otherUserName: requesterProfile?.full_name || 'Requester',
       })
+    }
+
+    function handleMarkComplete() {
+      Alert.alert(
+        'Mark as completed',
+        `Let ${requesterFirstName} know the work is done? They'll confirm to finalise the job.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Mark completed',
+            onPress: async () => {
+              const { error } = await supabase
+                .from('jobs')
+                .update({ status: 'awaiting_completion' })
+                .eq('id', job.id)
+                .select()
+                .single()
+              if (error) { Alert.alert('Error', error.message); return }
+              trackEvent('job_marked_complete', { job_id: job.id })
+              setJob(prev => ({ ...prev, status: 'awaiting_completion' }))
+              Alert.alert('Thanks!', `${requesterFirstName} has been asked to confirm the job is complete.`)
+            },
+          },
+        ]
+      )
     }
 
     return (
@@ -365,7 +450,7 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.category}>{job.category}</Text>
               <View style={[styles.acceptedBadge, isCancelled && styles.cancelledBadge]}>
                 <Text style={[styles.acceptedBadgeText, isCancelled && styles.cancelledBadgeText]}>
-                  {isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : 'Awarded'}
+                  {isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : isAwaitingCompletion ? 'Awaiting confirmation' : 'Awarded'}
                 </Text>
               </View>
             </View>
@@ -386,7 +471,9 @@ export default function JobDetailScreen({ route, navigation }) {
                 <Text style={styles.infoBoxGreenText}>
                   {isCompleted
                     ? `This job is complete. You can now review ${requesterFirstName}.`
-                    : `This job has been awarded to you for $${myBid.amount} NZD. Use chat to confirm timing and details with ${requesterFirstName}.`}
+                    : isAwaitingCompletion
+                      ? `You've marked this job done. Waiting for ${requesterFirstName} to confirm.`
+                      : `This job has been awarded to you for $${myBid.amount} NZD. Use chat to confirm timing and details with ${requesterFirstName}.`}
                 </Text>
               </View>
             )}
@@ -445,6 +532,21 @@ export default function JobDetailScreen({ route, navigation }) {
                 <Text style={styles.bigBtnGreenText}>🗺 Navigate to job</Text>
               </TouchableOpacity>
             )}
+            {(!isCompleted && !isCancelled) ? (
+              isAwaitingCompletion ? (
+                <View style={styles.awaitingBox}>
+                  <Text style={styles.awaitingBoxText}>
+                    ⏳ Waiting for {requesterFirstName} to confirm completion.
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
+                  onPress={handleMarkComplete}
+                  accessibilityRole="button" accessibilityLabel="Mark job as completed">
+                  <Text style={styles.bigBtnGreenText}>✓ Mark as completed</Text>
+                </TouchableOpacity>
+              )
+            ) : null}
             {isCompleted ? (
               <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
                 onPress={() => setReviewVisible(true)}
@@ -490,6 +592,8 @@ export default function JobDetailScreen({ route, navigation }) {
 
   // ─── Normal view (requester + open provider) ──────────────────────────────────
   const bidTotal = getBidTotal()
+  const acceptedBid = bids.find(b => b.status === 'accepted')
+  const acceptedProviderName = acceptedBid?.profiles?.full_name || 'the provider'
 
   const bidFormJSX = (
     <>
@@ -658,6 +762,49 @@ export default function JobDetailScreen({ route, navigation }) {
           {job.location_note ? <Text style={styles.locationNote}>📝 {job.location_note}</Text> : null}
           <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
         </View>
+
+        {/* Owner shortcut to the management screen (edit / share / cancel / delete) */}
+        {isJobOwner && (
+          <TouchableOpacity
+            style={styles.manageJobBtn}
+            onPress={() => navigation.navigate('ManageTask', { job, bidCount: bids.length })}
+            accessibilityRole="button"
+            accessibilityLabel="Manage this job">
+            <Text style={styles.manageJobBtnText}>⚙  Manage job</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Requester: provider has marked the job done — confirm + review */}
+        {isJobOwner && job.status === 'awaiting_completion' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Confirm completion</Text>
+            <View style={styles.infoBoxGreen}>
+              <Text style={styles.infoBoxGreenText}>
+                {acceptedProviderName} has marked this job as done. Confirm to finalise and leave a review.
+              </Text>
+            </View>
+            <TouchableOpacity style={[styles.button, { marginTop: 12 }]}
+              onPress={handleConfirmComplete}
+              accessibilityRole="button" accessibilityLabel="Confirm job complete">
+              <Text style={styles.buttonText}>✓ Confirm job complete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Requester: completed — leave / edit the provider review */}
+        {isJobOwner && job.status === 'completed' && acceptedBid && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review provider</Text>
+            <TouchableOpacity style={styles.button}
+              onPress={() => setProviderReviewVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={providerReview ? 'Edit provider review' : 'Review provider'}>
+              <Text style={styles.buttonText}>
+                {providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Feature 2: Q&A section */}
         {job.status === 'open' && (
@@ -874,6 +1021,16 @@ export default function JobDetailScreen({ route, navigation }) {
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
       </KeyboardAvoidingView>
+      <ReviewModal
+        visible={providerReviewVisible}
+        title={providerReview ? 'Edit provider review' : 'Review provider'}
+        subtitle={`How was working with ${acceptedProviderName}?`}
+        initialRating={providerReview?.rating || 0}
+        initialComment={providerReview?.comment || ''}
+        saving={savingProviderReview}
+        onClose={() => setProviderReviewVisible(false)}
+        onSubmit={handleSubmitProviderReview}
+      />
     </View>
   )
 }
@@ -912,6 +1069,9 @@ const styles = StyleSheet.create({
 
   section:      { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2, borderWidth: 1, borderColor: colors.border },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 14 },
+
+  manageJobBtn:     { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', minHeight: 52, marginBottom: 16 },
+  manageJobBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 
   input:     { backgroundColor: colors.background, borderRadius: 8, padding: 14, fontSize: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
   multiline: { height: 90, textAlignVertical: 'top' },
@@ -1034,6 +1194,9 @@ const styles = StyleSheet.create({
   bigBtnGreenText: { color: colors.white, fontSize: 16, fontWeight: '700' },
   bigBtnOutline:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 10, paddingVertical: 16, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
   bigBtnOutlineText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+
+  awaitingBox:     { backgroundColor: '#fef3c7', borderRadius: 10, padding: 14, marginBottom: 10 },
+  awaitingBoxText: { fontSize: 14, color: '#92400e', lineHeight: 20, textAlign: 'center', fontWeight: '600' },
 
   infoBoxBlue:     { backgroundColor: colors.infoLight, borderRadius: 10, padding: 14, marginBottom: 16 },
   infoBoxBlueText: { fontSize: 14, color: colors.info, lineHeight: 20 },

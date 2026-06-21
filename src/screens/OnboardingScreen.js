@@ -677,7 +677,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
         {step === 0 ? (
           <>
-            <Text style={styles.headerTitle}>Welcome to Rural Services</Text>
+            <Text style={styles.headerTitle}>Welcome to Rural Connections</Text>
             <Text style={styles.headerSub}>How will you mainly use the app?</Text>
           </>
         ) : step === 1 ? (

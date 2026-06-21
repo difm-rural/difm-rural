@@ -278,7 +278,7 @@ export default function AccountTabScreen({ navigation }) {
 
   function handleRoleChange() {
     Alert.alert(
-      'How do you use Rural Services?',
+      'How do you use Rural Connections?',
       'You can always post jobs and book services. Providing adds tools to advertise services and take on jobs.',
       [
         { text: '🏡 I just need help', onPress: () => updateRole('requester') },

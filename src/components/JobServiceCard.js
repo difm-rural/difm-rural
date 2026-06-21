@@ -103,6 +103,7 @@ export default function JobServiceCard({
   isWatched = false,
   showStatusBadge = false,
   status,
+  statusLabel,
   isGuest = false,
   onGuestAction,
 }) {
@@ -122,6 +123,7 @@ export default function JobServiceCard({
   const ratingText  = ratingCount > 0 ? `★ ${ratingAvg} · ${ratingCount}` : '★ New'
 
   const badge = showStatusBadge ? statusBadgeProps(status || item.status, bidCount) : null
+  if (badge && statusLabel) badge.label = statusLabel
   const showBidBadge = !isService && !showStatusBadge && bidCount > 0
   const showHeart = !!onWatchlistToggle || isGuest
 

@@ -223,6 +223,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       case 'accepted':
       case 'in_progress':
         return { label: 'Awarded', color: '#1e40af', bg: '#dbeafe' }
+      case 'awaiting_completion':
+        return { label: 'Awaiting confirmation', color: '#92400e', bg: '#fef3c7' }
       case 'completed':
         return { label: 'Completed', color: colors.textSecondary, bg: colors.border }
       case 'cancelled':
@@ -232,7 +234,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     }
   }
 
-  const cancelModalType = ['accepted', 'in_progress'].includes(job.status) ? 'job_accepted' : 'job_open'
+  const cancelModalType = ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status) ? 'job_accepted' : 'job_open'
   const cancelModalJSX = (
     <CancelModal
       visible={showCancelModal}
@@ -259,7 +261,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
-  const isAwarded = job.status === 'accepted' || job.status === 'in_progress'
+  const isAwarded = ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status)
 
   function ensureTaskOwner() {
     if (isTaskOwner) return true
@@ -277,7 +279,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     try {
       const priceStr = job.price_type === 'fixed' ? `$${job.price} fixed price` : 'Open to bids'
       await Share.share({
-        message: `Check out this job on Rural Services: ${job.title} in ${job.location_name}. ${priceStr}`,
+        message: `Check out this job on Rural Connections: ${job.title} in ${job.location_name}. ${priceStr}`,
       })
     } catch {}
   }
@@ -485,7 +487,9 @@ export default function ManageTaskScreen({ navigation, route }) {
             <View style={styles.acceptedHeaderRow}>
               <Text style={styles.acceptedJobTitle} numberOfLines={3}>{job.title}</Text>
               <View style={styles.greenBadge}>
-                <Text style={styles.greenBadgeText}>Awarded</Text>
+                <Text style={styles.greenBadgeText}>
+                  {job.status === 'awaiting_completion' ? 'Awaiting confirmation' : 'Awarded'}
+                </Text>
               </View>
             </View>
             <SummaryRow icon="📍" label="Location" value={job.location_name} />
@@ -549,6 +553,13 @@ export default function ManageTaskScreen({ navigation, route }) {
           {isTaskOwner && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Actions</Text>
+            {job.status === 'awaiting_completion' && (
+              <View style={styles.infoBox}>
+                <Text style={styles.infoBoxText}>
+                  {otherPartyFirstName} has marked this job as done. Confirm to finalise and leave a review.
+                </Text>
+              </View>
+            )}
             <View style={styles.actionBtns}>
               <TouchableOpacity
                 style={styles.btnGreen}

@@ -127,6 +127,7 @@ function BrowseStackNav() {
       <BrowseNav.Screen name="BrowseMain"    component={BrowseTabScreen}     />
       <BrowseNav.Screen name="JobFeed"      component={JobFeedScreen}       />
       <BrowseNav.Screen name="JobDetail"     component={JobDetailScreen}     />
+      <BrowseNav.Screen name="ManageTask"    component={ManageTaskScreen}    />
       <BrowseNav.Screen name="ServiceDetail" component={ServiceDetailScreen} />
       <BrowseNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <BrowseNav.Screen name="BookingConfirm" component={BookingConfirmScreen} />

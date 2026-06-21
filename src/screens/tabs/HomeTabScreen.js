@@ -104,7 +104,7 @@ export default function HomeTabScreen({ navigation }) {
 
     tasks.push(isRequester
       ? supabase.from('jobs').select('id', { count: 'exact', head: true })
-          .eq('requester_id', uid).in('status', ['open', 'accepted', 'in_progress'])
+          .eq('requester_id', uid).in('status', ['open', 'accepted', 'in_progress', 'awaiting_completion'])
       : Promise.resolve({ count: 0 }))
     tasks.push(isRequester
       ? supabase.from('bookings').select('id', { count: 'exact', head: true })
@@ -126,7 +126,7 @@ export default function HomeTabScreen({ navigation }) {
       activeJobs:      jobsRes.count || 0,
       reqBookings:     reqBookingsRes.count || 0,
       pendingBids:     bids.filter(b => b.jobs?.status === 'open').length,
-      jobsDoing:       bids.filter(b => ['accepted', 'in_progress'].includes(b.jobs?.status)).length,
+      jobsDoing:       bids.filter(b => ['accepted', 'in_progress', 'awaiting_completion'].includes(b.jobs?.status)).length,
       provBookings:    provBookingsRes.count || 0,
     }
   }
@@ -164,7 +164,7 @@ export default function HomeTabScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>Rural Services</Text>
+            <Text style={styles.kicker}>Rural Connections</Text>
             <Text style={styles.title}>
               {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
             </Text>

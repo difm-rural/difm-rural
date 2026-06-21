@@ -1,12 +1,18 @@
 {
   "expo": {
-    "name": "Rural Services",
+    "name": "Rural Connect",
     "slug": "difm-rural",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/do-it-for-me-rural-app-icon-1024.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8f162c89-3416-4f10-94a6-108bfc7b8c49"
+    },
     "splash": {
       "image": "./assets/do-it-for-me-rural-app-icon-1024.png",
       "resizeMode": "contain",
@@ -17,6 +23,7 @@
     ],
     "ios": {
       "supportsTablet": false,
+      "icon": "./assets/do-it-for-me-rural-app-icon-ios-1024.png",
       "bundleIdentifier": "nz.co.difmrural.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -57,15 +64,15 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Rural Services uses your location to find nearby jobs and verify job completion.",
-          "locationWhenInUsePermission": "Rural Services uses your location to find nearby jobs and services."
+          "locationAlwaysAndWhenInUsePermission": "Rural Connections uses your location to find nearby jobs and verify job completion.",
+          "locationWhenInUsePermission": "Rural Connections uses your location to find nearby jobs and services."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Rural Services lets providers choose service photos and create service drafts from flyers or screenshots.",
-          "cameraPermission": "Rural Services lets providers take photos of service flyers, signs, and notes to create draft listings.",
+          "photosPermission": "Rural Connections lets providers choose service photos and create service drafts from flyers or screenshots.",
+          "cameraPermission": "Rural Connections lets providers take photos of service flyers, signs, and notes to create draft listings.",
           "microphonePermission": false
         }
       ]

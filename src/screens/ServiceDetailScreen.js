@@ -180,16 +180,13 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const photos = Array.isArray(service.photos) ? service.photos : []
   const isOwnService = !!currentUserId && currentUserId === service.provider_id
 
-  function openEditService() {
+  function goToManageServices() {
     const routeNames = navigation.getState()?.routeNames || []
-    if (routeNames.includes('CreateService')) {
-      navigation.navigate('CreateService', { service })
+    if (routeNames.includes('MyServices')) {
+      navigation.navigate('MyServices')
       return
     }
-    navigation.getParent()?.navigate('Account', {
-      screen: 'CreateService',
-      params: { service },
-    })
+    navigation.getParent()?.navigate('Browse', { screen: 'MyServices' })
   }
 
   return (
@@ -214,6 +211,14 @@ export default function ServiceDetailScreen({ route, navigation }) {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}>
+
+        {isOwnService && (
+          <View style={styles.previewNote}>
+            <Text style={styles.previewNoteText}>
+              👁  Requesters see this. It's a preview of your live listing — edit it from “Manage your services”.
+            </Text>
+          </View>
+        )}
 
         {photos.length > 0 && (
           <ScrollView
@@ -363,14 +368,14 @@ export default function ServiceDetailScreen({ route, navigation }) {
         <TouchableOpacity
           style={isOwnService ? styles.bookBtn : isBooked ? styles.viewBookingBtn : styles.bookBtn}
           onPress={isOwnService
-            ? openEditService
+            ? goToManageServices
             : isBooked
             ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
             : () => navigation.navigate('BookingConfirm', { service, quantity })}
           accessibilityRole="button"
-          accessibilityLabel={isOwnService ? 'Edit service' : isBooked ? 'View your booking' : 'Book this service'}>
+          accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}>
           <Text style={isOwnService ? styles.bookBtnText : isBooked ? styles.viewBookingBtnText : styles.bookBtnText}>
-            {isOwnService ? 'Edit service' : isBooked ? 'View booking ->' : isQuoteRequired ? 'Request quote' : `Book now - $${total} NZD`}
+            {isOwnService ? 'Manage your services' : isBooked ? 'View booking ->' : isQuoteRequired ? 'Request quote' : `Book now - $${total} NZD`}
           </Text>
         </TouchableOpacity>
         {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
@@ -516,6 +521,16 @@ const styles = StyleSheet.create({
   },
   estimateLabel: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   estimateTotal: { fontSize: 20, fontWeight: 'bold', color: colors.primary },
+
+  previewNote: {
+    backgroundColor: colors.infoLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.info,
+  },
+  previewNoteText: { fontSize: 14, color: colors.info, fontWeight: '600', lineHeight: 20 },
 
   bookedInfoBox: {
     backgroundColor: colors.primaryLight,

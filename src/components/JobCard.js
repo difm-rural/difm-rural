@@ -28,6 +28,7 @@ function getStatusText(job, bidCount) {
     case 'open':      return bidCount > 0 ? `${bidCount} bid${bidCount > 1 ? 's' : ''}` : 'Open'
     case 'accepted':
     case 'in_progress': return 'Awarded'
+    case 'awaiting_completion': return 'Awaiting confirmation'
     case 'completed': return 'Completed'
     case 'cancelled': return 'Cancelled'
     default:          return job.status

@@ -136,7 +136,7 @@ export default function MyJobsScreen({ navigation, route }) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
   }
 
-  const activePosted = postedJobs.filter(j => ['open', 'accepted', 'in_progress'].includes(j.status))
+  const activePosted = postedJobs.filter(j => ['open', 'accepted', 'in_progress', 'awaiting_completion'].includes(j.status))
   const pastPosted = postedJobs.filter(j => ['completed', 'cancelled'].includes(j.status))
   const completedPosted = postedJobs.filter(j => j.status === 'completed')
 

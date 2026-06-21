@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { requestBadgeRefresh } from './badgeEvents'
 
 export const NOTIFICATION_ICONS = {
   new_booking:                     '📥',
@@ -6,6 +7,7 @@ export const NOTIFICATION_ICONS = {
   bid_accepted:                    '🎉',
   bid_rejected:                    '📋',
   job_cancelled:                   '⚠️',
+  job_ready:                       '🔔',
   job_completed:                   '✅',
   new_question:                    '❓',
   question_answered:               '💬',
@@ -33,6 +35,28 @@ export async function fetchNotifications(limit = 50) {
   return data || []
 }
 
+// Marks the current user's unread notifications for a given job or booking as
+// read — call when the user resolves the underlying item (e.g. confirms a
+// booking) so stale "please confirm" prompts leave the Needs-attention feed.
+export async function markNotificationsReadFor({ bookingId, jobId } = {}) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+    let q = supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', session.user.id)
+      .eq('read', false)
+    if (bookingId) q = q.eq('metadata->>booking_id', bookingId)
+    else if (jobId) q = q.eq('metadata->>job_id', jobId)
+    else return
+    await q
+    requestBadgeRefresh()
+  } catch {
+    // Best-effort — the badge catches up on the next refresh
+  }
+}
+
 export async function markAllNotificationsRead() {
   try {
     const { data: { session } } = await supabase.auth.getSession()
@@ -50,6 +74,11 @@ export async function markAllNotificationsRead() {
 // Navigates to whatever a notification is about. Works from any stack that
 // registers ServiceBookingDetail, ManageTask, and JobDetail.
 export async function openNotificationTarget(navigation, userId, notification) {
+  // Tapping a notification clears it from the Needs-attention feed.
+  if (notification?.id && !notification.read) {
+    supabase.from('notifications').update({ read: true }).eq('id', notification.id)
+      .then(() => requestBadgeRefresh())
+  }
   const meta = notification.metadata || {}
   try {
     // Chat-message notifications open the conversation directly.

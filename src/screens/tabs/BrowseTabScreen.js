@@ -190,10 +190,8 @@ export default function BrowseTabScreen({ navigation }) {
   }
 
   function handlePress(item) {
-    if (item.provider_id === currentUserId) {
-      navigation.navigate('CreateService', { service: item })
-      return
-    }
+    // Tapping any card — including your own listings — opens the requester-facing
+    // preview. Editing happens only via the "Manage your services" banner.
     navigation.navigate('ServiceDetail', { service: item })
   }
 
@@ -237,7 +235,7 @@ export default function BrowseTabScreen({ navigation }) {
     <View style={styles.screen}>
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+        <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.title}>Services</Text>
         <Text style={styles.subtitle}>Book rural service providers</Text>
         <TextInput

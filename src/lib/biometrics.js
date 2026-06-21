@@ -31,7 +31,7 @@ export async function getBiometricType() {
 export async function authenticate() {
   try {
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage:         'Sign in to Rural Services',
+      promptMessage:         'Sign in to Rural Connections',
       fallbackLabel:         'Use email code instead',
       cancelLabel:           'Cancel',
       disableDeviceFallback: false, // allows PIN/pattern as fallback on Android
