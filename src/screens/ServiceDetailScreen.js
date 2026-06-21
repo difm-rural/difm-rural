@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
+import { BOOKING_ACTIVE_STATUSES } from '../lib/lifecycle'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -112,7 +113,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
       .select('id, status, provider_id, requester_id, service_id')
       .eq('service_id', service.id)
       .eq('requester_id', user.id)
-      .in('status', ['pending', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested'])
+      .in('status', BOOKING_ACTIVE_STATUSES)
       .order('created_at', { ascending: false })
       .limit(1)
     const booking = data?.[0] || null
