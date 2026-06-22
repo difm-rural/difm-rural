@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
-import { confirmJobComplete, cancelJob, deleteJob, acceptBid } from '../lib/jobActions'
+import { confirmJobComplete, cancelJob, deleteJob, acceptBid as apiAcceptBid } from '../lib/jobActions'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
@@ -188,7 +188,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         {
           text: 'Accept',
           onPress: async () => {
-            const { error } = await acceptBid(job, bid)
+            const { error } = await apiAcceptBid(job, bid)
             if (error) { Alert.alert('Error', error.message); return }
             Alert.alert('Bid accepted!', `${provName} has been notified.`, [
               { text: 'OK', onPress: () => setJob(prev => ({ ...prev, status: 'accepted' })) },
