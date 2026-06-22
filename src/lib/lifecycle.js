@@ -87,6 +87,12 @@ export const BOOKING_TERMINAL_STATUSES = [
 export const isBookingActive   = s => BOOKING_ACTIVE_STATUSES.includes(s)
 export const isBookingTerminal = s => BOOKING_TERMINAL_STATUSES.includes(s)
 
+// Before a booking is accepted the requester can withdraw it outright; once
+// it's confirmed/underway, ending it is a cancellation request the provider
+// must confirm.
+export const BOOKING_WITHDRAWABLE_STATUSES = [BOOKING_STATUS.PENDING, BOOKING_STATUS.QUOTE_SENT]
+export const isBookingWithdrawable = s => BOOKING_WITHDRAWABLE_STATUSES.includes(s)
+
 // Canonical label for the verbose surfaces (booking detail screen).
 export function bookingStatusLabel(status) {
   switch (status) {

@@ -12,7 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
-import { BOOKING_ACTIVE_STATUSES } from '../lib/lifecycle'
+import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle'
+import { cancelBookingByRequester } from '../lib/bookingActions'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -123,7 +124,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
   function handleCancelBooking() {
     if (!activeBooking) return
-    const isPendingBooking = activeBooking.status === 'pending'
+    const isPendingBooking = isBookingWithdrawable(activeBooking.status)
     const message = isPendingBooking
       ? 'Withdraw this service request before the provider accepts it? The provider will be notified.'
       : 'Request cancellation? The provider will be asked to confirm.'
@@ -134,13 +135,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         text: isPendingBooking ? 'Withdraw request' : 'Request cancellation',
         style: 'destructive',
         onPress: async () => {
-          const nextStatus = isPendingBooking ? 'withdrawn' : 'cancellation_requested'
-          const { error } = await supabase
-            .from('bookings')
-            .update({ status: nextStatus })
-            .eq('id', activeBooking.id)
-            .eq('requester_id', activeBooking.requester_id)
-            .eq('status', activeBooking.status)
+          const { error } = await cancelBookingByRequester(activeBooking, activeBooking.requester_id)
 
           if (error) {
             Alert.alert(isPendingBooking ? 'Could not withdraw request' : 'Could not request cancellation', error.message)

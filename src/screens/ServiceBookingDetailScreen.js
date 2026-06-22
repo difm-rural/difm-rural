@@ -16,7 +16,15 @@ import { supabase } from '../lib/supabase'
 import { bookingStatusLabel } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
-import { loadReview, saveReview } from '../lib/reviews'
+import { loadReview } from '../lib/reviews'
+import {
+  updateBookingStatus,
+  confirmBookingComplete,
+  sendBookingQuote,
+  acceptBookingQuote,
+  dismissProviderBooking as dismissBookingApi,
+  saveBookingReview,
+} from '../lib/bookingActions'
 
 function formatMoney(amount, service) {
   if (amount != null) return `$${amount} NZD`
@@ -171,11 +179,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }
 
   async function updateStatus(nextStatus, allowedStatuses, message) {
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: nextStatus })
-      .eq('id', booking.id)
-      .in('status', allowedStatuses)
+    const { error } = await updateBookingStatus(booking.id, nextStatus, allowedStatuses)
     if (error) {
       Alert.alert('Could not update booking', error.message)
       return
@@ -192,27 +196,15 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     }
 
     setSavingQuote(true)
-    const patch = {
-      status: 'quote_sent',
-      quote_amount: amount,
-      quote_notes: quoteNotes.trim() || null,
-      total_amount: amount,
-      quote_sent_at: new Date().toISOString(),
-    }
-    const { error } = await supabase
-      .from('bookings')
-      .update(patch)
-      .eq('id', booking.id)
-      .eq('provider_id', booking.provider_id)
-      .in('status', ['pending', 'quote_sent', 'confirmed'])
-
+    const notes = quoteNotes.trim() || null
+    const { error } = await sendBookingQuote(booking.id, booking.provider_id, { amount, notes })
     setSavingQuote(false)
     if (error) {
       Alert.alert('Could not send quote', error.message)
       return
     }
 
-    setBooking(prev => ({ ...prev, ...patch }))
+    setBooking(prev => ({ ...prev, status: 'quote_sent', quote_amount: amount, quote_notes: notes, total_amount: amount }))
     Alert.alert('Quote sent', 'The requester can now review and accept this quote.')
   }
 
@@ -222,18 +214,12 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       {
         text: 'Accept',
         onPress: async () => {
-          const patch = { status: 'confirmed', quote_accepted_at: new Date().toISOString() }
-          const { error } = await supabase
-            .from('bookings')
-            .update(patch)
-            .eq('id', booking.id)
-            .eq('requester_id', booking.requester_id)
-            .eq('status', 'quote_sent')
+          const { error } = await acceptBookingQuote(booking.id, booking.requester_id)
           if (error) {
             Alert.alert('Could not accept quote', error.message)
             return
           }
-          setBooking(prev => ({ ...prev, ...patch }))
+          setBooking(prev => ({ ...prev, status: 'confirmed' }))
           Alert.alert('Quote accepted', 'The provider can now proceed with the service.')
         },
       },
@@ -267,12 +253,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         {
           text: 'Mark as complete',
           onPress: async () => {
-            const { error } = await supabase
-              .from('bookings')
-              .update({ status: 'completed' })
-              .eq('id', booking.id)
-              .eq('requester_id', booking.requester_id)
-              .in('status', ['awaiting_completion'])
+            const { error } = await confirmBookingComplete(booking.id, booking.requester_id)
             if (error) {
               Alert.alert('Could not confirm', error.message)
               return
@@ -288,19 +269,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   async function submitReview({ rating, comment }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const revieweeId = viewerRole === 'provider' ? booking.requester_id : booking.provider_id
-    const revieweeRole = viewerRole === 'provider' ? 'requester' : 'provider'
     setSavingReview(true)
     try {
-      const review = await saveReview({
-        bookingId: booking.id,
-        reviewerId: user.id,
-        revieweeId,
-        reviewerRole: viewerRole,
-        revieweeRole,
-        rating,
-        comment,
-      })
+      const review = await saveBookingReview({ booking, viewerRole, reviewerId: user.id, rating, comment })
       setMyReview(review)
       setReviewVisible(false)
       Alert.alert('Review saved', 'Thanks for your feedback.')
@@ -323,12 +294,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }
 
   async function dismissProviderBooking() {
-    const { error } = await supabase
-      .from('bookings')
-      .update({ provider_archive_at: new Date().toISOString() })
-      .eq('id', booking.id)
-      .eq('provider_id', booking.provider_id)
-      .in('status', ['withdrawn', 'cancelled'])
+    const { error } = await dismissBookingApi(booking.id, booking.provider_id)
 
     if (error) {
       Alert.alert('Could not dismiss booking', error.message)
