@@ -129,7 +129,10 @@ export async function openNotificationTarget(navigation, userId, notification) {
         .eq('id', meta.job_id)
         .maybeSingle()
       if (!job) return
-      if (job.requester_id === userId) navigation.navigate('ManageTask', { job, bidCount: 0 })
+      // Q&A lives on JobDetail (incl. the owner's answer UI), so route question
+      // notifications there rather than to the owner's ManageTask screen.
+      const isQuestion = notification.type === 'new_question' || notification.type === 'question_answered'
+      if (job.requester_id === userId && !isQuestion) navigation.navigate('ManageTask', { job, bidCount: 0 })
       else navigation.navigate('JobDetail', { job })
     }
   } catch {
