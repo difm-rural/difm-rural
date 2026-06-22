@@ -79,6 +79,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [savingReview, setSavingReview] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [questionCount, setQuestionCount] = useState(0)
 
   useEffect(() => {
     async function loadCurrentUserAndJob() {
@@ -113,7 +114,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       setLoadingBid(true)
       fetchAcceptedBid()
     }
-    if (job.status === 'open') fetchBids()
+    if (job.status === 'open') { fetchBids(); fetchQuestionCount() }
   }, [job.id, job.status])
 
   useEffect(() => {
@@ -196,6 +197,16 @@ export default function ManageTaskScreen({ navigation, route }) {
         },
       ]
     )
+  }
+
+  async function fetchQuestionCount() {
+    try {
+      const { count } = await supabase
+        .from('job_questions')
+        .select('id', { count: 'exact', head: true })
+        .eq('job_id', job.id)
+      setQuestionCount(count || 0)
+    } catch { /* table may not exist yet */ }
   }
 
   async function fetchProviderReview() {
@@ -301,6 +312,11 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   function handleReviewBids() {
+    if (!ensureTaskOwner()) return
+    navigation.navigate('JobDetail', { job })
+  }
+
+  function handleViewQuestions() {
     if (!ensureTaskOwner()) return
     navigation.navigate('JobDetail', { job })
   }
@@ -594,6 +610,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   //  OPEN / COMPLETED / CANCELLED LAYOUT (existing)
   // ─────────────────────────────────────────────────────────────────
   const showReviewBids = job.status === 'open' && bidCount > 0
+  const showQuestions  = job.status === 'open' && questionCount > 0
   const showEdit       = job.status === 'open'
   const showCancel     = ['open', 'accepted', 'in_progress'].includes(job.status)
   const showDelete     = (job.status === 'open' && bidCount === 0) || job.status === 'cancelled'
@@ -630,6 +647,14 @@ export default function ManageTaskScreen({ navigation, route }) {
       label: 'Review bids',
       subtitle: `${bidCount} bid${bidCount > 1 ? 's' : ''} waiting for your review`,
       onPress: handleReviewBids,
+    },
+    showQuestions && {
+      key: 'questions',
+      emoji: '❓',
+      iconBg: colors.infoLight,
+      label: `Questions (${questionCount})`,
+      subtitle: 'View and answer questions from providers',
+      onPress: handleViewQuestions,
     },
     showEdit && {
       key: 'edit',
