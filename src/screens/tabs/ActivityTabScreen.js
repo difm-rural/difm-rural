@@ -13,6 +13,15 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded } from '../../lib/lifecycle'
+import {
+  confirmBooking as apiConfirmBooking,
+  declineBooking as apiDeclineBooking,
+  markBookingReady as apiMarkBookingReady,
+  confirmBookingComplete as apiConfirmBookingComplete,
+  confirmBookingCancellation as apiConfirmBookingCancellation,
+  dismissProviderBooking as apiDismissProviderBooking,
+  cancelBookingByRequester as apiCancelBookingByRequester,
+} from '../../lib/bookingActions'
 import { colors } from '../../theme/tokens'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import ReviewModal from '../../components/ReviewModal'
@@ -391,7 +400,7 @@ export default function ActivityTabScreen({ navigation }) {
       navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })
       return
     }
-    const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', booking.id)
+    const { error } = await apiConfirmBooking(booking.id)
     if (!error) load()
     else Alert.alert('Error', 'Could not confirm booking.')
   }
@@ -403,7 +412,7 @@ export default function ActivityTabScreen({ navigation }) {
         text: 'Decline',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId)
+          const { error } = await apiDeclineBooking(bookingId)
           if (!error) load()
           else Alert.alert('Error', 'Could not decline booking.')
         },
@@ -415,12 +424,7 @@ export default function ActivityTabScreen({ navigation }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { error } = await supabase
-      .from('bookings')
-      .update({ provider_archive_at: new Date().toISOString() })
-      .eq('id', booking.id)
-      .eq('provider_id', user.id)
-      .in('status', ['withdrawn', 'cancelled'])
+    const { error } = await apiDismissProviderBooking(booking.id, user.id)
 
     if (error) Alert.alert('Could not dismiss booking', error.message)
     else load()
@@ -435,14 +439,7 @@ export default function ActivityTabScreen({ navigation }) {
         {
           text: 'Mark complete',
           onPress: async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-            const { error } = await supabase
-              .from('bookings')
-              .update({ status: 'awaiting_completion' })
-              .eq('id', bookingId)
-              .eq('provider_id', user.id)
-              .in('status', ['confirmed', 'in_progress'])
+            const { error } = await apiMarkBookingReady(bookingId)
             if (!error) load()
             else Alert.alert('Could not mark complete', error.message)
           },
@@ -459,23 +456,11 @@ export default function ActivityTabScreen({ navigation }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const booking = cancelBookingTarget
-    const isPendingBooking = ['pending', 'quote_sent'].includes(booking.status)
-    const nextStatus = isPendingBooking ? 'withdrawn' : 'cancellation_requested'
-
-    const { error } = await supabase
-      .from('bookings')
-      .update({
-        status: nextStatus,
-        cancellation_reason: reason,
-        cancellation_note: note,
-      })
-      .eq('id', booking.id)
-      .eq('requester_id', user.id)
-      .eq('status', booking.status)
+    const { error, isPending } = await apiCancelBookingByRequester(booking, user.id, { reason, note })
 
     if (error) {
       Alert.alert(
-        isPendingBooking ? 'Could not withdraw request' : 'Could not request cancellation',
+        isPending ? 'Could not withdraw request' : 'Could not request cancellation',
         error.message
       )
       return
@@ -488,12 +473,7 @@ export default function ActivityTabScreen({ navigation }) {
   async function confirmCancellation(bookingId) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: 'cancelled' })
-      .eq('id', bookingId)
-      .eq('provider_id', user.id)
-      .eq('status', 'cancellation_requested')
+    const { error } = await apiConfirmBookingCancellation(bookingId, user.id)
     if (error) Alert.alert('Could not confirm cancellation', error.message)
     else load()
   }
@@ -507,7 +487,9 @@ export default function ActivityTabScreen({ navigation }) {
         {
           text: 'Mark as complete',
           onPress: async () => {
-            const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', bookingId)
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { error } = await apiConfirmBookingComplete(bookingId, user.id)
             if (!error) {
               await markNotificationsReadFor({ bookingId })
               load()

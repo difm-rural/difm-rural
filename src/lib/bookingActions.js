@@ -20,6 +20,14 @@ export function confirmBooking(bookingId) {
   return updateBookingStatus(bookingId, BOOKING_STATUS.CONFIRMED, [BOOKING_STATUS.PENDING])
 }
 
+// Provider declines a request before any work is done.
+export function declineBooking(bookingId) {
+  return updateBookingStatus(bookingId, BOOKING_STATUS.CANCELLED, [
+    BOOKING_STATUS.PENDING,
+    BOOKING_STATUS.QUOTE_SENT,
+  ])
+}
+
 // Provider flags the work done; requester then confirms.
 export function markBookingReady(bookingId) {
   return updateBookingStatus(bookingId, BOOKING_STATUS.AWAITING_COMPLETION, [
