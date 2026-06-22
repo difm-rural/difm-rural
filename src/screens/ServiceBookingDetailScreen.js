@@ -16,6 +16,8 @@ import { supabase } from '../lib/supabase'
 import { bookingStatusLabel } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
+import StarRating from '../components/StarRating'
+import ReceivedReview from '../components/ReceivedReview'
 import { loadReview } from '../lib/reviews'
 import {
   updateBookingStatus,
@@ -352,9 +354,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           {otherReviews.length > 0 ? (
             otherReviews.map((r, i) => (
               <View key={i} style={styles.repReview}>
-                <Text style={styles.repStars}>
-                  {'★'.repeat(r.rating || 0)}{'☆'.repeat(Math.max(0, 5 - (r.rating || 0)))}
-                </Text>
+                <StarRating rating={r.rating} style={styles.repStars} />
                 <Text style={styles.repComment}>{r.comment}</Text>
               </View>
             ))
@@ -363,18 +363,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           )}
         </View>
 
-        {canReview && receivedReview && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Review from {otherRoleLabel.toLowerCase()}</Text>
-            <View style={styles.repReview}>
-              <Text style={styles.repStars}>
-                {'★'.repeat(receivedReview.rating || 0)}{'☆'.repeat(Math.max(0, 5 - (receivedReview.rating || 0)))}
-              </Text>
-              {receivedReview.comment ? (
-                <Text style={styles.repComment}>{receivedReview.comment}</Text>
-              ) : null}
-            </View>
-          </View>
+        {canReview && (
+          <ReceivedReview review={receivedReview} fromLabel={otherRoleLabel.toLowerCase()} />
         )}
 
         <View style={styles.card}>

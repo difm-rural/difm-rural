@@ -14,6 +14,7 @@ import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
 import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle'
 import { cancelBookingByRequester } from '../lib/bookingActions'
+import StarRating from '../components/StarRating'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -265,9 +266,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
             <Text style={styles.cardLabel}>Recent reviews</Text>
             {recentReviews.map((r, i) => (
               <View key={i} style={[styles.reviewItem, i < recentReviews.length - 1 && styles.reviewItemBorder]}>
-                <Text style={styles.reviewStars}>
-                  {'★'.repeat(r.rating || 0)}{'☆'.repeat(Math.max(0, 5 - (r.rating || 0)))}
-                </Text>
+                <StarRating rating={r.rating} style={styles.reviewStars} />
                 <Text style={styles.reviewComment}>{r.comment}</Text>
               </View>
             ))}

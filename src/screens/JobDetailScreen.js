@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
 import { markJobComplete, confirmJobComplete, acceptBid } from '../lib/jobActions'
+import ReceivedReview from '../components/ReceivedReview'
 import { colors } from '../theme/tokens'
 import PressableCard from '../components/PressableCard'
 import ReviewModal from '../components/ReviewModal'
@@ -46,6 +47,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [requesterReview, setRequesterReview] = useState(null)
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
+  const [receivedReview, setReceivedReview] = useState(null)
 
   // Requester-side: confirm completion + review the provider
   const [providerReview, setProviderReview] = useState(null)
@@ -75,6 +77,7 @@ export default function JobDetailScreen({ route, navigation }) {
   useEffect(() => {
     if (job.status !== 'completed' || !currentUser?.id || !myBid) return
     fetchRequesterReview()
+    fetchReceivedReview()
   }, [job.status, currentUser?.id, myBid?.id])
 
   useEffect(() => {
@@ -163,6 +166,20 @@ export default function JobDetailScreen({ route, navigation }) {
     try {
       const review = await loadReview({ jobId: job.id, reviewerId: currentUser.id, reviewerRole: 'provider' })
       setRequesterReview(review)
+    } catch { }
+  }
+
+  // The requester's review of me (the provider), shown on the completed job.
+  async function fetchReceivedReview() {
+    try {
+      const { data } = await supabase
+        .from('reviews')
+        .select('rating, comment')
+        .eq('job_id', job.id)
+        .eq('reviewee_id', currentUser.id)
+        .eq('reviewer_role', 'requester')
+        .maybeSingle()
+      setReceivedReview(data || null)
     } catch { }
   }
 
@@ -483,6 +500,8 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.chatBannerArrow}>›</Text>
             </TouchableOpacity>
           ) : null}
+
+          {isCompleted && <ReceivedReview review={receivedReview} fromLabel="requester" />}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Job details</Text>
