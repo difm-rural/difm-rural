@@ -4,6 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
+import { markJobComplete, confirmJobComplete, acceptBid } from '../lib/jobActions'
 import { colors } from '../theme/tokens'
 import PressableCard from '../components/PressableCard'
 import ReviewModal from '../components/ReviewModal'
@@ -178,8 +179,7 @@ export default function JobDetailScreen({ route, navigation }) {
       {
         text: 'Confirm',
         onPress: async () => {
-          const { error } = await supabase.from('jobs').update({ status: 'completed' })
-            .eq('id', job.id).eq('requester_id', currentUser.id)
+          const { error } = await confirmJobComplete(job.id, currentUser.id)
           if (error) { Alert.alert('Error', error.message); return }
           trackEvent('job_completed', { job_id: job.id })
           setJob(prev => ({ ...prev, status: 'completed' }))
@@ -339,11 +339,8 @@ export default function JobDetailScreen({ route, navigation }) {
       {
         text: 'Accept',
         onPress: async () => {
-          const { error: e1 } = await supabase.from('bids').update({ status: 'accepted' }).eq('id', bid.id)
-          if (e1) { Alert.alert('Error', e1.message); return }
-          await supabase.from('bids').update({ status: 'rejected' }).eq('job_id', job.id).neq('id', bid.id)
-          const { error: e3 } = await supabase.from('jobs').update({ status: 'accepted' }).eq('id', job.id)
-          if (e3) { Alert.alert('Error', e3.message); return }
+          const { error } = await acceptBid(job, bid)
+          if (error) { Alert.alert('Error', error.message); return }
           trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
           Alert.alert('Job awarded!', 'You can now chat with the provider.', [
             { text: 'OK', onPress: () => navigation.goBack() },
@@ -424,12 +421,7 @@ export default function JobDetailScreen({ route, navigation }) {
           {
             text: 'Mark completed',
             onPress: async () => {
-              const { error } = await supabase
-                .from('jobs')
-                .update({ status: 'awaiting_completion' })
-                .eq('id', job.id)
-                .select()
-                .single()
+              const { error } = await markJobComplete(job.id)
               if (error) { Alert.alert('Error', error.message); return }
               trackEvent('job_marked_complete', { job_id: job.id })
               setJob(prev => ({ ...prev, status: 'awaiting_completion' }))

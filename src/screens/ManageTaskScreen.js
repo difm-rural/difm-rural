@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
+import { confirmJobComplete, cancelJob, deleteJob, acceptBid } from '../lib/jobActions'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
@@ -186,12 +187,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         {
           text: 'Accept',
           onPress: async () => {
-            const { error: bidError } = await supabase
-              .from('bids').update({ status: 'accepted' }).eq('id', bid.id)
-            if (bidError) { Alert.alert('Error', bidError.message); return }
-            await supabase.from('bids').update({ status: 'rejected' }).eq('job_id', job.id).neq('id', bid.id)
-            const { error: jobError } = await supabase.from('jobs').update({ status: 'accepted' }).eq('id', job.id)
-            if (jobError) { Alert.alert('Error', jobError.message); return }
+            const { error } = await acceptBid(job, bid)
+            if (error) { Alert.alert('Error', error.message); return }
             Alert.alert('Bid accepted!', `${provName} has been notified.`, [
               { text: 'OK', onPress: () => setJob(prev => ({ ...prev, status: 'accepted' })) },
             ])
@@ -242,11 +239,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       visible={showCancelModal}
       onClose={() => setShowCancelModal(false)}
       onConfirm={async (reason, note) => {
-        const { error } = await supabase
-          .from('jobs')
-          .update({ status: 'cancelled', cancellation_reason: reason, cancellation_note: note })
-          .eq('id', job.id)
-          .eq('requester_id', currentUserId)
+        const { error } = await cancelJob(job.id, currentUserId, { reason, note })
         if (error) { Alert.alert('Something went wrong', error.message || 'Please try again'); return }
         setShowCancelModal(false)
         navigation.goBack()
@@ -299,7 +292,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase.from('jobs').delete().eq('id', job.id).eq('requester_id', currentUserId)
+          const { error } = await deleteJob(job.id, currentUserId)
           if (error) { Alert.alert('Something went wrong', error.message || 'Please try again', [{ text: 'OK' }]); return }
           navigation.goBack()
         },
@@ -370,7 +363,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         {
           text: 'Confirm',
           onPress: async () => {
-            const { error } = await supabase.from('jobs').update({ status: 'completed' }).eq('id', job.id).eq('requester_id', currentUserId)
+            const { error } = await confirmJobComplete(job.id, currentUserId)
             if (error) {
               Alert.alert('Error', error.message)
               return
