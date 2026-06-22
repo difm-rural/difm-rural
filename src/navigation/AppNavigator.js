@@ -1,4 +1,4 @@
-import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native'
+import { NavigationContainer, useNavigationContainerRef, getFocusedRouteNameFromRoute } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import React, { useEffect, useRef, useState } from 'react'
@@ -205,6 +205,10 @@ const TAB_ROOT = {
   Account:  'AccountMain',
 }
 
+// Screens that keep the bottom tab bar: every tab root, plus job management.
+// Everything else (detail / workflow screens) hides it.
+const TAB_BAR_ROUTES = new Set([...Object.values(TAB_ROOT), 'ManageTask'])
+
 function TabIcon({ name, active, avatarUrl }) {
   const inactive = colors.textMuted
   const c = active ? colors.primary : inactive
@@ -233,11 +237,12 @@ function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBad
   const insets = useSafeAreaInsets()
   const { avatarUrl } = useUser()
 
-  // Hide tab bar on pushed workflows, but keep it visible on job management.
+  // Hide tab bar on pushed detail/workflow screens, keep it on tab roots and
+  // job management. getFocusedRouteNameFromRoute reliably reports the focused
+  // nested screen (it returns undefined on a tab's root → keep the bar).
   const activeRoute = state.routes[state.index]
-  const nestedStackIndex = activeRoute?.state?.index ?? 0
-  const nestedRouteName = activeRoute?.state?.routes?.[nestedStackIndex]?.name
-  if (nestedStackIndex > 0 && nestedRouteName !== 'ManageTask') return null
+  const focusedRoute = getFocusedRouteNameFromRoute(activeRoute)
+  if (focusedRoute && !TAB_BAR_ROUTES.has(focusedRoute)) return null
 
   return (
     <View style={[tabStyles.bar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
