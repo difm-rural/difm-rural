@@ -14,7 +14,7 @@ import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
 import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle'
 import { cancelBookingByRequester } from '../lib/bookingActions'
-import StarRating from '../components/StarRating'
+import ReviewList from '../components/ReviewList'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -264,12 +264,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {recentReviews.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Recent reviews</Text>
-            {recentReviews.map((r, i) => (
-              <View key={i} style={[styles.reviewItem, i < recentReviews.length - 1 && styles.reviewItemBorder]}>
-                <StarRating rating={r.rating} style={styles.reviewStars} />
-                <Text style={styles.reviewComment}>{r.comment}</Text>
-              </View>
-            ))}
+            <ReviewList reviews={recentReviews} />
           </View>
         )}
 
@@ -478,10 +473,6 @@ const styles = StyleSheet.create({
 
   descText: { fontSize: 14, color: colors.textSecondary, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 16 },
 
-  reviewItem:       { paddingHorizontal: 16, paddingVertical: 12 },
-  reviewItemBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
-  reviewStars:      { fontSize: 13, color: colors.amber, marginBottom: 4 },
-  reviewComment:    { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
 
   estimatorRow: {
     flexDirection: 'row',

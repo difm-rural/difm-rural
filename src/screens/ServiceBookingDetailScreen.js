@@ -16,8 +16,8 @@ import { supabase } from '../lib/supabase'
 import { bookingStatusLabel } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
-import StarRating from '../components/StarRating'
 import ReceivedReview from '../components/ReceivedReview'
+import ReputationCard from '../components/ReputationCard'
 import { loadReview } from '../lib/reviews'
 import {
   updateBookingStatus,
@@ -341,27 +341,13 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <DetailRow label="Provider" value={provider?.full_name || booking.providerName || 'Provider'} />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>{otherRoleLabel} rating</Text>
-          <View style={styles.repHeader}>
-            <Text style={styles.repName}>{otherUser?.full_name || otherRoleLabel}</Text>
-            <Text style={styles.repRating}>
-              {otherStats?.ratingCount > 0
-                ? `⭐ ${otherStats.ratingAvg.toFixed(1)} (${otherStats.ratingCount} review${otherStats.ratingCount === 1 ? '' : 's'})`
-                : '⭐ No rating yet'}
-            </Text>
-          </View>
-          {otherReviews.length > 0 ? (
-            otherReviews.map((r, i) => (
-              <View key={i} style={styles.repReview}>
-                <StarRating rating={r.rating} style={styles.repStars} />
-                <Text style={styles.repComment}>{r.comment}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.repEmpty}>No written reviews yet.</Text>
-          )}
-        </View>
+        <ReputationCard
+          label={`${otherRoleLabel} rating`}
+          name={otherUser?.full_name || otherRoleLabel}
+          ratingAvg={otherStats?.ratingAvg}
+          ratingCount={otherStats?.ratingCount}
+          reviews={otherReviews}
+        />
 
         {canReview && (
           <ReceivedReview review={receivedReview} fromLabel={otherRoleLabel.toLowerCase()} />
@@ -518,13 +504,6 @@ const styles = StyleSheet.create({
   detailLabel: { width: 92, fontSize: 13, color: colors.textMuted, fontWeight: '700' },
   detailValue: { flex: 1, fontSize: 14, color: colors.textPrimary, fontWeight: '600', textAlign: 'right', lineHeight: 20 },
   linkValue: { color: colors.primary, fontWeight: '700' },
-  repHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2', paddingTop: 12 },
-  repName: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  repRating: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-  repReview: { paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
-  repStars: { fontSize: 13, color: colors.amber, marginBottom: 4 },
-  repComment: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-  repEmpty: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
 
   inputBlock: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
   inputLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '700', marginBottom: 8 },
