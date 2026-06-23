@@ -142,10 +142,18 @@ export default function PostJobStep5Review({ navigation, route }) {
     navigation.goBack()
   }
 
+  // Reset the current stack to its root screen. popToTop() can throw
+  // "POP_TO_TOP was not handled" depending on how the wizard was reached, so
+  // navigate to the bottom route by name instead (always handled).
+  function goToStackRoot() {
+    const rootName = navigation.getState()?.routes?.[0]?.name
+    if (rootName) navigation.navigate(rootName)
+  }
+
   // Clear the wizard and return to whichever tab launched it (defaults to the
-  // Jobs board when launched from there / origin unknown).
+  // current stack's root when launched from there / origin unknown).
   function returnAfterPost() {
-    navigation.popToTop()
+    goToStackRoot()
     const origin = route.params?.origin
     if (origin && origin !== 'Jobs') navigation.getParent()?.navigate(origin)
   }
@@ -205,7 +213,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       setUploadStatus('')
       resetJobData()
       Alert.alert('Job updated', 'Your job has been updated.', [
-        { text: 'OK', onPress: () => navigation.popToTop() },
+        { text: 'OK', onPress: goToStackRoot },
       ])
       return
     }
