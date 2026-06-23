@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -143,7 +144,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Go back">
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
           </TouchableOpacity>
           <Text style={styles.kicker}>Member profile</Text>
           <Text style={styles.headerTitle}>Requester profile</Text>
@@ -168,7 +169,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Member profile</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Requester profile</Text>
@@ -188,7 +189,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
               <Text style={styles.displayName}>{displayName}</Text>
               {profile?.primary_role === 'requester' || profile?.role === 'requester' ? (
                 <View style={styles.verifiedBadge}>
-                  <Text style={styles.verifiedText}>✓ Verified</Text>
+                  <Text style={styles.verifiedText}><Icon name="checkmark-circle" size={13} color={colors.primary} /> Verified</Text>
                 </View>
               ) : null}
             </View>
@@ -240,7 +241,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Location</Text>
           <View style={styles.locationRow}>
-            <Text style={styles.locationPin}>📍</Text>
+            <Icon name="location-outline" size={14} color={colors.textMuted} />
             <View>
               <Text style={styles.locationLabel}>Based in</Text>
               <Text style={styles.locationValue}>
@@ -293,7 +294,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
                   onPress={() => setShowAllReviews(true)}
                   accessibilityRole="button"
                   accessibilityLabel={`Show all ${reviews.length} reviews`}>
-                  <Text style={styles.showAllText}>Show all {reviews.length} reviews →</Text>
+                  <Text style={styles.showAllText}>Show all {reviews.length} reviews <Icon name="arrow-forward" size={13} color={colors.primary} /></Text>
                 </TouchableOpacity>
               )}
             </>

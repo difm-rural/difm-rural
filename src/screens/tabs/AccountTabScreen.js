@@ -20,6 +20,7 @@ import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../../l
 import { useUser } from '../../context/UserContext'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 import { canProvide } from '../../lib/roles'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import {
@@ -67,14 +68,14 @@ function MenuRow({ icon, label, value, onPress, last, danger }) {
       accessibilityLabel={`${label}${value ? `, ${value}` : ''}`}
       accessibilityHint="Double tap to open">
       <View style={styles.rowLeft}>
-        <Text style={styles.rowIcon}>{icon}</Text>
+        <Icon name={icon} size={18} color={danger ? colors.danger : colors.textSecondary} style={styles.rowIcon} />
         <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
       </View>
       <View style={styles.rowRight}>
         {!!value && (
           <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
         )}
-        <Text style={[styles.rowChevron, danger && styles.rowChevronDanger]}>›</Text>
+        <Icon name="chevron-forward" size={16} color={danger ? colors.danger : colors.textMuted} style={styles.rowChevron} />
       </View>
     </TouchableOpacity>
   )
@@ -88,12 +89,12 @@ function HubButton({ icon, label, sub, onPress }) {
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={label}>
-      <Text style={styles.hubIcon}>{icon}</Text>
+      <Icon name={icon} size={22} color={colors.primary} style={styles.hubIcon} />
       <View style={{ flex: 1 }}>
         <Text style={styles.hubLabel}>{label}</Text>
         <Text style={styles.hubSub}>{sub}</Text>
       </View>
-      <Text style={styles.hubChevron}>›</Text>
+      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
     </TouchableOpacity>
   )
 }
@@ -281,8 +282,8 @@ export default function AccountTabScreen({ navigation }) {
       'How do you use Rural Connections?',
       'You can always post jobs and book services. Providing adds tools to advertise services and take on jobs.',
       [
-        { text: '🏡 I just need help', onPress: () => updateRole('requester') },
-        { text: '🔧 I also provide',   onPress: () => updateRole('both') },
+        { text: 'I just need help', onPress: () => updateRole('requester') },
+        { text: 'I also provide',   onPress: () => updateRole('both') },
         { text: 'Cancel', style: 'cancel' },
       ]
     )
@@ -424,7 +425,7 @@ export default function AccountTabScreen({ navigation }) {
         )}
       </View>
       <View style={styles.cameraBtn}>
-        <Text style={styles.cameraBtnText}>📷</Text>
+        <Icon name="camera" size={14} color="#fff" />
       </View>
     </TouchableOpacity>
   )
@@ -448,15 +449,15 @@ export default function AccountTabScreen({ navigation }) {
 
       <View style={styles.hubButtons}>
         <HubButton
-          icon="👤" label="Profile" sub="Photo, name, bio, skills"
+          icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}
         />
         <HubButton
-          icon="⚙️" label="Account settings" sub="Contact details, mode, notifications"
+          icon="settings-outline" label="Account settings" sub="Contact details, mode, notifications"
           onPress={() => setSection('account')}
         />
         <HubButton
-          icon="🔒" label="Privacy" sub="Security, terms, support"
+          icon="lock-closed-outline" label="Privacy" sub="Security, terms, support"
           onPress={() => setSection('privacy')}
         />
       </View>
@@ -482,7 +483,7 @@ export default function AccountTabScreen({ navigation }) {
         accessibilityRole="button"
         accessibilityLabel={`Role: ${roleLabel}. Tap to change`}>
         <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={styles.roleCardTitle}>{isProvider ? '🔧 Provider' : '🏡 Requester'}</Text>
+          <Text style={styles.roleCardTitle}>{isProvider ? <><Icon name="construct-outline" size={15} color={colors.textPrimary} /> Provider</> : <><Icon name="home-outline" size={15} color={colors.textPrimary} /> Requester</>}</Text>
           <Text style={styles.roleCardSub}>
             {isProvider
               ? 'You can post jobs, book services, and advertise your own services.'
@@ -495,19 +496,19 @@ export default function AccountTabScreen({ navigation }) {
       <Text style={styles.sectionLabel}>About you</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="👤" label="Full name" value={profile.full_name || '—'}
+          icon="person-outline" label="Full name" value={profile.full_name || '—'}
           onPress={() => openEdit('full_name', 'Full name', profile.full_name)}
         />
         <MenuRow
-          icon="🏷️" label="Display name" value={profile.display_name || '—'}
+          icon="pricetag-outline" label="Display name" value={profile.display_name || '—'}
           onPress={() => openEdit('display_name', 'Display name', profile.display_name)}
         />
         <MenuRow
-          icon="📍" label="Location" value={locationDisplay}
+          icon="location-outline" label="Location" value={locationDisplay}
           onPress={openLocationModal}
         />
         <MenuRow
-          icon="📝" label="Bio" value={profile.bio ? profile.bio.slice(0, 30) + (profile.bio.length > 30 ? '…' : '') : '—'} last
+          icon="document-text-outline" label="Bio" value={profile.bio ? profile.bio.slice(0, 30) + (profile.bio.length > 30 ? '…' : '') : '—'} last
           onPress={() => openEdit('bio', 'Short bio', profile.bio)}
         />
       </View>
@@ -549,7 +550,7 @@ export default function AccountTabScreen({ navigation }) {
             {qualifications.map((q, i) => (
               <View key={i} style={[styles.row, styles.rowBorder]}>
                 <View style={styles.rowLeft}>
-                  <Text style={styles.rowIcon}>🎓</Text>
+                  <Icon name="school-outline" size={18} color={colors.textSecondary} style={styles.rowIcon} />
                   <Text style={[styles.rowLabel, { flex: 1 }]} numberOfLines={2}>{q}</Text>
                 </View>
                 <TouchableOpacity
@@ -557,7 +558,7 @@ export default function AccountTabScreen({ navigation }) {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${q}`}>
-                  <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', padding: 4 }}>✕</Text>
+                  <Icon name="close" size={14} color={colors.danger} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -584,7 +585,7 @@ export default function AccountTabScreen({ navigation }) {
                 <TouchableOpacity
                   onPress={() => { setShowQualInput(false); setQualInput('') }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: '600' }}>✕</Text>
+                  <Icon name="close" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             )}
@@ -594,7 +595,7 @@ export default function AccountTabScreen({ navigation }) {
               accessibilityRole="button"
               accessibilityLabel="Add a qualification">
               <View style={styles.rowLeft}>
-                <Text style={[styles.rowIcon, { color: colors.primary }]}>＋</Text>
+                <Icon name="add" size={18} color={colors.primary} style={styles.rowIcon} />
                 <Text style={[styles.rowLabel, { color: colors.primary }]}>Add a qualification</Text>
               </View>
             </TouchableOpacity>
@@ -603,11 +604,11 @@ export default function AccountTabScreen({ navigation }) {
           <Text style={styles.sectionLabel}>Provider tools</Text>
           <View style={styles.card}>
             <MenuRow
-              icon="🛠️" label="My services"
+              icon="construct-outline" label="My services"
               onPress={() => navigation.navigate('MyServices')}
             />
             <MenuRow
-              icon="⭐" label="My ratings" value={ratingText} last
+              icon="star-outline" label="My ratings" value={ratingText} last
               onPress={() => Alert.alert('My ratings', ratingText)}
             />
           </View>
@@ -622,11 +623,11 @@ export default function AccountTabScreen({ navigation }) {
       <Text style={styles.sectionLabel}>Contact</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="✉️" label="Email" value={email}
+          icon="mail-outline" label="Email" value={email}
           onPress={() => Alert.alert('Email', 'To change your email, please contact support.')}
         />
         <MenuRow
-          icon="📞" label="Phone" value={profile.phone || '—'} last
+          icon="call-outline" label="Phone" value={profile.phone || '—'} last
           onPress={() => openEdit('phone', 'Phone number', profile.phone, 'phone-pad')}
         />
       </View>
@@ -634,7 +635,7 @@ export default function AccountTabScreen({ navigation }) {
       <Text style={styles.sectionLabel}>App</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="🔔" label="Notifications" value="Enabled" last
+          icon="notifications-outline" label="Notifications" value="Enabled" last
           onPress={() => Alert.alert('Notifications', 'Notification preferences coming soon.')}
         />
       </View>
@@ -648,14 +649,14 @@ export default function AccountTabScreen({ navigation }) {
       <View style={styles.card}>
         {biometricAvailable && (
           <MenuRow
-            icon="🔐"
+            icon="shield-checkmark-outline"
             label="Biometric login"
             value={biometricEnabled ? 'Enabled' : 'Disabled'}
             onPress={handleBiometricToggle}
           />
         )}
         <MenuRow
-          icon="📄" label="Terms & privacy" last
+          icon="document-text-outline" label="Terms & privacy" last
           onPress={() => Alert.alert('Terms & privacy', 'Terms and privacy policy coming soon.')}
         />
       </View>
@@ -663,11 +664,11 @@ export default function AccountTabScreen({ navigation }) {
       <Text style={styles.sectionLabel}>Support</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="❓" label="Help & FAQ"
+          icon="help-circle-outline" label="Help & FAQ"
           onPress={() => Alert.alert('Help', 'Help documentation coming soon.')}
         />
         <MenuRow
-          icon="✉️" label="Contact us" last
+          icon="mail-outline" label="Contact us" last
           onPress={() => Alert.alert('Contact us', 'support@difmrural.co.nz')}
         />
       </View>
@@ -686,7 +687,7 @@ export default function AccountTabScreen({ navigation }) {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel="Back to account">
-            <Text style={styles.headerBack}>← Account</Text>
+            <Text style={styles.headerBack}><Icon name="chevron-back" size={14} color={colors.primary} /> Account</Text>
           </TouchableOpacity>
         )}
         <Text style={styles.headerLabel} accessibilityRole="header">{SECTION_TITLES[section]}</Text>
@@ -718,7 +719,7 @@ export default function AccountTabScreen({ navigation }) {
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel="Close">
-                <Text style={styles.locationClose}>✕</Text>
+                <Icon name="close" size={16} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
             <Text style={styles.locationHint}>

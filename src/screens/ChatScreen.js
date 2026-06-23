@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import { staticMapUrl } from '../lib/maps'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
 
@@ -325,7 +326,7 @@ export default function ChatScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}><Icon name="chevron-back" size={16} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Chat</Text>
         <Text style={styles.headerName} accessibilityRole="header">{otherUserName}</Text>
@@ -375,14 +376,14 @@ export default function ChatScreen({ route, navigation }) {
               onPress={sendLocationMessage}
               accessibilityRole="button"
               accessibilityLabel="Share location">
-              <Text style={styles.iconBtnText}>📍</Text>
+              <Icon name="location-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={sendProgressPhoto}
               accessibilityRole="button"
               accessibilityLabel="Send progress photo">
-              <Text style={styles.iconBtnText}>📷</Text>
+              <Icon name="camera-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
             <TextInput
               style={styles.input}

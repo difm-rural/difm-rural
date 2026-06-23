@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -814,7 +815,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           <Text style={availableFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
             {formatDisplayDate(availableFrom) || 'Available now'}
           </Text>
-          <Text style={styles.datePickerIcon}>📅</Text>
+          <Icon name="calendar-outline" size={18} color={colors.textMuted} />
         </TouchableOpacity>
         {availableFrom && (
           <TouchableOpacity onPress={() => setAvailableFrom(null)} style={styles.clearDateBtn}>

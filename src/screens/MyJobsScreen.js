@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { isJobActive, isJobTerminal } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
 export default function MyJobsScreen({ navigation, route }) {
@@ -163,7 +164,7 @@ export default function MyJobsScreen({ navigation, route }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
       )}
       <Text style={styles.kicker}>Activity</Text>
@@ -286,7 +287,7 @@ export default function MyJobsScreen({ navigation, route }) {
               accessibilityRole="button"
               accessibilityLabel={`Past tasks, ${pastPosted.length} items`}>
               <Text style={styles.pastSectionLabel}>Past tasks ({pastPosted.length})</Text>
-              <Text style={styles.pastChevron}>{pastTasksExpanded ? '▲' : '▼'}</Text>
+              <Text style={styles.pastChevron}><Icon name={pastTasksExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} /></Text>
             </TouchableOpacity>
             {pastTasksExpanded && (
               <FlatList
@@ -354,7 +355,7 @@ export default function MyJobsScreen({ navigation, route }) {
               accessibilityRole="button"
               accessibilityLabel={`Past jobs I did, ${pastBids.length} items`}>
               <Text style={styles.pastSectionLabel}>Past jobs I did ({pastBids.length})</Text>
-              <Text style={styles.pastChevron}>{pastBidsExpanded ? '▲' : '▼'}</Text>
+              <Text style={styles.pastChevron}><Icon name={pastBidsExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} /></Text>
             </TouchableOpacity>
             {pastBidsExpanded && (
               <FlatList

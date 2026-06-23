@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 
 function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
@@ -69,7 +70,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
       </Text>
 
       <Text style={styles.rowMeta}>
-        {service.category}  ·  📍 {service.location_name || '—'}
+        {service.category}  ·  <Icon name="location-outline" size={11} color={colors.textMuted} /> {service.location_name || '—'}
       </Text>
       <Text style={styles.rowDate}>{listedAgo(service.created_at)}</Text>
       <Text style={styles.rowRate}>{formatRate(service)}</Text>
@@ -246,7 +247,7 @@ export default function MyServicesScreen({ navigation, route }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Services</Text>
         <View style={styles.headerRow}>
@@ -270,7 +271,7 @@ export default function MyServicesScreen({ navigation, route }) {
         </View>
       ) : services.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyIcon}>🔧</Text>
+          <Icon name="construct-outline" size={40} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>No services listed yet</Text>
           <Text style={styles.emptyBody}>Create your first service to start receiving bookings</Text>
           <TouchableOpacity
@@ -278,7 +279,7 @@ export default function MyServicesScreen({ navigation, route }) {
             onPress={() => navigation.navigate('CreateService')}
             accessibilityRole="button"
             accessibilityLabel="Create your first service">
-            <Text style={styles.createBtnText}>Create your first service →</Text>
+            <Text style={styles.createBtnText}>Create your first service <Icon name="arrow-forward" size={15} color="#fff" /></Text>
           </TouchableOpacity>
         </View>
       ) : (

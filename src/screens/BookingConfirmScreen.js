@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 
 function formatDisplayDate(d) {
@@ -28,9 +29,9 @@ function formatDisplayDate(d) {
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 
 const SCHEDULE_OPTIONS = [
-  { id: 'asap',     label: 'As soon as possible', icon: '⚡' },
-  { id: 'specific', label: 'On a specific date',   icon: '📅' },
-  { id: 'flexible', label: "I'm flexible",          icon: '🤙' },
+  { id: 'asap',     label: 'As soon as possible', icon: 'flash-outline' },
+  { id: 'specific', label: 'On a specific date',   icon: 'calendar-outline' },
+  { id: 'flexible', label: "I'm flexible",          icon: 'happy-outline' },
 ]
 
 function SummaryRow({ label, value, last }) {
@@ -251,7 +252,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Booking</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Confirm booking</Text>
@@ -290,7 +291,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
               accessibilityRole="button"
               accessibilityLabel={opt.label}
               accessibilityState={{ selected: scheduleType === opt.id }}>
-              <Text style={styles.scheduleIcon}>{opt.icon}</Text>
+              <Icon name={opt.icon} size={18} color={colors.primary} />
               <Text style={[styles.scheduleLabel, scheduleType === opt.id && styles.scheduleLabelActive]}>
                 {opt.label}
               </Text>
@@ -309,7 +310,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
                 <Text style={date ? styles.datePickerValue : styles.datePickerPlaceholder}>
                   {date ? formatDisplayDate(date) : 'Select a date'}
                 </Text>
-                <Text style={styles.datePickerIcon}>📅</Text>
+                <Icon name="calendar-outline" size={18} color={colors.textMuted} />
               </TouchableOpacity>
               {showDatePicker && (
                 <>

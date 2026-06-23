@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const ALL_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -218,7 +219,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Go back">
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
           </TouchableOpacity>
           <Text style={styles.kicker}>Provider profile</Text>
           <Text style={styles.headerTitle}>Provider profile</Text>
@@ -243,7 +244,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Provider profile</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Provider profile</Text>
@@ -272,7 +273,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
               {(profile?.primary_role === 'provider' || profile?.primary_role === 'both' ||
                 profile?.role === 'provider' || profile?.role === 'both') && (
                 <View style={styles.verifiedBadge}>
-                  <Text style={styles.verifiedText}>✓ Verified</Text>
+                  <Text style={styles.verifiedText}><Icon name="checkmark-circle" size={13} color={colors.primary} /> Verified</Text>
                 </View>
               )}
             </View>
@@ -362,7 +363,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
                     onPress={() => navigation.navigate('ServiceDetail', { service: { ...svc, profile: { id: providerId, full_name: profile?.full_name, avatar_url: profile?.avatar_url } } })}
                     accessibilityRole="button"
                     accessibilityLabel={`View and book ${svc.title}`}>
-                    <Text style={styles.viewBookBtnText}>View & book →</Text>
+                    <Text style={styles.viewBookBtnText}>View & book <Icon name="arrow-forward" size={14} color="#fff" /></Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -373,7 +374,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
                 onPress={() => setShowAllServices(true)}
                 accessibilityRole="button"
                 accessibilityLabel={`See all ${services.length} services`}>
-                <Text style={styles.showAllText}>See all {services.length} services →</Text>
+                <Text style={styles.showAllText}>See all {services.length} services <Icon name="arrow-forward" size={13} color={colors.primary} /></Text>
               </TouchableOpacity>
             )}
           </View>
@@ -386,7 +387,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
 
             {maxTravel > 0 && region ? (
               <View style={styles.coverageRow}>
-                <Text style={styles.coverageIcon}>🗺️</Text>
+                <Icon name="map-outline" size={16} color={colors.primary} />
                 <Text style={styles.coverageText}>
                   Operates within <Text style={styles.coverageBold}>{maxTravel}km</Text> of {region}
                 </Text>
@@ -395,8 +396,8 @@ export default function ProviderProfileScreen({ route, navigation }) {
 
             {hasEquipment && (
               <View style={styles.coverageRow}>
-                <Text style={styles.coverageIcon}>🔧</Text>
-                <Text style={[styles.coverageText, { color: colors.primary }]}>✓ Equipment included in some services</Text>
+                <Icon name="construct-outline" size={16} color={colors.primary} />
+                <Text style={[styles.coverageText, { color: colors.primary }]}><Icon name="checkmark" size={13} color={colors.primary} /> Equipment included in some services</Text>
               </View>
             )}
 
@@ -462,7 +463,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Show all ${requesterReviews.length} reviews`}>
-                  <Text style={styles.showAllText}>Show all {requesterReviews.length} reviews →</Text>
+                  <Text style={styles.showAllText}>Show all {requesterReviews.length} reviews <Icon name="arrow-forward" size={13} color={colors.primary} /></Text>
                 </TouchableOpacity>
               )}
             </>
