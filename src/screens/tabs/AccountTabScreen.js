@@ -676,7 +676,7 @@ export default function AccountTabScreen({ navigation }) {
 
   return (
     <View style={styles.screen}>
-      {/* ── Fixed green header ──────────────────────────────────────────────── */}
+      {/* ── Fixed header ────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         {section === 'hub' ? (
           <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
@@ -798,16 +798,16 @@ const styles = StyleSheet.create({
 
   // ─── Fixed green header ───────────────────────────────────────────────────
   header: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingHorizontal: 20,
     paddingBottom: 14,
   },
-  brandLabel:  { fontSize: 11, fontWeight: '600', color: '#95d5b2', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 },
-  headerBack:  { fontSize: 15, fontWeight: '600', color: '#d8f3e3', marginBottom: 6 },
+  brandLabel:  { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
+  headerBack:  { fontSize: 15, fontWeight: '600', color: colors.primary, marginBottom: 6 },
   headerLabel: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: colors.white,
+    color: colors.textPrimary,
   },
 
   // ─── Hub summary card ──────────────────────────────────────────────────────
