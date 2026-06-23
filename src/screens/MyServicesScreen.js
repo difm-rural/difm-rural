@@ -248,7 +248,7 @@ export default function MyServicesScreen({ navigation, route }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Account</Text>
+        <Text style={styles.kicker}>Services</Text>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle} accessibilityRole="header">My services</Text>
