@@ -16,6 +16,7 @@ import { confirmJobComplete, cancelJob, deleteJob, acceptBid as apiAcceptBid } f
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
+import Icon from '../components/Icon'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 
@@ -37,7 +38,7 @@ function getInitials(name) {
 function SummaryRow({ icon, label, value, last }) {
   return (
     <View style={[styles.summaryRow, !last && styles.summaryRowBorder]}>
-      <Text style={styles.summaryIcon}>{icon}</Text>
+      <Icon name={icon} size={16} color={colors.textMuted} style={styles.summaryIcon} />
       <Text style={styles.summaryLabel}>{label}</Text>
       <Text style={styles.summaryValue} numberOfLines={2}>{value}</Text>
     </View>
@@ -53,13 +54,13 @@ function ActionRow({ emoji, iconBg, label, subtitle, onPress, last }) {
       accessibilityRole="button"
       accessibilityLabel={label}>
       <View style={[styles.actionIconCircle, { backgroundColor: iconBg }]}>
-        <Text style={styles.actionEmoji}>{emoji}</Text>
+        <Icon name={emoji} size={20} color={colors.textSecondary} />
       </View>
       <View style={styles.actionContent}>
         <Text style={styles.actionLabel}>{label}</Text>
         <Text style={styles.actionSubtitle}>{subtitle}</Text>
       </View>
-      <Text style={styles.actionChevron}>›</Text>
+      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
     </TouchableOpacity>
   )
 }
@@ -414,12 +415,13 @@ export default function ManageTaskScreen({ navigation, route }) {
   const headerJSX = (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       <TouchableOpacity
-        style={styles.backBtn}
+        style={[styles.backBtn, styles.backBtnRow]}
         onPress={() => navigation.goBack()}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         accessibilityRole="button"
         accessibilityLabel="Go back">
-        <Text style={styles.backBtnText}>← Back</Text>
+        <Icon name="chevron-back" size={18} color={colors.primary} />
+        <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
       <Text style={styles.kicker}>Job</Text>
       <Text style={styles.headerTitle} accessibilityRole="header">Manage job</Text>
@@ -501,9 +503,9 @@ export default function ManageTaskScreen({ navigation, route }) {
                 <Text style={styles.greenBadgeText}>{jobStatusLabel(job.status, bidCount)}</Text>
               </View>
             </View>
-            <SummaryRow icon="📍" label="Location" value={job.location_name} />
-            <SummaryRow icon="💰" label="Budget"   value={budgetText} />
-            <SummaryRow icon="🏷️" label="Category" value={job.category} last />
+            <SummaryRow icon="location-outline" label="Location" value={job.location_name} />
+            <SummaryRow icon="cash-outline" label="Budget"   value={budgetText} />
+            <SummaryRow icon="pricetag-outline" label="Category" value={job.category} last />
           </View>
 
           {/* Job participant */}
@@ -530,7 +532,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                     <Text style={styles.providerName}>{otherPartyName}</Text>
                     <Text style={styles.providerMeta}>{isAcceptedProvider ? 'Requester' : 'Provider'}</Text>
                   </View>
-                  <Text style={styles.actionChevron}>›</Text>
+                  <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxText}>
@@ -549,12 +551,12 @@ export default function ManageTaskScreen({ navigation, route }) {
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityLabel={`Chat with ${otherPartyFirstName}`}>
-              <Text style={styles.chatBannerIcon}>💬</Text>
+              <Icon name="chatbubble-ellipses-outline" size={26} color={colors.white} style={styles.chatBannerIcon} />
               <View style={styles.chatBannerContent}>
                 <Text style={styles.chatBannerTitle}>Chat with {otherPartyFirstName}</Text>
                 <Text style={styles.chatBannerSubtitle}>Discuss job details and start time</Text>
               </View>
-              <Text style={styles.chatBannerArrow}>›</Text>
+              <Icon name="chevron-forward" size={24} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           ) : null}
 
@@ -575,7 +577,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                 onPress={handleConfirmComplete}
                 accessibilityRole="button"
                 accessibilityLabel="Confirm job complete">
-                <Text style={styles.btnGreenText}>✓ Confirm job complete</Text>
+                <Text style={styles.btnGreenText}>Confirm job complete</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.btnDangerOutline}
@@ -591,13 +593,13 @@ export default function ManageTaskScreen({ navigation, route }) {
           {/* Job details */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Job details</Text>
-            <SummaryRow icon="🏷️" label="Category" value={job.category} />
-            <SummaryRow icon="📍" label="Location"  value={job.location_name} />
-            <SummaryRow icon="💰" label="Budget"    value={budgetText} />
+            <SummaryRow icon="pricetag-outline" label="Category" value={job.category} />
+            <SummaryRow icon="location-outline" label="Location"  value={job.location_name} />
+            <SummaryRow icon="cash-outline" label="Budget"    value={budgetText} />
             {acceptedBid?.bidAmount ? (
-              <SummaryRow icon="🤝" label="Agreed" value={`$${acceptedBid.bidAmount} NZD`} />
+              <SummaryRow icon="checkmark-circle-outline" label="Agreed" value={`$${acceptedBid.bidAmount} NZD`} />
             ) : null}
-            <SummaryRow icon="📅" label="Posted" value={timeAgo(job.created_at)} last />
+            <SummaryRow icon="calendar-outline" label="Posted" value={timeAgo(job.created_at)} last />
           </View>
 
         </ScrollView>
@@ -620,7 +622,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const actionItems = [
     showCompletedActions && {
       key: 'reviewProvider',
-      emoji: '⭐',
+      emoji: 'star-outline',
       iconBg: colors.primaryLight,
       label: providerReview ? 'Edit provider review' : 'Review provider',
       subtitle: acceptedBid
@@ -632,7 +634,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showCompletedActions && {
       key: 'payProvider',
-      emoji: '💳',
+      emoji: 'card-outline',
       iconBg: colors.infoLight,
       label: 'Pay provider',
       subtitle: acceptedBid?.bidAmount
@@ -642,7 +644,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showReviewBids && {
       key: 'reviewBids',
-      emoji: '🏷️',
+      emoji: 'pricetag-outline',
       iconBg: '#fef3c7',
       label: 'Review offers',
       subtitle: `${bidCount} offer${bidCount > 1 ? 's' : ''} waiting for your review`,
@@ -650,7 +652,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showQuestions && {
       key: 'questions',
-      emoji: '❓',
+      emoji: 'help-circle-outline',
       iconBg: colors.infoLight,
       label: `Questions (${questionCount})`,
       subtitle: 'View and answer questions from providers',
@@ -658,7 +660,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showEdit && {
       key: 'edit',
-      emoji: '✏️',
+      emoji: 'create-outline',
       iconBg: colors.primaryLight,
       label: 'Edit job details',
       subtitle: 'Update title, description, budget or schedule',
@@ -666,7 +668,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     {
       key: 'share',
-      emoji: '📤',
+      emoji: 'share-social-outline',
       iconBg: colors.infoLight,
       label: 'Share job',
       subtitle: 'Send to someone who might help',
@@ -674,7 +676,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showRepost && {
       key: 'repost',
-      emoji: '♻️',
+      emoji: 'refresh-outline',
       iconBg: colors.primaryLight,
       label: 'Repost job',
       subtitle: 'Create a new listing based on this job',
@@ -682,7 +684,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showCancel && {
       key: 'cancel',
-      emoji: '🚫',
+      emoji: 'close-circle-outline',
       iconBg: colors.warningLight,
       label: 'Cancel job',
       subtitle: 'Close job, notify interested providers',
@@ -690,7 +692,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     },
     showDelete && {
       key: 'delete',
-      emoji: '🗑️',
+      emoji: 'trash-outline',
       iconBg: colors.dangerLight,
       label: 'Delete job',
       subtitle: 'Permanently remove this job',
@@ -714,10 +716,10 @@ export default function ManageTaskScreen({ navigation, route }) {
               <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.label}</Text>
             </View>
           </View>
-          <SummaryRow icon="🏷️" label="Category" value={job.category} />
-          <SummaryRow icon="📍" label="Location"  value={job.location_name} />
-          <SummaryRow icon="💰" label="Budget"    value={budgetText} />
-          <SummaryRow icon="📅" label="Posted"    value={timeAgo(job.created_at)} last />
+          <SummaryRow icon="pricetag-outline" label="Category" value={job.category} />
+          <SummaryRow icon="location-outline" label="Location"  value={job.location_name} />
+          <SummaryRow icon="cash-outline" label="Budget"    value={budgetText} />
+          <SummaryRow icon="calendar-outline" label="Posted"    value={timeAgo(job.created_at)} last />
         </View>
 
         {/* Offers received — inline on open jobs */}
@@ -759,7 +761,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                         <Text style={styles.bidProviderName}>{provName}</Text>
                         <Text style={styles.bidProviderMeta} numberOfLines={1}>
                           {bid.stats?.ratingCount > 0
-                            ? `⭐ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
+                            ? `★ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
                             : 'New provider'}
                           {bid.stats?.jobsDone > 0 ? ` · ${bid.stats.jobsDone} done` : ''}
                         </Text>
@@ -780,10 +782,16 @@ export default function ManageTaskScreen({ navigation, route }) {
                       <Text style={styles.bidMessage}>{bid.message}</Text>
                     )}
                     {!!bid.available_from && (
-                      <Text style={styles.bidMeta}>📅 Available from: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                      <View style={styles.bidMetaRow}>
+                        <Icon name="calendar-outline" size={13} color={colors.textMuted} />
+                        <Text style={styles.bidMeta}>Available from: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                      </View>
                     )}
                     {!!bid.estimated_duration && (
-                      <Text style={styles.bidMeta}>⏱ Est. duration: {bid.estimated_duration}</Text>
+                      <View style={styles.bidMetaRow}>
+                        <Icon name="time-outline" size={13} color={colors.textMuted} />
+                        <Text style={styles.bidMeta}>Est. duration: {bid.estimated_duration}</Text>
+                      </View>
                     )}
                     <TouchableOpacity
                       style={styles.acceptBidBtn}
@@ -847,6 +855,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  backBtnRow:  { flexDirection: 'row', alignItems: 'center' },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
   headerSubtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
@@ -1078,7 +1087,8 @@ const styles = StyleSheet.create({
   bidProviderMeta: { fontSize: 12, color: colors.textMuted, marginBottom: 2 },
   bidAmount: { fontSize: 17, fontWeight: 'bold', color: colors.primary },
   bidMessage: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 8, fontStyle: 'italic' },
-  bidMeta:    { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+  bidMeta:    { fontSize: 13, color: colors.textMuted },
+  bidMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   lineItemsBreakdown: { marginVertical: 6, paddingVertical: 6, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#e8e8e8', marginBottom: 8 },
   breakdownRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   breakdownLabel:  { fontSize: 13, color: colors.textSecondary },
