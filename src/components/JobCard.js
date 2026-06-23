@@ -2,6 +2,7 @@ import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import { jobStatusLabel } from '../lib/lifecycle'
+import Icon from './Icon'
 
 function truncateWords(text, max = 30) {
   if (!text) return ''
@@ -81,7 +82,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}>
-              <Text style={styles.watchBtnText}>🔖</Text>
+              <Icon name={isWatched ? 'bookmark' : 'bookmark-outline'} size={16} color={isWatched ? colors.primary : colors.textMuted} />
             </TouchableOpacity>
           )}
           <Text style={styles.budgetLabel}>{job.status === 'completed' && paidAmount != null ? 'Paid' : 'Budget'}</Text>
@@ -114,7 +115,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
       {/* Location */}
       <Text style={styles.location}>
-        📍 {job.location_name}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
+        <Icon name="location-outline" size={11} color={colors.textMuted} /> {job.location_name}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
       </Text>
 
       <Text style={styles.postedDate}>{postedAgo(job.created_at)}</Text>

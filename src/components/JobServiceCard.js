@@ -1,6 +1,7 @@
 import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
+import Icon from './Icon'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const CARD_WIDTH    = 155
@@ -21,16 +22,16 @@ export const CATEGORY_COLORS = {
 }
 
 export const CATEGORY_ICONS = {
-  Fencing:           '🪚',
-  Machinery:         '🚜',
-  'Water delivery':  '💧',
-  Landscaping:       '🌿',
-  Maintenance:       '🔧',
-  'Animal care':     '🐾',
-  Labour:            '👷',
-  'General labour':  '👷',
-  'Property check':  '🔭',
-  Other:             '📋',
+  Fencing:           'grid-outline',
+  Machinery:         'cog-outline',
+  'Water delivery':  'water-outline',
+  Landscaping:       'leaf-outline',
+  Maintenance:       'construct-outline',
+  'Animal care':     'paw-outline',
+  Labour:            'people-outline',
+  'General labour':  'people-outline',
+  'Property check':  'home-outline',
+  Other:             'pricetag-outline',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,7 +113,7 @@ export default function JobServiceCard({
   const photoUrl  = Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0] : null
   const category  = item.category || 'Other'
   const catStyle  = CATEGORY_COLORS[category] || CATEGORY_COLORS.Other
-  const catIcon   = CATEGORY_ICONS[category]  || '📋'
+  const catIcon   = CATEGORY_ICONS[category]  || 'pricetag-outline'
   const initials  = getInitials(profile.full_name)
   const firstName = getFirstName(profile.full_name)
   const price     = formatPrice(item)
@@ -153,7 +154,7 @@ export default function JobServiceCard({
           <Image source={{ uri: photoUrl }} style={styles.photo} />
         ) : (
           <View style={[styles.placeholder, { backgroundColor: catStyle.bg }]}>
-            <Text style={styles.placeholderIcon}>{catIcon}</Text>
+            <Icon name={catIcon} size={34} color={catStyle.fg} />
           </View>
         )}
 
@@ -166,7 +167,7 @@ export default function JobServiceCard({
             accessibilityRole="button"
             accessibilityLabel={isWatched ? 'Remove from watchlist' : 'Save'}>
             <Text style={[styles.heartIcon, isWatched && styles.heartActive]}>
-              {isWatched ? '♥' : '♡'}
+              <Icon name={isWatched ? 'heart' : 'heart-outline'} size={14} color={isWatched ? '#e53935' : colors.textMuted} />
             </Text>
           </TouchableOpacity>
         )}
