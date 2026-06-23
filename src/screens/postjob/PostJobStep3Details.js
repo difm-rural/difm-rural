@@ -8,11 +8,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 
 const MATERIALS_OPTIONS = [
-  { id: 'none',      label: 'None needed', icon: '✅' },
-  { id: 'requester', label: "I'll provide", icon: '🏠' },
-  { id: 'provider',  label: 'Provider supplies', icon: '🔧' },
+  { id: 'none',      label: 'None needed', icon: 'checkmark-circle-outline' },
+  { id: 'requester', label: "I'll provide", icon: 'home-outline' },
+  { id: 'provider',  label: 'Provider supplies', icon: 'construct-outline' },
 ]
 
 function getPhotoUri(photo) { return typeof photo === 'string' ? photo : photo?.uri }
@@ -52,10 +53,10 @@ export default function PostJobStep3Details({ navigation, route }) {
   const [locationNote,     setLocationNote]     = useState(jobData.locationNote || '')
 
   const locationSummary = jobData.jobAddress
-    ? `📍 ${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
+    ? `${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
     : jobData.areaPolygon?.length > 0
-      ? `📍 ${jobData.areaHectares} ha traced`
-      : jobData.latitude ? '📍 Location set' : null
+      ? `${jobData.areaHectares} ha traced`
+      : jobData.latitude ? 'Location set' : null
 
   const charsLeft = 20 - description.trim().length
 
@@ -156,7 +157,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                   onPress={() => setMaterialsType(opt.id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: materialsType === opt.id }}>
-                  <Text style={styles.tileIcon}>{opt.icon}</Text>
+                  <Icon name={opt.icon} size={22} color={colors.primary} />
                   <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
                     {opt.label}
                   </Text>
@@ -197,11 +198,11 @@ export default function PostJobStep3Details({ navigation, route }) {
                 accessConditions.includes('park_and_walk') && styles.checkboxSelected,
               ]}>
                 {accessConditions.includes('park_and_walk') && (
-                  <Text style={styles.checkTick}>✓</Text>
+                  <Icon name="checkmark" size={14} color="#fff" />
                 )}
               </View>
               <View style={styles.checkContent}>
-                <Text style={styles.checkLabel}>🚗 Park and walk — easy access</Text>
+                <Text style={styles.checkLabel}><Icon name="walk-outline" size={14} color={colors.textSecondary} /> Park and walk — easy access</Text>
                 <Text style={styles.checkSub}>Can park nearby, short walk to job site</Text>
               </View>
             </TouchableOpacity>
@@ -216,11 +217,11 @@ export default function PostJobStep3Details({ navigation, route }) {
                 accessConditions.includes('4wd_required') && styles.checkboxSelected,
               ]}>
                 {accessConditions.includes('4wd_required') && (
-                  <Text style={styles.checkTick}>✓</Text>
+                  <Icon name="checkmark" size={14} color="#fff" />
                 )}
               </View>
               <View style={styles.checkContent}>
-                <Text style={styles.checkLabel}>🚜 4WD required</Text>
+                <Text style={styles.checkLabel}><Icon name="car-outline" size={14} color={colors.textSecondary} /> 4WD required</Text>
                 <Text style={styles.checkSub}>Standard vehicle won't make it to the site</Text>
               </View>
             </TouchableOpacity>
@@ -240,7 +241,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                     style={styles.photoRemove}
                     onPress={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={styles.photoRemoveText}>✕</Text>
+                    <Icon name="close" size={14} color="#fff" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -251,7 +252,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                     onPress={handleAddPhoto}
                     accessibilityRole="button"
                     accessibilityLabel="Choose from library">
-                    <Text style={styles.photoAddIcon}>🖼️</Text>
+                    <Icon name="images-outline" size={22} color={colors.primary} />
                     <Text style={styles.photoAddText}>Library</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -259,7 +260,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                     onPress={handleTakePhoto}
                     accessibilityRole="button"
                     accessibilityLabel="Take a photo">
-                    <Text style={styles.photoAddIcon}>📷</Text>
+                    <Icon name="camera-outline" size={22} color={colors.primary} />
                     <Text style={styles.photoAddText}>Camera</Text>
                   </TouchableOpacity>
                 </View>
@@ -275,7 +276,7 @@ export default function PostJobStep3Details({ navigation, route }) {
               onPress={handleBack}
               accessibilityRole="button"
               accessibilityLabel="Go back">
-              <Text style={styles.backBtnText}>← Back</Text>
+              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
@@ -283,7 +284,7 @@ export default function PostJobStep3Details({ navigation, route }) {
               disabled={!canProceed()}
               accessibilityRole="button"
               accessibilityLabel="Next step">
-              <Text style={styles.nextBtnText}>Next — Budget →</Text>
+              <Text style={styles.nextBtnText}>Next — Budget <Icon name="arrow-forward" size={15} color="#fff" /></Text>
             </TouchableOpacity>
           </View>
         </View>

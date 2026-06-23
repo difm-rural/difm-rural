@@ -14,6 +14,7 @@ import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { inferJobCategory } from '../../lib/categorize'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -233,7 +234,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     ])
   }
 
-  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : 'Post job →')
+  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : 'Post job')
 
   return (
     <View style={styles.screen}>
@@ -252,7 +253,7 @@ export default function PostJobStep5Review({ navigation, route }) {
           <Image source={{ uri: mapImgUri }} style={styles.mapThumb} resizeMode="cover" />
         ) : (
           <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapPlaceholderText}>📍 No location set</Text>
+            <Text style={styles.mapPlaceholderText}><Icon name="location-outline" size={13} color={colors.textMuted} /> No location set</Text>
           </View>
         )}
 
@@ -277,7 +278,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoIcon}>⚡</Text>
+          <Icon name="flash-outline" size={18} color={colors.primary} />
           <Text style={styles.infoText}>
             Your job will be visible to providers{' '}
             {latitude || areaPolygon.length > 0
@@ -290,7 +291,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         {isEditMode && editBidCount > 0 && (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              ⚠️ This job has {editBidCount} bid{editBidCount > 1 ? 's' : ''}. Editing may affect existing bids.
+              <Icon name="warning-outline" size={14} color={colors.warning} /> This job has {editBidCount} bid{editBidCount > 1 ? 's' : ''}. Editing may affect existing bids.
             </Text>
           </View>
         )}
@@ -303,7 +304,7 @@ export default function PostJobStep5Review({ navigation, route }) {
             onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Go back">
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.submitBtn, !!uploadStatus && styles.submitBtnDisabled]}

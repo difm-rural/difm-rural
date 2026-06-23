@@ -7,10 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 
 const PRICE_OPTIONS = [
-  { id: 'fixed', icon: '💰', label: 'Fixed price',  desc: 'Set your budget upfront' },
-  { id: 'open',  icon: '📊', label: 'Open to offers', desc: 'Let providers quote you' },
+  { id: 'fixed', icon: 'cash-outline', label: 'Fixed price',  desc: 'Set your budget upfront' },
+  { id: 'open',  icon: 'pricetags-outline', label: 'Open to offers', desc: 'Let providers quote you' },
 ]
 
 const SCHEDULE_LABELS = {
@@ -47,10 +48,10 @@ export default function PostJobStep4Budget({ navigation, route }) {
   const [price,     setPrice]     = useState(jobData.price)
 
   const locationSummary = jobData.jobAddress
-    ? `📍 ${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
+    ? `${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
     : jobData.areaPolygon?.length > 0
-      ? `📍 ${jobData.areaHectares} ha traced`
-      : jobData.latitude ? '📍 Location set' : null
+      ? `${jobData.areaHectares} ha traced`
+      : jobData.latitude ? 'Location set' : null
 
   const scheduleLabel   = SCHEDULE_LABELS[jobData.scheduleType] || jobData.scheduleType
   const scheduleDisplay = jobData.scheduleType === 'specific' && jobData.scheduledDate
@@ -108,7 +109,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   onPress={() => setPriceType(opt.id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: priceType === opt.id }}>
-                  <Text style={styles.priceIcon}>{opt.icon}</Text>
+                  <Icon name={opt.icon} size={24} color={colors.primary} />
                   <Text style={[styles.priceTileLabel, priceType === opt.id && styles.priceTileLabelActive]}>
                     {opt.label}
                   </Text>
@@ -144,7 +145,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
           )}
 
           <View style={styles.escrowBox}>
-            <Text style={styles.escrowIcon}>🔒</Text>
+            <Icon name="lock-closed-outline" size={18} color={colors.textSecondary} />
             <Text style={styles.escrowText}>
               Funds held securely and released when you confirm the job is complete.
             </Text>
@@ -158,7 +159,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
               onPress={handleBack}
               accessibilityRole="button"
               accessibilityLabel="Go back">
-              <Text style={styles.backBtnText}>← Back</Text>
+              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
@@ -166,7 +167,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
               disabled={!canProceed()}
               accessibilityRole="button"
               accessibilityLabel="Review job">
-              <Text style={styles.nextBtnText}>Review →</Text>
+              <Text style={styles.nextBtnText}>Review <Icon name="arrow-forward" size={15} color="#fff" /></Text>
             </TouchableOpacity>
           </View>
         </View>

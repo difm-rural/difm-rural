@@ -13,6 +13,7 @@ import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { reverseGeocode } from '../../lib/location'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 
 const MAP_HEIGHT = 300
 
@@ -266,21 +267,21 @@ export default function PostJobStep2Location({ navigation, route }) {
             onPress={() => mapRef.current?.zoomIn()}
             accessibilityRole="button"
             accessibilityLabel="Zoom in">
-            <Text style={styles.mapControlText}>＋</Text>
+            <Icon name="add" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.mapControlBtn}
             onPress={() => mapRef.current?.zoomOut()}
             accessibilityRole="button"
             accessibilityLabel="Zoom out">
-            <Text style={styles.mapControlText}>－</Text>
+            <Icon name="remove" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.mapControlBtn}
             onPress={handleCurrentLocation}
             accessibilityRole="button"
             accessibilityLabel="Use my location">
-            <Text style={styles.mapControlText}>◎</Text>
+            <Icon name="locate" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -317,7 +318,7 @@ export default function PostJobStep2Location({ navigation, route }) {
               onPress={handleTraceArea}
               accessibilityRole="button"
               accessibilityLabel="Trace work area">
-              <Text style={styles.pillIcon}>🗺️</Text>
+              <Icon name="map-outline" size={16} color={colors.primary} />
               <Text style={styles.pillText}>Trace area</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -325,7 +326,7 @@ export default function PostJobStep2Location({ navigation, route }) {
               onPress={handleAddPhoto}
               accessibilityRole="button"
               accessibilityLabel="Add a photo">
-              <Text style={styles.pillIcon}>📸</Text>
+              <Icon name="camera-outline" size={16} color={colors.primary} />
               <Text style={styles.pillText}>Add photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -339,11 +340,11 @@ export default function PostJobStep2Location({ navigation, route }) {
 
           {hasArea && (
             <View style={styles.areaChip}>
-              <Text style={styles.areaChipText}>✓ {areaHectares} ha traced</Text>
+              <Text style={styles.areaChipText}><Icon name="checkmark" size={12} color={colors.primary} /> {areaHectares} ha traced</Text>
               <TouchableOpacity
                 onPress={() => { setAreaPolygon([]); setAreaHectares(null) }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.areaChipRemove}>✕</Text>
+                <Icon name="close" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           )}
@@ -357,7 +358,7 @@ export default function PostJobStep2Location({ navigation, route }) {
                     style={styles.photoRemove}
                     onPress={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={styles.photoRemoveText}>✕</Text>
+                    <Icon name="close" size={14} color="#fff" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -372,14 +373,14 @@ export default function PostJobStep2Location({ navigation, route }) {
               onPress={handleBack}
               accessibilityRole="button"
               accessibilityLabel="Go back">
-              <Text style={styles.backBtnText}>← Back</Text>
+              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.nextBtn}
               onPress={handleNext}
               accessibilityRole="button"
               accessibilityLabel="Next step">
-              <Text style={styles.nextBtnText}>Next — Details →</Text>
+              <Text style={styles.nextBtnText}>Next — Details <Icon name="arrow-forward" size={15} color="#fff" /></Text>
             </TouchableOpacity>
           </View>
         </View>

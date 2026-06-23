@@ -2,6 +2,7 @@ import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 
 const STEPS = ['Job type', 'Location', 'Details', 'Budget', 'Review']
 
@@ -16,7 +17,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
           accessibilityLabel={currentStep === 1 ? 'Cancel' : 'Go back'}>
-          <Text style={styles.backText}>{currentStep === 1 ? 'Cancel' : '← Back'}</Text>
+          <Text style={styles.backText}>{currentStep === 1 ? 'Cancel' : <><Icon name="chevron-back" size={14} color="rgba(255,255,255,0.92)" /> Back</>}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{title || 'Post a job'}</Text>
         <View style={styles.spacer} />
@@ -30,7 +31,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
             <View key={n} style={styles.stepItem}>
               <View style={[styles.dot, done && styles.dotDone, active && styles.dotActive]}>
                 <Text style={[styles.dotNum, (done || active) && styles.dotNumLight]}>
-                  {done ? '✓' : String(n)}
+                  {done ? <Icon name="checkmark" size={13} color={colors.primary} /> : String(n)}
                 </Text>
               </View>
               <Text style={[styles.stepLabel, active && styles.stepLabelActive]} numberOfLines={1}>

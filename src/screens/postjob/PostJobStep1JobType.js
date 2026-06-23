@@ -8,11 +8,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 
 const SCHEDULE_OPTIONS = [
-  { id: 'asap',     label: 'As soon as possible', icon: '⚡' },
-  { id: 'specific', label: 'On a specific date',   icon: '📅' },
-  { id: 'flexible', label: "I'm flexible",          icon: '🤙' },
+  { id: 'asap',     label: 'As soon as possible', icon: 'flash-outline' },
+  { id: 'specific', label: 'On a specific date',   icon: 'calendar-outline' },
+  { id: 'flexible', label: "I'm flexible",          icon: 'happy-outline' },
 ]
 
 function formatDate(d) {
@@ -127,7 +128,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
                   onPress={() => setScheduleType(opt.id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: scheduleType === opt.id }}>
-                  <Text style={styles.scheduleTileIcon}>{opt.icon}</Text>
+                  <Icon name={opt.icon} size={18} color={colors.primary} />
                   <Text style={[styles.scheduleTileLabel, scheduleType === opt.id && styles.scheduleTileLabelActive]}>
                     {opt.label}
                   </Text>
@@ -147,7 +148,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
                   <Text style={scheduledDate ? styles.datePickerValue : styles.datePickerPlaceholder}>
                     {scheduledDate ? formatDate(scheduledDate) : 'Select a date'}
                   </Text>
-                  <Text style={styles.datePickerIcon}>📅</Text>
+                  <Icon name="calendar-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
                 {showDatePicker && (
                   <>
@@ -181,7 +182,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
             disabled={!canProceed()}
             accessibilityRole="button"
             accessibilityLabel="Next step">
-            <Text style={styles.nextBtnText}>Next — Location →</Text>
+            <Text style={styles.nextBtnText}>Next — Location <Icon name="arrow-forward" size={15} color="#fff" /></Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
