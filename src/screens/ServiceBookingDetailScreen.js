@@ -18,6 +18,7 @@ import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import ReceivedReview from '../components/ReceivedReview'
 import ReputationCard from '../components/ReputationCard'
+import Icon from '../components/Icon'
 import { loadReview } from '../lib/reviews'
 import {
   updateBookingStatus,
@@ -133,7 +134,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>Back</Text>
+            <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Booking unavailable</Text>
         </View>
@@ -322,7 +323,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>Back</Text>
+          <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Service booking</Text>
         <Text style={styles.title} numberOfLines={2}>{service.title || 'Service booking'}</Text>
@@ -364,7 +365,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
               accessibilityLabel="View location on map">
               <Text style={styles.detailLabel}>Pin</Text>
               <Text style={[styles.detailValue, styles.linkValue]}>
-                {`${Number(booking.latitude).toFixed(5)}, ${Number(booking.longitude).toFixed(5)}  ›`}
+                {`${Number(booking.latitude).toFixed(5)}, ${Number(booking.longitude).toFixed(5)} `}<Icon name="chevron-forward" size={13} color={colors.primary} />
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -491,7 +492,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   header: { backgroundColor: colors.background, paddingHorizontal: 20, paddingBottom: 14 },
-  backBtn: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 8 },
+  backBtn: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   backText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   title: { fontSize: 30, lineHeight: 35, fontWeight: '700', color: colors.textPrimary },

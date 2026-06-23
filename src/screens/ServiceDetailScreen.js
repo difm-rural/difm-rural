@@ -15,6 +15,7 @@ import { fetchProviderStats } from '../lib/providerStats'
 import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle'
 import { cancelBookingByRequester } from '../lib/bookingActions'
 import ReviewList from '../components/ReviewList'
+import Icon from '../components/Icon'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -195,7 +196,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>Back</Text>
+          <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Service</Text>
         <Text style={styles.headerTitle} numberOfLines={2} accessibilityRole="header">{service.title}</Text>
@@ -212,7 +213,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {isOwnService && (
           <View style={styles.previewNote}>
             <Text style={styles.previewNoteText}>
-              👁  Requesters see this. It's a preview of your live listing — edit it from “Manage your services”.
+              <Icon name="eye-outline" size={14} color={colors.info} /> Requesters see this. It's a preview of your live listing — edit it from “Manage your services”.
             </Text>
           </View>
         )}
@@ -249,15 +250,15 @@ export default function ServiceDetailScreen({ route, navigation }) {
               <Text style={styles.providerName}>{profile?.full_name || 'Provider'}</Text>
               <Text style={styles.providerMeta}>
                 {providerStats?.ratingCount > 0
-                  ? `⭐ ${providerStats.ratingAvg.toFixed(1)} (${providerStats.ratingCount} review${providerStats.ratingCount === 1 ? '' : 's'})`
-                  : '⭐ New provider'}
+                  ? `★ ${providerStats.ratingAvg.toFixed(1)} (${providerStats.ratingCount} review${providerStats.ratingCount === 1 ? '' : 's'})`
+                  : '★ New provider'}
                 {providerStats?.jobsDone > 0 ? `  ·  ${providerStats.jobsDone} done` : ''}
               </Text>
               {service.location_name ? (
-                <Text style={styles.providerMeta}>📍 {service.location_name}</Text>
+                <Text style={styles.providerMeta}><Icon name="location-outline" size={12} color={colors.textMuted} /> {service.location_name}</Text>
               ) : null}
             </View>
-            <Text style={styles.providerChevron}>›</Text>
+            <Icon name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -312,7 +313,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
         {isBooked && (
           <View style={styles.bookedInfoBox}>
-            <Text style={styles.bookedInfoIcon}>✓</Text>
+            <Icon name="checkmark-circle" size={18} color={colors.primary} />
             <Text style={styles.bookedInfoText}>
               {activeBooking?.status === 'cancellation_requested'
                 ? 'Cancellation requested. Waiting for provider confirmation.'
@@ -331,7 +332,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
                 onPress={() => setQuantity(q => Math.max(service.minimum_units || 1, q - 1))}
                 accessibilityRole="button"
                 accessibilityLabel="Decrease quantity">
-                <Text style={styles.qtyBtnText}>−</Text>
+                <Icon name="remove" size={22} color={colors.primary} />
               </TouchableOpacity>
               <View style={styles.qtyDisplay}>
                 <Text style={styles.qtyNum}>{quantity}</Text>
@@ -342,7 +343,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
                 onPress={() => setQuantity(q => q + 1)}
                 accessibilityRole="button"
                 accessibilityLabel="Increase quantity">
-                <Text style={styles.qtyBtnText}>+</Text>
+                <Icon name="add" size={22} color={colors.primary} />
               </TouchableOpacity>
             </View>
             <View style={styles.estimateResult}>
@@ -392,7 +393,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 14,
   },
-  backBtn:      { marginBottom: 4, minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
+  backBtn:      { marginBottom: 4, minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center' },
   backBtnText:  { color: colors.primary, fontSize: 15, fontWeight: '700' },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: {
