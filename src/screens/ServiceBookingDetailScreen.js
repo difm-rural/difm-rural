@@ -13,7 +13,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
-import { bookingStatusLabel } from '../lib/lifecycle'
+import { bookingStatusLabel, BOOKING_STATUS, BOOKING_UNDERWAY_STATUSES, isBookingUnderway, isBookingDismissable } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import ReceivedReview from '../components/ReceivedReview'
@@ -229,7 +229,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }
 
   function confirmBooking() {
-    updateStatus('confirmed', ['pending'], 'The requester can now see this booking is confirmed.')
+    updateStatus('confirmed', [BOOKING_STATUS.PENDING], 'The requester can now see this booking is confirmed.')
   }
 
   function markReady() {
@@ -240,7 +240,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Mark complete',
-          onPress: () => updateStatus('awaiting_completion', ['confirmed', 'in_progress'], 'The requester has been asked to confirm completion.'),
+          onPress: () => updateStatus('awaiting_completion', BOOKING_UNDERWAY_STATUSES, 'The requester has been asked to confirm completion.'),
         },
       ]
     )
@@ -290,7 +290,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       {
         text: 'Confirm',
         style: 'destructive',
-        onPress: () => updateStatus('cancelled', ['cancellation_requested'], 'The booking has been cancelled.'),
+        onPress: () => updateStatus('cancelled', [BOOKING_STATUS.CANCELLATION_REQUESTED], 'The booking has been cancelled.'),
       },
     ])
   }
@@ -309,9 +309,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const providerCanQuote = viewerRole === 'provider' && isQuoteRequired && (['pending', 'quote_sent'].includes(booking.status) || canRecoverMissingQuote)
   const requesterCanAcceptQuote = viewerRole === 'requester' && booking.status === 'quote_sent'
   const providerCanConfirm = viewerRole === 'provider' && !isQuoteRequired && booking.status === 'pending'
-  const providerCanReady = viewerRole === 'provider' && ['confirmed', 'in_progress'].includes(booking.status)
+  const providerCanReady = viewerRole === 'provider' && isBookingUnderway(booking.status)
   const providerCanConfirmCancel = viewerRole === 'provider' && booking.status === 'cancellation_requested'
-  const providerCanDismiss = viewerRole === 'provider' && ['withdrawn', 'cancelled'].includes(booking.status)
+  const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
   const requesterCanConfirmComplete = viewerRole === 'requester' && booking.status === 'awaiting_completion'
   const canReview = booking.status === 'completed'
 

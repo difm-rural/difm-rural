@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
-import { isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
+import { isJobActive, isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
 import { confirmJobComplete, cancelJob, deleteJob, acceptBid as apiAcceptBid } from '../lib/jobActions'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
@@ -612,7 +612,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const showReviewBids = job.status === 'open' && bidCount > 0
   const showQuestions  = job.status === 'open' && questionCount > 0
   const showEdit       = job.status === 'open'
-  const showCancel     = ['open', 'accepted', 'in_progress'].includes(job.status)
+  const showCancel     = isJobActive(job.status)
   const showDelete     = (job.status === 'open' && bidCount === 0) || job.status === 'cancelled'
   const showRepost     = job.status === 'completed' || job.status === 'cancelled'
   const showCompletedActions = job.status === 'completed'

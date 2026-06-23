@@ -93,6 +93,14 @@ export const isBookingTerminal = s => BOOKING_TERMINAL_STATUSES.includes(s)
 export const BOOKING_WITHDRAWABLE_STATUSES = [BOOKING_STATUS.PENDING, BOOKING_STATUS.QUOTE_SENT]
 export const isBookingWithdrawable = s => BOOKING_WITHDRAWABLE_STATUSES.includes(s)
 
+// Confirmed/underway — the provider can progress it or mark it ready.
+export const BOOKING_UNDERWAY_STATUSES = [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.IN_PROGRESS]
+export const isBookingUnderway = s => BOOKING_UNDERWAY_STATUSES.includes(s)
+
+// Closed states the provider can archive/dismiss from their list.
+export const BOOKING_DISMISSABLE_STATUSES = [BOOKING_STATUS.WITHDRAWN, BOOKING_STATUS.CANCELLED]
+export const isBookingDismissable = s => BOOKING_DISMISSABLE_STATUSES.includes(s)
+
 // Canonical label for the verbose surfaces (booking detail screen).
 export function bookingStatusLabel(status) {
   switch (status) {

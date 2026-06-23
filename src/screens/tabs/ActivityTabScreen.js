@@ -12,7 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
-import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded } from '../../lib/lifecycle'
+import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded, isBookingWithdrawable, isBookingUnderway, isBookingDismissable } from '../../lib/lifecycle'
 import {
   confirmBooking as apiConfirmBooking,
   declineBooking as apiDeclineBooking,
@@ -62,9 +62,9 @@ function BookingWorkCard({
   const requesterNeedsConfirm = viewerRole === 'requester' && booking.status === 'awaiting_completion'
   const providerNeedsQuote = viewerRole === 'provider' && booking.status === 'pending' && serviceItem.pricing_type === 'quote_required'
   const providerPending = viewerRole === 'provider' && booking.status === 'pending' && !providerNeedsQuote
-  const providerActive = viewerRole === 'provider' && ['confirmed', 'in_progress'].includes(booking.status)
+  const providerActive = viewerRole === 'provider' && isBookingUnderway(booking.status)
   const providerCanConfirmCancellation = viewerRole === 'provider' && booking.status === 'cancellation_requested'
-  const providerCanDismiss = viewerRole === 'provider' && ['withdrawn', 'cancelled'].includes(booking.status)
+  const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
   const canReview = booking.status === 'completed' && !!onReview
 
   return (
@@ -162,7 +162,7 @@ function BookingWorkCard({
           accessibilityRole="button"
           accessibilityLabel="Cancel service booking">
           <Text style={styles.miniDangerText}>
-            {['pending', 'quote_sent'].includes(booking.status) ? 'Withdraw' : 'Request cancel'}
+            {isBookingWithdrawable(booking.status) ? 'Withdraw' : 'Request cancel'}
           </Text>
         </TouchableOpacity>
       )}
@@ -309,7 +309,7 @@ export default function ActivityTabScreen({ navigation }) {
       const profileMap = {}
       reqProfiles?.forEach(p => { profileMap[p.id] = p })
       const visibleBookings = rawBookings.filter(b =>
-        !(['withdrawn', 'cancelled'].includes(b.status) && b.provider_archive_at)
+        !(isBookingDismissable(b.status) && b.provider_archive_at)
       )
       setProviderBookings(visibleBookings.map(b => ({
         ...b,
