@@ -181,8 +181,8 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function acceptBid(bid) {
     const provName = bid.provider?.full_name || 'this provider'
     Alert.alert(
-      'Accept bid?',
-      `Accept ${provName}'s bid of $${bid.amount} NZD? All other bids will be declined.`,
+      'Accept offer?',
+      `Accept ${provName}'s offer of $${bid.amount} NZD? All other offers will be declined.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -190,7 +190,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           onPress: async () => {
             const { error } = await apiAcceptBid(job, bid)
             if (error) { Alert.alert('Error', error.message); return }
-            Alert.alert('Bid accepted!', `${provName} has been notified.`, [
+            Alert.alert('Offer accepted!', `${provName} has been notified.`, [
               { text: 'OK', onPress: () => setJob(prev => ({ ...prev, status: 'accepted' })) },
             ])
           },
@@ -264,7 +264,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   )
 
   const badge = getBadge()
-  const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
+  const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to offers'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
   const isAwarded = isJobAwarded(job.status)
@@ -283,7 +283,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   async function handleShare() {
     try {
-      const priceStr = job.price_type === 'fixed' ? `$${job.price} fixed price` : 'Open to bids'
+      const priceStr = job.price_type === 'fixed' ? `$${job.price} fixed price` : 'Open to offers'
       await Share.share({
         message: `Check out this job on Rural Connections: ${job.title} in ${job.location_name}. ${priceStr}`,
       })
@@ -644,8 +644,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       key: 'reviewBids',
       emoji: '🏷️',
       iconBg: '#fef3c7',
-      label: 'Review bids',
-      subtitle: `${bidCount} bid${bidCount > 1 ? 's' : ''} waiting for your review`,
+      label: 'Review offers',
+      subtitle: `${bidCount} offer${bidCount > 1 ? 's' : ''} waiting for your review`,
       onPress: handleReviewBids,
     },
     showQuestions && {
@@ -685,7 +685,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       emoji: '🚫',
       iconBg: colors.warningLight,
       label: 'Cancel job',
-      subtitle: 'Close job, notify bidding providers',
+      subtitle: 'Close job, notify interested providers',
       onPress: handleCancel,
     },
     showDelete && {
@@ -720,11 +720,11 @@ export default function ManageTaskScreen({ navigation, route }) {
           <SummaryRow icon="📅" label="Posted"    value={timeAgo(job.created_at)} last />
         </View>
 
-        {/* Bids received — inline on open jobs */}
+        {/* Offers received — inline on open jobs */}
         {job.status === 'open' && (
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Bids received</Text>
+              <Text style={styles.cardTitle}>Offers received</Text>
               {bids.length > 0 && (
                 <View style={[styles.statusBadge, { backgroundColor: '#fef3c7' }]}>
                   <Text style={[styles.statusBadgeText, { color: '#92400e' }]}>
@@ -734,9 +734,9 @@ export default function ManageTaskScreen({ navigation, route }) {
               )}
             </View>
             {loadingBids ? (
-              <Text style={styles.loadingText}>Loading bids…</Text>
+              <Text style={styles.loadingText}>Loading offers…</Text>
             ) : bids.length === 0 ? (
-              <Text style={styles.noBidsText}>No bids yet — check back soon</Text>
+              <Text style={styles.noBidsText}>No offers yet — check back soon</Text>
             ) : (
               bids.map((bid, idx) => {
                 const provName = bid.provider?.full_name || 'Provider'
@@ -789,8 +789,8 @@ export default function ManageTaskScreen({ navigation, route }) {
                       style={styles.acceptBidBtn}
                       onPress={() => acceptBid(bid)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Accept bid from ${provName}`}>
-                      <Text style={styles.acceptBidBtnText}>Accept bid</Text>
+                      accessibilityLabel={`Accept offer from ${provName}`}>
+                      <Text style={styles.acceptBidBtnText}>Accept offer</Text>
                     </TouchableOpacity>
                   </View>
                 )

@@ -10,7 +10,7 @@ import { colors } from '../../theme/tokens'
 
 const PRICE_OPTIONS = [
   { id: 'fixed', icon: '💰', label: 'Fixed price',  desc: 'Set your budget upfront' },
-  { id: 'open',  icon: '📊', label: 'Open to bids', desc: 'Let providers quote you' },
+  { id: 'open',  icon: '📊', label: 'Open to offers', desc: 'Let providers quote you' },
 ]
 
 const SCHEDULE_LABELS = {

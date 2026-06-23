@@ -17,7 +17,7 @@ const REASONS = {
     'Found someone locally',
     'Budget has changed',
     'Posted by mistake',
-    'Taking too long to get bids',
+    'Taking too long to get offers',
     'Other',
   ],
   job_accepted: [
@@ -78,7 +78,7 @@ export default function CancelModal({
   let warningText  = null
   let isRedWarning = false
   if (type === 'job_open' && bidCount > 0) {
-    warningText = `${bidCount} provider${bidCount !== 1 ? 's have' : ' has'} bid on this job and will be notified.`
+    warningText = `${bidCount} provider${bidCount !== 1 ? 's have' : ' has'} made an offer on this job and will be notified.`
   } else if (type === 'job_accepted') {
     warningText = `${providerName ? `${providerName} has` : 'A provider has'} accepted this job and will be notified. This may affect your rating.`
     isRedWarning = true

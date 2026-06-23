@@ -67,7 +67,7 @@ function statusBadgeProps(status, bidCount) {
   switch (status) {
     case 'open':
       return {
-        label: bidCount > 0 ? `${bidCount} bid${bidCount > 1 ? 's' : ''}` : '0 bids',
+        label: bidCount > 0 ? `${bidCount} offer${bidCount > 1 ? 's' : ''}` : '0 offers',
         bg: '#e8f5e9', fg: colors.primary,
       }
     case 'accepted':
@@ -181,7 +181,7 @@ export default function JobServiceCard({
         {/* Bid count bubble (tasks only, when no status badge) */}
         {showBidBadge && (
           <View style={styles.bidBubble}>
-            <Text style={styles.bidBubbleText}>{bidCount} bid{bidCount > 1 ? 's' : ''}</Text>
+            <Text style={styles.bidBubbleText}>{bidCount} offer{bidCount > 1 ? 's' : ''}</Text>
           </View>
         )}
       </View>

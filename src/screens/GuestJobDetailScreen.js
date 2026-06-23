@@ -45,7 +45,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
         <View style={styles.badgeRow}>
           <Text style={styles.category}>{job.category}</Text>
           <Text style={styles.price}>
-            {job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to Bids'}
+            {job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to Offers'}
           </Text>
         </View>
 
@@ -56,9 +56,9 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           style={styles.bidButton}
           onPress={openAuthSheet}
           accessibilityRole="button"
-          accessibilityLabel="Bid on this job"
-          accessibilityHint="Double tap to create an account and bid on this job">
-          <Text style={styles.bidButtonText}>Bid on this job</Text>
+          accessibilityLabel="Offer on this job"
+          accessibilityHint="Double tap to create an account and offer on this job">
+          <Text style={styles.bidButtonText}>Offer on this job</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.contactButton}
@@ -78,7 +78,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
         <View style={styles.modalWrap}>
           <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={closeAuthSheet} />
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Create a free account to bid on this job</Text>
+            <Text style={styles.sheetTitle}>Create a free account to offer on this job</Text>
             <TouchableOpacity
               style={styles.sheetPrimary}
               onPress={goToRegister}

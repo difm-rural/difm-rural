@@ -88,7 +88,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
           <Text style={styles.budgetAmount}>{budgetText}</Text>
           {hasBids && (
             <View style={styles.bidBadge}>
-              <Text style={styles.bidBadgeText}>{bidCount} new bid{bidCount > 1 ? 's' : ''}</Text>
+              <Text style={styles.bidBadgeText}>{bidCount} new offer{bidCount > 1 ? 's' : ''}</Text>
             </View>
           )}
         </View>

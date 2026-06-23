@@ -187,7 +187,7 @@ export default function JobsTabScreen({ navigation }) {
           accessibilityLabel="Post a job">
           <View style={{ flex: 1 }}>
             <Text style={styles.postCtaTitle}>Post a job</Text>
-            <Text style={styles.postCtaSub}>Describe the work and get bids from local providers</Text>
+            <Text style={styles.postCtaSub}>Describe the work and get offers from local providers</Text>
           </View>
           <Text style={styles.postCtaArrow}>→</Text>
         </TouchableOpacity>
@@ -221,7 +221,7 @@ export default function JobsTabScreen({ navigation }) {
       {/* Provider: bids awaiting an answer */}
       {isProvider && myBidJobs.length > 0 && (
         <View style={styles.railSection}>
-          <Text style={styles.railTitle}>Your bids</Text>
+          <Text style={styles.railTitle}>Your offers</Text>
           <FlatList
             horizontal
             data={myBidJobs}
@@ -232,7 +232,7 @@ export default function JobsTabScreen({ navigation }) {
                   item={bid.jobs}
                   onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
                 />
-                <Text style={styles.bidLabel}>Bid sent: ${bid.amount} NZD</Text>
+                <Text style={styles.bidLabel}>Offer sent: ${bid.amount} NZD</Text>
               </View>
             )}
             showsHorizontalScrollIndicator={false}

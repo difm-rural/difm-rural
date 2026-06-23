@@ -267,7 +267,7 @@ export default function JobDetailScreen({ route, navigation }) {
 
   async function handlePlaceBid() {
     const total = getBidTotal()
-    if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter a bid amount'); return }
+    if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter an offer amount'); return }
     setLoading(true)
     const { error } = await supabase.from('bids').insert({
       job_id:             job.id,
@@ -283,7 +283,7 @@ export default function JobDetailScreen({ route, navigation }) {
       Alert.alert('Error', error.message)
     } else {
       trackEvent('bid_placed', { job_id: job.id, amount: total })
-      Alert.alert('Bid Placed!', 'Your bid has been submitted successfully.')
+      Alert.alert('Offer sent!', 'Your offer has been submitted successfully.')
       setAlreadyBid(true)
       setEditingBid(false)
       fetchData()
@@ -294,7 +294,7 @@ export default function JobDetailScreen({ route, navigation }) {
   async function handleUpdateBid() {
     if (!myBid) return
     const total = getBidTotal()
-    if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter a bid amount'); return }
+    if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter an offer amount'); return }
     setLoading(true)
     const { error } = await supabase.from('bids').update({
       amount:             total,
@@ -306,7 +306,7 @@ export default function JobDetailScreen({ route, navigation }) {
     if (error) {
       Alert.alert('Error', error.message)
     } else {
-      Alert.alert('Bid updated!', 'Your bid has been updated.')
+      Alert.alert('Offer updated!', 'Your offer has been updated.')
       setEditingBid(false)
       fetchData()
     }
@@ -351,7 +351,7 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   async function handleAcceptBid(bid) {
-    Alert.alert('Accept Bid', `Accept bid of $${bid.amount} NZD from ${bid.profiles?.full_name}?`, [
+    Alert.alert('Accept Offer', `Accept offer of $${bid.amount} NZD from ${bid.profiles?.full_name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Accept',
@@ -416,7 +416,7 @@ export default function JobDetailScreen({ route, navigation }) {
   if (isAcceptedProvider) {
     const requesterFirstName = requesterProfile?.full_name?.split(' ')[0] || 'the requester'
     const otherBidCount = Math.max(0, bids.length - 1)
-    const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to bids'
+    const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to offers'
     const isCompleted = job.status === 'completed'
     const isCancelled = job.status === 'cancelled'
     const isAwaitingCompletion = job.status === 'awaiting_completion'
@@ -518,7 +518,7 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.detailValue}>{budgetText}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Your bid</Text>
+              <Text style={styles.detailLabel}>Your offer</Text>
               <Text style={[styles.detailValue, { color: colors.primary, fontWeight: '700' }]}>${myBid.amount} NZD</Text>
             </View>
             {job.scheduled_date ? (
@@ -580,8 +580,8 @@ export default function JobDetailScreen({ route, navigation }) {
             <View style={styles.infoBoxBlue}>
               <Text style={styles.infoBoxBlueText}>
                 {otherBidCount > 0
-                  ? `${otherBidCount} other bid${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your bid of $${myBid.amount} NZD was the winning bid.`
-                  : `Your bid of $${myBid.amount} NZD was the only bid — you got it!`}
+                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer of $${myBid.amount} NZD was the winning offer.`
+                  : `Your offer of $${myBid.amount} NZD was the only offer — you got it!`}
               </Text>
             </View>
           )}
@@ -640,7 +640,7 @@ export default function JobDetailScreen({ route, navigation }) {
       </TouchableOpacity>
       {lineItems.length > 1 && (
         <View style={styles.bidTotalRow}>
-          <Text style={styles.bidTotalLabel}>Bid total</Text>
+          <Text style={styles.bidTotalLabel}>Offer total</Text>
           <Text style={styles.bidTotalAmount}>${bidTotal.toFixed(2)} NZD</Text>
         </View>
       )}
@@ -697,8 +697,8 @@ export default function JobDetailScreen({ route, navigation }) {
         onPress={editingBid ? handleUpdateBid : handlePlaceBid}
         disabled={loading}
         accessibilityRole="button"
-        accessibilityLabel={editingBid ? 'Update bid' : 'Submit bid'}>
-        <Text style={styles.buttonText}>{loading ? 'Submitting...' : editingBid ? 'Update Bid' : 'Submit Bid'}</Text>
+        accessibilityLabel={editingBid ? 'Update offer' : 'Submit offer'}>
+        <Text style={styles.buttonText}>{loading ? 'Submitting...' : editingBid ? 'Update Offer' : 'Submit Offer'}</Text>
       </TouchableOpacity>
       {editingBid && (
         <TouchableOpacity style={styles.cancelEditBtn} onPress={() => setEditingBid(false)}>
@@ -719,7 +719,7 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.cardHeader}>
             <Text style={styles.category}>{job.category}</Text>
             <Text style={styles.price}>
-              {job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to Bids'}
+              {job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to Offers'}
             </Text>
           </View>
           <Text style={styles.title} accessibilityRole="header">{job.title}</Text>
@@ -911,7 +911,7 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.section}>
             {alreadyBid && !editingBid ? (
               <>
-                <Text style={styles.sectionTitle}>Your bid</Text>
+                <Text style={styles.sectionTitle}>Your offer</Text>
                 <View style={styles.myBidSummary}>
                   <Text style={styles.myBidAmount}>${Number(myBid?.amount || 0).toFixed(2)} NZD</Text>
                   {myBid?.line_items?.length > 1 && (
@@ -935,14 +935,14 @@ export default function JobDetailScreen({ route, navigation }) {
                 </View>
                 {myBid?.status === 'pending' && (
                   <TouchableOpacity style={styles.editBidBtn} onPress={() => setEditingBid(true)}
-                    accessibilityRole="button" accessibilityLabel="Edit your bid">
-                    <Text style={styles.editBidBtnText}>Edit bid</Text>
+                    accessibilityRole="button" accessibilityLabel="Edit your offer">
+                    <Text style={styles.editBidBtnText}>Edit offer</Text>
                   </TouchableOpacity>
                 )}
               </>
             ) : (
               <>
-                <Text style={styles.sectionTitle}>{editingBid ? 'Edit your bid' : 'Place a Bid'}</Text>
+                <Text style={styles.sectionTitle}>{editingBid ? 'Edit your offer' : 'Make an Offer'}</Text>
                 {bidFormJSX}
               </>
             )}
@@ -953,7 +953,7 @@ export default function JobDetailScreen({ route, navigation }) {
         {isJobOwner && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {bids.length === 0 ? 'No bids yet' : `${bids.length} Bid${bids.length > 1 ? 's' : ''} Received`}
+              {bids.length === 0 ? 'No offers yet' : `${bids.length} Offer${bids.length > 1 ? 's' : ''} Received`}
             </Text>
             {bids.map(bid => (
               <PressableCard key={bid.id} style={styles.bidCard}>
@@ -1004,8 +1004,8 @@ export default function JobDetailScreen({ route, navigation }) {
                 <Text style={styles.bidStatus}>Status: {bid.status.toUpperCase()}</Text>
                 {bid.status === 'pending' && job.status === 'open' && (
                   <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptBid(bid)}
-                    accessibilityRole="button" accessibilityLabel={`Accept bid from ${bid.profiles?.full_name}`}>
-                    <Text style={styles.acceptButtonText}>✓ Accept This Bid</Text>
+                    accessibilityRole="button" accessibilityLabel={`Accept offer from ${bid.profiles?.full_name}`}>
+                    <Text style={styles.acceptButtonText}>✓ Accept This Offer</Text>
                   </TouchableOpacity>
                 )}
                 {bid.status === 'accepted' && (

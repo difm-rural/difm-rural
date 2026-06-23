@@ -43,7 +43,7 @@ export const isJobAwarded  = s => JOB_AWARDED_STATUSES.includes(s)
 export function jobStatusLabel(status, bidCount = 0) {
   switch (status) {
     case JOB_STATUS.OPEN:
-      return bidCount > 0 ? `${bidCount} bid${bidCount > 1 ? 's' : ''}` : 'Open'
+      return bidCount > 0 ? `${bidCount} offer${bidCount > 1 ? 's' : ''}` : 'Open'
     case JOB_STATUS.ACCEPTED:
     case JOB_STATUS.IN_PROGRESS:         return 'Awarded'
     case JOB_STATUS.AWAITING_COMPLETION: return 'Awaiting confirmation'

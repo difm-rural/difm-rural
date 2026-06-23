@@ -319,7 +319,7 @@ export default function MyJobsScreen({ navigation, route }) {
           <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>Jobs I'm doing</Text>
           {activeBids.length === 0 ? (
             <View style={[styles.emptySection, { marginHorizontal: 16 }]}>
-              <Text style={styles.emptySectionText}>No active bids placed yet</Text>
+              <Text style={styles.emptySectionText}>No active offers placed yet</Text>
             </View>
           ) : (
             <FlatList
