@@ -193,7 +193,7 @@ export default function HomeTabScreen({ navigation }) {
           <PrimaryAction
             title="Post a job"
             subtitle="Describe the work and get local help"
-            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob' })}
+            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })}
           />
           <PrimaryAction
             title="Browse services"

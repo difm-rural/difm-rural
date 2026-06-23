@@ -291,7 +291,7 @@ export default function BrowseTabScreen({ navigation }) {
           <Text style={styles.emptyBody}>Check back soon or post a job to get quotes.</Text>
           <TouchableOpacity
             style={styles.emptyBtn}
-            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob' })}
+            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })}
             accessibilityRole="button"
             accessibilityLabel="Post a job">
             <Text style={styles.emptyBtnText}>Post a job →</Text>

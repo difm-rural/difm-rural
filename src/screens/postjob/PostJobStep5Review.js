@@ -141,6 +141,14 @@ export default function PostJobStep5Review({ navigation, route }) {
     navigation.goBack()
   }
 
+  // Clear the wizard and return to whichever tab launched it (defaults to the
+  // Jobs board when launched from there / origin unknown).
+  function returnAfterPost() {
+    navigation.popToTop()
+    const origin = route.params?.origin
+    if (origin && origin !== 'Jobs') navigation.getParent()?.navigate(origin)
+  }
+
   function handleEditRow(popCount) {
     navigation.pop(popCount)
   }
@@ -221,7 +229,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     setUploadStatus('')
     resetJobData()
     Alert.alert('Job posted!', 'Providers near you will be notified.', [
-      { text: 'OK', onPress: () => navigation.popToTop() },
+      { text: 'OK', onPress: returnAfterPost },
     ])
   }
 

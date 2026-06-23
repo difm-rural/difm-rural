@@ -181,7 +181,7 @@ export default function JobsTabScreen({ navigation }) {
       {isRequester && (
         <TouchableOpacity
           style={styles.postCta}
-          onPress={() => navigation.navigate('PostJob')}
+          onPress={() => navigation.navigate('PostJob', { origin: 'Jobs' })}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Post a job">
