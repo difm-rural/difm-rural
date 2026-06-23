@@ -110,7 +110,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   }, [job.requester_id])
 
   useEffect(() => {
-    if (['accepted', 'in_progress', 'completed'].includes(job.status)) {
+    if (isJobAwarded(job.status) || job.status === 'completed') {
       setLoadingBid(true)
       fetchAcceptedBid()
     }
