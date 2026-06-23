@@ -51,6 +51,7 @@ import OnboardingScreen        from '../screens/OnboardingScreen'
 import LocationPickerScreen from '../components/LocationPickerScreen'
 import AreaTracerScreen     from '../components/AreaTracerScreen'
 import JobMapScreen         from '../components/JobMapScreen'
+import Icon                 from '../components/Icon'
 
 // ─── Guest / unauthenticated screens ─────────────────────────────────────────
 import LandingScreen          from '../screens/LandingScreen'
@@ -209,28 +210,30 @@ const TAB_ROOT = {
 // Everything else (detail / workflow screens) hides it.
 const TAB_BAR_ROUTES = new Set([...Object.values(TAB_ROOT), 'ManageTask'])
 
+const TAB_ICONS = {
+  Home:     ['home-outline', 'home'],
+  Jobs:     ['hammer-outline', 'hammer'],
+  Browse:   ['construct-outline', 'construct'],
+  Activity: ['list-outline', 'list'],
+}
+
 function TabIcon({ name, active, avatarUrl }) {
-  const inactive = colors.textMuted
-  const c = active ? colors.primary : inactive
-  switch (name) {
-    case 'Home':     return <Text style={{ fontSize: 22, color: c, lineHeight: 26 }}>⌂</Text>
-    case 'Jobs':     return <Text style={{ fontSize: 20, color: c, lineHeight: 26 }}>⚒</Text>
-    case 'Browse':   return <Text style={{ fontSize: 20, color: c, lineHeight: 26 }}>⚙</Text>
-    case 'Activity': return <Text style={{ fontSize: 20, color: c, lineHeight: 26 }}>≡</Text>
-    case 'Account':
-      if (avatarUrl) {
-        return (
-          <View style={[
-            tabStyles.avatarThumb,
-            active ? tabStyles.avatarThumbActive : tabStyles.avatarThumbInactive,
-          ]}>
-            <Image source={{ uri: avatarUrl }} style={tabStyles.avatarThumbImg} />
-          </View>
-        )
-      }
-      return <Text style={{ fontSize: 22, color: c, lineHeight: 26 }}>◯</Text>
-    default: return null
+  const c = active ? colors.primary : colors.textMuted
+  if (name === 'Account') {
+    if (avatarUrl) {
+      return (
+        <View style={[
+          tabStyles.avatarThumb,
+          active ? tabStyles.avatarThumbActive : tabStyles.avatarThumbInactive,
+        ]}>
+          <Image source={{ uri: avatarUrl }} style={tabStyles.avatarThumbImg} />
+        </View>
+      )
+    }
+    return <Icon name={active ? 'person-circle' : 'person-circle-outline'} size={26} color={c} />
   }
+  const [outline, filled] = TAB_ICONS[name] || ['ellipse-outline', 'ellipse']
+  return <Icon name={active ? filled : outline} size={24} color={c} />
 }
 
 function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBadge, clearJobsBadge, clearServicesBadge }) {
