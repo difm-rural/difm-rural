@@ -12,6 +12,7 @@ import { trackEvent } from '../../lib/analytics'
 import { trackCategoryInterest } from '../../lib/preferences'
 import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
+import { inferJobCategory } from '../../lib/categorize'
 import { colors } from '../../theme/tokens'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -121,7 +122,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   // popCount = screens to pop from Step5 to reach that step
   const rows = [
     { label: 'Location',    value: locationSummary, popCount: 3 },
-    { label: 'Category',    value: category,        popCount: 4 },
+    category ? { label: 'Category', value: category, popCount: 4 } : null,
     { label: 'Title',       value: title,           popCount: 4 },
     { label: 'When',        value: scheduleDisplay, popCount: 4 },
     { label: 'Budget',      value: budgetDisplay,   popCount: 1 },
@@ -147,10 +148,16 @@ export default function PostJobStep5Review({ navigation, route }) {
   async function handleSubmit() {
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Category is auto-detected from the title + details (keep any existing one
+    // on edit). Falls back to 'Other' if the AI call is unavailable.
+    const resolvedCategory = (category && category.trim())
+      ? category
+      : await inferJobCategory(title, description)
+
     const payload = {
       title,
       description,
-      category,
+      category: resolvedCategory,
       price_type:        priceType,
       price:             priceType === 'fixed' ? parseFloat(price) : null,
       location_name:     jobAddress || null,
@@ -209,8 +216,8 @@ export default function PostJobStep5Review({ navigation, route }) {
       }
     }
 
-    trackEvent('job_posted', { category, price_type: priceType, location: jobAddress })
-    trackCategoryInterest(category)
+    trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress })
+    trackCategoryInterest(resolvedCategory)
     setUploadStatus('')
     resetJobData()
     Alert.alert('Job posted!', 'Providers near you will be notified.', [

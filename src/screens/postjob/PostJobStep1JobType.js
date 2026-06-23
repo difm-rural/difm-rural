@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
-import { JOB_CATEGORIES as CATEGORIES } from '../../lib/categories'
 
 const SCHEDULE_OPTIONS = [
   { id: 'asap',     label: 'As soon as possible', icon: '⚡' },
@@ -28,7 +27,6 @@ export default function PostJobStep1JobType({ navigation, route }) {
   const editJob    = route.params?.job || null
   const prefill    = route.params?.prefill || null
 
-  const [category,       setCategory]       = useState(editJob?.category        || jobData.category)
   const [title,          setTitle]          = useState(editJob?.title           || jobData.title || prefill?.title || '')
   const [scheduleType,   setScheduleType]   = useState(editJob?.schedule_type   || jobData.scheduleType)
   const [scheduledDate,  setScheduledDate]  = useState(() => {
@@ -67,15 +65,14 @@ export default function PostJobStep1JobType({ navigation, route }) {
   // Keep context in sync with local state
   useEffect(() => {
     updateJobData({
-      category,
       title,
       scheduleType,
       scheduledDate: scheduledDate ? scheduledDate.toISOString() : null,
     })
-  }, [category, title, scheduleType, scheduledDate])
+  }, [title, scheduleType, scheduledDate])
 
   function canProceed() {
-    return !!(category && title.trim().length >= 3 && scheduleType)
+    return !!(title.trim().length >= 3 && scheduleType)
   }
 
   function handleBack() {
@@ -101,24 +98,6 @@ export default function PostJobStep1JobType({ navigation, route }) {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-
-          <View style={styles.card}>
-            <Text style={styles.cardQuestion}>What type of job is this?</Text>
-            <View style={styles.chipGrid}>
-              {CATEGORIES.map(cat => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.chip, category === cat && styles.chipActive]}
-                  onPress={() => setCategory(cat)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: category === cat }}>
-                  <Text style={[styles.chipText, category === cat && styles.chipTextActive]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
 
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Give the job a title</Text>

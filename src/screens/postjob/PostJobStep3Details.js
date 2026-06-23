@@ -119,7 +119,7 @@ export default function PostJobStep3Details({ navigation, route }) {
 
           <SummaryBar items={[
             locationSummary ? { label: 'Location', value: locationSummary } : null,
-            { label: 'Category', value: jobData.category },
+            jobData.category ? { label: 'Category', value: jobData.category } : null,
             { label: 'Title',    value: jobData.title },
           ]} />
 

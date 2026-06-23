@@ -94,7 +94,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
           <SummaryBar items={[
             locationSummary ? { label: 'Location', value: locationSummary } : null,
-            { label: 'Category', value: jobData.category },
+            jobData.category ? { label: 'Category', value: jobData.category } : null,
             { label: 'When',     value: scheduleDisplay },
           ]} />
 
