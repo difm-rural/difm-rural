@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
-  kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.primary, textTransform: 'uppercase', marginBottom: 6 },
+  kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
   title:    { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 

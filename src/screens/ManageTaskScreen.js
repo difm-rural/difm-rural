@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
   headerSubtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
 

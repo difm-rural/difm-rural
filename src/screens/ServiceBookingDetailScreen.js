@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   header: { backgroundColor: colors.background, paddingHorizontal: 20, paddingBottom: 14 },
   backBtn: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 8 },
   backText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   title: { fontSize: 30, lineHeight: 35, fontWeight: '700', color: colors.textPrimary },
   statusPill: { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 },
   statusText: { color: colors.primary, fontSize: 12, fontWeight: '700' },

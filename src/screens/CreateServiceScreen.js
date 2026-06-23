@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 14, backgroundColor: colors.background },
   headerBackBtn: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 4 },
   headerBackBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0 },
   headerSub: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 14 },
   progressWrap: { flexDirection: 'row', gap: 8 },

@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   heading: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
-  kicker: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '700',

@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   },
   backBtn:     { marginBottom: 12, minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-  kicker:      { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker:      { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
 
   // ─── Scroll ─────────────────────────────────────────────────────────

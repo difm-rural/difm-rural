@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   backBtn:     { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 8 },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-  kicker:      { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 6 },
+  kicker:      { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 6 },
   title:       { fontSize: 30, lineHeight: 34, fontWeight: '700', color: colors.textPrimary },
 
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },

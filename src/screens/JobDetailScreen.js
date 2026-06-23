@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
   headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   backBtn:     { minHeight: 36, justifyContent: 'center' },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-  kicker:      { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker:      { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
 
   watchBtn:       { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center', opacity: 0.55 },

@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   },
   backButton: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 12 },
   backText:   { color: colors.primary, fontSize: 15, fontWeight: '600' },
-  kicker:     { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 8 },
+  kicker:     { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerName: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
   headerJob:  { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
 

@@ -3,6 +3,8 @@ export const colors = {
   primaryLight:   '#e8f5e9',
   primaryDark:    '#085041',
   primaryMuted:   '#95d5b2',
+  accent:         '#c71418',
+  accentLight:    '#fce9e9',
   white:          '#ffffff',
   background:     '#f5f5f5',
   card:           '#ffffff',
