@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { colors } from '../theme/tokens'
+import Icon from './Icon'
 
 const REASONS = {
   job_open: [
@@ -72,7 +74,7 @@ export default function CancelModal({
   const reasons    = REASONS[type] || REASONS.job_open
   const isJob      = type !== 'booking'
   const keepLabel  = isJob ? 'Keep job' : 'Keep booking'
-  const confirmLabel = isJob ? 'Cancel job →' : 'Cancel booking →'
+  const confirmLabel = isJob ? 'Cancel job' : 'Cancel booking'
   const canConfirm = !!selectedReason && !submitting
 
   let warningText  = null
@@ -137,7 +139,7 @@ export default function CancelModal({
             {!!warningText && (
               <View style={[styles.warningBox, isRedWarning && styles.warningBoxRed]}>
                 <Text style={[styles.warningText, isRedWarning && styles.warningTextRed]}>
-                  ⚠️ {warningText}
+                  <Icon name="warning-outline" size={14} color={colors.warning} /> {warningText}
                 </Text>
               </View>
             )}

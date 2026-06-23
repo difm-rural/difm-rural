@@ -11,6 +11,7 @@ import {
 import MapView, { Marker } from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../theme/tokens'
+import Icon from './Icon'
 import { reverseGeocode, getCurrentLocation } from '../lib/location'
 
 const NZ_CENTER = { latitude: -41.2865, longitude: 174.7762 }
@@ -116,7 +117,7 @@ export default function LocationPickerScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}><Icon name="chevron-back" size={16} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{route.params?.title || 'Pin the job location'}</Text>
         <Text style={styles.subtitle}>{route.params?.subtitle || 'Tap the map or drag the pin to the exact spot'}</Text>
@@ -161,13 +162,13 @@ export default function LocationPickerScreen({ route, navigation }) {
         {/* Zoom + my location — top right */}
         <View style={styles.zoomBar}>
           <TouchableOpacity style={styles.zoomBtn} onPress={zoomIn} accessibilityRole="button" accessibilityLabel="Zoom in">
-            <Text style={styles.zoomBtnText}>＋</Text>
+            <Icon name="add" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.zoomBtn} onPress={zoomOut} accessibilityRole="button" accessibilityLabel="Zoom out">
-            <Text style={styles.zoomBtnText}>－</Text>
+            <Icon name="remove" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.zoomBtn} onPress={handleCurrentLocation} accessibilityRole="button" accessibilityLabel="My location">
-            <Text style={styles.zoomBtnText}>◎</Text>
+            <Icon name="locate" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -177,7 +178,7 @@ export default function LocationPickerScreen({ route, navigation }) {
           onPress={handleCurrentLocation}
           accessibilityRole="button"
           accessibilityLabel="Use my current location">
-          <Text style={styles.myLocationPillText}>📍 Use my current location</Text>
+          <Text style={styles.myLocationPillText}><Icon name="locate" size={14} color={colors.primary} /> Use my current location</Text>
         </TouchableOpacity>
       </View>
 
@@ -222,7 +223,7 @@ export default function LocationPickerScreen({ route, navigation }) {
           disabled={!pinLocation}
           accessibilityRole="button"
           accessibilityLabel="Confirm location">
-          <Text style={styles.confirmBtnText}>Confirm location →</Text>
+          <Text style={styles.confirmBtnText}>Confirm location <Icon name="arrow-forward" size={15} color="#fff" /></Text>
         </TouchableOpacity>
       </View>
     </View>

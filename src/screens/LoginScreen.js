@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import {
   authenticate,
   clearSessionTokens,
@@ -229,7 +230,7 @@ export default function LoginScreen({ navigation }) {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
               accessibilityLabel="Back to email entry">
-              <Text style={styles.backArrow}>←</Text>
+              <Icon name="chevron-back" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.wordmark}>RURAL CONNECTIONS</Text>
             <View style={{ width: 32 }} />
@@ -294,7 +295,7 @@ export default function LoginScreen({ navigation }) {
   // ─── Email stage ──────────────────────────────────────────────────────────────
 
   const biometricLabel = getBiometricLabel(biometricType)
-  const biometricIcon  = biometricType === 'face' ? '👤' : '👆'
+  const biometricIcon  = biometricType === 'face' ? 'scan-outline' : 'finger-print'
 
   return (
     <KeyboardAvoidingView
@@ -341,7 +342,7 @@ export default function LoginScreen({ navigation }) {
           {loading ? (
             <ActivityIndicator color={colors.white} />
           ) : (
-            <Text style={styles.buttonText}>Send code →</Text>
+            <Text style={styles.buttonText}>Send code <Icon name="arrow-forward" size={15} color="#fff" /></Text>
           )}
         </TouchableOpacity>
 
@@ -352,7 +353,7 @@ export default function LoginScreen({ navigation }) {
             disabled={loading}
             accessibilityRole="button"
             accessibilityLabel={`Sign in with ${biometricLabel}`}>
-            <Text style={styles.biometricIcon}>{biometricIcon}</Text>
+            <Icon name={biometricIcon} size={22} color={colors.primary} />
             <Text style={styles.biometricText}>Sign in with {biometricLabel}</Text>
           </TouchableOpacity>
         )}

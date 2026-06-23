@@ -47,8 +47,8 @@ export async function fetchProviderStats(providerIds = []) {
   return map
 }
 
-// "⭐ 4.8 (12)" or "New provider"
+// "★ 4.8 (12)" or "New provider"
 export function formatProviderRating(stats) {
   if (!stats || stats.ratingCount === 0) return 'New provider'
-  return `⭐ ${stats.ratingAvg.toFixed(1)} (${stats.ratingCount})`
+  return `★ ${stats.ratingAvg.toFixed(1)} (${stats.ratingCount})`
 }

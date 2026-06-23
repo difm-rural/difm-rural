@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 import { useUser } from '../../context/UserContext'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
@@ -294,7 +295,7 @@ export default function BrowseTabScreen({ navigation }) {
             onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })}
             accessibilityRole="button"
             accessibilityLabel="Post a job">
-            <Text style={styles.emptyBtnText}>Post a job →</Text>
+            <Text style={styles.emptyBtnText}>Post a job <Icon name="arrow-forward" size={15} color="#fff" /></Text>
           </TouchableOpacity>
         </View>
       ) : (

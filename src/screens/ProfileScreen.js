@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import {
   authenticate,
   clearCredentials,
@@ -297,9 +298,9 @@ export default function ProfileScreen({ navigation }) {
   // ─── Dashboard mode ────────────────────────────────────────────
   function handleRoleChange() {
     const options = [
-      { text: '🏡 Requester — Post tasks', role: 'requester' },
-      { text: '🔧 Provider — Do jobs',     role: 'provider'  },
-      { text: '🔄 Both — Post & do jobs',  role: 'both'      },
+      { text: 'Requester — Post tasks', role: 'requester' },
+      { text: 'Provider — Do jobs',     role: 'provider'  },
+      { text: 'Both — Post & do jobs',  role: 'both'      },
       { text: 'Cancel', style: 'cancel' },
     ]
     Alert.alert(
@@ -364,7 +365,7 @@ export default function ProfileScreen({ navigation }) {
   }
 
   const biometricLabel = biometricType === 'face' ? 'Face ID' : 'fingerprint'
-  const biometricIcon  = biometricType === 'face' ? '🔐' : '👆'
+  const biometricIcon  = biometricType === 'face' ? 'scan-outline' : 'finger-print'
 
   return (
     <View style={styles.screen}>
@@ -382,7 +383,7 @@ export default function ProfileScreen({ navigation }) {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityRole="button"
                 accessibilityLabel="Go back">
-                <Text style={styles.backBtnText}>← Back</Text>
+                <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.navSpacer} />
@@ -410,7 +411,7 @@ export default function ProfileScreen({ navigation }) {
               accessibilityRole="button"
               accessibilityLabel="Change profile photo"
               accessibilityHint="Double tap to change your profile photo">
-              <Text style={styles.cameraBtnText}>📷</Text>
+              <Icon name="camera" size={14} color={colors.white} />
             </TouchableOpacity>
           </View>
 
@@ -418,7 +419,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.headerSince}>Member since {memberSince}</Text>
 
           <View style={styles.ratingPill}>
-            <Text style={styles.ratingText}>⭐ {ratingText}</Text>
+            <Text style={styles.ratingText}>★ {ratingText}</Text>
           </View>
         </View>
 
@@ -429,24 +430,24 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.sectionLabel}>Personal details</Text>
           <View style={styles.card}>
             <DetailRow
-              icon="👤"
+              icon="person-outline"
               label="Full name"
               value={profile.full_name || '—'}
               onPress={() => openEdit('full_name', 'Full name', profile.full_name)}
             />
             <DetailRow
-              icon="✉️"
+              icon="mail-outline"
               label="Email"
               value={email}
             />
             <DetailRow
-              icon="📞"
+              icon="call-outline"
               label="Phone"
               value={profile.phone || '—'}
               onPress={() => openEdit('phone', 'Phone number', profile.phone, 'phone-pad')}
             />
             <DetailRow
-              icon="📍"
+              icon="location-outline"
               label="Region"
               value={profile.region || '—'}
               last
@@ -458,19 +459,19 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.sectionLabel}>Account</Text>
           <View style={styles.card}>
             <DetailRow
-              icon="⭐"
+              icon="star-outline"
               label="My ratings"
               value={ratingText}
             />
             <DetailRow
-              icon="✅"
+              icon="checkmark-circle-outline"
               label="Verification"
               value="Not verified"
               valueMuted
               onPress={() => Alert.alert('Verification', 'Identity verification coming soon.')}
             />
             <DetailRow
-              icon="🔔"
+              icon="notifications-outline"
               label="Notifications"
               value={notificationsEnabled ? 'Enabled' : 'Disabled'}
               valueGreen={notificationsEnabled}
@@ -488,7 +489,7 @@ export default function ProfileScreen({ navigation }) {
               />
             )}
             <DetailRow
-              icon="🔄"
+              icon="swap-horizontal-outline"
               label="Dashboard mode"
               value={
                 profile.primary_role === 'provider' ? 'Provider'
@@ -498,7 +499,7 @@ export default function ProfileScreen({ navigation }) {
               onPress={handleRoleChange}
             />
             <DetailRow
-              icon="🚪"
+              icon="log-out-outline"
               label="Sign out"
               labelRed
               last
@@ -633,7 +634,7 @@ function DetailRow({ icon, label, value, valueMuted, valueGreen, valueBadge, lab
       accessibilityLabel={label + (value ? `, ${value}` : '') + (valueBadge ? `, ${valueBadge}` : '')}
       accessibilityHint={onPress ? 'Double tap to edit' : undefined}>
       <View style={styles.rowLeft}>
-        <Text style={styles.rowIcon}>{icon}</Text>
+        <Icon name={icon} size={18} color={labelRed ? colors.danger : colors.textSecondary} style={styles.rowIcon} />
         <Text style={[styles.rowLabel, labelRed && styles.rowLabelRed]}>{label}</Text>
       </View>
       <View style={styles.rowRight}>
@@ -654,7 +655,7 @@ function DetailRow({ icon, label, value, valueMuted, valueGreen, valueBadge, lab
           </Text>
         ) : null}
         {onPress && (
-          <Text style={[styles.rowChevron, labelRed && styles.rowChevronRed]}>›</Text>
+          <Icon name="chevron-forward" size={16} color={labelRed ? colors.danger : colors.textMuted} style={styles.rowChevron} />
         )}
       </View>
     </TouchableOpacity>

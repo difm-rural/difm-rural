@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 
 export default function GuestJobDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
@@ -35,7 +36,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>{job.category}</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">{job.title}</Text>
@@ -49,7 +50,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.location}>📍 {job.location_name}</Text>
+        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
         <Text style={styles.description}>{job.description}</Text>
 
         <TouchableOpacity

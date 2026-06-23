@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -147,7 +148,7 @@ export default function ReviewsListScreen({ route, navigation }) {
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         accessibilityRole="button"
         accessibilityLabel="Go back">
-        <Text style={styles.backBtnText}>← Back</Text>
+        <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
       </TouchableOpacity>
       <Text style={styles.kicker}>Reviews</Text>
       <Text style={styles.headerTitle} accessibilityRole="header">{headerTitle}</Text>
@@ -193,7 +194,7 @@ export default function ReviewsListScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>⭐</Text>
+            <Icon name="star-outline" size={40} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No reviews yet</Text>
             <Text style={styles.emptyBody}>Reviews will appear here after jobs are completed.</Text>
           </View>

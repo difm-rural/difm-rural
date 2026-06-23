@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
 const FILTERS = [
@@ -172,7 +173,7 @@ export default function GuestJobFeedScreen({ navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.title}>Available jobs</Text>

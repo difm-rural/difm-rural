@@ -12,6 +12,7 @@ import MapView, { Marker, Polygon, Polyline } from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from './Icon'
 import { reverseGeocode, getCurrentLocation, haversineDistance } from '../lib/location'
 
 export default function JobMapScreen({ route, navigation }) {
@@ -108,7 +109,7 @@ export default function JobMapScreen({ route, navigation }) {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel="Go back">
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}><Icon name="chevron-back" size={16} color={colors.primary} /> Back</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.title} numberOfLines={1}>{job.title || 'Job location'}</Text>
@@ -200,13 +201,13 @@ export default function JobMapScreen({ route, navigation }) {
             <Text style={styles.infoAddress} numberOfLines={2}>{address}</Text>
           ) : null}
           {job.location_note ? (
-            <Text style={styles.infoNote}>📝 {job.location_note}</Text>
+            <Text style={styles.infoNote}><Icon name="document-text-outline" size={12} color={colors.textSecondary} /> {job.location_note}</Text>
           ) : null}
           {job.location_name && !address ? (
             <Text style={styles.infoAddress}>{job.location_name}</Text>
           ) : null}
           {hasPolygon && job.area_hectares ? (
-            <Text style={styles.infoArea}>⬡ {job.area_hectares} ha work area</Text>
+            <Text style={styles.infoArea}><Icon name="shapes-outline" size={12} color={colors.primary} /> {job.area_hectares} ha work area</Text>
           ) : null}
         </View>
 
@@ -220,7 +221,7 @@ export default function JobMapScreen({ route, navigation }) {
               accessibilityRole="button"
               accessibilityLabel="Check in">
               <Text style={[styles.checkInBtnText, checkedIn && styles.checkInBtnTextDone]}>
-                {checkedIn ? '✓ Checked in' : 'Check in'}
+                {checkedIn ? <><Icon name="checkmark" size={14} color={colors.primary} /> Checked in</> : 'Check in'}
               </Text>
             </TouchableOpacity>
           )}
@@ -229,7 +230,7 @@ export default function JobMapScreen({ route, navigation }) {
             onPress={handleDirections}
             accessibilityRole="button"
             accessibilityLabel="Get directions">
-            <Text style={styles.directionsBtnText}>Get directions →</Text>
+            <Text style={styles.directionsBtnText}>Get directions <Icon name="arrow-forward" size={15} color="#fff" /></Text>
           </TouchableOpacity>
         </View>
       </View>

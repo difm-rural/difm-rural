@@ -13,8 +13,8 @@ export default function ReputationCard({
   style,
 }) {
   const summary = ratingCount > 0
-    ? `⭐ ${Number(ratingAvg).toFixed(1)} (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
-    : '⭐ No rating yet'
+    ? `★ ${Number(ratingAvg).toFixed(1)} (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
+    : '★ No rating yet'
 
   return (
     <View style={[styles.card, style]}>

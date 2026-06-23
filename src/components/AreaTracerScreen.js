@@ -8,6 +8,7 @@ import {
 import MapView, { Marker, Polygon } from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../theme/tokens'
+import Icon from './Icon'
 import { haversineDistance } from '../lib/location'
 
 const NZ_CENTER = { latitude: -41.2865, longitude: 174.7762 }
@@ -102,7 +103,7 @@ export default function AreaTracerScreen({ route, navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}><Icon name="chevron-back" size={16} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Trace the work area</Text>
         <Text style={styles.subtitle}>Tap around the paddock boundary</Text>
@@ -210,7 +211,7 @@ export default function AreaTracerScreen({ route, navigation }) {
           accessibilityRole="button"
           accessibilityLabel="Undo last point">
           <Text style={[styles.undoBtnText, polygonPoints.length === 0 && styles.undoBtnTextDisabled]}>
-            ← Undo
+            Undo
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -219,7 +220,7 @@ export default function AreaTracerScreen({ route, navigation }) {
           disabled={polygonPoints.length < 3}
           accessibilityRole="button"
           accessibilityLabel="Confirm area">
-          <Text style={styles.confirmBtnText}>Confirm area →</Text>
+          <Text style={styles.confirmBtnText}>Confirm area <Icon name="arrow-forward" size={15} color="#fff" /></Text>
         </TouchableOpacity>
       </View>
     </View>

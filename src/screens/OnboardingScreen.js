@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../lib/uploadAvatar'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 
 const SKILLS = [
@@ -28,8 +29,8 @@ const SKILLS = [
 // Everyone can request (post jobs, book services). "I also provide" adds the
 // provider tools on top — it never removes the ability to request.
 const ROLE_OPTIONS = [
-  { key: 'requester', emoji: '🏡', label: 'I need help',    sub: 'Post jobs and book local services' },
-  { key: 'both',      emoji: '🔧', label: 'I also provide', sub: 'Advertise services and take on jobs too' },
+  { key: 'requester', emoji: 'home-outline', label: 'I need help',    sub: 'Post jobs and book local services' },
+  { key: 'both',      emoji: 'construct-outline', label: 'I also provide', sub: 'Advertise services and take on jobs too' },
 ]
 
 // Step meta indexed by step number (0–4)
@@ -316,7 +317,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             accessibilityRole="button"
             accessibilityState={{ selected: primaryRole === r.key }}
             accessibilityLabel={`${r.label} — ${r.sub}`}>
-            <Text style={styles.roleTileEmoji}>{r.emoji}</Text>
+            <Icon name={r.emoji} size={28} color={colors.primary} />
             <View style={styles.roleTileBody}>
               <Text style={[styles.roleTileLabel, primaryRole === r.key && styles.roleTileLabelSelected]}>
                 {r.label}
@@ -326,7 +327,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
               </Text>
             </View>
             {primaryRole === r.key && (
-              <Text style={styles.roleTileCheck}>✓</Text>
+              <Icon name="checkmark-circle" size={18} color={colors.primary} />
             )}
           </TouchableOpacity>
         ))}
@@ -342,7 +343,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         keyboardShouldPersistTaps="handled">
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoCardIcon}>👤</Text>
+          <Icon name="person-outline" size={22} color={colors.primary} />
           <View style={styles.infoCardBody}>
             <Text style={styles.infoCardLabel}>You're set up as</Text>
             <View style={styles.roleBadge}>
@@ -352,7 +353,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoCardIcon}>⚡</Text>
+          <Icon name="flash-outline" size={22} color={colors.primary} />
           <View style={styles.infoCardBody}>
             <Text style={styles.infoCardLabel}>
               Quick setup — {isRequester ? '2' : '3'} steps
@@ -364,7 +365,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         </View>
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoCardIcon}>🔒</Text>
+          <Icon name="lock-closed-outline" size={22} color={colors.primary} />
           <View style={styles.infoCardBody}>
             <Text style={styles.infoCardLabel}>Your privacy matters</Text>
             <Text style={styles.infoCardSub}>
@@ -405,7 +406,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
                 )}
               </View>
               <View style={styles.cameraOverlay}>
-                <Text style={{ fontSize: 12 }}>📷</Text>
+                <Icon name="camera" size={12} color={colors.white} />
               </View>
             </TouchableOpacity>
           </View>
@@ -518,14 +519,14 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
           {qualifications.map((q, i) => (
             <View key={i} style={styles.qualRow}>
-              <Text style={styles.qualIcon}>🎓</Text>
+              <Icon name="school-outline" size={16} color={colors.textSecondary} />
               <Text style={styles.qualText} numberOfLines={2}>{q}</Text>
               <TouchableOpacity
                 onPress={() => removeQual(i)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${q}`}>
-                <Text style={styles.qualRemove}>✕</Text>
+                <Icon name="close" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           ))}
@@ -555,7 +556,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
                 onPress={() => { setShowQualInput(false); setQualInput('') }}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel">
-                <Text style={styles.qualCancelBtnText}>✕</Text>
+                <Icon name="close" size={16} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -564,7 +565,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
               onPress={() => setShowQualInput(true)}
               accessibilityRole="button"
               accessibilityLabel="Add a qualification">
-              <Text style={styles.qualAddIcon}>＋</Text>
+              <Icon name="add" size={18} color={colors.primary} />
               <Text style={styles.qualAddText}>Add a qualification...</Text>
             </TouchableOpacity>
           )}
@@ -597,7 +598,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           </View>
           <Text style={styles.summaryName}>{nameToShow}</Text>
           <View style={styles.summaryMeta}>
-            {!!locationStr && <Text style={styles.summaryMetaText}>📍 {locationStr}</Text>}
+            {!!locationStr && <Text style={styles.summaryMetaText}><Icon name="location-outline" size={12} color={colors.textMuted} /> {locationStr}</Text>}
             <View style={styles.roleBadge}>
               <Text style={styles.roleBadgeText}>{roleLabel}</Text>
             </View>
@@ -631,7 +632,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             onPress={markComplete}
             accessibilityRole="button"
             accessibilityLabel="Post a task">
-            <Text style={styles.actionCardIcon}>📋</Text>
+            <Icon name="clipboard-outline" size={22} color={colors.primary} />
             <Text style={styles.actionCardTitle}>Post a task</Text>
             <Text style={styles.actionCardSub}>Get rural help sorted</Text>
           </TouchableOpacity>
@@ -640,7 +641,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             onPress={markComplete}
             accessibilityRole="button"
             accessibilityLabel="Browse services">
-            <Text style={styles.actionCardIcon}>🔍</Text>
+            <Icon name="search-outline" size={22} color={colors.primary} />
             <Text style={styles.actionCardTitle}>Browse services</Text>
             <Text style={styles.actionCardSub}>Find local providers</Text>
           </TouchableOpacity>
@@ -659,7 +660,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   const progressPct = isRequester
     ? ({ 0: 25, 1: 50, 2: 75, 4: 100 }[step] ?? 100)
     : ({ 0: 20, 1: 40, 2: 60, 3: 80, 4: 100 }[step] ?? 100)
-  const btnLabel = isLastStep ? 'Go to dashboard →' : saving ? 'Saving…' : 'Next →'
+  const btnLabel = isLastStep ? 'Go to dashboard' : saving ? 'Saving…' : 'Next'
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>

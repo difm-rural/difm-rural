@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
 function HorizontalSection({ title, items, onPressItem, onGuestAction }) {
@@ -199,7 +200,7 @@ export default function LandingScreen({ navigation }) {
           onPress={() => setMode('home')}
           accessibilityRole="button"
           accessibilityState={{ selected: mode === 'home' }}>
-          <Text style={[styles.tabIcon, mode === 'home' && styles.tabActive]}>⌂</Text>
+          <Icon name="home-outline" size={22} color={mode === 'home' ? colors.primary : colors.textMuted} />
           <Text style={[styles.tabLabel, mode === 'home' && styles.tabActive]}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -207,21 +208,21 @@ export default function LandingScreen({ navigation }) {
           onPress={() => setMode('services')}
           accessibilityRole="button"
           accessibilityState={{ selected: mode === 'services' }}>
-          <Text style={[styles.tabIcon, mode === 'services' && styles.tabActive]}>⊙</Text>
+          <Icon name="construct-outline" size={22} color={mode === 'services' ? colors.primary : colors.textMuted} />
           <Text style={[styles.tabLabel, mode === 'services' && styles.tabActive]}>Services</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tab}
           onPress={() => navigation.navigate('GuestPostJob')}
           accessibilityRole="button">
-          <Text style={styles.tabIcon}>＋</Text>
+          <Icon name="add-circle-outline" size={22} color={colors.textMuted} />
           <Text style={styles.tabLabel}>Post</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tab}
           onPress={() => navigation.navigate('Login')}
           accessibilityRole="button">
-          <Text style={styles.tabIcon}>◯</Text>
+          <Icon name="person-circle-outline" size={22} color={colors.textMuted} />
           <Text style={styles.tabLabel}>Account</Text>
         </TouchableOpacity>
       </View>
