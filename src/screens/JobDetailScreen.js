@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
 import { markJobComplete, confirmJobComplete, acceptBid } from '../lib/jobActions'
 import ReceivedReview from '../components/ReceivedReview'
+import Icon from '../components/Icon'
 import { colors } from '../theme/tokens'
 import PressableCard from '../components/PressableCard'
 import ReviewModal from '../components/ReviewModal'
@@ -395,7 +396,7 @@ export default function JobDetailScreen({ route, navigation }) {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button" accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
         {!isAcceptedProvider && currentUser && !isJobOwner && (
           <TouchableOpacity style={[styles.watchBtn, isWatched && styles.watchBtnActive]}
@@ -403,7 +404,7 @@ export default function JobDetailScreen({ route, navigation }) {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}>
-            <Text style={styles.watchBtnText}>🔖</Text>
+            <Icon name={isWatched ? 'bookmark' : 'bookmark-outline'} size={18} color={isWatched ? colors.primary : colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -465,7 +466,7 @@ export default function JobDetailScreen({ route, navigation }) {
               </View>
             </View>
             <Text style={styles.title}>{job.title}</Text>
-            <Text style={styles.location}>📍 {job.location_name}</Text>
+            <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
             {isCancelled ? (
               <View style={styles.cancelBox}>
                 <Text style={styles.cancelBoxTitle}>This job was cancelled by the requester</Text>
@@ -492,12 +493,12 @@ export default function JobDetailScreen({ route, navigation }) {
           {(!isCompleted && !isCancelled) ? (
             <TouchableOpacity style={styles.chatBanner} onPress={handleChat} activeOpacity={0.85}
               accessibilityRole="button" accessibilityLabel={`Chat with ${requesterFirstName}`}>
-              <Text style={styles.chatBannerIcon}>💬</Text>
+              <Icon name="chatbubble-ellipses-outline" size={26} color={colors.white} style={styles.chatBannerIcon} />
               <View style={styles.chatBannerContent}>
                 <Text style={styles.chatBannerTitle}>Chat with {requesterFirstName}</Text>
                 <Text style={styles.chatBannerSubtitle}>Confirm timing and details</Text>
               </View>
-              <Text style={styles.chatBannerArrow}>›</Text>
+              <Icon name="chevron-forward" size={24} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           ) : null}
 
@@ -541,21 +542,21 @@ export default function JobDetailScreen({ route, navigation }) {
               <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
                 onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
                 accessibilityRole="button" accessibilityLabel="Navigate to job">
-                <Text style={styles.bigBtnGreenText}>🗺 Navigate to job</Text>
+                <Text style={styles.bigBtnGreenText}><Icon name="navigate-outline" size={16} color={colors.white} /> Navigate to job</Text>
               </TouchableOpacity>
             )}
             {(!isCompleted && !isCancelled) ? (
               isAwaitingCompletion ? (
                 <View style={styles.awaitingBox}>
                   <Text style={styles.awaitingBoxText}>
-                    ⏳ Waiting for {requesterFirstName} to confirm completion.
+                    <Icon name="hourglass-outline" size={14} color="#92400e" /> Waiting for {requesterFirstName} to confirm completion.
                   </Text>
                 </View>
               ) : (
                 <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
                   onPress={handleMarkComplete}
                   accessibilityRole="button" accessibilityLabel="Mark job as completed">
-                  <Text style={styles.bigBtnGreenText}>✓ Mark as completed</Text>
+                  <Text style={styles.bigBtnGreenText}><Icon name="checkmark" size={16} color={colors.white} /> Mark as completed</Text>
                 </TouchableOpacity>
               )
             ) : null}
@@ -630,7 +631,7 @@ export default function JobDetailScreen({ route, navigation }) {
             <TouchableOpacity onPress={() => removeLineItem(idx)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Remove line item">
-              <Text style={styles.removeItemBtn}>✕</Text>
+              <Icon name="close" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -661,14 +662,14 @@ export default function JobDetailScreen({ route, navigation }) {
       <TouchableOpacity style={styles.availabilityBtn} onPress={() => setShowDatePicker(true)}
         accessibilityRole="button" accessibilityLabel="Set availability date">
         <Text style={styles.availabilityBtnText}>
-          📅 {availableFrom
+          <Icon name="calendar-outline" size={14} color={colors.textSecondary} /> {availableFrom
             ? `Available from ${availableFrom.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`
             : 'Set availability date (optional)'}
         </Text>
         {availableFrom && (
           <TouchableOpacity onPress={() => setAvailableFrom(null)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.clearDateBtn}>✕</Text>
+            <Icon name="close" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -728,19 +729,19 @@ export default function JobDetailScreen({ route, navigation }) {
           {/* Feature 1: materials/access */}
           {job.materials_type && (
             <View style={styles.accessRow}>
-              <Text style={styles.accessIcon}>🔧</Text>
+              <Icon name="construct-outline" size={14} color={colors.textSecondary} />
               <Text style={styles.accessText}>{MATERIALS_LABELS[job.materials_type] || job.materials_type}</Text>
             </View>
           )}
           {job.access_conditions?.length > 0 && (
             <View style={styles.accessRow}>
-              <Text style={styles.accessIcon}>🚗</Text>
+              <Icon name="car-outline" size={14} color={colors.textSecondary} />
               <Text style={styles.accessText}>{job.access_conditions.map(c => ACCESS_LABELS[c] || c).join(', ')}</Text>
             </View>
           )}
           {job.location_note ? (
             <View style={styles.accessRow}>
-              <Text style={styles.accessIcon}>📝</Text>
+              <Icon name="document-text-outline" size={14} color={colors.textSecondary} />
               <Text style={styles.accessText}>{job.location_note}</Text>
             </View>
           ) : null}
@@ -765,13 +766,13 @@ export default function JobDetailScreen({ route, navigation }) {
                 </View>
               ) : null}
               <View style={styles.mapTapHint}>
-                <Text style={styles.mapTapHintText}>Tap to navigate →</Text>
+                <Text style={styles.mapTapHintText}>Tap to navigate <Icon name="arrow-forward" size={12} color={colors.white} /></Text>
               </View>
             </TouchableOpacity>
           )}
 
-          <Text style={styles.location}>📍 {job.location_name}</Text>
-          {job.location_note ? <Text style={styles.locationNote}>📝 {job.location_note}</Text> : null}
+          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
+          {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}
           <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
         </View>
 
@@ -782,7 +783,7 @@ export default function JobDetailScreen({ route, navigation }) {
             onPress={() => navigation.navigate('ManageTask', { job, bidCount: bids.length })}
             accessibilityRole="button"
             accessibilityLabel="Manage this job">
-            <Text style={styles.manageJobBtnText}>⚙  Manage job</Text>
+            <Text style={styles.manageJobBtnText}><Icon name="settings-outline" size={16} color={colors.white} /> Manage job</Text>
           </TouchableOpacity>
         )}
 
@@ -798,7 +799,7 @@ export default function JobDetailScreen({ route, navigation }) {
             <TouchableOpacity style={[styles.button, { marginTop: 12 }]}
               onPress={handleConfirmComplete}
               accessibilityRole="button" accessibilityLabel="Confirm job complete">
-              <Text style={styles.buttonText}>✓ Confirm job complete</Text>
+              <Text style={styles.buttonText}><Icon name="checkmark" size={16} color={colors.white} /> Confirm job complete</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -926,10 +927,10 @@ export default function JobDetailScreen({ route, navigation }) {
                   )}
                   {myBid?.message ? <Text style={styles.myBidMessage}>{myBid.message}</Text> : null}
                   {myBid?.available_from && (
-                    <Text style={styles.myBidMeta}>📅 Available from: {new Date(myBid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {new Date(myBid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
                   )}
                   {myBid?.estimated_duration && (
-                    <Text style={styles.myBidMeta}>⏱ Est. duration: {myBid.estimated_duration}</Text>
+                    <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
                   )}
                   <Text style={styles.myBidStatus}>Status: {myBid?.status?.toUpperCase()}</Text>
                 </View>
@@ -976,7 +977,7 @@ export default function JobDetailScreen({ route, navigation }) {
                       <Text style={styles.bidName} numberOfLines={1}>{bid.profiles?.full_name || 'Provider'}</Text>
                       <Text style={styles.bidProviderMeta} numberOfLines={1}>
                         {bid.stats?.ratingCount > 0
-                          ? `⭐ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
+                          ? `★ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
                           : 'New provider'}
                         {bid.stats?.jobsDone > 0 ? ` · ${bid.stats.jobsDone} done` : ''}
                       </Text>
@@ -996,16 +997,16 @@ export default function JobDetailScreen({ route, navigation }) {
                 )}
                 {bid.message ? <Text style={styles.bidMessage}>{bid.message}</Text> : null}
                 {bid.available_from && (
-                  <Text style={styles.bidMeta}>📅 Available: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
                 )}
                 {bid.estimated_duration && (
-                  <Text style={styles.bidMeta}>⏱ Est. duration: {bid.estimated_duration}</Text>
+                  <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>
                 )}
                 <Text style={styles.bidStatus}>Status: {bid.status.toUpperCase()}</Text>
                 {bid.status === 'pending' && job.status === 'open' && (
                   <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptBid(bid)}
                     accessibilityRole="button" accessibilityLabel={`Accept offer from ${bid.profiles?.full_name}`}>
-                    <Text style={styles.acceptButtonText}>✓ Accept This Offer</Text>
+                    <Text style={styles.acceptButtonText}><Icon name="checkmark" size={15} color={colors.white} /> Accept This Offer</Text>
                   </TouchableOpacity>
                 )}
                 {bid.status === 'accepted' && (
@@ -1017,7 +1018,7 @@ export default function JobDetailScreen({ route, navigation }) {
                         otherUserName: bid.profiles?.full_name || 'Provider',
                       })}
                       accessibilityRole="button" accessibilityLabel={`Chat with ${bid.profiles?.full_name}`}>
-                      <Text style={styles.chatButtonText}>💬 Chat with Provider</Text>
+                      <Text style={styles.chatButtonText}><Icon name="chatbubble-ellipses-outline" size={15} color={colors.white} /> Chat with Provider</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.viewProviderBtn}
                       onPress={() => navigation.navigate('ProviderProfile', { providerId: bid.provider_id })}
@@ -1056,7 +1057,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  backBtn:     { minHeight: 36, justifyContent: 'center' },
+  backBtn:     { minHeight: 36, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
   kicker:      { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
