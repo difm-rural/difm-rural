@@ -23,6 +23,7 @@ import {
   cancelBookingByRequester as apiCancelBookingByRequester,
 } from '../../lib/bookingActions'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import ReviewModal from '../../components/ReviewModal'
 import CancelModal from '../../components/CancelModal'
@@ -584,7 +585,7 @@ export default function ActivityTabScreen({ navigation }) {
               accessibilityRole="button"
               accessibilityLabel="View all my jobs">
               <Text style={styles.myJobsBtnText}>My jobs</Text>
-              <Text style={styles.myJobsArrow}>›</Text>
+              <Icon name="chevron-forward" size={18} color={colors.primary} />
             </TouchableOpacity>
           )}
         </View>

@@ -11,6 +11,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
+import Icon from '../components/Icon'
 import {
   NOTIFICATION_ICONS,
   fetchNotifications,
@@ -59,7 +60,7 @@ export default function NotificationsScreen({ navigation }) {
         activeOpacity={0.75}
         accessibilityRole="button"
         accessibilityLabel={item.body}>
-        <Text style={styles.rowIcon}>{NOTIFICATION_ICONS[item.type] || '🔔'}</Text>
+        <Icon name={NOTIFICATION_ICONS[item.type] || 'notifications-outline'} size={20} color={colors.primary} />
         <View style={styles.rowContent}>
           <Text style={styles.rowBody}>{item.body}</Text>
           <Text style={styles.rowTime}>{notificationTimeAgo(item.created_at)}</Text>
@@ -78,7 +79,7 @@ export default function NotificationsScreen({ navigation }) {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Activity</Text>
         <Text style={styles.title} accessibilityRole="header">Notifications</Text>

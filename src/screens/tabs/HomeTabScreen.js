@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded } from '../../lib/lifecycle'
 import { colors } from '../../theme/tokens'
+import Icon from '../../components/Icon'
 import {
   NOTIFICATION_ICONS,
   fetchNotifications,
@@ -58,7 +59,7 @@ function SummaryRow({ label, count, onPress, last }) {
         <Text style={styles.summaryCountText}>{count}</Text>
       </View>
       <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryChevron}>›</Text>
+      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
     </TouchableOpacity>
   )
 }
@@ -244,7 +245,7 @@ export default function HomeTabScreen({ navigation }) {
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel={n.body}>
-                <Text style={styles.notifIcon}>{NOTIFICATION_ICONS[n.type] || '🔔'}</Text>
+                <Icon name={NOTIFICATION_ICONS[n.type] || 'notifications-outline'} size={20} color={colors.primary} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.notifBody} numberOfLines={2}>{n.body}</Text>
                   <Text style={styles.notifTime}>{notificationTimeAgo(n.created_at)}</Text>
