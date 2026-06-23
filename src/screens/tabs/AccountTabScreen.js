@@ -679,7 +679,7 @@ export default function AccountTabScreen({ navigation }) {
       {/* ── Fixed green header ──────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         {section === 'hub' ? (
-          <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         ) : (
           <TouchableOpacity
             onPress={() => setSection('hub')}

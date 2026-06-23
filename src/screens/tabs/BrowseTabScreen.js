@@ -241,7 +241,7 @@ export default function BrowseTabScreen({ navigation }) {
         <TextInput
           style={styles.searchInput}
           placeholder="Search fencing, water, machinery..."
-          placeholderTextColor="rgba(255,255,255,0.6)"
+          placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
           onSubmitEditing={Keyboard.dismiss}
@@ -350,40 +350,40 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
 
   header: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingHorizontal: 20,
     paddingBottom: 18,
   },
   brandLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#95d5b2',
-    letterSpacing: 3,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '700',
-    color: colors.white,
+    color: colors.textPrimary,
     marginBottom: 2,
-    lineHeight: 30,
+    lineHeight: 32,
   },
   subtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.75)',
+    color: colors.textSecondary,
     marginBottom: 14,
   },
   searchInput: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: colors.white,
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 11,
     fontSize: 14,
-    color: colors.white,
+    color: colors.textPrimary,
     minHeight: 46,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: colors.border,
   },
 
   manageBanner: {

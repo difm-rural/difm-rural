@@ -34,8 +34,8 @@ const ROLE_OPTIONS = [
 
 // Step meta indexed by step number (0–4)
 const STEP_META = [
-  { title: 'RURAL SERVICES',   subtitle: null },                              // 0 role selection
-  { title: 'RURAL SERVICES',   subtitle: null },                              // 1 welcome
+  { title: 'RURAL CONNECTIONS',   subtitle: null },                              // 0 role selection
+  { title: 'RURAL CONNECTIONS',   subtitle: null },                              // 1 welcome
   { title: 'Your profile', subtitle: 'How others will see you' },         // 2 details
   { title: 'Your skills',  subtitle: 'What can you help with?' },         // 3 skills
   { title: 'All set!',     subtitle: 'Your profile is ready' },           // 4 summary
@@ -668,7 +668,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       <View style={styles.header}>
         <View style={styles.headerTop}>
           {step <= 1 ? (
-            <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+            <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
           ) : (
             <Text style={styles.stepKicker}>{meta.title}</Text>
           )}

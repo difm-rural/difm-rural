@@ -554,7 +554,7 @@ export default function ActivityTabScreen({ navigation }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
-          <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
           <Text style={styles.headerTitle}>Activity</Text>
         </View>
         <View style={styles.center}>
@@ -569,7 +569,7 @@ export default function ActivityTabScreen({ navigation }) {
       <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+            <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
             <Text style={styles.headerTitle} accessibilityRole="header">Activity</Text>
             <Text style={styles.headerSub}>
               {totalActive > 0
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   },
   myJobsBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
   myJobsArrow:   { fontSize: 18, color: colors.primary, lineHeight: 20 },
-  brandLabel: { fontSize: 11, fontWeight: '600', color: '#95d5b2', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 },
+  brandLabel: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
   headerTitle: {
     fontSize: 34,
     lineHeight: 38,

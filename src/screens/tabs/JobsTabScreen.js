@@ -275,7 +275,7 @@ export default function JobsTabScreen({ navigation }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
           <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         </View>
         <View style={{ padding: 16 }}>
@@ -288,13 +288,13 @@ export default function JobsTabScreen({ navigation }) {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.brandLabel}>RURAL SERVICES</Text>
+        <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         <Text style={styles.headerSub}>The community job board</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search fencing, water, animal care..."
-          placeholderTextColor="rgba(255,255,255,0.6)"
+          placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
           onSubmitEditing={Keyboard.dismiss}
@@ -347,20 +347,22 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
 
   header: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingHorizontal: 20,
     paddingBottom: 16,
   },
-  brandLabel:  { color: '#95d5b2', fontSize: 10, letterSpacing: 2, fontWeight: '700', marginBottom: 4 },
-  headerTitle: { color: colors.white, fontSize: 28, fontWeight: '700' },
-  headerSub:   { color: 'rgba(255,255,255,0.85)', fontSize: 14, marginTop: 2, marginBottom: 12 },
+  brandLabel:  { color: colors.accent, fontSize: 12, letterSpacing: 1.5, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6 },
+  headerTitle: { color: colors.textPrimary, fontSize: 28, fontWeight: '700' },
+  headerSub:   { color: colors.textSecondary, fontSize: 14, marginTop: 2, marginBottom: 12 },
   searchInput: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: colors.white,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: colors.white,
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   postCta: {

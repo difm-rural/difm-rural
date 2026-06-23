@@ -231,7 +231,7 @@ export default function LoginScreen({ navigation }) {
               accessibilityLabel="Back to email entry">
               <Text style={styles.backArrow}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.wordmark}>RURAL SERVICES</Text>
+            <Text style={styles.wordmark}>RURAL CONNECTIONS</Text>
             <View style={{ width: 32 }} />
           </View>
         </View>
@@ -302,7 +302,7 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <View style={styles.topBarInner}>
-          <Text style={styles.wordmark}>RURAL SERVICES</Text>
+          <Text style={styles.wordmark}>RURAL CONNECTIONS</Text>
           <Text style={styles.tagline}>GET JOBS DONE</Text>
         </View>
       </View>
