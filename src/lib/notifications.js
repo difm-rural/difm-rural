@@ -1,3 +1,4 @@
+import { Alert } from 'react-native'
 import { supabase } from './supabase'
 import { requestBadgeRefresh } from './badgeEvents'
 
@@ -72,15 +73,33 @@ export async function markAllNotificationsRead() {
   }
 }
 
-// Navigates to whatever a notification is about. Works from any stack that
-// registers ServiceBookingDetail, ManageTask, and JobDetail.
+// Navigates to whatever a notification is about, then marks it read — works
+// from any stack that registers ServiceBookingDetail, ManageTask, JobDetail
+// and Chat. Returns true if the notification was resolved (routed, or the
+// target is genuinely gone, or it's purely informational). Returns false on a
+// transient failure so the caller leaves it unread for the user to retry.
+//
+// Mark-read happens ONLY after we've actually routed (or confirmed there's
+// nothing to route to) — never up front — so a notification can't disappear
+// from the Needs-attention feed while taking the user nowhere.
 export async function openNotificationTarget(navigation, userId, notification) {
-  // Tapping a notification clears it from the Needs-attention feed.
-  if (notification?.id && !notification.read) {
-    supabase.from('notifications').update({ read: true }).eq('id', notification.id)
-      .then(() => requestBadgeRefresh())
+  const meta = notification?.metadata || {}
+
+  const markRead = () => {
+    if (notification?.id && !notification.read) {
+      supabase.from('notifications').update({ read: true }).eq('id', notification.id)
+        .then(() => requestBadgeRefresh())
+    }
   }
-  const meta = notification.metadata || {}
+
+  // A target that was deleted will never open — clear it and say so, rather
+  // than leaving an un-openable item stuck in the command center.
+  const targetGone = (what) => {
+    markRead()
+    Alert.alert('No longer available', `This ${what} has been removed.`)
+    return false
+  }
+
   try {
     // Chat-message notifications open the conversation directly.
     if (notification.type === 'new_message' && meta.sender_id) {
@@ -96,7 +115,8 @@ export async function openNotificationTarget(navigation, userId, notification) {
           otherUserId:   meta.sender_id,
           otherUserName,
         })
-        return
+        markRead()
+        return true
       }
       if (meta.job_id) {
         const { data: job } = await supabase
@@ -107,36 +127,48 @@ export async function openNotificationTarget(navigation, userId, notification) {
           otherUserId:   meta.sender_id,
           otherUserName,
         })
-        return
+        markRead()
+        return true
       }
     }
 
     if (meta.booking_id) {
-      const { data: booking } = await supabase
+      const { data: booking, error } = await supabase
         .from('bookings')
         .select('*, service:service_id(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
         .eq('id', meta.booking_id)
         .maybeSingle()
-      if (!booking) return
+      if (error) return false           // transient — keep unread, allow retry
+      if (!booking) return targetGone('booking')
       const viewerRole = booking.provider_id === userId ? 'provider' : 'requester'
       navigation.navigate('ServiceBookingDetail', { booking, viewerRole })
-      return
+      markRead()
+      return true
     }
+
     if (meta.job_id) {
-      const { data: job } = await supabase
+      const { data: job, error } = await supabase
         .from('jobs')
         .select('*')
         .eq('id', meta.job_id)
         .maybeSingle()
-      if (!job) return
+      if (error) return false           // transient — keep unread, allow retry
+      if (!job) return targetGone('job')
       // Q&A lives on JobDetail (incl. the owner's answer UI), so route question
       // notifications there rather than to the owner's ManageTask screen.
       const isQuestion = notification.type === 'new_question' || notification.type === 'question_answered'
       if (job.requester_id === userId && !isQuestion) navigation.navigate('ManageTask', { job, bidCount: 0 })
       else navigation.navigate('JobDetail', { job })
+      markRead()
+      return true
     }
+
+    // Purely informational (no target to open) — acknowledge it on tap.
+    markRead()
+    return true
   } catch {
-    // Target may have been deleted — nothing to open
+    // Unexpected/transient failure — keep it unread so the user can retry.
+    return false
   }
 }
 

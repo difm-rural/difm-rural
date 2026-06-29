@@ -19,6 +19,7 @@ import ReviewModal from '../components/ReviewModal'
 import ReceivedReview from '../components/ReceivedReview'
 import ReputationCard from '../components/ReputationCard'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 import { loadReview } from '../lib/reviews'
 import {
   updateBookingStatus,
@@ -185,6 +186,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     const { error } = await updateBookingStatus(booking.id, nextStatus, allowedStatuses)
     if (error) {
       Alert.alert('Could not update booking', error.message)
+      if (error.code === 'stale') fetchBooking()   // re-sync so the UI reflects reality
       return
     }
     setBooking(prev => ({ ...prev, status: nextStatus }))
@@ -204,6 +206,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     setSavingQuote(false)
     if (error) {
       Alert.alert('Could not send quote', error.message)
+      if (error.code === 'stale') fetchBooking()
       return
     }
 
@@ -220,6 +223,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           const { error } = await acceptBookingQuote(booking.id, booking.requester_id)
           if (error) {
             Alert.alert('Could not accept quote', error.message)
+            if (error.code === 'stale') fetchBooking()
             return
           }
           setBooking(prev => ({ ...prev, status: 'confirmed' }))
@@ -259,6 +263,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
             const { error } = await confirmBookingComplete(booking.id, booking.requester_id)
             if (error) {
               Alert.alert('Could not confirm', error.message)
+              if (error.code === 'stale') fetchBooking()
               return
             }
             setBooking(prev => ({ ...prev, status: 'completed' }))
@@ -301,6 +306,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
     if (error) {
       Alert.alert('Could not dismiss booking', error.message)
+      if (error.code === 'stale') fetchBooking()
       return
     }
     navigation.goBack()
@@ -320,7 +326,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      enabled={Platform.OS === 'android'}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backText}>Back</Text>
@@ -335,7 +342,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 180 }]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive">
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}>
         <View style={styles.card}>
           <Text style={styles.cardLabel}>People</Text>
           <DetailRow label="Requester" value={requester?.full_name || booking.requesterName || 'Requester'} />
@@ -430,48 +438,39 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={openChat}>
-          <Text style={styles.secondaryText}>Chat</Text>
-        </TouchableOpacity>
+        <Button variant="secondary" title="Chat" onPress={openChat} style={styles.footerBtn} />
         {providerCanConfirm && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={confirmBooking}>
-            <Text style={styles.primaryText}>Confirm</Text>
-          </TouchableOpacity>
+          <Button title="Confirm" onPress={confirmBooking} style={styles.footerBtn} />
         )}
         {providerCanQuote && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={sendQuote} disabled={savingQuote}>
-            <Text style={styles.primaryText}>{booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}</Text>
-          </TouchableOpacity>
+          <Button
+            title={booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}
+            onPress={sendQuote}
+            loading={savingQuote}
+            style={styles.footerBtn}
+          />
         )}
         {requesterCanAcceptQuote && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={acceptQuote}>
-            <Text style={styles.primaryText}>Accept quote</Text>
-          </TouchableOpacity>
+          <Button title="Accept quote" onPress={acceptQuote} style={styles.footerBtn} />
         )}
         {providerCanReady && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={markReady}>
-            <Text style={styles.primaryText}>Mark job complete</Text>
-          </TouchableOpacity>
+          <Button title="Mark job complete" onPress={markReady} style={styles.footerBtn} />
         )}
         {requesterCanConfirmComplete && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={confirmComplete}>
-            <Text style={styles.primaryText}>Confirm complete</Text>
-          </TouchableOpacity>
+          <Button title="Confirm complete" onPress={confirmComplete} style={styles.footerBtn} />
         )}
         {canReview && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => setReviewVisible(true)}>
-            <Text style={styles.primaryText}>{myReview ? 'Edit review' : `Review ${otherRoleLabel.toLowerCase()}`}</Text>
-          </TouchableOpacity>
+          <Button
+            title={myReview ? 'Edit review' : `Review ${otherRoleLabel.toLowerCase()}`}
+            onPress={() => setReviewVisible(true)}
+            style={styles.footerBtn}
+          />
         )}
         {providerCanConfirmCancel && (
-          <TouchableOpacity style={styles.dangerBtn} onPress={confirmCancellation}>
-            <Text style={styles.dangerText}>Confirm cancel</Text>
-          </TouchableOpacity>
+          <Button variant="destructive" title="Confirm cancel" onPress={confirmCancellation} style={styles.footerBtn} />
         )}
         {providerCanDismiss && (
-          <TouchableOpacity style={styles.primaryBtn} onPress={dismissProviderBooking}>
-            <Text style={styles.primaryText}>Dismiss</Text>
-          </TouchableOpacity>
+          <Button title="Dismiss" onPress={dismissProviderBooking} style={styles.footerBtn} />
         )}
       </View>
 
@@ -499,7 +498,7 @@ const styles = StyleSheet.create({
   statusPill: { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 },
   statusText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   content: { padding: 16 },
-  card: { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.border, paddingTop: 14, marginBottom: 14, overflow: 'hidden' },
+  card: { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingTop: 14, marginBottom: 14, overflow: 'hidden' },
   cardLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 16, marginBottom: 8 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
   detailLabel: { width: 92, fontSize: 13, color: colors.textMuted, fontWeight: '700' },
@@ -520,14 +519,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   textArea: { minHeight: 92, textAlignVertical: 'top' },
-  noticeCard: { backgroundColor: colors.primaryLight, borderRadius: 14, padding: 16, marginBottom: 14 },
+  noticeCard: { backgroundColor: colors.primaryLight, borderRadius: 12, padding: 16, marginBottom: 14 },
   noticeTitle: { fontSize: 15, fontWeight: '700', color: colors.primary, marginBottom: 6 },
   noticeText: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
   footer: { flexDirection: 'row', gap: 10, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 16, paddingTop: 14 },
-  primaryBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
-  primaryText: { color: colors.white, fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  secondaryBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-  dangerBtn: { flex: 1, borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' },
-  dangerText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
+  footerBtn: { flex: 1 },
 })

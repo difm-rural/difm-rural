@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -15,6 +14,8 @@ import { supabase } from '../lib/supabase'
 import { isJobActive, isJobTerminal } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import Loading from '../components/Loading'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
 export default function MyJobsScreen({ navigation, route }) {
@@ -135,7 +136,7 @@ export default function MyJobsScreen({ navigation, route }) {
   }
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>
+    return <Loading label="Loading your jobs…" />
   }
 
   const activePosted = postedJobs.filter(j => isJobActive(j.status))
@@ -181,9 +182,12 @@ export default function MyJobsScreen({ navigation, route }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
 
           {completedPosted.length === 0 && completedBids.length === 0 ? (
-            <View style={[styles.emptySection, { marginHorizontal: 16 }]}>
-              <Text style={styles.emptySectionText}>No completed jobs yet</Text>
-            </View>
+            <EmptyState
+              tone="positive"
+              icon="checkmark-done-outline"
+              title="No completed jobs yet"
+              body="Once a job wraps up, it'll be saved here with its rating and review."
+            />
           ) : null}
 
           {completedPosted.length > 0 && (
@@ -251,9 +255,12 @@ export default function MyJobsScreen({ navigation, route }) {
         <View style={styles.cardSection}>
           <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>My posted tasks</Text>
           {activePosted.length === 0 ? (
-            <View style={[styles.emptySection, { marginHorizontal: 16 }]}>
-              <Text style={styles.emptySectionText}>No active tasks posted</Text>
-            </View>
+            <EmptyState
+              compact
+              icon="clipboard-outline"
+              title="No active tasks"
+              body="Post a job and it'll show up here while it's live."
+            />
           ) : (
             <FlatList
               horizontal
@@ -319,9 +326,12 @@ export default function MyJobsScreen({ navigation, route }) {
         <View style={styles.cardSection}>
           <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>Jobs I'm doing</Text>
           {activeBids.length === 0 ? (
-            <View style={[styles.emptySection, { marginHorizontal: 16 }]}>
-              <Text style={styles.emptySectionText}>No active offers placed yet</Text>
-            </View>
+            <EmptyState
+              compact
+              icon="pricetag-outline"
+              title="No offers placed yet"
+              body="Browse the job board and make an offer to start working."
+            />
           ) : (
             <FlatList
               horizontal
@@ -426,7 +436,4 @@ const styles = StyleSheet.create({
   pastChevron: { fontSize: 13, color: colors.textMuted },
   backBtn: { marginBottom: 12, minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
-  emptySection: { paddingVertical: 20, alignItems: 'center', marginBottom: 8 },
-  emptySectionText: { fontSize: 14, color: colors.textMuted },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 })

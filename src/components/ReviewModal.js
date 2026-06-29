@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { colors } from '../theme/tokens'
+import Button from './Button'
 
 export default function ReviewModal({
   visible,
@@ -83,26 +83,22 @@ export default function ReviewModal({
           />
 
           <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.cancelButton}
+            <Button
+              variant="secondary"
+              title="Cancel"
               onPress={onClose}
               disabled={saving}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel review">
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.submitButton, (!rating || saving) && styles.submitButtonDisabled]}
+              style={{ flex: 1 }}
+              accessibilityLabel="Cancel review"
+            />
+            <Button
+              title="Submit review"
               onPress={handleSubmit}
-              disabled={!rating || saving}
-              accessibilityRole="button"
-              accessibilityLabel="Submit review">
-              {saving ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.submitText}>Submit review</Text>
-              )}
-            </TouchableOpacity>
+              disabled={!rating}
+              loading={saving}
+              style={{ flex: 1 }}
+              accessibilityLabel="Submit review"
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -151,24 +147,4 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actions: { flexDirection: 'row', gap: 10 },
-  cancelButton: {
-    flex: 1,
-    minHeight: 50,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-  submitButton: {
-    flex: 1,
-    minHeight: 50,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonDisabled: { backgroundColor: '#a8cfc0' },
-  submitText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 })

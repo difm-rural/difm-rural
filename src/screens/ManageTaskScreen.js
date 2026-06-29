@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Image,
@@ -9,14 +9,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { isJobActive, isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
 import { confirmJobComplete, cancelJob, deleteJob, acceptBid as apiAcceptBid } from '../lib/jobActions'
+import { OFFER_MATERIALS_LABELS, formatOfferAmount } from '../lib/offers'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import Button from '../components/Button'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 
@@ -97,6 +101,18 @@ export default function ManageTaskScreen({ navigation, route }) {
     loadCurrentUserAndJob()
   }, [initialJob.id])
 
+  // Re-read the job each time we return here (e.g. after accepting an offer
+  // over on JobDetail) so this management screen is never a stale destination.
+  useFocusEffect(useCallback(() => {
+    let active = true
+    ;(async () => {
+      const { data: latestJob } = await supabase
+        .from('jobs').select('*').eq('id', initialJob.id).maybeSingle()
+      if (active && latestJob) setJob(latestJob)
+    })()
+    return () => { active = false }
+  }, [initialJob.id]))
+
   useEffect(() => {
     async function fetchRequesterProfile() {
       if (!job.requester_id) return
@@ -126,7 +142,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function fetchAcceptedBid() {
     const { data: bidData } = await supabase
       .from('bids')
-      .select('provider_id, amount')
+      .select('provider_id, amount, pricing_type, materials')
       .eq('job_id', job.id)
       .eq('status', 'accepted')
       .single()
@@ -141,6 +157,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         providerName: provProfile?.full_name || 'Provider',
         avatarUrl: provProfile?.avatar_url || null,
         bidAmount: bidData.amount,
+        pricingType: bidData.pricing_type,
+        materials: bidData.materials,
       })
     }
     setLoadingBid(false)
@@ -151,10 +169,10 @@ export default function ManageTaskScreen({ navigation, route }) {
     try {
       const { data: bidsData, error } = await supabase
         .from('bids')
-        .select('id, provider_id, amount, status, message, created_at, line_items, available_from, estimated_duration')
+        .select('id, provider_id, amount, status, message, created_at, line_items, available_from, estimated_duration, pricing_type, materials')
         .eq('job_id', job.id)
         .not('status', 'eq', 'rejected')
-        .order('amount', { ascending: true })
+        .order('created_at', { ascending: false })   // newest first, not cheapest — fit over price
       if (error) throw error
 
       const providerIds = [...new Set(bidsData?.map(b => b.provider_id).filter(Boolean) || [])]
@@ -179,6 +197,12 @@ export default function ManageTaskScreen({ navigation, route }) {
     }
   }
 
+  // Pull the latest job row so a raced action re-syncs this screen in place.
+  async function resyncJob() {
+    const { data: latestJob } = await supabase.from('jobs').select('*').eq('id', job.id).maybeSingle()
+    if (latestJob) setJob(latestJob)
+  }
+
   async function acceptBid(bid) {
     const provName = bid.provider?.full_name || 'this provider'
     Alert.alert(
@@ -190,7 +214,11 @@ export default function ManageTaskScreen({ navigation, route }) {
           text: 'Accept',
           onPress: async () => {
             const { error } = await apiAcceptBid(job, bid)
-            if (error) { Alert.alert('Error', error.message); return }
+            if (error) {
+              Alert.alert('Could not accept offer', error.message)
+              if (error.code === 'stale') { resyncJob(); fetchBids() }
+              return
+            }
             Alert.alert('Offer accepted!', `${provName} has been notified.`, [
               { text: 'OK', onPress: () => setJob(prev => ({ ...prev, status: 'accepted' })) },
             ])
@@ -252,7 +280,11 @@ export default function ManageTaskScreen({ navigation, route }) {
       onClose={() => setShowCancelModal(false)}
       onConfirm={async (reason, note) => {
         const { error } = await cancelJob(job.id, currentUserId, { reason, note })
-        if (error) { Alert.alert('Something went wrong', error.message || 'Please try again'); return }
+        if (error) {
+          Alert.alert('Could not cancel', error.message || 'Please try again')
+          if (error.code === 'stale') { setShowCancelModal(false); resyncJob() }
+          return
+        }
         setShowCancelModal(false)
         navigation.goBack()
       }}
@@ -305,7 +337,11 @@ export default function ManageTaskScreen({ navigation, route }) {
         style: 'destructive',
         onPress: async () => {
           const { error } = await deleteJob(job.id, currentUserId)
-          if (error) { Alert.alert('Something went wrong', error.message || 'Please try again', [{ text: 'OK' }]); return }
+          if (error) {
+            Alert.alert('Could not delete', error.message || 'Please try again', [{ text: 'OK' }])
+            if (error.code === 'stale') resyncJob()   // e.g. now awarded → show that
+            return
+          }
           navigation.goBack()
         },
       },
@@ -314,12 +350,12 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   function handleReviewBids() {
     if (!ensureTaskOwner()) return
-    navigation.navigate('JobDetail', { job })
+    navigation.navigate('JobDetail', { job, fromManage: true })
   }
 
   function handleViewQuestions() {
     if (!ensureTaskOwner()) return
-    navigation.navigate('JobDetail', { job })
+    navigation.navigate('JobDetail', { job, fromManage: true })
   }
 
   function handleLeaveReview() {
@@ -382,7 +418,8 @@ export default function ManageTaskScreen({ navigation, route }) {
           onPress: async () => {
             const { error } = await confirmJobComplete(job.id, currentUserId)
             if (error) {
-              Alert.alert('Error', error.message)
+              Alert.alert('Could not confirm', error.message)
+              if (error.code === 'stale') resyncJob()
               return
             }
             setJob(prev => ({ ...prev, status: 'completed' }))
@@ -450,20 +487,17 @@ export default function ManageTaskScreen({ navigation, route }) {
             <Text style={styles.accessBody}>
               This job was posted by another requester, so it cannot be edited or managed from your account.
             </Text>
-            <TouchableOpacity
-              style={styles.viewJobBtn}
+            <Button
+              title="View job details"
               onPress={() => navigation.replace('JobDetail', { job })}
-              accessibilityRole="button"
-              accessibilityLabel="View job details">
-              <Text style={styles.viewJobBtnText}>View job details</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.viewProfileBtn}
+              style={{ marginHorizontal: 16, marginBottom: 10 }}
+            />
+            <Button
+              variant="secondary"
+              title="View requester profile"
               onPress={() => navigation.navigate('RequesterProfile', { requesterId: job.requester_id })}
-              accessibilityRole="button"
-              accessibilityLabel="View requester profile">
-              <Text style={styles.viewProfileBtnText}>View requester profile</Text>
-            </TouchableOpacity>
+              style={{ marginHorizontal: 16, marginBottom: 16 }}
+            />
           </View>
         </View>
       </View>
@@ -572,20 +606,17 @@ export default function ManageTaskScreen({ navigation, route }) {
               </View>
             )}
             <View style={styles.actionBtns}>
-              <TouchableOpacity
-                style={styles.btnGreen}
+              <Button
+                title="Confirm job complete"
                 onPress={handleConfirmComplete}
-                accessibilityRole="button"
-                accessibilityLabel="Confirm job complete">
-                <Text style={styles.btnGreenText}>Confirm job complete</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.btnDangerOutline}
+                accessibilityLabel="Confirm job complete"
+              />
+              <Button
+                variant="destructive"
+                title="Cancel job"
                 onPress={handleCancel}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel job">
-                <Text style={styles.btnDangerOutlineText}>Cancel job</Text>
-              </TouchableOpacity>
+                accessibilityLabel="Cancel job"
+              />
             </View>
           </View>
           )}
@@ -597,7 +628,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             <SummaryRow icon="location-outline" label="Location"  value={job.location_name} />
             <SummaryRow icon="cash-outline" label="Budget"    value={budgetText} />
             {acceptedBid?.bidAmount ? (
-              <SummaryRow icon="checkmark-circle-outline" label="Agreed" value={`$${acceptedBid.bidAmount} NZD`} />
+              <SummaryRow icon="checkmark-circle-outline" label="Agreed" value={formatOfferAmount(acceptedBid.bidAmount, acceptedBid.pricingType)} />
             ) : null}
             <SummaryRow icon="calendar-outline" label="Posted" value={timeAgo(job.created_at)} last />
           </View>
@@ -738,7 +769,12 @@ export default function ManageTaskScreen({ navigation, route }) {
             {loadingBids ? (
               <Text style={styles.loadingText}>Loading offers…</Text>
             ) : bids.length === 0 ? (
-              <Text style={styles.noBidsText}>No offers yet — check back soon</Text>
+              <EmptyState
+                compact
+                icon="pricetag-outline"
+                title="No offers yet"
+                body="When providers make an offer on your job, it'll appear here."
+              />
             ) : (
               bids.map((bid, idx) => {
                 const provName = bid.provider?.full_name || 'Provider'
@@ -765,7 +801,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                             : 'New provider'}
                           {bid.stats?.jobsDone > 0 ? ` · ${bid.stats.jobsDone} done` : ''}
                         </Text>
-                        <Text style={styles.bidAmount}>${bid.amount} NZD</Text>
+                        <Text style={styles.bidAmount}>{formatOfferAmount(bid.amount, bid.pricing_type)}</Text>
                       </View>
                     </TouchableOpacity>
                     {bid.line_items?.length > 1 && (
@@ -791,6 +827,12 @@ export default function ManageTaskScreen({ navigation, route }) {
                       <View style={styles.bidMetaRow}>
                         <Icon name="time-outline" size={13} color={colors.textMuted} />
                         <Text style={styles.bidMeta}>Est. duration: {bid.estimated_duration}</Text>
+                      </View>
+                    )}
+                    {!!bid.materials && (
+                      <View style={styles.bidMetaRow}>
+                        <Icon name="construct-outline" size={13} color={colors.textMuted} />
+                        <Text style={styles.bidMeta}>{OFFER_MATERIALS_LABELS[bid.materials] || bid.materials}</Text>
                       </View>
                     )}
                     <TouchableOpacity
@@ -867,7 +909,7 @@ const styles = StyleSheet.create({
   // ─── Cards ─────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -897,27 +939,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  viewJobBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    minHeight: 48,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewJobBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
-  viewProfileBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 10,
-    minHeight: 48,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewProfileBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
 
   // ─── Status badge ───────────────────────────────────────────────
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
@@ -1029,7 +1050,7 @@ const styles = StyleSheet.create({
   // ─── Chat banner ────────────────────────────────────────────────
   chatBanner: {
     backgroundColor: colors.primary,
-    borderRadius: 14,
+    borderRadius: 12,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1045,28 +1066,8 @@ const styles = StyleSheet.create({
 
   // ─── Action buttons (accepted layout) ───────────────────────────
   actionBtns: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
-  btnGreen: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  btnGreenText: { color: colors.white, fontSize: 16, fontWeight: '700' },
-  btnDangerOutline: {
-    borderWidth: 1.5,
-    borderColor: colors.danger,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  btnDangerOutlineText: { color: colors.danger, fontSize: 16, fontWeight: '700' },
 
   // ─── Bids list ──────────────────────────────────────────────────
-  noBidsText: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 16, lineHeight: 22 },
   bidCard: { paddingHorizontal: 16, paddingVertical: 14 },
   bidCardBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
   bidHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },

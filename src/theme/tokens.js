@@ -34,11 +34,15 @@ export const spacing = {
   xxxl: 32,
 }
 
+// Strict radius scale. Cards/containers = lg (12), controls (buttons/inputs)
+// = md (8), chips/small = sm (6), pills/avatars = full. Cards are flat:
+// hairline border, no shadow.
 export const radius = {
   sm:   6,
   md:   8,
+  card: 12,
   lg:   12,
-  xl:   20,
+  xl:   16,
   full: 999,
 }
 

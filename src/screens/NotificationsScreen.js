@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import Loading from '../components/Loading'
 import {
   NOTIFICATION_ICONS,
   fetchNotifications,
@@ -35,16 +37,12 @@ export default function NotificationsScreen({ navigation }) {
     setUserId(user?.id || null)
 
     const list = await fetchNotifications(100)
-    // Keep the unread flag from fetch time so new items stay highlighted
-    // in this view even though we mark them read below.
+    // Items stay unread until the user acts on one (taps to open) or chooses
+    // "Mark all read" — simply viewing the inbox no longer clears the command
+    // centre, so nothing disappears before it's been dealt with.
     setItems(list.map(n => ({ ...n, _wasUnread: !n.read })))
     setLoading(false)
     setRefreshing(false)
-
-    if (list.some(n => !n.read)) {
-      await markAllNotificationsRead()
-      requestBadgeRefresh()
-    }
   }
 
   function onRefresh() {
@@ -52,11 +50,24 @@ export default function NotificationsScreen({ navigation }) {
     load()
   }
 
+  async function handleMarkAllRead() {
+    setItems(prev => prev.map(n => ({ ...n, read: true, _wasUnread: false })))
+    await markAllNotificationsRead()
+    requestBadgeRefresh()
+  }
+
+  const hasUnread = items.some(n => !n.read)
+
   function renderItem({ item }) {
     return (
       <TouchableOpacity
         style={[styles.row, item._wasUnread && styles.rowUnread]}
-        onPress={() => openNotificationTarget(navigation, userId, item)}
+        onPress={async () => {
+          const resolved = await openNotificationTarget(navigation, userId, item)
+          if (resolved) {
+            setItems(prev => prev.map(n => (n.id === item.id ? { ...n, read: true, _wasUnread: false } : n)))
+          }
+        }}
         activeOpacity={0.75}
         accessibilityRole="button"
         accessibilityLabel={item.body}>
@@ -73,29 +84,37 @@ export default function NotificationsScreen({ navigation }) {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Go back">
-          <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
-        </TouchableOpacity>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
+            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
+          </TouchableOpacity>
+          {hasUnread && (
+            <TouchableOpacity
+              onPress={handleMarkAllRead}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Mark all notifications read">
+              <Text style={styles.markAllText}>Mark all read</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.kicker}>Activity</Text>
         <Text style={styles.title} accessibilityRole="header">Notifications</Text>
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <Loading label="Loading notifications…" />
       ) : items.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyTitle}>Nothing yet</Text>
-          <Text style={styles.emptyBody}>
-            Bids, bookings, questions, and job updates will appear here.
-          </Text>
-        </View>
+        <EmptyState
+          icon="notifications-outline"
+          title="Nothing yet"
+          body="Offers, bookings, questions, and job updates will appear here."
+        />
       ) : (
         <FlatList
           data={items}
@@ -121,15 +140,13 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.background,
   },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backBtn:     { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 8 },
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  markAllText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   kicker:      { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 6 },
   title:       { fontSize: 30, lineHeight: 34, fontWeight: '700', color: colors.textPrimary },
 
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  loadingText: { fontSize: 15, color: colors.textMuted },
-  emptyTitle:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
-  emptyBody:   { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21 },
 
   row: {
     flexDirection: 'row',

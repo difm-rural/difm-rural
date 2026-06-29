@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Loading from '../components/Loading'
+import EmptyState from '../components/EmptyState'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -81,7 +82,8 @@ export default function RequesterProfileScreen({ route, navigation }) {
     setLoading(true)
     try {
       const [profileResult, jobsResult, reviewsResult] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', requesterId).single(),
+        // Safe public columns only — never fetch another user's phone/address/GPS.
+        supabase.from('profiles').select('id, full_name, avatar_url, display_name, bio, region, primary_role, role, created_at').eq('id', requesterId).single(),
         supabase.from('jobs').select('id, status, category').eq('requester_id', requesterId),
         supabase.from('reviews')
           .select('*')
@@ -149,9 +151,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
           <Text style={styles.kicker}>Member profile</Text>
           <Text style={styles.headerTitle}>Requester profile</Text>
         </View>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <Loading label="Loading profile…" />
       </View>
     )
   }
@@ -256,9 +256,12 @@ export default function RequesterProfileScreen({ route, navigation }) {
           <Text style={styles.cardTitle}>Reviews from providers</Text>
 
           {reviews.length === 0 ? (
-            <View style={styles.emptyReviews}>
-              <Text style={styles.emptyReviewsText}>No reviews yet</Text>
-            </View>
+            <EmptyState
+              compact
+              icon="star-outline"
+              title="No reviews yet"
+              body="Reviews appear here once providers rate completed jobs."
+            />
           ) : (
             <>
               {visibleReviews.map((review, idx) => (
@@ -333,7 +336,7 @@ const styles = StyleSheet.create({
   // ─── Profile card ───────────────────────────────────────────────────
   profileCard: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 20,
@@ -341,10 +344,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   avatarCircle: {
     backgroundColor: colors.primaryLight,
@@ -387,10 +386,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 10,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   statTileMid: {
     borderLeftWidth: 0,
@@ -403,16 +398,12 @@ const styles = StyleSheet.create({
   // ─── Cards ──────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
     marginBottom: 12,
     paddingTop: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   cardTitle: {
     fontSize: 13,
@@ -437,8 +428,6 @@ const styles = StyleSheet.create({
   locationValue: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
 
   // ─── Reviews ────────────────────────────────────────────────────────
-  emptyReviews:     { paddingHorizontal: 16, paddingBottom: 16, alignItems: 'center' },
-  emptyReviewsText: { fontSize: 14, color: colors.textMuted },
 
   reviewItem: { paddingHorizontal: 16, paddingVertical: 14 },
   reviewItemBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },

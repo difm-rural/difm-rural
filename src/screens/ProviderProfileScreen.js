@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Loading from '../components/Loading'
+import EmptyState from '../components/EmptyState'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const ALL_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -118,7 +119,8 @@ export default function ProviderProfileScreen({ route, navigation }) {
     try {
       // Step 1: profile + bids + services + reviews in parallel
       const [profileResult, bidsResult, servicesResult, reviewsResult] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', providerId).single(),
+        // Safe public columns only — never fetch another user's phone/address/GPS.
+        supabase.from('profiles').select('id, full_name, avatar_url, display_name, bio, skills, qualifications, region, primary_role, role, created_at').eq('id', providerId).single(),
         supabase.from('bids').select('job_id, status, created_at').eq('provider_id', providerId),
         supabase.from('services')
           .select('*')
@@ -224,9 +226,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
           <Text style={styles.kicker}>Provider profile</Text>
           <Text style={styles.headerTitle}>Provider profile</Text>
         </View>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <Loading label="Loading profile…" />
       </View>
     )
   }
@@ -334,7 +334,12 @@ export default function ProviderProfileScreen({ route, navigation }) {
               {categories.map(cat => <CategoryChip key={cat} label={cat} />)}
             </View>
           ) : (
-            <Text style={styles.emptyCardText}>No skills listed yet</Text>
+            <EmptyState
+              compact
+              icon="construct-outline"
+              title="No skills listed yet"
+              body="This provider hasn't added the categories they work in."
+            />
           )}
         </View>
 
@@ -412,7 +417,12 @@ export default function ProviderProfileScreen({ route, navigation }) {
             )}
 
             {maxTravel === 0 && !hasEquipment && availDays.size === 0 && (
-              <Text style={styles.emptyCardText}>Coverage details coming soon</Text>
+              <EmptyState
+                compact
+                icon="navigate-outline"
+                title="No coverage details yet"
+                body="Travel range, equipment, and availability will show here once added."
+              />
             )}
           </View>
         )}
@@ -422,9 +432,12 @@ export default function ProviderProfileScreen({ route, navigation }) {
           <Text style={styles.cardTitle}>Reviews from requesters</Text>
 
           {requesterReviews.length === 0 ? (
-            <View style={styles.emptyReviews}>
-              <Text style={styles.emptyReviewsText}>No reviews yet · Be the first</Text>
-            </View>
+            <EmptyState
+              compact
+              icon="star-outline"
+              title="No reviews yet"
+              body="Reviews appear here once requesters rate completed jobs."
+            />
           ) : (
             <>
               {visibleReviews.map((review, idx) => (
@@ -502,7 +515,7 @@ const styles = StyleSheet.create({
   // ─── Profile card ────────────────────────────────────────────────────
   profileCard: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 20,
@@ -510,10 +523,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   avatarCircle: {
     backgroundColor: colors.primaryLight,
@@ -557,10 +566,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 8,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   statTileMid:    {},
   statValue:      { fontSize: 20, fontWeight: '700', color: colors.primary, marginBottom: 4, textAlign: 'center' },
@@ -570,16 +575,12 @@ const styles = StyleSheet.create({
   // ─── Cards ───────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
     marginBottom: 12,
     paddingTop: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   cardTitle: {
     fontSize: 13,
@@ -589,13 +590,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     paddingHorizontal: 16,
     marginBottom: 12,
-  },
-  emptyCardText: {
-    fontSize: 14,
-    color: colors.textMuted,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    fontStyle: 'italic',
   },
 
   // ─── Chips ───────────────────────────────────────────────────────────
@@ -657,8 +651,6 @@ const styles = StyleSheet.create({
   dayChipTextActive: { color: colors.primary },
 
   // ─── Reviews ──────────────────────────────────────────────────────────
-  emptyReviews:     { paddingHorizontal: 16, paddingBottom: 16, alignItems: 'center' },
-  emptyReviewsText: { fontSize: 14, color: colors.textMuted },
 
   reviewItem:       { paddingHorizontal: 16, paddingVertical: 14 },
   reviewItemBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },

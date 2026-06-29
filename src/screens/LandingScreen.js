@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import { SkeletonList } from '../components/SkeletonCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
 function HorizontalSection({ title, items, onPressItem, onGuestAction }) {
@@ -72,21 +74,15 @@ export default function LandingScreen({ navigation }) {
     if (raw.length === 0) { setJobs([]); return }
 
     const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]
-    const [{ data: profilesData }, { data: bidsData }] = requesterIds.length > 0
-      ? await Promise.all([
-        supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
-        supabase.from('bids').select('job_id').in('job_id', raw.map(j => j.id)).eq('status', 'pending'),
-      ])
-      : [{ data: [] }, { data: [] }]
-
-    const bidCountMap = {}
-    bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+    // Offers are private — no bid counts on the public board.
+    const { data: profilesData } = requesterIds.length > 0
+      ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds)
+      : { data: [] }
 
     setJobs(raw.map(j => ({
       ...j,
       _type: 'job',
       profiles: profilesData?.find(p => p.id === j.requester_id) || null,
-      bidCount: bidCountMap[j.id] || 0,
     })))
   }
 
@@ -163,14 +159,13 @@ export default function LandingScreen({ navigation }) {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
       ) : isEmpty ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyTitle}>Nothing listed yet</Text>
-          <Text style={styles.emptyBody}>Check back soon, or post the first job.</Text>
-        </View>
+        <EmptyState
+          icon="map-outline"
+          title="Nothing listed yet"
+          body="Be the first in your area — check back soon, or post a job to get started."
+        />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -251,7 +246,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 16 },
   searchInput: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 13,
     fontSize: 15,
@@ -271,10 +266,6 @@ const styles = StyleSheet.create({
   },
   hListContent: { paddingLeft: 14 },
 
-  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  loadingText: { color: colors.textMuted, fontSize: 15 },
-  emptyTitle:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
-  emptyBody:   { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
 
   tabBar: {
     position: 'absolute',

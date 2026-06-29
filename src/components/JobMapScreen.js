@@ -280,6 +280,8 @@ const styles = StyleSheet.create({
     top: 12,
     right: 12,
     backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,

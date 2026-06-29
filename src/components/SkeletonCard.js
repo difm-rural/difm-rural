@@ -33,6 +33,16 @@ export default function SkeletonCard() {
   )
 }
 
+// A short list of skeleton cards — previews the shape of content while it
+// loads, which reads as more intentional than a bare spinner.
+export function SkeletonList({ count = 3, style }) {
+  return (
+    <View style={style}>
+      {Array.from({ length: count }).map((_, i) => <SkeletonCard key={i} />)}
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',

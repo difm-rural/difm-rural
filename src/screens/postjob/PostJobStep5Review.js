@@ -15,6 +15,7 @@ import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { inferJobCategory } from '../../lib/categorize'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import Button from '../../components/Button'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -285,6 +286,21 @@ export default function PostJobStep5Review({ navigation, route }) {
           ))}
         </View>
 
+        {photos.length === 0 && (
+          <TouchableOpacity
+            style={styles.photoReminder}
+            onPress={() => handleEditRow(2)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Add photos to your job">
+            <Icon name="camera-outline" size={18} color={colors.warning} />
+            <Text style={styles.photoReminderText}>
+              No photos added — jobs with photos get more offers. Tap to add a couple.
+            </Text>
+            <Icon name="chevron-forward" size={16} color={colors.warning} />
+          </TouchableOpacity>
+        )}
+
         <View style={styles.infoBox}>
           <Icon name="flash-outline" size={18} color={colors.primary} />
           <Text style={styles.infoText}>
@@ -314,14 +330,13 @@ export default function PostJobStep5Review({ navigation, route }) {
             accessibilityLabel="Go back">
             <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.submitBtn, !!uploadStatus && styles.submitBtnDisabled]}
+          <Button
+            title={submitLabel}
             onPress={handleSubmit}
-            disabled={!!uploadStatus}
-            accessibilityRole="button"
-            accessibilityLabel={submitLabel}>
-            <Text style={styles.submitBtnText}>{submitLabel}</Text>
-          </TouchableOpacity>
+            loading={!!uploadStatus}
+            style={{ flex: 1 }}
+            accessibilityLabel={submitLabel}
+          />
         </View>
       </View>
 
@@ -366,14 +381,10 @@ const styles = StyleSheet.create({
 
   reviewCard: {
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e8e8e8',
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   reviewRow:       { flexDirection: 'row', alignItems: 'flex-start', padding: 14 },
   reviewRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
@@ -395,6 +406,18 @@ const styles = StyleSheet.create({
   },
   infoIcon: { fontSize: 18 },
   infoText: { flex: 1, fontSize: 13, color: '#92400e', lineHeight: 19 },
+  photoReminder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.warningLight,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f0c98a',
+    padding: 14,
+    marginBottom: 12,
+  },
+  photoReminderText: { flex: 1, fontSize: 13, color: colors.warning, lineHeight: 19, fontWeight: '600' },
 
   warningBox: {
     backgroundColor: '#fff3e0',
@@ -420,9 +443,6 @@ const styles = StyleSheet.create({
   footerBtns:        { flexDirection: 'row', gap: 10 },
   backBtn:           { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   backBtnText:       { color: colors.primary, fontSize: 14, fontWeight: '600' },
-  submitBtn:         { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  submitBtnDisabled: { backgroundColor: colors.primaryMuted },
-  submitBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   absoluteFill: { ...StyleSheet.absoluteFillObject },
   backdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },

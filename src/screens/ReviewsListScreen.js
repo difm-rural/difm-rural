@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react'
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import Loading from '../components/Loading'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -162,9 +163,7 @@ export default function ReviewsListScreen({ route, navigation }) {
     return (
       <View style={styles.screen}>
         {header}
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <Loading label="Loading reviews…" />
       </View>
     )
   }
@@ -193,11 +192,11 @@ export default function ReviewsListScreen({ route, navigation }) {
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Icon name="star-outline" size={40} color={colors.textMuted} />
-            <Text style={styles.emptyTitle}>No reviews yet</Text>
-            <Text style={styles.emptyBody}>Reviews will appear here after jobs are completed.</Text>
-          </View>
+          <EmptyState
+            icon="star-outline"
+            title="No reviews yet"
+            body="Reviews will appear here after jobs are completed."
+          />
         }
       />
     </View>
@@ -206,7 +205,6 @@ export default function ReviewsListScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // ─── Header ────────────────────────────────────────────────────────
   header: {
@@ -229,15 +227,11 @@ const styles = StyleSheet.create({
   // ─── Review card ───────────────────────────────────────────────────
   reviewCard: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   reviewHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   reviewerAvatar: {
@@ -265,9 +259,4 @@ const styles = StyleSheet.create({
   },
   categoryChipText: { fontSize: 12, fontWeight: '700', color: colors.primary },
 
-  // ─── Empty state ───────────────────────────────────────────────────
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, marginTop: 60 },
-  emptyIcon:  { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  emptyBody:  { fontSize: 15, color: colors.textSecondary, lineHeight: 22, textAlign: 'center' },
 })

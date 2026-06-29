@@ -5,8 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
 import { markJobComplete, confirmJobComplete, acceptBid } from '../lib/jobActions'
+import { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
 import ReceivedReview from '../components/ReceivedReview'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import Button from '../components/Button'
 import { colors } from '../theme/tokens'
 import PressableCard from '../components/PressableCard'
 import ReviewModal from '../components/ReviewModal'
@@ -36,6 +39,10 @@ function jobStaticMapUrl(job) {
 export default function JobDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { job: initialJob } = route.params
+  // When the owner drilled in here from Manage job (to review offers / Q&A),
+  // hide the "Manage job" shortcut so Back returns straight to Manage rather
+  // than stacking another management screen.
+  const fromManage = route.params?.fromManage === true
   const [job, setJob] = useState(initialJob)
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(false)
@@ -62,6 +69,8 @@ export default function JobDetailScreen({ route, navigation }) {
   const [availableFrom,     setAvailableFrom]     = useState(null)
   const [showDatePicker,    setShowDatePicker]    = useState(false)
   const [estimatedDuration, setEstimatedDuration] = useState('')
+  const [bidPricingType,    setBidPricingType]    = useState('fixed')
+  const [bidMaterials,      setBidMaterials]      = useState('included')
 
   // Q&A state (Feature 2)
   const [questions,    setQuestions]    = useState([])
@@ -132,6 +141,8 @@ export default function JobDetailScreen({ route, navigation }) {
       }
       setBidMessage(existingBid.message || '')
       setEstimatedDuration(existingBid.estimated_duration || '')
+      setBidPricingType(existingBid.pricing_type || 'fixed')
+      setBidMaterials(existingBid.materials || 'included')
       if (existingBid.available_from) setAvailableFrom(new Date(existingBid.available_from))
     } else {
       setAlreadyBid(false)
@@ -198,7 +209,11 @@ export default function JobDetailScreen({ route, navigation }) {
         text: 'Confirm',
         onPress: async () => {
           const { error } = await confirmJobComplete(job.id, currentUser.id)
-          if (error) { Alert.alert('Error', error.message); return }
+          if (error) {
+            Alert.alert('Could not confirm', error.message)
+            if (error.code === 'stale') fetchData()
+            return
+          }
           trackEvent('job_completed', { job_id: job.id })
           setJob(prev => ({ ...prev, status: 'completed' }))
           const accepted = bids.find(b => b.status === 'accepted')
@@ -279,6 +294,8 @@ export default function JobDetailScreen({ route, navigation }) {
       line_items:         buildLineItemsPayload(),
       available_from:     availableFrom ? availableFrom.toISOString().split('T')[0] : null,
       estimated_duration: estimatedDuration || null,
+      pricing_type:       bidPricingType,
+      materials:          job.materials_type === 'provider' ? bidMaterials : null,
     })
     if (error) {
       Alert.alert('Error', error.message)
@@ -303,6 +320,8 @@ export default function JobDetailScreen({ route, navigation }) {
       line_items:         buildLineItemsPayload(),
       available_from:     availableFrom ? availableFrom.toISOString().split('T')[0] : null,
       estimated_duration: estimatedDuration || null,
+      pricing_type:       bidPricingType,
+      materials:          job.materials_type === 'provider' ? bidMaterials : null,
     }).eq('id', myBid.id)
     if (error) {
       Alert.alert('Error', error.message)
@@ -358,7 +377,11 @@ export default function JobDetailScreen({ route, navigation }) {
         text: 'Accept',
         onPress: async () => {
           const { error } = await acceptBid(job, bid)
-          if (error) { Alert.alert('Error', error.message); return }
+          if (error) {
+            Alert.alert('Could not accept offer', error.message)
+            if (error.code === 'stale') fetchData()   // re-sync offers + status
+            return
+          }
           trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
           Alert.alert('Job awarded!', 'You can now chat with the provider.', [
             { text: 'OK', onPress: () => navigation.goBack() },
@@ -408,7 +431,7 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
-      <Text style={styles.kicker}>{job.category}</Text>
+      <Text style={styles.kicker}>Job details</Text>
       <Text style={styles.headerTitle} accessibilityRole="header">{job.title}</Text>
     </View>
   )
@@ -440,7 +463,11 @@ export default function JobDetailScreen({ route, navigation }) {
             text: 'Mark completed',
             onPress: async () => {
               const { error } = await markJobComplete(job.id)
-              if (error) { Alert.alert('Error', error.message); return }
+              if (error) {
+                Alert.alert('Could not update', error.message)
+                if (error.code === 'stale') fetchData()
+                return
+              }
               trackEvent('job_marked_complete', { job_id: job.id })
               setJob(prev => ({ ...prev, status: 'awaiting_completion' }))
               Alert.alert('Thanks!', `${requesterFirstName} has been asked to confirm the job is complete.`)
@@ -453,8 +480,8 @@ export default function JobDetailScreen({ route, navigation }) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {headerJSX}
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
+        <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
@@ -520,7 +547,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Your offer</Text>
-              <Text style={[styles.detailValue, { color: colors.primary, fontWeight: '700' }]}>${myBid.amount} NZD</Text>
+              <Text style={[styles.detailValue, { color: colors.primary, fontWeight: '700' }]}>{formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
             </View>
             {job.scheduled_date ? (
               <View style={styles.detailRow}>
@@ -539,11 +566,12 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
             {job.latitude && job.longitude && (
-              <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
+              <Button
+                icon="navigate-outline"
+                title="Navigate to job"
                 onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
-                accessibilityRole="button" accessibilityLabel="Navigate to job">
-                <Text style={styles.bigBtnGreenText}><Icon name="navigate-outline" size={16} color={colors.white} /> Navigate to job</Text>
-              </TouchableOpacity>
+                style={{ marginBottom: 10 }}
+              />
             )}
             {(!isCompleted && !isCancelled) ? (
               isAwaitingCompletion ? (
@@ -553,28 +581,28 @@ export default function JobDetailScreen({ route, navigation }) {
                   </Text>
                 </View>
               ) : (
-                <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
+                <Button
+                  icon="checkmark"
+                  title="Mark as completed"
                   onPress={handleMarkComplete}
-                  accessibilityRole="button" accessibilityLabel="Mark job as completed">
-                  <Text style={styles.bigBtnGreenText}><Icon name="checkmark" size={16} color={colors.white} /> Mark as completed</Text>
-                </TouchableOpacity>
+                  style={{ marginBottom: 10 }}
+                  accessibilityLabel="Mark job as completed"
+                />
               )
             ) : null}
             {isCompleted ? (
-              <TouchableOpacity style={[styles.bigBtnGreen, { marginBottom: 10 }]}
+              <Button
+                title={requesterReview ? `Edit review (${requesterReview.rating}/5)` : 'Review requester'}
                 onPress={() => setReviewVisible(true)}
-                accessibilityRole="button"
-                accessibilityLabel={requesterReview ? 'Edit requester review' : 'Review requester'}>
-                <Text style={styles.bigBtnGreenText}>
-                  {requesterReview ? `Edit review (${requesterReview.rating}/5)` : 'Review requester'}
-                </Text>
-              </TouchableOpacity>
+                style={{ marginBottom: 10 }}
+                accessibilityLabel={requesterReview ? 'Edit requester review' : 'Review requester'}
+              />
             ) : null}
-            <TouchableOpacity style={styles.bigBtnOutline}
+            <Button
+              variant="secondary"
+              title="View requester profile"
               onPress={() => navigation.navigate('RequesterProfile', { requesterId: job.requester_id })}
-              accessibilityRole="button" accessibilityLabel="View requester profile">
-              <Text style={styles.bigBtnOutlineText}>View requester profile</Text>
-            </TouchableOpacity>
+            />
           </View>
 
           {!isCancelled && (
@@ -610,6 +638,27 @@ export default function JobDetailScreen({ route, navigation }) {
 
   const bidFormJSX = (
     <>
+      <View style={styles.privacyNote}>
+        <Icon name="lock-closed-outline" size={14} color={colors.primary} />
+        <Text style={styles.privacyNoteText}>
+          Your offer is private — only you and the requester see it. Other offers stay private too, so send your best availability and approach.
+        </Text>
+      </View>
+
+      <Text style={styles.offerLabel}>How is your price based?</Text>
+      <View style={styles.offerSegRow}>
+        {OFFER_PRICING_TYPES.map(o => (
+          <TouchableOpacity
+            key={o.id}
+            style={[styles.offerSeg, bidPricingType === o.id && styles.offerSegActive]}
+            onPress={() => setBidPricingType(o.id)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: bidPricingType === o.id }}>
+            <Text style={[styles.offerSegText, bidPricingType === o.id && styles.offerSegTextActive]}>{o.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {lineItems.map((li, idx) => (
         <View key={idx} style={styles.lineItemRow}>
           <TextInput
@@ -644,6 +693,24 @@ export default function JobDetailScreen({ route, navigation }) {
           <Text style={styles.bidTotalLabel}>Offer total</Text>
           <Text style={styles.bidTotalAmount}>${bidTotal.toFixed(2)} NZD</Text>
         </View>
+      )}
+
+      {job.materials_type === 'provider' && (
+        <>
+          <Text style={styles.offerLabel}>This job needs you to supply materials — how are they priced?</Text>
+          <View style={styles.offerSegRow}>
+            {OFFER_MATERIALS_OPTIONS.map(o => (
+              <TouchableOpacity
+                key={o.id}
+                style={[styles.offerSeg, bidMaterials === o.id && styles.offerSegActive]}
+                onPress={() => setBidMaterials(o.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: bidMaterials === o.id }}>
+                <Text style={[styles.offerSegText, bidMaterials === o.id && styles.offerSegTextActive]}>{o.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
       )}
 
       <TextInput
@@ -694,13 +761,12 @@ export default function JobDetailScreen({ route, navigation }) {
         accessibilityLabel="Estimated duration"
       />
 
-      <TouchableOpacity style={styles.button}
+      <Button
+        title={editingBid ? 'Update Offer' : 'Submit Offer'}
         onPress={editingBid ? handleUpdateBid : handlePlaceBid}
-        disabled={loading}
-        accessibilityRole="button"
-        accessibilityLabel={editingBid ? 'Update offer' : 'Submit offer'}>
-        <Text style={styles.buttonText}>{loading ? 'Submitting...' : editingBid ? 'Update Offer' : 'Submit Offer'}</Text>
-      </TouchableOpacity>
+        loading={loading}
+        accessibilityLabel={editingBid ? 'Update offer' : 'Submit offer'}
+      />
       {editingBid && (
         <TouchableOpacity style={styles.cancelEditBtn} onPress={() => setEditingBid(false)}>
           <Text style={styles.cancelEditBtnText}>Cancel</Text>
@@ -712,8 +778,8 @@ export default function JobDetailScreen({ route, navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {headerJSX}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
+      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
         {/* Job card */}
         <View style={styles.card}>
@@ -776,15 +842,16 @@ export default function JobDetailScreen({ route, navigation }) {
           <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
         </View>
 
-        {/* Owner shortcut to the management screen (edit / share / cancel / delete) */}
-        {isJobOwner && (
-          <TouchableOpacity
-            style={styles.manageJobBtn}
+        {/* Owner shortcut to the management screen (edit / share / cancel / delete).
+            Hidden when we arrived from Manage, so Back just returns there. */}
+        {isJobOwner && !fromManage && (
+          <Button
+            icon="settings-outline"
+            title="Manage job"
             onPress={() => navigation.navigate('ManageTask', { job, bidCount: bids.length })}
-            accessibilityRole="button"
-            accessibilityLabel="Manage this job">
-            <Text style={styles.manageJobBtnText}><Icon name="settings-outline" size={16} color={colors.white} /> Manage job</Text>
-          </TouchableOpacity>
+            style={{ marginBottom: 16 }}
+            accessibilityLabel="Manage this job"
+          />
         )}
 
         {/* Requester: provider has marked the job done — confirm + review */}
@@ -796,11 +863,13 @@ export default function JobDetailScreen({ route, navigation }) {
                 {acceptedProviderName} has marked this job as done. Confirm to finalise and leave a review.
               </Text>
             </View>
-            <TouchableOpacity style={[styles.button, { marginTop: 12 }]}
+            <Button
+              icon="checkmark"
+              title="Confirm job complete"
               onPress={handleConfirmComplete}
-              accessibilityRole="button" accessibilityLabel="Confirm job complete">
-              <Text style={styles.buttonText}><Icon name="checkmark" size={16} color={colors.white} /> Confirm job complete</Text>
-            </TouchableOpacity>
+              style={{ marginTop: 12 }}
+              accessibilityLabel="Confirm job complete"
+            />
           </View>
         )}
 
@@ -808,14 +877,11 @@ export default function JobDetailScreen({ route, navigation }) {
         {isJobOwner && job.status === 'completed' && acceptedBid && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Review provider</Text>
-            <TouchableOpacity style={styles.button}
+            <Button
+              title={providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
               onPress={() => setProviderReviewVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={providerReview ? 'Edit provider review' : 'Review provider'}>
-              <Text style={styles.buttonText}>
-                {providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
-              </Text>
-            </TouchableOpacity>
+              accessibilityLabel={providerReview ? 'Edit provider review' : 'Review provider'}
+            />
           </View>
         )}
 
@@ -824,7 +890,12 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Questions & Answers</Text>
             {questions.length === 0 && (
-              <Text style={styles.noQuestionsText}>No questions yet.</Text>
+              <EmptyState
+                compact
+                icon="chatbubbles-outline"
+                title="No questions yet"
+                body="Questions about this job will show up here."
+              />
             )}
             {questions.map(q => (
               <View key={q.id} style={styles.questionCard}>
@@ -854,10 +925,12 @@ export default function JobDetailScreen({ route, navigation }) {
                         accessibilityLabel="Answer"
                       />
                       <View style={styles.qaActionRow}>
-                        <TouchableOpacity style={styles.answerSubmitBtn}
-                          onPress={() => handleAnswerQuestion(q.id)} disabled={submittingQ}>
-                          <Text style={styles.answerSubmitBtnText}>{submittingQ ? 'Saving...' : 'Post answer'}</Text>
-                        </TouchableOpacity>
+                        <Button
+                          size="sm"
+                          title="Post answer"
+                          onPress={() => handleAnswerQuestion(q.id)}
+                          loading={submittingQ}
+                        />
                         <TouchableOpacity onPress={() => { setAnsweringId(null); setAnswerText('') }}>
                           <Text style={styles.cancelEditBtnText}>Cancel</Text>
                         </TouchableOpacity>
@@ -888,20 +961,26 @@ export default function JobDetailScreen({ route, navigation }) {
                     accessibilityLabel="Your question"
                   />
                   <View style={styles.qaActionRow}>
-                    <TouchableOpacity style={styles.answerSubmitBtn}
-                      onPress={handleAskQuestion} disabled={submittingQ || !askText.trim()}>
-                      <Text style={styles.answerSubmitBtnText}>{submittingQ ? 'Posting...' : 'Post question'}</Text>
-                    </TouchableOpacity>
+                    <Button
+                      size="sm"
+                      title="Post question"
+                      onPress={handleAskQuestion}
+                      loading={submittingQ}
+                      disabled={!askText.trim()}
+                    />
                     <TouchableOpacity onPress={() => { setShowAskInput(false); setAskText('') }}>
                       <Text style={styles.cancelEditBtnText}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.askBtn} onPress={() => setShowAskInput(true)}
-                  accessibilityRole="button" accessibilityLabel="Ask a question">
-                  <Text style={styles.askBtnText}>Ask a question</Text>
-                </TouchableOpacity>
+                <Button
+                  variant="secondary"
+                  icon="help-circle-outline"
+                  title="Ask a question"
+                  onPress={() => setShowAskInput(true)}
+                  style={{ marginTop: 8 }}
+                />
               )
             )}
           </View>
@@ -914,7 +993,7 @@ export default function JobDetailScreen({ route, navigation }) {
               <>
                 <Text style={styles.sectionTitle}>Your offer</Text>
                 <View style={styles.myBidSummary}>
-                  <Text style={styles.myBidAmount}>${Number(myBid?.amount || 0).toFixed(2)} NZD</Text>
+                  <Text style={styles.myBidAmount}>{formatOfferAmount(Number(myBid?.amount || 0).toFixed(2), myBid?.pricing_type)}</Text>
                   {myBid?.line_items?.length > 1 && (
                     <View style={styles.lineItemsBreakdown}>
                       {myBid.line_items.map((li, i) => (
@@ -932,13 +1011,20 @@ export default function JobDetailScreen({ route, navigation }) {
                   {myBid?.estimated_duration && (
                     <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
                   )}
-                  <Text style={styles.myBidStatus}>Status: {myBid?.status?.toUpperCase()}</Text>
+                  {myBid?.materials && (
+                    <Text style={styles.myBidMeta}><Icon name="construct-outline" size={12} color={colors.textMuted} /> {OFFER_MATERIALS_LABELS[myBid.materials] || myBid.materials}</Text>
+                  )}
+                  <Text style={styles.myBidStatus}>{offerStatusLabel(myBid?.status)}</Text>
                 </View>
                 {myBid?.status === 'pending' && (
-                  <TouchableOpacity style={styles.editBidBtn} onPress={() => setEditingBid(true)}
-                    accessibilityRole="button" accessibilityLabel="Edit your offer">
-                    <Text style={styles.editBidBtnText}>Edit offer</Text>
-                  </TouchableOpacity>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    title="Edit offer"
+                    onPress={() => setEditingBid(true)}
+                    style={{ marginTop: 4 }}
+                    accessibilityLabel="Edit your offer"
+                  />
                 )}
               </>
             ) : (
@@ -954,8 +1040,19 @@ export default function JobDetailScreen({ route, navigation }) {
         {isJobOwner && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {bids.length === 0 ? 'No offers yet' : `${bids.length} Offer${bids.length > 1 ? 's' : ''} Received`}
+              {bids.length === 0 ? 'Offers' : `${bids.length} Offer${bids.length > 1 ? 's' : ''} Received`}
             </Text>
+            {bids.length > 0 && (
+              <Text style={styles.offersHint}>Private to you. Choose the right fit — reputation, location, availability and price.</Text>
+            )}
+            {bids.length === 0 && (
+              <EmptyState
+                compact
+                icon="pricetag-outline"
+                title="No offers yet"
+                body="When providers make an offer on your job, it'll appear here."
+              />
+            )}
             {bids.map(bid => (
               <PressableCard key={bid.id} style={styles.bidCard}>
                 <View style={styles.bidHeader}>
@@ -983,7 +1080,7 @@ export default function JobDetailScreen({ route, navigation }) {
                       </Text>
                     </View>
                   </TouchableOpacity>
-                  <Text style={styles.bidAmount}>${bid.amount} NZD</Text>
+                  <Text style={styles.bidAmount}>{formatOfferAmount(bid.amount, bid.pricing_type)}</Text>
                 </View>
                 {bid.line_items?.length > 1 && (
                   <View style={styles.lineItemsBreakdown}>
@@ -1002,29 +1099,40 @@ export default function JobDetailScreen({ route, navigation }) {
                 {bid.estimated_duration && (
                   <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>
                 )}
+                {bid.materials && (
+                  <Text style={styles.bidMeta}><Icon name="construct-outline" size={12} color={colors.textMuted} /> {OFFER_MATERIALS_LABELS[bid.materials] || bid.materials}</Text>
+                )}
                 <Text style={styles.bidStatus}>Status: {bid.status.toUpperCase()}</Text>
                 {bid.status === 'pending' && job.status === 'open' && (
-                  <TouchableOpacity style={styles.acceptButton} onPress={() => handleAcceptBid(bid)}
-                    accessibilityRole="button" accessibilityLabel={`Accept offer from ${bid.profiles?.full_name}`}>
-                    <Text style={styles.acceptButtonText}><Icon name="checkmark" size={15} color={colors.white} /> Accept This Offer</Text>
-                  </TouchableOpacity>
+                  <Button
+                    icon="checkmark"
+                    title="Accept This Offer"
+                    onPress={() => handleAcceptBid(bid)}
+                    style={{ marginTop: 4 }}
+                    accessibilityLabel={`Accept offer from ${bid.profiles?.full_name}`}
+                  />
                 )}
                 {bid.status === 'accepted' && (
                   <>
-                    <TouchableOpacity style={styles.chatButton}
+                    <Button
+                      variant="secondary"
+                      icon="chatbubble-ellipses-outline"
+                      title="Chat with Provider"
                       onPress={() => navigation.navigate('Chat', {
                         jobId: job.id, jobTitle: job.title,
                         otherUserId: bid.provider_id,
                         otherUserName: bid.profiles?.full_name || 'Provider',
                       })}
-                      accessibilityRole="button" accessibilityLabel={`Chat with ${bid.profiles?.full_name}`}>
-                      <Text style={styles.chatButtonText}><Icon name="chatbubble-ellipses-outline" size={15} color={colors.white} /> Chat with Provider</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.viewProviderBtn}
+                      style={{ marginTop: 6 }}
+                      accessibilityLabel={`Chat with ${bid.profiles?.full_name}`}
+                    />
+                    <Button
+                      variant="secondary"
+                      title="View provider profile"
                       onPress={() => navigation.navigate('ProviderProfile', { providerId: bid.provider_id })}
-                      accessibilityRole="button" accessibilityLabel={`View ${bid.profiles?.full_name}'s profile`}>
-                      <Text style={styles.viewProviderBtnText}>View provider profile</Text>
-                    </TouchableOpacity>
+                      style={{ marginTop: 6 }}
+                      accessibilityLabel={`View ${bid.profiles?.full_name}'s profile`}
+                    />
                   </>
                 )}
               </PressableCard>
@@ -1066,7 +1174,7 @@ const styles = StyleSheet.create({
   watchBtnActive: { backgroundColor: '#ede7f6', opacity: 1 },
   watchBtnText:   { fontSize: 18 },
 
-  card: { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2, borderWidth: 1, borderColor: colors.border },
+  card: { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   cardHeader:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   category:    { backgroundColor: colors.primaryLight, color: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 13, fontWeight: '600' },
   price:       { fontWeight: 'bold', color: colors.primary, fontSize: 15 },
@@ -1080,16 +1188,11 @@ const styles = StyleSheet.create({
   accessIcon: { fontSize: 14 },
   accessText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 18 },
 
-  section:      { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2, borderWidth: 1, borderColor: colors.border },
+  section:      { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 14 },
-
-  manageJobBtn:     { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', minHeight: 52, marginBottom: 16 },
-  manageJobBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 
   input:     { backgroundColor: colors.background, borderRadius: 8, padding: 14, fontSize: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
   multiline: { height: 90, textAlignVertical: 'top' },
-  button:    { backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 16, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  buttonText:{ color: colors.white, fontSize: 16, fontWeight: 'bold' },
 
   // Feature 4: line items
   lineItemRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
@@ -1102,6 +1205,17 @@ const styles = StyleSheet.create({
   bidTotalLabel:   { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   bidTotalAmount:  { fontSize: 16, fontWeight: '700', color: colors.primary },
 
+  // Offer pricing/materials segmented controls
+  offerLabel:        { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8, marginTop: 4 },
+  offerSegRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  offerSeg:          { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.white },
+  offerSegActive:    { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  offerSegText:      { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  offerSegTextActive:{ color: colors.primary },
+  privacyNote:       { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 14 },
+  privacyNoteText:   { flex: 1, fontSize: 12, color: colors.primary, lineHeight: 17 },
+  offersHint:        { fontSize: 12, color: colors.textMuted, marginTop: -8, marginBottom: 12, lineHeight: 17 },
+
   availabilityBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background, borderRadius: 8, padding: 14, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
   availabilityBtnText: { color: colors.textSecondary, fontSize: 14, flex: 1 },
   clearDateBtn:        { color: colors.textMuted, fontSize: 16 },
@@ -1112,8 +1226,6 @@ const styles = StyleSheet.create({
   myBidMessage: { fontSize: 14, color: colors.textSecondary, marginBottom: 4 },
   myBidMeta:    { fontSize: 13, color: colors.textMuted, marginBottom: 2 },
   myBidStatus:  { fontSize: 12, color: colors.textMuted, marginTop: 4 },
-  editBidBtn:      { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 4, minHeight: 44 },
-  editBidBtnText:  { color: colors.primary, fontWeight: '700', fontSize: 14 },
   cancelEditBtn:   { paddingVertical: 12, alignItems: 'center', marginTop: 4 },
   cancelEditBtnText: { color: colors.textMuted, fontSize: 14 },
 
@@ -1136,12 +1248,6 @@ const styles = StyleSheet.create({
   bidMessage: { color: colors.textSecondary, fontSize: 14, marginBottom: 6 },
   bidMeta:    { fontSize: 13, color: colors.textMuted, marginBottom: 2 },
   bidStatus:  { color: colors.textMuted, fontSize: 13, marginBottom: 8, marginTop: 4 },
-  acceptButton:     { backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 14, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  acceptButtonText: { color: colors.white, fontWeight: 'bold', fontSize: 15 },
-  chatButton:       { backgroundColor: colors.info, borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 6, minHeight: 52, justifyContent: 'center' },
-  chatButtonText:   { color: colors.white, fontWeight: 'bold', fontSize: 15 },
-  viewProviderBtn:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 6, minHeight: 52, justifyContent: 'center' },
-  viewProviderBtnText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
 
   // Photos
   photoStripWrap: { marginBottom: 10, marginHorizontal: -4 },
@@ -1158,7 +1264,6 @@ const styles = StyleSheet.create({
   locationNote:      { color: colors.textMuted, fontSize: 13, marginBottom: 6, lineHeight: 18 },
 
   // Feature 2: Q&A
-  noQuestionsText: { color: colors.textMuted, fontSize: 14, marginBottom: 12 },
   questionCard:    { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e8e8e8' },
   questionRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   questionAsker:   { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
@@ -1172,13 +1277,9 @@ const styles = StyleSheet.create({
   answerBtnText:     { fontSize: 13, color: colors.primary, fontWeight: '600' },
   answerInputBlock:  { marginTop: 8 },
   qaActionRow:       { flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 8 },
-  answerSubmitBtn:   { backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
-  answerSubmitBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  askBtn:            { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
-  askBtnText:        { color: colors.primary, fontWeight: '600', fontSize: 14 },
 
   // Provider accepted view
-  acceptedCard:       { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12, elevation: 2, borderWidth: 1.5, borderColor: colors.primary },
+  acceptedCard:       { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary },
   acceptedCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 },
   acceptedBadge:      { backgroundColor: colors.primaryLight, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, flexShrink: 0 },
   acceptedBadgeText:  { fontSize: 12, fontWeight: '700', color: colors.primary },
@@ -1192,7 +1293,7 @@ const styles = StyleSheet.create({
   cancelBoxText:      { fontSize: 14, color: '#7f1d1d', lineHeight: 20, marginTop: 2 },
   cancelBoxNote:      { fontSize: 14, color: '#7f1d1d', lineHeight: 20, marginTop: 4, fontStyle: 'italic' },
 
-  chatBanner:         { backgroundColor: colors.primary, borderRadius: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', paddingVertical: 18, paddingHorizontal: 18, minHeight: 72 },
+  chatBanner:         { backgroundColor: colors.primary, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center', paddingVertical: 18, paddingHorizontal: 18, minHeight: 72 },
   chatBannerIcon:     { fontSize: 26, marginRight: 14 },
   chatBannerContent:  { flex: 1 },
   chatBannerTitle:    { fontSize: 16, fontWeight: '700', color: colors.white, marginBottom: 2 },
@@ -1203,10 +1304,6 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600', flex: 0, marginRight: 12 },
   detailValue: { fontSize: 13, color: colors.textPrimary, fontWeight: '500', textAlign: 'right', flex: 1 },
 
-  bigBtnGreen:     { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 16, alignItems: 'center', minHeight: 52, justifyContent: 'center', marginBottom: 10 },
-  bigBtnGreenText: { color: colors.white, fontSize: 16, fontWeight: '700' },
-  bigBtnOutline:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 10, paddingVertical: 16, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  bigBtnOutlineText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 
   awaitingBox:     { backgroundColor: '#fef3c7', borderRadius: 10, padding: 14, marginBottom: 10 },
   awaitingBoxText: { fontSize: 14, color: '#92400e', lineHeight: 20, textAlign: 'center', fontWeight: '600' },

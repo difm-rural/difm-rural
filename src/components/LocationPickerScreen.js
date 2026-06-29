@@ -297,6 +297,8 @@ const styles = StyleSheet.create({
     bottom: 14,
     alignSelf: 'center',
     backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 10,

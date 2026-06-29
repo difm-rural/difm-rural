@@ -38,19 +38,9 @@ export const isJobActive   = s => JOB_ACTIVE_STATUSES.includes(s)
 export const isJobTerminal = s => JOB_TERMINAL_STATUSES.includes(s)
 export const isJobAwarded  = s => JOB_AWARDED_STATUSES.includes(s)
 
-// Canonical label for the verbose surfaces (detail screens, large cards).
-// `open` reflects the bid count. Small cards may keep their own terse labels.
+// Job convenience wrapper — delegates to the shared vocabulary below.
 export function jobStatusLabel(status, bidCount = 0) {
-  switch (status) {
-    case JOB_STATUS.OPEN:
-      return bidCount > 0 ? `${bidCount} offer${bidCount > 1 ? 's' : ''}` : 'Open'
-    case JOB_STATUS.ACCEPTED:
-    case JOB_STATUS.IN_PROGRESS:         return 'Awarded'
-    case JOB_STATUS.AWAITING_COMPLETION: return 'Awaiting confirmation'
-    case JOB_STATUS.COMPLETED:           return 'Completed'
-    case JOB_STATUS.CANCELLED:           return 'Cancelled'
-    default:                             return status
-  }
+  return statusLabel(status, bidCount)
 }
 
 // ─── Service bookings ───────────────────────────────────────────────────────────
@@ -101,19 +91,62 @@ export const isBookingUnderway = s => BOOKING_UNDERWAY_STATUSES.includes(s)
 export const BOOKING_DISMISSABLE_STATUSES = [BOOKING_STATUS.WITHDRAWN, BOOKING_STATUS.CANCELLED]
 export const isBookingDismissable = s => BOOKING_DISMISSABLE_STATUSES.includes(s)
 
-// Canonical label for the verbose surfaces (booking detail screen).
+// Booking convenience wrapper — delegates to the shared vocabulary below.
 export function bookingStatusLabel(status) {
+  return statusLabel(status)
+}
+
+// ─── Unified status language ─────────────────────────────────────────────────
+// One word per lifecycle stage, shared across jobs AND bookings so the same
+// stage always reads the same wherever it appears — cards, badges, and detail
+// screens. Status string values don't collide between the two domains, so a
+// single map serves both. This is the only place lifecycle wording is defined.
+//
+//   open                 → "Open" / "{n} offers"   (job on the board)
+//   pending              → "Requested"             (booking awaiting provider)
+//   quote_sent           → "Quote sent"
+//   accepted / confirmed → "Confirmed"             (provider engaged, going ahead)
+//   in_progress          → "In progress"
+//   awaiting_completion  → "Awaiting confirmation" (provider done, requester signs off)
+//   cancellation_requested → "Cancellation requested"
+//   completed            → "Completed"
+//   withdrawn/declined/cancelled → as named
+export function statusLabel(status, bidCount = 0) {
   switch (status) {
-    case BOOKING_STATUS.PENDING:                return 'Waiting for provider'
+    case JOB_STATUS.OPEN:
+      return bidCount > 0 ? `${bidCount} offer${bidCount > 1 ? 's' : ''}` : 'Open'
+    case BOOKING_STATUS.PENDING:                return 'Requested'
     case BOOKING_STATUS.QUOTE_SENT:             return 'Quote sent'
-    case BOOKING_STATUS.CONFIRMED:              return 'Confirmed'
-    case BOOKING_STATUS.IN_PROGRESS:            return 'In progress'
-    case BOOKING_STATUS.AWAITING_COMPLETION:    return 'Ready for requester confirmation'
+    case JOB_STATUS.ACCEPTED:                   // jobs: a bid was accepted
+    case BOOKING_STATUS.CONFIRMED:              // bookings: provider confirmed
+      return 'Confirmed'
+    case JOB_STATUS.IN_PROGRESS:                return 'In progress'
+    case JOB_STATUS.AWAITING_COMPLETION:        return 'Awaiting confirmation'
     case BOOKING_STATUS.CANCELLATION_REQUESTED: return 'Cancellation requested'
-    case BOOKING_STATUS.COMPLETED:              return 'Completed'
+    case JOB_STATUS.COMPLETED:                  return 'Completed'
     case BOOKING_STATUS.WITHDRAWN:              return 'Withdrawn'
-    case BOOKING_STATUS.CANCELLED:              return 'Cancelled'
+    case JOB_STATUS.CANCELLED:                  return 'Cancelled'
     case BOOKING_STATUS.DECLINED:               return 'Declined'
-    default:                                    return status || 'Booking'
+    default:                                    return status || ''
+  }
+}
+
+// Semantic tone for a status badge — lets every surface colour the same stage
+// the same way. Screens map these keys to their own colour palette.
+export function statusTone(status) {
+  switch (status) {
+    case JOB_STATUS.OPEN:                       return 'active'
+    case BOOKING_STATUS.PENDING:
+    case BOOKING_STATUS.QUOTE_SENT:             return 'waiting'
+    case JOB_STATUS.ACCEPTED:
+    case BOOKING_STATUS.CONFIRMED:
+    case JOB_STATUS.IN_PROGRESS:                return 'engaged'
+    case JOB_STATUS.AWAITING_COMPLETION:
+    case BOOKING_STATUS.CANCELLATION_REQUESTED: return 'attention'
+    case JOB_STATUS.COMPLETED:                  return 'done'
+    case BOOKING_STATUS.WITHDRAWN:
+    case BOOKING_STATUS.DECLINED:               return 'muted'
+    case JOB_STATUS.CANCELLED:                  return 'cancelled'
+    default:                                    return 'muted'
   }
 }

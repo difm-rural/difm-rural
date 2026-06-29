@@ -17,6 +17,8 @@ import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import { useUser } from '../../context/UserContext'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
+import EmptyState from '../../components/EmptyState'
+import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
 
 const FILTERS = [
@@ -283,21 +285,27 @@ export default function BrowseTabScreen({ navigation }) {
       </ScrollView>
 
       {loading ? (
-        <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
       ) : isEmpty ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyTitle}>No services available yet</Text>
-          <Text style={styles.emptyBody}>Check back soon or post a job to get quotes.</Text>
-          <TouchableOpacity
-            style={styles.emptyBtn}
-            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })}
-            accessibilityRole="button"
-            accessibilityLabel="Post a job">
-            <Text style={styles.emptyBtnText}>Post a job <Icon name="arrow-forward" size={15} color="#fff" /></Text>
-          </TouchableOpacity>
-        </View>
+        isProvider ? (
+          <EmptyState
+            icon="construct-outline"
+            title="No services listed yet"
+            body="Be the first — list a service so locals nearby can book you."
+            actionLabel="List a service"
+            actionIcon="arrow-forward"
+            onAction={() => navigation.navigate('MyServices')}
+          />
+        ) : (
+          <EmptyState
+            icon="pricetags-outline"
+            title="No services available yet"
+            body="Check back soon, or post a job to get quotes from providers."
+            actionLabel="Post a job"
+            actionIcon="arrow-forward"
+            onAction={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })}
+          />
+        )
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -391,7 +399,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     marginHorizontal: 14,
     marginTop: 10,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.primary,
     padding: 12,
@@ -437,18 +445,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   pausedBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
-
-  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  loadingText: { color: colors.textMuted, fontSize: 15 },
-  emptyTitle:  { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  emptyBody:   { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 },
-  emptyBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-  },
-  emptyBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 
   noMore:     { paddingVertical: 20, alignItems: 'center' },
   noMoreText: { fontSize: 13, color: colors.textMuted },

@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 
 export default function GuestJobDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
@@ -17,14 +19,28 @@ export default function GuestJobDetailScreen({ route, navigation }) {
     setShowAuthSheet(false)
   }
 
-  function goToRegister() {
-    closeAuthSheet()
-    navigation.navigate('Register')
+  // Remember which job the guest wanted to act on so we can return them to it
+  // once they've signed in (and finished onboarding, for brand-new accounts).
+  async function savePendingJobView() {
+    try {
+      await AsyncStorage.setItem('pendingJobView', JSON.stringify({ job, savedAt: Date.now() }))
+    } catch (e) {
+      console.log('Could not save pending job view:', e)
+    }
   }
 
-  function goToLogin() {
+  // Passwordless email-code login auto-creates the account, so both
+  // "Create account" and "Sign in" route to the Login screen.
+  async function goToRegister() {
     closeAuthSheet()
-    navigation.navigate('Login')
+    await savePendingJobView()
+    navigation.navigate('Login', { intent: 'register' })
+  }
+
+  async function goToLogin() {
+    closeAuthSheet()
+    await savePendingJobView()
+    navigation.navigate('Login', { intent: 'login' })
   }
 
   return (
@@ -53,22 +69,18 @@ export default function GuestJobDetailScreen({ route, navigation }) {
         <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
         <Text style={styles.description}>{job.description}</Text>
 
-        <TouchableOpacity
-          style={styles.bidButton}
+        <Button
+          title="Offer on this job"
           onPress={openAuthSheet}
-          accessibilityRole="button"
+          style={{ marginBottom: 12 }}
           accessibilityLabel="Offer on this job"
-          accessibilityHint="Double tap to create an account and offer on this job">
-          <Text style={styles.bidButtonText}>Offer on this job</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.contactButton}
+        />
+        <Button
+          variant="secondary"
+          title="Contact requester"
           onPress={openAuthSheet}
-          accessibilityRole="button"
           accessibilityLabel="Contact requester"
-          accessibilityHint="Double tap to create an account and contact the requester">
-          <Text style={styles.contactButtonText}>Contact requester</Text>
-        </TouchableOpacity>
+        />
       </ScrollView>
 
       <Modal
@@ -80,20 +92,19 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={closeAuthSheet} />
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Create a free account to offer on this job</Text>
-            <TouchableOpacity
-              style={styles.sheetPrimary}
+            <Button
+              title="Create account"
               onPress={goToRegister}
-              accessibilityRole="button"
-              accessibilityLabel="Create account">
-              <Text style={styles.sheetPrimaryText}>Create account</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.sheetSecondary}
+              style={{ marginBottom: 12 }}
+              accessibilityLabel="Create account"
+            />
+            <Button
+              variant="secondary"
+              title="Sign in"
               onPress={goToLogin}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in to existing account">
-              <Text style={styles.sheetSecondaryText}>Sign in</Text>
-            </TouchableOpacity>
+              style={{ marginBottom: 20 }}
+              accessibilityLabel="Sign in to existing account"
+            />
             <TouchableOpacity
               style={styles.sheetCancelBtn}
               onPress={closeAuthSheet}
@@ -124,18 +135,10 @@ const styles = StyleSheet.create({
   price: { fontWeight: 'bold', color: colors.primary, fontSize: 17 },
   location: { color: colors.textMuted, fontSize: 14, marginBottom: 16 },
   description: { color: colors.textSecondary, fontSize: 16, lineHeight: 26, marginBottom: 32 },
-  bidButton: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginBottom: 12, minHeight: 52, justifyContent: 'center' },
-  bidButtonText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
-  contactButton: { borderRadius: 10, paddingVertical: 16, alignItems: 'center', borderWidth: 2, borderColor: colors.primary, minHeight: 52, justifyContent: 'center' },
-  contactButtonText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   modalWrap: { flex: 1, justifyContent: 'flex-end' },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, paddingBottom: 48 },
   sheetTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 24 },
-  sheetPrimary: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginBottom: 12, minHeight: 52, justifyContent: 'center' },
-  sheetPrimaryText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
-  sheetSecondary: { borderRadius: 10, paddingVertical: 16, alignItems: 'center', borderWidth: 2, borderColor: colors.primary, marginBottom: 20, minHeight: 52, justifyContent: 'center' },
-  sheetSecondaryText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   sheetCancelBtn: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   sheetCancel: { color: colors.textMuted, textAlign: 'center', fontSize: 14 },
 })

@@ -8,6 +8,7 @@ import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import Button from '../../components/Button'
 
 const PRICE_OPTIONS = [
   { id: 'fixed', icon: 'cash-outline', label: 'Fixed price',  desc: 'Set your budget upfront' },
@@ -86,11 +87,13 @@ export default function PostJobStep4Budget({ navigation, route }) {
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}>
+        keyboardVerticalOffset={0}
+        enabled={Platform.OS === 'android'}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
 
           <SummaryBar items={[
@@ -161,14 +164,14 @@ export default function PostJobStep4Budget({ navigation, route }) {
               accessibilityLabel="Go back">
               <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
+            <Button
+              title="Review"
+              icon="arrow-forward"
               onPress={handleNext}
               disabled={!canProceed()}
-              accessibilityRole="button"
-              accessibilityLabel="Review job">
-              <Text style={styles.nextBtnText}>Review <Icon name="arrow-forward" size={15} color="#fff" /></Text>
-            </TouchableOpacity>
+              style={{ flex: 1 }}
+              accessibilityLabel="Review job"
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -197,15 +200,11 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: colors.primary,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   cardQuestion: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },
 
@@ -255,7 +254,4 @@ const styles = StyleSheet.create({
   footerBtns:      { flexDirection: 'row', gap: 10 },
   backBtn:         { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   backBtnText:     { color: colors.primary, fontSize: 14, fontWeight: '600' },
-  nextBtn:         { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  nextBtnDisabled: { backgroundColor: colors.primaryMuted },
-  nextBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },
 })

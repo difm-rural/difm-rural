@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../theme/tokens'
 import Icon from './Icon'
+import Button from './Button'
 
 const REASONS = {
   job_open: [
@@ -128,6 +129,7 @@ export default function CancelModal({
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={true}
             contentContainerStyle={styles.scrollContent}>
 
             <Text style={styles.title}>{title}</Text>
@@ -183,23 +185,20 @@ export default function CancelModal({
 
           {/* Fixed action buttons */}
           <View style={[styles.buttons, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <TouchableOpacity
-              style={styles.keepBtn}
+            <Button
+              variant="secondary"
+              title={keepLabel}
               onPress={onClose}
-              accessibilityRole="button"
-              accessibilityLabel={keepLabel}>
-              <Text style={styles.keepBtnText}>{keepLabel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
+              accessibilityLabel={keepLabel}
+            />
+            <Button
+              variant="destructive"
+              title={confirmLabel}
               onPress={handleConfirm}
-              disabled={!canConfirm}
-              accessibilityRole="button"
-              accessibilityLabel={confirmLabel}>
-              <Text style={styles.confirmBtnText}>
-                {submitting ? 'Cancelling…' : confirmLabel}
-              </Text>
-            </TouchableOpacity>
+              disabled={!selectedReason}
+              loading={submitting}
+              accessibilityLabel={confirmLabel}
+            />
           </View>
 
         </Animated.View>
@@ -344,35 +343,5 @@ const styles = StyleSheet.create({
     gap: 10,
     borderTopWidth: 1,
     borderTopColor: '#f2f2f2',
-  },
-  keepBtn: {
-    borderWidth: 1.5,
-    borderColor: '#cccccc',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  keepBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  confirmBtn: {
-    backgroundColor: '#c0392b',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  confirmBtnDisabled: {
-    backgroundColor: '#e8a9a0',
-  },
-  confirmBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
   },
 })

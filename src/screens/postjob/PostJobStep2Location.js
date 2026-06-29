@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert, Image, Keyboard,
   KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import * as Location from 'expo-location'
@@ -14,6 +14,7 @@ import { reverseGeocode } from '../../lib/location'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import Button from '../../components/Button'
 
 const MAP_HEIGHT = 300
 
@@ -237,6 +238,13 @@ export default function PostJobStep2Location({ navigation, route }) {
         />
       </View>
 
+      <View style={styles.mapHint}>
+        <Icon name="location-outline" size={14} color={colors.primary} />
+        <Text style={styles.mapHintText}>
+          Zoom and tap the map to drop a pin on the exact location, if required.
+        </Text>
+      </View>
+
       <View style={styles.mapContainer}>
         <JobLocationMap
           ref={mapRef}
@@ -289,28 +297,17 @@ export default function PostJobStep2Location({ navigation, route }) {
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}>
+        keyboardVerticalOffset={0}
+        enabled={Platform.OS === 'android'}>
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
 
           <SummaryBar category={jobData.category} title={jobData.title} />
-
-          <View style={styles.noteRow}>
-            <TextInput
-              style={styles.noteInput}
-              placeholder="Add a note for the provider (optional)"
-              placeholderTextColor="#aaa"
-              value={locationNote}
-              onChangeText={setLocationNote}
-              returnKeyType="done"
-              onSubmitEditing={Keyboard.dismiss}
-              accessibilityLabel="Location note"
-            />
-          </View>
 
           <View style={styles.pillsRow}>
             <TouchableOpacity
@@ -375,13 +372,13 @@ export default function PostJobStep2Location({ navigation, route }) {
               accessibilityLabel="Go back">
               <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.nextBtn}
+            <Button
+              title="Next — Details"
+              icon="arrow-forward"
               onPress={handleNext}
-              accessibilityRole="button"
-              accessibilityLabel="Next step">
-              <Text style={styles.nextBtnText}>Next — Details <Icon name="arrow-forward" size={15} color="#fff" /></Text>
-            </TouchableOpacity>
+              style={{ flex: 1 }}
+              accessibilityLabel="Next step"
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -438,18 +435,17 @@ const styles = StyleSheet.create({
   scroll:        { flex: 1 },
   scrollContent: { padding: 14, paddingBottom: 24 },
 
-  noteRow: {
+  mapHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: '#e0e0e0',
+    gap: 6,
     paddingHorizontal: 12,
-    marginBottom: 10,
-    height: 44,
+    paddingVertical: 8,
+    backgroundColor: '#f0faf5',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#c3e6d4',
   },
-  noteInput: { flex: 1, fontSize: 13, color: '#333' },
+  mapHintText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
 
   pillsRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 10 },
   pill: {
@@ -498,6 +494,4 @@ const styles = StyleSheet.create({
   footerBtns:  { flexDirection: 'row', gap: 10 },
   backBtn:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   backBtnText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
-  nextBtn:     { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  nextBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 })

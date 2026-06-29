@@ -2,6 +2,7 @@
   "expo": {
     "name": "Rural Connect",
     "slug": "difm-rural",
+    "scheme": "difmrural",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/do-it-for-me-rural-app-icon-1024.png",
@@ -75,7 +76,8 @@
           "cameraPermission": "Rural Connections lets providers take photos of service flyers, signs, and notes to create draft listings.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

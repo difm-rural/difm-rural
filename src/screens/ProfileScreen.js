@@ -37,6 +37,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Loading from '../components/Loading'
+import Button from '../components/Button'
 import {
   authenticate,
   clearCredentials,
@@ -318,14 +320,19 @@ export default function ProfileScreen({ navigation }) {
   }
 
   async function updatePrimaryRole(newRole) {
+    // Legacy `role` column only allows requester/provider — map "both" to
+    // provider there; primary_role is the real source of truth.
+    const legacyRole = newRole === 'both' ? 'provider' : newRole
     const { error } = await supabase
       .from('profiles')
-      .update({ primary_role: newRole, role: newRole })
+      .update({ primary_role: newRole, role: legacyRole })
       .eq('id', userId)
-    if (!error) {
-      setProfile(p => ({ ...p, primary_role: newRole, role: newRole }))
-      Alert.alert('Dashboard updated', 'Your dashboard will update next time you open the app.')
+    if (error) {
+      Alert.alert('Could not update', error.message)
+      return
     }
+    setProfile(p => ({ ...p, primary_role: newRole, role: legacyRole }))
+    Alert.alert('Dashboard updated', 'Your dashboard will update next time you open the app.')
   }
 
   // ─── Sign out ──────────────────────────────────────────────────
@@ -357,11 +364,7 @@ export default function ProfileScreen({ navigation }) {
     : 'No reviews yet'
 
   if (loading) {
-    return (
-      <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    )
+    return <Loading />
   }
 
   const biometricLabel = biometricType === 'face' ? 'Face ID' : 'fingerprint'
@@ -549,22 +552,20 @@ export default function ProfileScreen({ navigation }) {
               accessibilityLabel={editModal.label}
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
+              <Button
+                variant="secondary"
+                title="Cancel"
                 onPress={() => setEditModal(m => ({ ...m, visible: false }))}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel editing">
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, saving && { opacity: 0.7 }]}
+                style={{ flex: 1 }}
+                accessibilityLabel="Cancel editing"
+              />
+              <Button
+                title="Save"
                 onPress={saveEdit}
-                disabled={saving}
-                accessibilityRole="button"
+                loading={saving}
+                style={{ flex: 1 }}
                 accessibilityLabel="Save changes"
-                accessibilityHint="Double tap to save your changes">
-                <Text style={styles.modalSaveText}>{saving ? 'Saving…' : 'Save'}</Text>
-              </TouchableOpacity>
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -599,21 +600,20 @@ export default function ProfileScreen({ navigation }) {
               accessibilityLabel="Password"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
+              <Button
+                variant="secondary"
+                title="Cancel"
                 onPress={() => { setPasswordModal(false); setPasswordInput('') }}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel">
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSave, enablingBiometric && { opacity: 0.7 }]}
+                style={{ flex: 1 }}
+                accessibilityLabel="Cancel"
+              />
+              <Button
+                title="Enable"
                 onPress={enableBiometric}
-                disabled={enablingBiometric}
-                accessibilityRole="button"
-                accessibilityLabel="Enable biometric login">
-                <Text style={styles.modalSaveText}>{enablingBiometric ? 'Enabling…' : 'Enable'}</Text>
-              </TouchableOpacity>
+                loading={enablingBiometric}
+                style={{ flex: 1 }}
+                accessibilityLabel="Enable biometric login"
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
   // ─── Card ────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 22,
     borderWidth: 1,
@@ -810,7 +810,9 @@ const styles = StyleSheet.create({
   },
   modalBox: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
     padding: 24,
     width: '100%',
     maxWidth: 380,
@@ -832,25 +834,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
   },
   modalActions: { flexDirection: 'row', gap: 10 },
-  modalCancel: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  modalCancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
-  modalSave: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  modalSaveText: { fontSize: 14, fontWeight: '700', color: colors.white },
 })

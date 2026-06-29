@@ -14,6 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import Loading from '../components/Loading'
+import Button from '../components/Button'
 
 function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
@@ -82,20 +85,22 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
       )}
 
       <View style={styles.rowActions}>
-        <TouchableOpacity
-          style={styles.editBtn}
+        <Button
+          variant="secondary"
+          size="sm"
+          title="Edit"
           onPress={() => onEdit(service)}
-          accessibilityRole="button"
-          accessibilityLabel="Edit service">
-          <Text style={styles.editBtnText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteBtn}
+          style={{ flex: 1 }}
+          accessibilityLabel="Edit service"
+        />
+        <Button
+          variant="destructive"
+          size="sm"
+          title="Delete"
           onPress={() => onDelete(service)}
-          accessibilityRole="button"
-          accessibilityLabel="Delete service">
-          <Text style={styles.deleteBtnText}>Delete</Text>
-        </TouchableOpacity>
+          style={{ flex: 1 }}
+          accessibilityLabel="Delete service"
+        />
       </View>
     </View>
   )
@@ -255,33 +260,27 @@ export default function MyServicesScreen({ navigation, route }) {
             <Text style={styles.headerTitle} accessibilityRole="header">My services</Text>
             <Text style={styles.headerSub}>{services.length} listed</Text>
           </View>
-          <TouchableOpacity
-            style={styles.addBtn}
+          <Button
+            size="sm"
+            icon="add"
+            title="Add"
             onPress={() => navigation.navigate('CreateService')}
-            accessibilityRole="button"
-            accessibilityLabel="Add new service">
-            <Text style={styles.addBtnText}>+ Add</Text>
-          </TouchableOpacity>
+            accessibilityLabel="Add new service"
+          />
         </View>
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <Loading label="Loading your services…" />
       ) : services.length === 0 ? (
-        <View style={styles.center}>
-          <Icon name="construct-outline" size={40} color={colors.textMuted} />
-          <Text style={styles.emptyTitle}>No services listed yet</Text>
-          <Text style={styles.emptyBody}>Create your first service to start receiving bookings</Text>
-          <TouchableOpacity
-            style={styles.createBtn}
-            onPress={() => navigation.navigate('CreateService')}
-            accessibilityRole="button"
-            accessibilityLabel="Create your first service">
-            <Text style={styles.createBtnText}>Create your first service <Icon name="arrow-forward" size={15} color="#fff" /></Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon="construct-outline"
+          title="No services listed yet"
+          body="Create your first service to start receiving bookings from locals."
+          actionLabel="Create your first service"
+          actionIcon="arrow-forward"
+          onAction={() => navigation.navigate('CreateService')}
+        />
       ) : (
         <FlatList
           data={services}
@@ -316,37 +315,14 @@ const styles = StyleSheet.create({
   headerRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
   headerSub:   { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  addBtnText: { color: colors.white, fontSize: 14, fontWeight: '700' },
-
-  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  loadingText: { color: colors.textMuted, fontSize: 15 },
-  emptyIcon:   { fontSize: 40, marginBottom: 12 },
-  emptyTitle:  { fontSize: 17, fontWeight: '700', color: colors.textSecondary, marginBottom: 6 },
-  emptyBody:   { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
-  createBtn:   { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 14, minHeight: 48, justifyContent: 'center' },
-  createBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 
   row: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   rowInactive: { opacity: 0.6 },
   rowPhoto: {
@@ -388,26 +364,4 @@ const styles = StyleSheet.create({
   bookingCountText: { fontSize: 12, fontWeight: '700', color: colors.info },
 
   rowActions: { flexDirection: 'row', gap: 10 },
-  editBtn: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-    minHeight: 40,
-    justifyContent: 'center',
-  },
-  editBtnText:   { fontSize: 13, fontWeight: '700', color: colors.primary },
-  deleteBtn: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: colors.danger,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-    minHeight: 40,
-    justifyContent: 'center',
-  },
-  deleteBtnText: { fontSize: 13, fontWeight: '700', color: colors.danger },
 })

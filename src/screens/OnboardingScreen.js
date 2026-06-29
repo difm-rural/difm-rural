@@ -17,6 +17,7 @@ import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../lib/
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 
 const SKILLS = [
@@ -29,8 +30,8 @@ const SKILLS = [
 // Everyone can request (post jobs, book services). "I also provide" adds the
 // provider tools on top — it never removes the ability to request.
 const ROLE_OPTIONS = [
-  { key: 'requester', emoji: 'home-outline', label: 'I need help',    sub: 'Post jobs and book local services' },
-  { key: 'both',      emoji: 'construct-outline', label: 'I also provide', sub: 'Advertise services and take on jobs too' },
+  { key: 'requester', emoji: 'home-outline',      label: 'I will mostly post jobs and book local services', sub: 'Find trusted rural people nearby' },
+  { key: 'both',      emoji: 'construct-outline',  label: 'I will mostly advertise services and take on jobs', sub: 'Advertise services and take on jobs too' },
 ]
 
 // Step meta indexed by step number (0–4)
@@ -161,9 +162,12 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         Alert.alert('Error', 'Not logged in. Please restart the app.')
         return
       }
+      // Legacy `role` column only allows requester/provider — map "both" to
+      // provider there; primary_role is the real source of truth.
+      const legacyRole = primaryRole === 'both' ? 'provider' : primaryRole
       const { error } = await supabase
         .from('profiles')
-        .update({ primary_role: primaryRole, role: primaryRole })
+        .update({ primary_role: primaryRole, role: legacyRole })
         .eq('id', user.id)
       if (error) {
         Alert.alert('Error saving', error.message)
@@ -307,7 +311,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
         {ROLE_OPTIONS.map(r => (
           <TouchableOpacity
             key={r.key}
@@ -331,6 +335,9 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             )}
           </TouchableOpacity>
         ))}
+        <Text style={styles.roleNote}>
+          Your primary role can be changed at any time in Account settings.
+        </Text>
       </ScrollView>
     )
   }
@@ -340,7 +347,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
         <View style={styles.infoCard}>
           <Icon name="person-outline" size={22} color={colors.primary} />
@@ -382,11 +389,12 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}>
+        keyboardVerticalOffset={0}
+        enabled={Platform.OS === 'android'}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           {/* Avatar */}
           <View style={styles.avatarRow}>
@@ -483,11 +491,12 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        enabled={Platform.OS === 'android'}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           <Text style={styles.introText}>
             Select any skills you have — this helps match you with relevant jobs
@@ -584,7 +593,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
         <View style={styles.summaryCard}>
           <View style={styles.summaryAvatarRow}>
@@ -706,14 +715,13 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={[styles.nextBtn, saving && { opacity: 0.7 }]}
+        <Button
+          title={btnLabel}
           onPress={handleNext}
-          disabled={saving}
-          accessibilityRole="button"
-          accessibilityLabel={btnLabel}>
-          <Text style={styles.nextBtnText}>{btnLabel}</Text>
-        </TouchableOpacity>
+          loading={saving}
+          style={{ marginBottom: 10 }}
+          accessibilityLabel={btnLabel}
+        />
         {/* Skip is not available for step 0 (role required) or last step */}
         {!isLastStep && step > 0 && (
           <TouchableOpacity
@@ -786,15 +794,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 18,
     marginBottom: 12,
     borderWidth: 2,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   roleTileSelected: {
     borderColor: colors.primary,
@@ -808,6 +812,7 @@ const styles = StyleSheet.create({
   roleTileLabelSelected: { color: colors.primary },
   roleTileSub: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   roleTileSubSelected: { color: colors.primaryDark },
+  roleNote: { fontSize: 13, color: colors.textMuted, lineHeight: 19, textAlign: 'center', marginTop: 16, paddingHorizontal: 8 },
   roleTileCheck: { fontSize: 22, color: colors.primary, fontWeight: '700' },
 
   // ─── Info cards (Step 1) ──────────────────────────────────────────────────────
@@ -816,15 +821,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 14,
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   infoCardIcon:  { fontSize: 22, lineHeight: 28, marginTop: 1 },
   infoCardBody:  { flex: 1 },
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
   qualRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: colors.white,
-    borderRadius: 10, padding: 12, marginBottom: 8,
+    borderRadius: 12, padding: 12, marginBottom: 8,
     borderWidth: 1, borderColor: colors.border,
   },
   qualIcon:   { fontSize: 16 },
@@ -915,7 +916,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
     borderWidth: 1.5, borderColor: colors.primary,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 13, paddingVertical: 11,
     fontSize: 14, color: colors.textPrimary,
   },
@@ -930,7 +931,7 @@ const styles = StyleSheet.create({
   qualAddRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: colors.white,
-    borderRadius: 10, padding: 12,
+    borderRadius: 12, padding: 12,
     borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed',
     marginTop: 4,
   },
@@ -940,7 +941,7 @@ const styles = StyleSheet.create({
   // ─── Step 4 ───────────────────────────────────────────────────────────────────
   summaryCard: {
     backgroundColor: colors.white,
-    borderRadius: 16, padding: 20, marginBottom: 14,
+    borderRadius: 12, padding: 20, marginBottom: 14,
     alignItems: 'center',
     borderWidth: 1, borderColor: colors.border,
   },
@@ -966,7 +967,7 @@ const styles = StyleSheet.create({
 
   whatsNextCard: {
     backgroundColor: colors.white,
-    borderRadius: 16, padding: 18, marginBottom: 14,
+    borderRadius: 12, padding: 18, marginBottom: 14,
     borderWidth: 1, borderColor: colors.border,
   },
   whatsNextTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
@@ -975,7 +976,7 @@ const styles = StyleSheet.create({
   actionCards: { flexDirection: 'row', gap: 10 },
   actionCard: {
     flex: 1, backgroundColor: colors.white,
-    borderRadius: 16, padding: 16,
+    borderRadius: 12, padding: 16,
     borderWidth: 1, borderColor: colors.border,
     alignItems: 'center',
   },
@@ -991,16 +992,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  nextBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 17,
-    alignItems: 'center',
-    marginBottom: 10,
-    minHeight: 54,
-    justifyContent: 'center',
-  },
-  nextBtnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
   skipBtn:     { minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   skipBtnText: { color: colors.textMuted, fontSize: 14 },
 })

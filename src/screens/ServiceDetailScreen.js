@@ -16,6 +16,7 @@ import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle
 import { cancelBookingByRequester } from '../lib/bookingActions'
 import ReviewList from '../components/ReviewList'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -33,6 +34,12 @@ function formatPricingType(type) {
     case 'day_rate': return 'Day rate'
     default:         return type
   }
+}
+
+const MATERIALS_LABELS = {
+  included:           'Included',
+  estimate:           'Charged as estimate',
+  requester_supplies: 'Requester supplies',
 }
 
 function DetailRow({ label, value, last }) {
@@ -292,6 +299,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
             />
           )}
           <DetailRow label="Equipment" value={service.includes_equipment ? 'Included' : 'Not included'} />
+          {service.materials ? (
+            <DetailRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
+          ) : null}
           {service.travel_range_km ? (
             <DetailRow label="Travel range" value={`${service.travel_range_km} km`} />
           ) : null}
@@ -356,29 +366,24 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
       {/* Book button */}
       <View style={[styles.bookFooter, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={isOwnService ? styles.bookBtn : isBooked ? styles.viewBookingBtn : styles.bookBtn}
+        <Button
+          variant={!isOwnService && isBooked ? 'secondary' : 'primary'}
+          title={isOwnService ? 'Manage your services' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : `Book now · $${total} NZD`}
           onPress={isOwnService
             ? goToManageServices
             : isBooked
             ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
             : () => navigation.navigate('BookingConfirm', { service, quantity })}
-          accessibilityRole="button"
-          accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}>
-          <Text style={isOwnService ? styles.bookBtnText : isBooked ? styles.viewBookingBtnText : styles.bookBtnText}>
-            {isOwnService ? 'Manage your services' : isBooked ? 'View booking ->' : isQuoteRequired ? 'Request quote' : `Book now - $${total} NZD`}
-          </Text>
-        </TouchableOpacity>
+          accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}
+        />
         {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
-          <TouchableOpacity
-            style={styles.cancelBookingBtn}
+          <Button
+            variant="destructive"
+            title={activeBooking?.status === 'pending' ? 'Withdraw request' : 'Request cancellation'}
             onPress={handleCancelBooking}
-            accessibilityRole="button"
-            accessibilityLabel={activeBooking?.status === 'pending' ? 'Withdraw service request' : 'Request cancellation'}>
-            <Text style={styles.cancelBookingBtnText}>
-              {activeBooking?.status === 'pending' ? 'Withdraw request' : 'Request cancellation'}
-            </Text>
-          </TouchableOpacity>
+            style={{ marginTop: 10 }}
+            accessibilityLabel={activeBooking?.status === 'pending' ? 'Withdraw service request' : 'Request cancellation'}
+          />
         )}
       </View>
     </View>
@@ -419,7 +424,7 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -532,27 +537,6 @@ const styles = StyleSheet.create({
   },
   bookedInfoIcon: { fontSize: 18, color: colors.primary },
   bookedInfoText: { fontSize: 14, color: colors.primary, fontWeight: '600', flex: 1 },
-  viewBookingBtn: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  viewBookingBtnText: { color: colors.primary, fontSize: 16, fontWeight: 'bold' },
-  cancelBookingBtn: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    minHeight: 48,
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  cancelBookingBtnText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
-
   bookFooter: {
     backgroundColor: colors.white,
     borderTopWidth: 1,
@@ -560,13 +544,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
   },
-  bookBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  bookBtnText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
 })

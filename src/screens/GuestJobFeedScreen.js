@@ -16,6 +16,8 @@ import * as Location from 'expo-location'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EmptyState from '../components/EmptyState'
+import { SkeletonList } from '../components/SkeletonCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
 const FILTERS = [
@@ -110,21 +112,15 @@ export default function GuestJobFeedScreen({ navigation }) {
     if (raw.length === 0) { setJobs([]); setLoading(false); setRefreshing(false); return }
 
     const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]
-    const [{ data: profilesData }, { data: bidsData }] = requesterIds.length > 0
-      ? await Promise.all([
-        supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
-        supabase.from('bids').select('job_id').in('job_id', raw.map(j => j.id)).eq('status', 'pending'),
-      ])
-      : [{ data: [] }, { data: [] }]
-
-    const bidCountMap = {}
-    bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+    // Offers are private — no bid counts on the public board.
+    const { data: profilesData } = requesterIds.length > 0
+      ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds)
+      : { data: [] }
 
     setJobs(raw.map(j => ({
       ...j,
       _type: 'job',
       profiles: profilesData?.find(p => p.id === j.requester_id) || null,
-      bidCount: bidCountMap[j.id] || 0,
     })))
     setLoading(false)
     setRefreshing(false)
@@ -212,14 +208,21 @@ export default function GuestJobFeedScreen({ navigation }) {
 
       {/* Content */}
       {loading ? (
-        <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
       ) : bothEmpty ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyTitle}>No jobs found</Text>
-          <Text style={styles.emptyBody}>Try a different search or filter.</Text>
-        </View>
+        filter !== 'All' || search.trim() ? (
+          <EmptyState
+            icon="search-outline"
+            title="No jobs match"
+            body="Try a different search or filter."
+          />
+        ) : (
+          <EmptyState
+            icon="briefcase-outline"
+            title="No jobs nearby yet"
+            body="New jobs appear here as locals post them. Pull down to refresh."
+          />
+        )
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -314,10 +317,6 @@ const styles = StyleSheet.create({
   },
   hListContent: { paddingLeft: 14 },
 
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  loadingText: { color: colors.textMuted, fontSize: 15 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
-  emptyBody:  { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
   noMore:     { paddingVertical: 20, alignItems: 'center' },
   noMoreText: { fontSize: 13, color: colors.textMuted },
 })

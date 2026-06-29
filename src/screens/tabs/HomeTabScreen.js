@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react'
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -22,6 +21,8 @@ import {
   openNotificationTarget,
 } from '../../lib/notifications'
 import { canProvide } from '../../lib/roles'
+import EmptyState from '../../components/EmptyState'
+import Loading from '../../components/Loading'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -149,8 +150,8 @@ export default function HomeTabScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={[styles.screen, styles.center]}>
-        <ActivityIndicator color={colors.primary} size="large" />
+      <View style={styles.screen}>
+        <Loading />
       </View>
     )
   }
@@ -235,7 +236,12 @@ export default function HomeTabScreen({ navigation }) {
             </TouchableOpacity>
           </View>
           {attention.length === 0 ? (
-            <Text style={styles.allClearText}>All caught up — nothing waiting on you.</Text>
+            <EmptyState
+              compact
+              tone="positive"
+              icon="checkmark-circle-outline"
+              body="All caught up — nothing waiting on you."
+            />
           ) : (
             attention.map((n, i) => (
               <TouchableOpacity
@@ -303,12 +309,16 @@ export default function HomeTabScreen({ navigation }) {
 
         {totalActive === 0 && (
           <View style={styles.section}>
-            <Text style={styles.emptyTitle}>No active work yet</Text>
-            <Text style={styles.emptyBody}>
-              {isProvider && !isRequester
-                ? 'Find jobs on the board or advertise a service when you are ready.'
-                : 'Post a job or browse services to get started.'}
-            </Text>
+            <EmptyState
+              compact
+              icon="leaf-outline"
+              title="No active work yet"
+              body={
+                isProvider && !isRequester
+                  ? 'Find jobs on the board or advertise a service when you are ready.'
+                  : 'Post a job or browse services to get started.'
+              }
+            />
           </View>
         )}
       </ScrollView>
@@ -318,7 +328,6 @@ export default function HomeTabScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  center: { alignItems: 'center', justifyContent: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
   kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
@@ -339,7 +348,7 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
 
   actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  actionCard:  { flex: 1, borderRadius: 14, padding: 16, minHeight: 104 },
+  actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 104 },
   primaryAction:   { backgroundColor: colors.primary },
   secondaryAction: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
   actionTitle:    { fontSize: 16, fontWeight: '700', marginBottom: 4 },
@@ -351,7 +360,7 @@ const styles = StyleSheet.create({
 
   section: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -365,8 +374,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
-
-  allClearText: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
 
   notifRow: {
     flexDirection: 'row',
@@ -400,6 +407,4 @@ const styles = StyleSheet.create({
   summaryLabel:     { flex: 1, fontSize: 14, color: colors.textPrimary },
   summaryChevron:   { fontSize: 20, color: colors.textMuted },
 
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
-  emptyBody:  { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
 })

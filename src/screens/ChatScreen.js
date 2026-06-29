@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'flex-end',
   },
-  sendButtonDisabled: { backgroundColor: '#b0c4bb' },
+  sendButtonDisabled: { backgroundColor: colors.primaryMuted },
   sendText: { color: colors.white, fontWeight: '700', fontSize: 15 },
 
   // ─── Special message bubbles ────────────────────────────────────────

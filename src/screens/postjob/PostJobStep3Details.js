@@ -9,6 +9,7 @@ import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import Button from '../../components/Button'
 
 const MATERIALS_OPTIONS = [
   { id: 'none',      label: 'None needed', icon: 'checkmark-circle-outline' },
@@ -111,11 +112,13 @@ export default function PostJobStep3Details({ navigation, route }) {
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}>
+        keyboardVerticalOffset={0}
+        enabled={Platform.OS === 'android'}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
 
           <SummaryBar items={[
@@ -233,6 +236,14 @@ export default function PostJobStep3Details({ navigation, route }) {
               <Text style={styles.cardQuestion}>Photos</Text>
               <Text style={styles.optionalTag}>Optional · up to 6</Text>
             </View>
+            {photos.length === 0 && (
+              <View style={styles.photoNudge}>
+                <Icon name="camera-outline" size={16} color={colors.primary} />
+                <Text style={styles.photoNudgeText}>
+                  Providers are far more likely to make an offer when they can see the job — a quick photo or two really helps.
+                </Text>
+              </View>
+            )}
             <View style={styles.photoGrid}>
               {photos.map((p, i) => (
                 <View key={i} style={styles.photoThumb}>
@@ -278,14 +289,14 @@ export default function PostJobStep3Details({ navigation, route }) {
               accessibilityLabel="Go back">
               <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
+            <Button
+              title="Next — Budget"
+              icon="arrow-forward"
               onPress={handleNext}
               disabled={!canProceed()}
-              accessibilityRole="button"
-              accessibilityLabel="Next step">
-              <Text style={styles.nextBtnText}>Next — Budget <Icon name="arrow-forward" size={15} color="#fff" /></Text>
-            </TouchableOpacity>
+              style={{ flex: 1 }}
+              accessibilityLabel="Next step"
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -314,7 +325,7 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     borderWidth: 0.5,
@@ -395,6 +406,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
+  photoNudge:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10 },
+  photoNudgeText:  { flex: 1, fontSize: 12, color: colors.primary, lineHeight: 17 },
   photoGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photoThumb:      { width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' },
   photoImg:        { width: 72, height: 72 },
@@ -415,7 +428,4 @@ const styles = StyleSheet.create({
   footerBtns:      { flexDirection: 'row', gap: 10 },
   backBtn:         { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   backBtnText:     { color: colors.primary, fontSize: 14, fontWeight: '600' },
-  nextBtn:         { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  nextBtnDisabled: { backgroundColor: colors.primaryMuted },
-  nextBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },
 })

@@ -21,7 +21,10 @@ import { useUser } from '../../context/UserContext'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import Loading from '../../components/Loading'
+import Button from '../../components/Button'
 import { canProvide } from '../../lib/roles'
+import { loadUserPreferences, updateUserPreferences } from '../../lib/preferences'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import {
   authenticate,
@@ -58,7 +61,7 @@ function getDisplayLocation(addr) {
   return parts.slice(-3, -1).join(', ').trim() || addr
 }
 
-function MenuRow({ icon, label, value, onPress, last, danger }) {
+function MenuRow({ icon, label, sub, value, onPress, last, danger }) {
   return (
     <TouchableOpacity
       style={[styles.row, !last && styles.rowBorder]}
@@ -69,7 +72,10 @@ function MenuRow({ icon, label, value, onPress, last, danger }) {
       accessibilityHint="Double tap to open">
       <View style={styles.rowLeft}>
         <Icon name={icon} size={18} color={danger ? colors.danger : colors.textSecondary} style={styles.rowIcon} />
-        <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
+        <View style={styles.rowLabelWrap}>
+          <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
+          {!!sub && <Text style={styles.rowSub} numberOfLines={2}>{sub}</Text>}
+        </View>
       </View>
       <View style={styles.rowRight}>
         {!!value && (
@@ -135,6 +141,7 @@ export default function AccountTabScreen({ navigation }) {
   const [ratingSummary, setRatingSummary]       = useState({ average: 0, count: 0 })
   const [biometricEnabled,   setBiometricEnabled]   = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [dailyDigest,        setDailyDigest]        = useState(false)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
   const [editModal, setEditModal]           = useState({
     visible: false, field: '', label: '', value: '', keyboardType: 'default',
@@ -164,7 +171,7 @@ export default function AccountTabScreen({ navigation }) {
 
     const [{ data: profileData }, { data: reviewsData }, { count: jobCount }, { count: serviceCount }] = await Promise.all([
       supabase.from('profiles')
-        .select('full_name, phone, region, avatar_url, primary_role, role, display_name, bio, skills, qualifications, address, latitude, longitude')
+        .select('full_name, phone, region, avatar_url, primary_role, role, is_admin, display_name, bio, skills, qualifications, address, latitude, longitude')
         .eq('id', user.id)
         .single(),
       supabase.from('reviews').select('rating').eq('reviewee_id', user.id),
@@ -192,7 +199,17 @@ export default function AccountTabScreen({ navigation }) {
     setBiometricAvailable(available)
     setBiometricEnabled(enabled)
 
+    const prefs = await loadUserPreferences()
+    setDailyDigest(!!prefs?.daily_digest)
+
     setLoading(false)
+  }
+
+  // ─── Daily summary toggle ──────────────────────────────────────────────────
+  async function handleDailyDigestToggle() {
+    const next = !dailyDigest
+    setDailyDigest(next)                              // optimistic
+    await updateUserPreferences({ daily_digest: next })
   }
 
   // ─── Biometric toggle ──────────────────────────────────────────────────────
@@ -385,8 +402,8 @@ export default function AccountTabScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={[styles.screen, styles.center]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.screen}>
+        <Loading />
       </View>
     )
   }
@@ -399,6 +416,7 @@ export default function AccountTabScreen({ navigation }) {
     : 'No reviews yet'
   const roleLabel  = canProvide(profile) ? 'Provider' : 'Requester'
   const isProvider = canProvide(profile)
+  const isAdmin = !!profile?.is_admin
   const locationDisplay = getDisplayLocation(profile.address) || profile.address || '—'
 
   const onboardYears = Math.floor(monthsOnboard / 12)
@@ -448,6 +466,12 @@ export default function AccountTabScreen({ navigation }) {
       </View>
 
       <View style={styles.hubButtons}>
+        {isAdmin && (
+          <HubButton
+            icon="speedometer-outline" label="Admin" sub="Jobs, services, bookings, activity"
+            onPress={() => navigation.navigate('Admin')}
+          />
+        )}
         <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}
@@ -462,13 +486,13 @@ export default function AccountTabScreen({ navigation }) {
         />
       </View>
 
-      <TouchableOpacity
-        style={[styles.signOutBtn, { marginHorizontal: 16, marginTop: 20 }]}
+      <Button
+        variant="destructive"
+        title="Log out"
         onPress={handleSignOut}
-        accessibilityRole="button"
-        accessibilityLabel="Log out">
-        <Text style={styles.signOutText}>Log out</Text>
-      </TouchableOpacity>
+        style={{ marginHorizontal: 16, marginTop: 20 }}
+        accessibilityLabel="Log out"
+      />
     </>
   )
 
@@ -635,8 +659,12 @@ export default function AccountTabScreen({ navigation }) {
       <Text style={styles.sectionLabel}>App</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="notifications-outline" label="Notifications" value="Enabled" last
-          onPress={() => Alert.alert('Notifications', 'Notification preferences coming soon.')}
+          icon="mail-outline"
+          label="Daily summary"
+          sub="A morning notification of your jobs and bookings in flight"
+          value={dailyDigest ? 'On' : 'Off'}
+          last
+          onPress={handleDailyDigestToggle}
         />
       </View>
     </View>
@@ -815,7 +843,7 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ececec',
     marginHorizontal: 16,
@@ -837,7 +865,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ececec',
     paddingVertical: 16,
@@ -897,7 +925,7 @@ const styles = StyleSheet.create({
   // ─── Card / rows ──────────────────────────────────────────────────────────
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 22,
     borderWidth: 1,
@@ -913,6 +941,8 @@ const styles = StyleSheet.create({
   },
   rowBorder:      { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
   rowLeft:        { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
+  rowLabelWrap:   { flex: 1 },
+  rowSub:         { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   rowIcon:        { fontSize: 16, marginRight: 12, width: 22, textAlign: 'center' },
   rowLabel:       { fontSize: 14, fontWeight: '500', color: colors.textPrimary },
   rowLabelDanger: { color: colors.danger, fontWeight: '600' },
@@ -945,7 +975,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ececec',
     padding: 16,
@@ -954,15 +984,6 @@ const styles = StyleSheet.create({
   roleCardTitle:  { fontSize: 16, fontWeight: '700', color: colors.primary },
   roleCardSub:    { fontSize: 12, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
   roleCardAction: { fontSize: 14, fontWeight: '700', color: colors.primary },
-
-  signOutBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.danger,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  signOutText: { fontSize: 15, fontWeight: '700', color: colors.danger },
 
   // ─── Location modal ───────────────────────────────────────────────────────
   locationOverlay: {
@@ -1007,7 +1028,9 @@ const styles = StyleSheet.create({
   },
   modalBox: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
     padding: 24,
     width: '100%',
     maxWidth: 380,

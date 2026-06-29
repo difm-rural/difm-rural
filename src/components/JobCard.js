@@ -25,8 +25,9 @@ function getInitials(fullName) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function getStatusText(job, bidCount) {
-  return jobStatusLabel(job.status, bidCount)
+function getStatusText(job) {
+  // Offers are private — providers browsing the board never see offer counts.
+  return jobStatusLabel(job.status)
 }
 
 function postedAgo(createdAt) {
@@ -43,7 +44,6 @@ function postedAgo(createdAt) {
 
 export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle, actionLabel = 'View', distanceKm = null }) {
   const profile    = job.profiles || {}
-  const hasBids    = bidCount > 0 && job.status === 'open'
   const isOpen     = job.status === 'open'
   const initials   = getInitials(profile.full_name)
   const name       = shortName(profile.full_name)
@@ -52,7 +52,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
   const budgetText = job.status === 'completed' && paidAmount != null
     ? `$${paidAmount} NZD`
     : job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open'
-  const statusText = getStatusText(job, bidCount)
+  const statusText = getStatusText(job)
   const photoUrl = Array.isArray(job.photos) && job.photos.length > 0 ? job.photos[0] : null
   const showCompletedSummary = job.status === 'completed' && (
     paidAmount != null ||
@@ -62,7 +62,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
   return (
     <TouchableOpacity
-      style={[styles.card, hasBids && styles.cardHighlight, style]}
+      style={[styles.card, style]}
       onPress={onPress}
       activeOpacity={0.75}
       accessibilityRole="button"
@@ -87,11 +87,6 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
           )}
           <Text style={styles.budgetLabel}>{job.status === 'completed' && paidAmount != null ? 'Paid' : 'Budget'}</Text>
           <Text style={styles.budgetAmount}>{budgetText}</Text>
-          {hasBids && (
-            <View style={styles.bidBadge}>
-              <Text style={styles.bidBadgeText}>{bidCount} new offer{bidCount > 1 ? 's' : ''}</Text>
-            </View>
-          )}
         </View>
       </View>
 
@@ -156,14 +151,10 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   cardHighlight: { borderWidth: 1.5, borderColor: colors.primary },

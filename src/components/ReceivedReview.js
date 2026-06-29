@@ -19,7 +19,7 @@ export default function ReceivedReview({ review, fromLabel = 'them', style }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,

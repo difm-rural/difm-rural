@@ -1,6 +1,7 @@
 import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
+import { statusLabel, statusTone } from '../lib/lifecycle'
 import Icon from './Icon'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -63,37 +64,22 @@ function getFirstName(name) {
   return name.trim().split(/\s+/)[0]
 }
 
+// Badge colours per semantic tone (see statusTone in lifecycle). Language and
+// stage→tone mapping live in lifecycle; only the palette lives here.
+const STATUS_TONE_COLORS = {
+  active:    { bg: '#e8f5e9', fg: colors.primary },
+  waiting:   { bg: '#fff3e0', fg: '#fb8c00' },
+  engaged:   { bg: '#e3f2fd', fg: '#1565c0' },
+  attention: { bg: '#fff3e0', fg: '#fb8c00' },
+  done:      { bg: '#f5f5f5', fg: '#757575' },
+  muted:     { bg: '#f5f5f5', fg: '#757575' },
+  cancelled: { bg: '#fdecea', fg: colors.danger },
+}
+
 function statusBadgeProps(status, bidCount) {
   if (!status) return null
-  switch (status) {
-    case 'open':
-      return {
-        label: bidCount > 0 ? `${bidCount} offer${bidCount > 1 ? 's' : ''}` : '0 offers',
-        bg: '#e8f5e9', fg: colors.primary,
-      }
-    case 'accepted':
-      return { label: 'Accepted', bg: '#e3f2fd', fg: '#1565c0' }
-    case 'in_progress':
-      return { label: 'In progress', bg: '#e3f2fd', fg: '#1565c0' }
-    case 'pending':
-      return { label: 'Booked', bg: '#f3e5f5', fg: '#9c27b0' }
-    case 'quote_sent':
-      return { label: 'Quote sent', bg: '#fff3e0', fg: '#fb8c00' }
-    case 'confirmed':
-      return { label: 'Confirmed', bg: '#f3e5f5', fg: '#9c27b0' }
-    case 'awaiting_completion':
-      return { label: 'Ready', bg: '#fff3e0', fg: '#fb8c00' }
-    case 'cancellation_requested':
-      return { label: 'Cancel requested', bg: '#fff3e0', fg: '#fb8c00' }
-    case 'completed':
-      return { label: 'Completed', bg: '#f5f5f5', fg: '#757575' }
-    case 'withdrawn':
-      return { label: 'Withdrawn', bg: '#f5f5f5', fg: '#757575' }
-    case 'cancelled':
-      return { label: 'Cancelled', bg: '#fdecea', fg: colors.danger }
-    default:
-      return { label: status, bg: '#f5f5f5', fg: '#757575' }
-  }
+  const tone = STATUS_TONE_COLORS[statusTone(status)] || STATUS_TONE_COLORS.muted
+  return { label: statusLabel(status, bidCount), ...tone }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -104,7 +90,6 @@ export default function JobServiceCard({
   isWatched = false,
   showStatusBadge = false,
   status,
-  statusLabel,
   isGuest = false,
   onGuestAction,
 }) {
@@ -124,8 +109,6 @@ export default function JobServiceCard({
   const ratingText  = ratingCount > 0 ? `★ ${ratingAvg} · ${ratingCount}` : '★ New'
 
   const badge = showStatusBadge ? statusBadgeProps(status || item.status, bidCount) : null
-  if (badge && statusLabel) badge.label = statusLabel
-  const showBidBadge = !isService && !showStatusBadge && bidCount > 0
   const showHeart = !!onWatchlistToggle || isGuest
 
   function handleHeartPress() {
@@ -179,12 +162,6 @@ export default function JobServiceCard({
           </View>
         )}
 
-        {/* Bid count bubble (tasks only, when no status badge) */}
-        {showBidBadge && (
-          <View style={styles.bidBubble}>
-            <Text style={styles.bidBubbleText}>{bidCount} offer{bidCount > 1 ? 's' : ''}</Text>
-          </View>
-        )}
       </View>
 
       {/* ── Card body ───────────────────────────────────────────────────────── */}

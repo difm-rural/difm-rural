@@ -40,6 +40,7 @@ import BookingConfirmScreen from '../screens/BookingConfirmScreen'
 import CreateServiceScreen  from '../screens/CreateServiceScreen'
 import MyServicesScreen     from '../screens/MyServicesScreen'
 import ProfileScreen        from '../screens/ProfileScreen'
+import AdminScreen          from '../screens/AdminScreen'
 
 import JobFeedScreen           from '../screens/JobFeedScreen'
 import MyJobsScreen            from '../screens/MyJobsScreen'
@@ -177,6 +178,7 @@ function AccountStackNav() {
       <AccountNav.Screen name="MyServices"    component={MyServicesScreen}   />
       <AccountNav.Screen name="CreateService" component={CreateServiceScreen} />
       <AccountNav.Screen name="Profile"       component={ProfileScreen}      />
+      <AccountNav.Screen name="Admin"         component={AdminScreen}        />
       <AccountNav.Screen name="ServiceDetail"  component={ServiceDetailScreen}  />
       <AccountNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <AccountNav.Screen name="BookingConfirm" component={BookingConfirmScreen} />
@@ -468,6 +470,39 @@ export default function AppNavigator() {
     }
   }, [])
 
+  // After a guest taps "Offer on this job" they're sent to sign in; once the
+  // authenticated tabs are actually mounted (immediately for existing users,
+  // after onboarding for new ones) return them to that job ready to offer.
+  const authedTabsActive = !!session && !showOnboarding && !loading
+  useEffect(() => {
+    if (!authedTabsActive) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const raw = await AsyncStorage.getItem('pendingJobView')
+        if (!raw) return
+        await AsyncStorage.removeItem('pendingJobView')
+        const parsed = JSON.parse(raw)
+        const job = parsed?.job
+        const fresh = parsed?.savedAt && Date.now() - parsed.savedAt < 60 * 60 * 1000
+        if (!job || !fresh) return
+        // The tab tree may still be mounting — retry until the ref is ready.
+        const go = (attempt = 0) => {
+          if (cancelled) return
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('Jobs', { screen: 'JobDetail', params: { job } })
+          } else if (attempt < 20) {
+            setTimeout(() => go(attempt + 1), 100)
+          }
+        }
+        go()
+      } catch (e) {
+        console.log('Error opening pending job view:', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [authedTabsActive])
+
   async function postPendingJobIfAny(userId) {
     try {
       const raw = await AsyncStorage.getItem('pendingJob')
@@ -510,15 +545,18 @@ export default function AppNavigator() {
       const { error } = await supabase
         .from('bookings')
         .insert({ ...booking, requester_id: userId, status: booking.status || 'pending' })
-      await AsyncStorage.removeItem('pendingBooking')
-      if (!error) {
-        Alert.alert(
-          'Booking requested',
-          `Your booking request has been sent to ${pending.providerName || 'the provider'}.`
-        )
-      } else {
-        Alert.alert('Booking not sent', error.message)
+
+      if (error) {
+        // Keep the draft so the user can retry — don't silently lose their booking.
+        Alert.alert('Booking not sent', `${error.message}\n\nYour details are saved — please try booking again.`)
+        return
       }
+
+      await AsyncStorage.removeItem('pendingBooking')
+      Alert.alert(
+        'Booking requested',
+        `Your booking request has been sent to ${pending.providerName || 'the provider'}.`
+      )
     } catch (error) {
       console.log('Error posting pending booking:', error)
     }

@@ -23,6 +23,7 @@ import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../../li
 import JobCard from '../../components/JobCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import SkeletonCard from '../../components/SkeletonCard'
+import EmptyState from '../../components/EmptyState'
 
 const FILTERS = ['All', ...JOB_CATEGORIES]
 
@@ -321,16 +322,19 @@ export default function JobsTabScreen({ navigation }) {
           </View>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyTitle}>
-              {filter !== 'All' || search.trim() ? 'No jobs match' : 'No open jobs right now'}
-            </Text>
-            <Text style={styles.emptyBody}>
-              {filter !== 'All' || search.trim()
-                ? 'Try a different category or search term.'
-                : 'Check back soon — new jobs appear here as neighbours post them.'}
-            </Text>
-          </View>
+          filter !== 'All' || search.trim() ? (
+            <EmptyState
+              icon="search-outline"
+              title="No jobs match"
+              body="Try a different category or search term."
+            />
+          ) : (
+            <EmptyState
+              icon="briefcase-outline"
+              title="No open jobs right now"
+              body="Check back soon — new jobs appear here as neighbours post them."
+            />
+          )
         }
         contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
         refreshControl={
@@ -356,7 +360,7 @@ const styles = StyleSheet.create({
   headerSub:   { color: colors.textSecondary, fontSize: 14, marginTop: 2, marginBottom: 12 },
   searchInput: {
     backgroundColor: colors.white,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
@@ -369,7 +373,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     marginHorizontal: 16,
     marginTop: 16,
@@ -419,7 +423,7 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.border,
@@ -430,7 +434,4 @@ const styles = StyleSheet.create({
 
   boardCardWrap: { paddingHorizontal: 16 },
 
-  emptyWrap:  { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
-  emptyBody:  { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21 },
 })

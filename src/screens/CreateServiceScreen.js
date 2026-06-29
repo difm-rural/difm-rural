@@ -21,17 +21,27 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 const CATEGORIES = ['Machinery', 'Labour', 'Water delivery', 'Animal care', 'Maintenance', 'Fencing', 'Other']
 const PRICING_TYPES = [
-  { id: 'quote_required', label: 'Quote required' },
-  { id: 'hourly', label: 'Hourly' },
-  { id: 'per_unit', label: 'Per unit' },
-  { id: 'fixed', label: 'Fixed' },
-  { id: 'day_rate', label: 'Day rate' },
+  { id: 'fixed', label: 'Fixed price' },
+  { id: 'hourly', label: 'Hourly rate' },
+  { id: 'per_unit', label: 'Per load/unit' },
+  { id: 'quote_required', label: 'Estimate / quote' },
 ]
+const PAYMENT_OPTIONS = [
+  { id: 'upfront', label: 'Pay upfront' },
+  { id: 'on_completion', label: 'On completion' },
+]
+const MATERIALS_OPTIONS = [
+  { id: 'included', label: 'Included' },
+  { id: 'estimate', label: 'Extra estimate' },
+  { id: 'requester_supplies', label: 'Requester supplies' },
+]
+const materialsLabel = (id) => MATERIALS_OPTIONS.find(o => o.id === id)?.label || '—'
 const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Equipment', 'Review']
 const AI_FUNCTION_NAME = 'create-service-draft-from-photo'
 
@@ -145,9 +155,11 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [description, setDescription] = useState(editingService?.description || '')
   const [photos, setPhotos] = useState(Array.isArray(editingService?.photos) ? editingService.photos : [])
 
-  const [pricingType, setPricingType] = useState(editingService?.pricing_type || '')
+  const [pricingType, setPricingType] = useState(normalizePricingType(editingService?.pricing_type))
   const [rate, setRate] = useState(editingService?.rate != null ? String(editingService.rate) : '')
   const [unitLabel, setUnitLabel] = useState(editingService?.unit_label || '')
+  const [paymentTiming, setPaymentTiming] = useState(editingService?.payment_timing || 'on_completion')
+  const [materials, setMaterials] = useState(editingService?.materials || 'included')
   const [locationName, setLocationName] = useState(editingService?.location_name || '')
   const [travelRange, setTravelRange] = useState(editingService?.travel_range_km != null ? String(editingService.travel_range_km) : '')
   const [availableFrom,   setAvailableFrom]   = useState(toDateValue(editingService?.availability))
@@ -198,7 +210,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     if (v === 'hourly') return 'hourly'
     if (v === 'fixed') return 'fixed'
     if (v === 'quote_required' || v === 'unknown') return 'quote_required'
-    if (v === 'day_rate' || v === 'per_day') return 'day_rate'
+    if (v === 'day_rate' || v === 'per_day') return 'fixed'   // day rate folded into fixed for preview
     if (v === 'per_unit' || v === 'per_load' || v === 'per_job') return 'per_unit'
     return ''
   }
@@ -374,22 +386,20 @@ export default function CreateServiceScreen({ navigation, route }) {
                 </View>
               )}
               <View style={styles.footerRow}>
-                <TouchableOpacity
-                  style={styles.backBtn}
+                <Button
+                  variant="secondary"
+                  title="Retake"
                   onPress={() => setSourcePhoto(null)}
                   disabled={creatingDraft}
-                  accessibilityRole="button"
-                  accessibilityLabel="Retake or choose another photo">
-                  <Text style={styles.backBtnText}>Retake</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.nextBtn, creatingDraft && styles.btnDisabled]}
+                  accessibilityLabel="Retake or choose another photo"
+                />
+                <Button
+                  title={draftError ? 'Use manually' : 'Use photo'}
                   onPress={draftError ? () => { setDraftSource('photo'); setCreationMode('manual'); setStep(1) } : createDraftFromPhoto}
-                  disabled={creatingDraft}
-                  accessibilityRole="button"
-                  accessibilityLabel="Use photo">
-                  <Text style={styles.nextBtnText}>{draftError ? 'Use manually' : 'Use photo'}</Text>
-                </TouchableOpacity>
+                  loading={creatingDraft}
+                  style={{ flex: 1 }}
+                  accessibilityLabel="Use photo"
+                />
               </View>
             </>
           ) : (
@@ -494,7 +504,8 @@ export default function CreateServiceScreen({ navigation, route }) {
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
       minimum_units: 1,
       includes_equipment: includesEquipment,
-      payment_timing: 'on_completion',
+      payment_timing: paymentTiming,
+      materials,
       availability: formatAvailabilityPayload(availableFrom),
       is_active: isEditing ? serviceActive : true,
       ...(isEditing && photos.length === 0 ? { photos: [] } : {}),
@@ -774,6 +785,34 @@ export default function CreateServiceScreen({ navigation, route }) {
           </View>
         )}
 
+        <Text style={styles.fieldLabel}>When is payment due?</Text>
+        <View style={styles.segmentGrid}>
+          {PAYMENT_OPTIONS.map(o => (
+            <TouchableOpacity
+              key={o.id}
+              style={[styles.segmentBtn, paymentTiming === o.id && styles.segmentBtnActive]}
+              onPress={() => setPaymentTiming(o.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: paymentTiming === o.id }}>
+              <Text style={[styles.segmentText, paymentTiming === o.id && styles.segmentTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.fieldLabel}>Are materials included?</Text>
+        <View style={styles.segmentGrid}>
+          {MATERIALS_OPTIONS.map(o => (
+            <TouchableOpacity
+              key={o.id}
+              style={[styles.segmentBtn, materials === o.id && styles.segmentBtnActive]}
+              onPress={() => setMaterials(o.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: materials === o.id }}>
+              <Text style={[styles.segmentText, materials === o.id && styles.segmentTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
       </>
     )
   }
@@ -888,6 +927,8 @@ export default function CreateServiceScreen({ navigation, route }) {
       { label: 'Service', value: title },
       { label: 'Category', value: category },
       { label: 'Rate', value: formatRate() },
+      { label: 'Payment', value: paymentTiming === 'upfront' ? 'Pay upfront' : 'On completion' },
+      { label: 'Materials', value: materialsLabel(materials) },
       { label: 'Location', value: locationName },
       travelRange && { label: 'Travel', value: `${travelRange} km` },
       { label: 'Equipment', value: includesEquipment ? 'Included' : 'Not included' },
@@ -952,22 +993,19 @@ export default function CreateServiceScreen({ navigation, route }) {
                 ? 'This service is visible to requesters. Pause advertising while you make adjustments.'
                 : 'This service is hidden from requesters. Existing bookings and chats are not cancelled.'}
             </Text>
-            <TouchableOpacity
-              style={[styles.pauseBtn, !serviceActive && styles.resumeBtn]}
+            <Button
+              variant={serviceActive ? 'secondary' : 'primary'}
+              title={serviceActive ? 'Pause advertising' : 'Resume advertising'}
               onPress={() => setServiceActive(prev => !prev)}
-              accessibilityRole="button"
-              accessibilityLabel={serviceActive ? 'Pause service advertising' : 'Resume service advertising'}>
-              <Text style={[styles.pauseBtnText, !serviceActive && styles.resumeBtnText]}>
-                {serviceActive ? 'Pause advertising' : 'Resume advertising'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteServiceBtn}
+              style={{ marginBottom: 10 }}
+              accessibilityLabel={serviceActive ? 'Pause service advertising' : 'Resume service advertising'}
+            />
+            <Button
+              variant="destructive"
+              title="Delete service"
               onPress={handleDeleteService}
-              accessibilityRole="button"
-              accessibilityLabel="Delete service">
-              <Text style={styles.deleteServiceText}>Delete service</Text>
-            </TouchableOpacity>
+              accessibilityLabel="Delete service"
+            />
           </View>
         )}
         {!!description && (
@@ -1013,13 +1051,15 @@ export default function CreateServiceScreen({ navigation, route }) {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        enabled={Platform.OS === 'android'}>
         <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: stepTranslateX }] }]}>
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive">
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={true}>
             {RENDERERS[step - 1]()}
           </ScrollView>
         </Animated.View>
@@ -1027,41 +1067,37 @@ export default function CreateServiceScreen({ navigation, route }) {
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         {step === 1 ? (
-          <TouchableOpacity
-            style={[styles.nextBtnFull, !canProceed() && styles.btnDisabled]}
+          <Button
+            title="Next"
             onPress={() => animateStep(2, 'forward')}
             disabled={!canProceed()}
-            accessibilityRole="button"
-            accessibilityLabel="Next step">
-            <Text style={styles.nextBtnText}>Next</Text>
-          </TouchableOpacity>
+            accessibilityLabel="Next step"
+          />
         ) : (
           <View style={styles.footerRow}>
-            <TouchableOpacity
-              style={styles.backBtn}
+            <Button
+              variant="secondary"
+              title="Back"
               onPress={() => animateStep(step - 1, 'backward')}
-              accessibilityRole="button"
-              accessibilityLabel="Previous step">
-              <Text style={styles.backBtnText}>Back</Text>
-            </TouchableOpacity>
+              accessibilityLabel="Previous step"
+            />
             {step < 6 ? (
-              <TouchableOpacity
-                style={[styles.nextBtn, !canProceed() && styles.btnDisabled]}
+              <Button
+                title="Next"
                 onPress={() => animateStep(step + 1, 'forward')}
                 disabled={!canProceed()}
-                accessibilityRole="button"
-                accessibilityLabel="Next step">
-                <Text style={styles.nextBtnText}>Next</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+                accessibilityLabel="Next step"
+              />
             ) : (
-              <TouchableOpacity
-                style={[styles.nextBtn, (submitting || !canProceed()) && styles.btnDisabled]}
+              <Button
+                title={isEditing ? 'Save' : 'Publish'}
                 onPress={handlePublish}
-                disabled={submitting || !canProceed()}
-                accessibilityRole="button"
-                accessibilityLabel="Publish service">
-                <Text style={styles.nextBtnText}>{submitting ? 'Saving...' : isEditing ? 'Save' : 'Publish'}</Text>
-              </TouchableOpacity>
+                loading={submitting}
+                disabled={!canProceed()}
+                style={{ flex: 1 }}
+                accessibilityLabel="Publish service"
+              />
             )}
           </View>
         )}
@@ -1088,7 +1124,7 @@ const styles = StyleSheet.create({
   optional: { fontSize: 13, fontWeight: '400', color: colors.textMuted },
   input: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 15,
     fontSize: 16,
     borderWidth: 1,
@@ -1157,14 +1193,14 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
   segmentTextActive: { color: colors.white },
   inlineRow: { flexDirection: 'row', gap: 10 },
-  reviewCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  reviewCard: { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   reviewRow: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'flex-start' },
   reviewRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
   reviewLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '700', width: 88, flexShrink: 0 },
   reviewValue: { fontSize: 14, color: colors.textPrimary, flex: 1, fontWeight: '600', textAlign: 'right' },
   managementCard: {
     backgroundColor: colors.white,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
@@ -1173,44 +1209,16 @@ const styles = StyleSheet.create({
   },
   managementTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   managementBody: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
-  pauseBtn: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 46,
-  },
-  resumeBtn: { backgroundColor: colors.primary },
-  pauseBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  resumeBtnText: { color: colors.white },
-  deleteServiceBtn: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.danger,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 46,
-  },
-  deleteServiceText: { fontSize: 14, fontWeight: '700', color: colors.danger },
-  descCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16, marginTop: 12 },
+  descCard: { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 16, marginTop: 12 },
   descText: { fontSize: 14, color: colors.textSecondary, lineHeight: 22, marginTop: 8 },
   footer: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, padding: 16 },
   footerRow: { flexDirection: 'row', gap: 12 },
-  backBtn: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 12, borderWidth: 1, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
-  nextBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  nextBtnFull: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', minHeight: 52, justifyContent: 'center' },
-  nextBtnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
-  btnDisabled: { backgroundColor: '#a8cfc0' },
   datePickerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 15,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1228,7 +1236,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
@@ -1250,7 +1258,7 @@ const styles = StyleSheet.create({
   startArrow: { fontSize: 22, color: colors.textMuted, fontWeight: '700' },
   photoChoice: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 18,
@@ -1315,7 +1323,7 @@ const styles = StyleSheet.create({
   reviewActionsTop: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   reviewActionBtn: {
     backgroundColor: colors.white,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 12,

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 import {
   authenticate,
   clearSessionTokens,
@@ -33,7 +34,10 @@ function getBiometricLabel(type) {
   return 'Fingerprint or PIN'
 }
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, route }) {
+  // Accounts are passwordless (email code) and auto-created, so "Create account"
+  // and "Sign in" are the same screen — `intent` only adjusts the copy.
+  const isRegister = route?.params?.intent === 'register'
   const insets = useSafeAreaInsets()
   const [stage, setStage] = useState('email') // 'email' | 'verify'
   const [email, setEmail] = useState('')
@@ -222,7 +226,7 @@ export default function LoginScreen({ navigation }) {
     return (
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
         <View style={[styles.topBar, { paddingTop: insets.top }]}>
           <View style={styles.topBarInner}>
             <TouchableOpacity
@@ -240,6 +244,7 @@ export default function LoginScreen({ navigation }) {
         <ScrollView
           contentContainerStyle={[styles.formArea, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
 
           <Text style={styles.title} accessibilityRole="header">Check your email</Text>
@@ -300,7 +305,7 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <View style={styles.topBarInner}>
           <Text style={styles.wordmark}>RURAL CONNECTIONS</Text>
@@ -311,11 +316,16 @@ export default function LoginScreen({ navigation }) {
       <ScrollView
         contentContainerStyle={[styles.formArea, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
         showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.title} accessibilityRole="header">Sign in</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          {isRegister ? 'Create your account' : 'Sign in'}
+        </Text>
         <Text style={styles.subtitle}>
-          Enter your email to receive a sign in code
+          {isRegister
+            ? "Enter your email — we'll send a code and set up your account."
+            : 'Enter your email to receive a sign in code'}
         </Text>
 
         <TextInput
@@ -333,38 +343,33 @@ export default function LoginScreen({ navigation }) {
           accessibilityLabel="Email address"
         />
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+        <Button
+          title="Send code"
+          icon="arrow-forward"
           onPress={handleSendCode}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityLabel="Send sign in code">
-          {loading ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.buttonText}>Send code <Icon name="arrow-forward" size={15} color="#fff" /></Text>
-          )}
-        </TouchableOpacity>
+          loading={loading}
+          accessibilityLabel="Send sign in code"
+        />
 
         {biometricReady && (
-          <TouchableOpacity
-            style={styles.biometricButton}
+          <Button
+            variant="secondary"
+            icon={biometricIcon}
+            title={`Sign in with ${biometricLabel}`}
             onPress={handleBiometricLogin}
             disabled={loading}
-            accessibilityRole="button"
-            accessibilityLabel={`Sign in with ${biometricLabel}`}>
-            <Icon name={biometricIcon} size={22} color={colors.primary} />
-            <Text style={styles.biometricText}>Sign in with {biometricLabel}</Text>
-          </TouchableOpacity>
+            style={{ marginTop: 12 }}
+            accessibilityLabel={`Sign in with ${biometricLabel}`}
+          />
         )}
 
-        <TouchableOpacity
-          style={styles.googleBtn}
+        <Button
+          variant="secondary"
+          title="Continue with Google"
           disabled
-          accessibilityRole="button"
-          accessibilityLabel="Continue with Google (coming soon)">
-          <Text style={styles.googleBtnText}>Continue with Google</Text>
-        </TouchableOpacity>
+          style={{ marginTop: 12 }}
+          accessibilityLabel="Continue with Google (coming soon)"
+        />
 
         <Text style={styles.footerText}>
           New to Rural Connections? Just enter your email —{'\n'}
@@ -414,7 +419,7 @@ const styles = StyleSheet.create({
 
   input: {
     backgroundColor: colors.white,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 16,
     fontSize: 16,
@@ -423,48 +428,6 @@ const styles = StyleSheet.create({
     minHeight: 52,
     color: colors.textPrimary,
   },
-
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    marginBottom: 12,
-  },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: colors.white, fontSize: 16, fontWeight: '700' },
-
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 14,
-    marginBottom: 12,
-    backgroundColor: colors.white,
-    minHeight: 52,
-  },
-  biometricIcon: { fontSize: 22 },
-  biometricText: { fontSize: 15, fontWeight: '500', color: colors.primary },
-
-  googleBtn: {
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-    marginBottom: 24,
-    opacity: 0.5,
-  },
-  googleBtnText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
 
   footerText: {
     fontSize: 13,

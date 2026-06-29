@@ -27,6 +27,8 @@ import Icon from '../../components/Icon'
 import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import ReviewModal from '../../components/ReviewModal'
 import CancelModal from '../../components/CancelModal'
+import EmptyState from '../../components/EmptyState'
+import Loading from '../../components/Loading'
 import { loadReview, saveReview } from '../../lib/reviews'
 import { canProvide } from '../../lib/roles'
 import { markNotificationsReadFor } from '../../lib/notifications'
@@ -74,7 +76,6 @@ function BookingWorkCard({
         item={serviceItem}
         showStatusBadge
         status={booking.status}
-        statusLabel={requesterNeedsConfirm ? 'Needs action' : undefined}
         onPress={onPress}
       />
 
@@ -402,8 +403,8 @@ export default function ActivityTabScreen({ navigation }) {
       return
     }
     const { error } = await apiConfirmBooking(booking.id)
-    if (!error) load()
-    else Alert.alert('Error', 'Could not confirm booking.')
+    if (error) Alert.alert('Could not confirm booking', error.message)
+    load()   // re-sync either way so a raced item reflects reality
   }
 
   function declineBooking(bookingId) {
@@ -414,8 +415,8 @@ export default function ActivityTabScreen({ navigation }) {
         style: 'destructive',
         onPress: async () => {
           const { error } = await apiDeclineBooking(bookingId)
-          if (!error) load()
-          else Alert.alert('Error', 'Could not decline booking.')
+          if (error) Alert.alert('Could not decline booking', error.message)
+          load()
         },
       },
     ])
@@ -441,8 +442,8 @@ export default function ActivityTabScreen({ navigation }) {
           text: 'Mark complete',
           onPress: async () => {
             const { error } = await apiMarkBookingReady(bookingId)
-            if (!error) load()
-            else Alert.alert('Could not mark complete', error.message)
+            if (error) Alert.alert('Could not mark complete', error.message)
+            load()
           },
         },
       ]
@@ -464,9 +465,7 @@ export default function ActivityTabScreen({ navigation }) {
         isPending ? 'Could not withdraw request' : 'Could not request cancellation',
         error.message
       )
-      return
     }
-
     setCancelBookingTarget(null)
     load()
   }
@@ -476,7 +475,7 @@ export default function ActivityTabScreen({ navigation }) {
     if (!user) return
     const { error } = await apiConfirmBookingCancellation(bookingId, user.id)
     if (error) Alert.alert('Could not confirm cancellation', error.message)
-    else load()
+    load()
   }
 
   function confirmBookingComplete(bookingId) {
@@ -491,10 +490,9 @@ export default function ActivityTabScreen({ navigation }) {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
             const { error } = await apiConfirmBookingComplete(bookingId, user.id)
-            if (!error) {
-              await markNotificationsReadFor({ bookingId })
-              load()
-            } else Alert.alert('Error', 'Could not confirm booking complete.')
+            if (error) Alert.alert('Could not confirm', error.message)
+            else await markNotificationsReadFor({ bookingId })
+            load()
           },
         },
       ]
@@ -558,9 +556,7 @@ export default function ActivityTabScreen({ navigation }) {
           <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
           <Text style={styles.headerTitle}>Activity</Text>
         </View>
-        <View style={styles.center}>
-          <Text style={styles.loadingText}>Loading activity...</Text>
-        </View>
+        <Loading label="Loading activity…" />
       </View>
     )
   }
@@ -599,28 +595,20 @@ export default function ActivityTabScreen({ navigation }) {
 
         {/* Empty state */}
         {totalActive === 0 && (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyTitle}>All caught up</Text>
-            <Text style={styles.emptyBody}>
-              Your active tasks and bookings will appear here.
-            </Text>
-            {isRequester && (
-              <TouchableOpacity
-                style={styles.postBtn}
-                onPress={() => navigation.getParent()?.navigate('Home')}
-                accessibilityRole="button">
-                <Text style={styles.postBtnText}>Post a job</Text>
-              </TouchableOpacity>
-            )}
-            {isProvider && (
-              <TouchableOpacity
-                style={styles.browseBtn}
-                onPress={() => navigation.getParent()?.navigate('Jobs')}
-                accessibilityRole="button">
-                <Text style={styles.browseBtnText}>Browse jobs</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <EmptyState
+            tone="positive"
+            icon="checkmark-circle-outline"
+            title="All caught up"
+            body="Your active tasks and bookings will appear here as they come in."
+            actionLabel={isRequester ? 'Post a job' : isProvider ? 'Browse jobs' : undefined}
+            onAction={
+              isRequester
+                ? () => navigation.getParent()?.navigate('Home')
+                : isProvider
+                ? () => navigation.getParent()?.navigate('Jobs')
+                : undefined
+            }
+          />
         )}
 
         {/* Requester: Posted tasks */}
@@ -828,8 +816,6 @@ export default function ActivityTabScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: colors.textMuted, fontSize: 15 },
 
   header: {
     paddingHorizontal: 20,
@@ -914,44 +900,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  emptyWrap: {
-    alignItems: 'center',
-    paddingVertical: 34,
-    paddingHorizontal: 18,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
-  emptyBody:  { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 24, lineHeight: 21 },
-  postBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    marginBottom: 12,
-    minHeight: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  postBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
-  browseBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    minHeight: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  browseBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
-
   completedBtn: {
     borderWidth: 1.5,
     borderColor: colors.primary,
-    borderRadius: 16,
+    borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,

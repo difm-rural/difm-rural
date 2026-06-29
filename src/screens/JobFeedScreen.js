@@ -8,6 +8,7 @@ import { colors } from '../theme/tokens'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../lib/watchlist'
 import JobCard from '../components/JobCard'
 import SkeletonCard from '../components/SkeletonCard'
+import EmptyState from '../components/EmptyState'
 
 export default function JobFeedScreen({ navigation }) {
   const insets = useSafeAreaInsets()
@@ -76,24 +77,19 @@ export default function JobFeedScreen({ navigation }) {
 
     if (rawJobs.length > 0) {
       const requesterIds = [...new Set(rawJobs.map(j => j.requester_id))]
+      // Offers are private — the board never shows counts, so don't fetch bids here.
       const fetchTasks = [
         supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
-        supabase.from('bids').select('job_id').in('job_id', rawJobs.map(j => j.id)).eq('status', 'pending'),
       ]
       if (uid) fetchTasks.push(fetchWatchlistIds(uid))
 
       const results = await Promise.all(fetchTasks)
       const profilesData = results[0].data
-      const bidsData     = results[1].data
-      const watchIds     = results[2] || new Set()
-
-      const bidCountMap = {}
-      bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+      const watchIds     = results[1] || new Set()
 
       const jobsWithAll = rawJobs.map(job => ({
         ...job,
         profiles: profilesData?.find(p => p.id === job.requester_id) || null,
-        bidCount: bidCountMap[job.id] || 0,
       }))
 
       setWatchedIds(watchIds)
@@ -162,10 +158,11 @@ export default function JobFeedScreen({ navigation }) {
         {userRegion && <Text style={styles.localNote}>Local first</Text>}
       </View>
       {jobs.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>No jobs posted yet</Text>
-          <Text style={styles.emptySubtext}>Check back soon!</Text>
-        </View>
+        <EmptyState
+          icon="briefcase-outline"
+          title="No jobs posted yet"
+          body="New jobs from your area will appear here. Pull down to refresh."
+        />
       ) : (
         <FlatList
           data={jobs}
@@ -192,7 +189,4 @@ const styles = StyleSheet.create({
   headerRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   heading:      { fontSize: 26, fontWeight: 'bold', color: colors.primary },
   localNote:    { fontSize: 13, color: colors.primary, fontWeight: '600', backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  center:       { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText:    { fontSize: 18, fontWeight: 'bold', color: colors.textSecondary },
-  emptySubtext: { color: colors.textMuted, marginTop: 4, fontSize: 15 },
 })

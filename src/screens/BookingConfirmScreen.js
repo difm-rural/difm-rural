@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 
 function formatDisplayDate(d) {
@@ -41,6 +42,12 @@ function SummaryRow({ label, value, last }) {
       <Text style={styles.summaryValue}>{value}</Text>
     </View>
   )
+}
+
+const MATERIALS_LABELS = {
+  included:           'Included in price',
+  estimate:           'Estimated, billed extra',
+  requester_supplies: 'You supply',
 }
 
 function asNumber(value, fallback = 0) {
@@ -97,11 +104,14 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const [submitting, setSubmitting] = useState(false)
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
-  const paymentExplanation = isQuoteRequired
+  const basePaymentExplanation = isQuoteRequired
     ? 'The provider will confirm pricing before the work goes ahead.'
     : service?.payment_timing === 'upfront'
     ? 'Payment will be taken now and held securely until the service is confirmed.'
     : 'Payment will be taken after you confirm the service is complete.'
+  const paymentExplanation = service?.materials === 'estimate'
+    ? `${basePaymentExplanation} Materials are estimated and charged at actual cost on completion.`
+    : basePaymentExplanation
 
   useEffect(() => {
     const result = route.params?.locationResult
@@ -177,14 +187,16 @@ export default function BookingConfirmScreen({ route, navigation }) {
     }))
   }
 
-  async function requireAuth(nextScreen) {
+  async function requireAuth(intent) {
     if (!location.trim()) {
       Alert.alert('Location required', 'Please enter your location or property address.')
       return
     }
     await savePendingBooking()
     setShowAuthSheet(false)
-    navigation.navigate(nextScreen)
+    // Passwordless email-code login auto-creates the account, so both
+    // "Create account" and "Sign in" go to the Login screen.
+    navigation.navigate('Login', { intent })
   }
 
   function navigateToServices() {
@@ -242,7 +254,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      enabled={Platform.OS === 'android'}>
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -262,7 +275,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 170 }]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive">
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}>
 
         {/* Booking summary */}
         <View style={styles.card}>
@@ -273,6 +287,9 @@ export default function BookingConfirmScreen({ route, navigation }) {
             <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
           )}
           <SummaryRow label="Total" value={isQuoteRequired ? 'Quote to be confirmed' : `$${total} NZD`} />
+          {service.materials ? (
+            <SummaryRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
+          ) : null}
           <SummaryRow
             label="Payment"
             value={service.payment_timing === 'upfront' ? 'Upfront' : 'On completion'}
@@ -407,14 +424,12 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
       {/* Confirm button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
+        <Button
+          title="Confirm booking"
           onPress={handleConfirm}
-          disabled={submitting}
-          accessibilityRole="button"
-          accessibilityLabel="Confirm booking">
-          <Text style={styles.confirmBtnText}>{submitting ? 'Confirming...' : 'Confirm booking'}</Text>
-        </TouchableOpacity>
+          loading={submitting}
+          accessibilityLabel="Confirm booking"
+        />
       </View>
 
       {/* Auth wall */}
@@ -425,8 +440,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
         onRequestClose={() => setShowAuthSheet(false)}>
         <AuthSheet
           onDismiss={() => setShowAuthSheet(false)}
-          onLogin={() => requireAuth('Login')}
-          onRegister={() => requireAuth('Register')}
+          onLogin={() => requireAuth('login')}
+          onRegister={() => requireAuth('register')}
         />
       </Modal>
     </KeyboardAvoidingView>
@@ -454,7 +469,7 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -565,7 +580,7 @@ const styles = StyleSheet.create({
 
   totalCard: {
     backgroundColor: colors.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -594,17 +609,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
   },
-  confirmBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    minHeight: 52,
-    justifyContent: 'center',
-  },
-  confirmBtnDisabled: { backgroundColor: '#a8cfc0' },
-  confirmBtnText: { color: colors.white, fontSize: 16, fontWeight: 'bold' },
-
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
     position: 'absolute',
