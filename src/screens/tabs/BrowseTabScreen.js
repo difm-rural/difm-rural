@@ -161,7 +161,7 @@ export default function BrowseTabScreen({ navigation }) {
     const providerIds = [...new Set(raw.map(s => s.provider_id).filter(Boolean))]
     const [{ data: profilesData }, { data: reviewsData }] = providerIds.length > 0
       ? await Promise.all([
-        supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds),
+        supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', providerIds),
         supabase.from('reviews').select('reviewee_id, rating').in('reviewee_id', providerIds),
       ])
       : [{ data: [] }, { data: [] }]

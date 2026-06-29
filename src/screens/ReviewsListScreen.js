@@ -103,7 +103,7 @@ export default function ReviewsListScreen({ route, navigation }) {
 
         const [profileResult, jobResult] = await Promise.all([
           reviewerIds.length > 0
-            ? supabase.from('profiles').select('id, full_name').in('id', reviewerIds)
+            ? supabase.from('profiles_public').select('id, full_name').in('id', reviewerIds)
             : Promise.resolve({ data: [] }),
           jobIds.length > 0
             ? supabase.from('jobs').select('id, category').in('id', jobIds)

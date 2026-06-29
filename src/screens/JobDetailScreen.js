@@ -118,7 +118,7 @@ export default function JobDetailScreen({ route, navigation }) {
     if (bidsData && bidsData.length > 0) {
       const providerIds = [...new Set(bidsData.map(b => b.provider_id))]
       const [{ data: providerProfiles }, stats] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds),
+        supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', providerIds),
         fetchProviderStats(providerIds),
       ])
       setBids(bidsData.map(bid => ({
@@ -150,7 +150,7 @@ export default function JobDetailScreen({ route, navigation }) {
     }
 
     const { data: reqProfile } = await supabase
-      .from('profiles').select('id, full_name, avatar_url').eq('id', currentJob.requester_id).single()
+      .from('profiles_public').select('id, full_name, avatar_url').eq('id', currentJob.requester_id).single()
     setRequesterProfile(reqProfile)
 
     const { data: watchData } = await supabase
@@ -163,7 +163,7 @@ export default function JobDetailScreen({ route, navigation }) {
         .from('job_questions').select('*').eq('job_id', currentJob.id).order('created_at', { ascending: true })
       if (qs?.length > 0) {
         const askerIds = [...new Set(qs.map(q => q.asker_id).filter(Boolean))]
-        const { data: askerProfiles } = await supabase.from('profiles').select('id, full_name').in('id', askerIds)
+        const { data: askerProfiles } = await supabase.from('profiles_public').select('id, full_name').in('id', askerIds)
         setQuestions(qs.map(q => ({
           ...q,
           askerName: askerProfiles?.find(p => p.id === q.asker_id)?.full_name || 'Provider',

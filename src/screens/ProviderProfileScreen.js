@@ -120,7 +120,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
       // Step 1: profile + bids + services + reviews in parallel
       const [profileResult, bidsResult, servicesResult, reviewsResult] = await Promise.all([
         // Safe public columns only — never fetch another user's phone/address/GPS.
-        supabase.from('profiles').select('id, full_name, avatar_url, display_name, bio, skills, qualifications, region, primary_role, role, created_at').eq('id', providerId).single(),
+        supabase.from('profiles_public').select('id, full_name, avatar_url, display_name, bio, skills, qualifications, region, primary_role, role, created_at').eq('id', providerId).single(),
         supabase.from('bids').select('job_id, status, created_at').eq('provider_id', providerId),
         supabase.from('services')
           .select('*')
@@ -157,7 +157,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
       if (revs.length > 0) {
         const reviewerIds = [...new Set(revs.map(r => r.reviewer_id).filter(Boolean))]
         const { data: rProfiles } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id, full_name, avatar_url')
           .in('id', reviewerIds)
         setReviewerProfiles(rProfiles || [])

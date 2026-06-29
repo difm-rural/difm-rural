@@ -268,7 +268,7 @@ export default function ActivityTabScreen({ navigation }) {
     if (rawBookings.length > 0) {
       const providerIds = [...new Set(rawBookings.map(b => b.provider_id).filter(Boolean))]
       const { data: provProfiles } = await supabase
-        .from('profiles').select('id, full_name').in('id', providerIds)
+        .from('profiles_public').select('id, full_name').in('id', providerIds)
       const profileMap = {}
       provProfiles?.forEach(p => { profileMap[p.id] = p })
       setMyBookings(rawBookings.map(b => ({
@@ -307,7 +307,7 @@ export default function ActivityTabScreen({ navigation }) {
     if (rawBookings.length > 0) {
       const requesterIds = [...new Set(rawBookings.map(b => b.requester_id).filter(Boolean))]
       const { data: reqProfiles } = await supabase
-        .from('profiles').select('id, full_name').in('id', requesterIds)
+        .from('profiles_public').select('id, full_name').in('id', requesterIds)
       const profileMap = {}
       reqProfiles?.forEach(p => { profileMap[p.id] = p })
       const visibleBookings = rawBookings.filter(b =>
@@ -345,7 +345,7 @@ export default function ActivityTabScreen({ navigation }) {
             const providerIds = [...new Set(raw.map(b => b.provider_id).filter(Boolean))]
             let profileMap = {}
             if (providerIds.length > 0) {
-              const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', providerIds)
+              const { data: profiles } = await supabase.from('profiles_public').select('id, full_name').in('id', providerIds)
               profiles?.forEach(p => { profileMap[p.id] = p })
             }
             bookings.push(...raw.map(b => ({
@@ -378,7 +378,7 @@ export default function ActivityTabScreen({ navigation }) {
             const requesterIds = [...new Set(raw.map(b => b.requester_id).filter(Boolean))]
             let profileMap = {}
             if (requesterIds.length > 0) {
-              const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', requesterIds)
+              const { data: profiles } = await supabase.from('profiles_public').select('id, full_name').in('id', requesterIds)
               profiles?.forEach(p => { profileMap[p.id] = p })
             }
             bookings.push(...raw.map(b => ({

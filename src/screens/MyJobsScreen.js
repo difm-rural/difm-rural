@@ -116,7 +116,7 @@ export default function MyJobsScreen({ navigation, route }) {
 
     const requesterIds = [...new Set(bidList.map(b => b.jobs?.requester_id).filter(Boolean))]
     const { data: profilesData } = await supabase
-      .from('profiles')
+      .from('profiles_public')
       .select('id, full_name, avatar_url')
       .in('id', requesterIds)
 

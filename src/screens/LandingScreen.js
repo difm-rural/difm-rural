@@ -76,7 +76,7 @@ export default function LandingScreen({ navigation }) {
     const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]
     // Offers are private — no bid counts on the public board.
     const { data: profilesData } = requesterIds.length > 0
-      ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds)
+      ? await supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', requesterIds)
       : { data: [] }
 
     setJobs(raw.map(j => ({
@@ -98,7 +98,7 @@ export default function LandingScreen({ navigation }) {
 
     const providerIds = [...new Set(raw.map(s => s.provider_id).filter(Boolean))]
     const { data: profilesData } = providerIds.length > 0
-      ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds)
+      ? await supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', providerIds)
       : { data: [] }
     const profileMap = {}
     profilesData?.forEach(p => { profileMap[p.id] = p })

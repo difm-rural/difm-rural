@@ -104,7 +104,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
     // Chat-message notifications open the conversation directly.
     if (notification.type === 'new_message' && meta.sender_id) {
       const { data: sender } = await supabase
-        .from('profiles').select('full_name').eq('id', meta.sender_id).maybeSingle()
+        .from('profiles_public').select('full_name').eq('id', meta.sender_id).maybeSingle()
       const otherUserName = sender?.full_name || 'Chat'
       if (meta.booking_id) {
         const { data: booking } = await supabase

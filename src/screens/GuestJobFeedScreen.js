@@ -114,7 +114,7 @@ export default function GuestJobFeedScreen({ navigation }) {
     const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]
     // Offers are private — no bid counts on the public board.
     const { data: profilesData } = requesterIds.length > 0
-      ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds)
+      ? await supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', requesterIds)
       : { data: [] }
 
     setJobs(raw.map(j => ({

@@ -167,7 +167,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
   async function fetchProfile() {
     const { data } = await supabase
-      .from('profiles')
+      .from('profiles_public')
       .select('id, full_name, avatar_url')
       .eq('id', service.provider_id)
       .single()

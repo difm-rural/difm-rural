@@ -178,7 +178,7 @@ export default function AdminScreen({ navigation }) {
       withTimeFilter(supabase.from('jobs').select('id, title, status, category, location_name, created_at'), cutoff).order('created_at', { ascending: false }).limit(8),
       withTimeFilter(supabase.from('services').select('id, title, is_active, category, location_name, created_at'), cutoff).order('created_at', { ascending: false }).limit(8),
       withTimeFilter(supabase.from('bookings').select('id, status, location_name, created_at, service:service_id(title)'), cutoff).order('created_at', { ascending: false }).limit(8),
-      withTimeFilter(supabase.from('profiles').select('id, full_name, primary_role, role, created_at'), cutoff).order('created_at', { ascending: false }).limit(8),
+      withTimeFilter(supabase.from('profiles_public').select('id, full_name, primary_role, role, created_at'), cutoff).order('created_at', { ascending: false }).limit(8),
       withTimeFilter(supabase.from('user_activity').select('id, event_type, created_at'), cutoff).order('created_at', { ascending: false }).limit(10),
     ])
 

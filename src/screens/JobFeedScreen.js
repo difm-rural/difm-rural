@@ -79,7 +79,7 @@ export default function JobFeedScreen({ navigation }) {
       const requesterIds = [...new Set(rawJobs.map(j => j.requester_id))]
       // Offers are private — the board never shows counts, so don't fetch bids here.
       const fetchTasks = [
-        supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
+        supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', requesterIds),
       ]
       if (uid) fetchTasks.push(fetchWatchlistIds(uid))
 

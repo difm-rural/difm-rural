@@ -86,18 +86,13 @@ export default function JobsTabScreen({ navigation }) {
     if (raw.length === 0) { setBoardJobs([]); return }
 
     const requesterIds = [...new Set(raw.map(j => j.requester_id))]
-    const [{ data: profilesData }, { data: bidsData }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, avatar_url').in('id', requesterIds),
-      supabase.from('bids').select('job_id').in('job_id', raw.map(j => j.id)).eq('status', 'pending'),
-    ])
-
-    const bidCountMap = {}
-    bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+    // Offers are private — the board never shows counts.
+    const { data: profilesData } = await supabase
+      .from('profiles_public').select('id, full_name, avatar_url').in('id', requesterIds)
 
     setBoardJobs(raw.map(job => ({
       ...job,
       profiles: profilesData?.find(p => p.id === job.requester_id) || null,
-      bidCount: bidCountMap[job.id] || 0,
     })))
   }
 

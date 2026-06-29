@@ -83,7 +83,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
     try {
       const [profileResult, jobsResult, reviewsResult] = await Promise.all([
         // Safe public columns only — never fetch another user's phone/address/GPS.
-        supabase.from('profiles').select('id, full_name, avatar_url, display_name, bio, region, primary_role, role, created_at').eq('id', requesterId).single(),
+        supabase.from('profiles_public').select('id, full_name, avatar_url, display_name, bio, region, primary_role, role, created_at').eq('id', requesterId).single(),
         supabase.from('jobs').select('id, status, category').eq('requester_id', requesterId),
         supabase.from('reviews')
           .select('*')
@@ -108,7 +108,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
       if (revs.length > 0) {
         const reviewerIds = [...new Set(revs.map(r => r.reviewer_id).filter(Boolean))]
         const { data: rProfiles } = await supabase
-          .from('profiles')
+          .from('profiles_public')
           .select('id, full_name, avatar_url')
           .in('id', reviewerIds)
         setReviewerProfiles(rProfiles || [])

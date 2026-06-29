@@ -117,7 +117,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     async function fetchRequesterProfile() {
       if (!job.requester_id) return
       const { data } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('full_name, avatar_url')
         .eq('id', job.requester_id)
         .single()
@@ -148,7 +148,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       .single()
     if (bidData) {
       const { data: provProfile } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('full_name, avatar_url')
         .eq('id', bidData.provider_id)
         .single()
@@ -178,7 +178,7 @@ export default function ManageTaskScreen({ navigation, route }) {
       const providerIds = [...new Set(bidsData?.map(b => b.provider_id).filter(Boolean) || [])]
       const [{ data: providerProfiles }, stats] = await Promise.all([
         providerIds.length > 0
-          ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', providerIds)
+          ? supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', providerIds)
           : Promise.resolve({ data: [] }),
         fetchProviderStats(providerIds),
       ])
