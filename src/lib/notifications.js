@@ -5,6 +5,7 @@ import { requestBadgeRefresh } from './badgeEvents'
 export const NOTIFICATION_ICONS = {
   new_booking:                     'briefcase-outline',
   new_bid:                         'cash-outline',
+  new_job_invite:                  'mail-open-outline',
   bid_accepted:                    'trophy-outline',
   bid_rejected:                    'close-circle-outline',
   job_cancelled:                   'alert-circle-outline',

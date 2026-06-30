@@ -68,6 +68,7 @@ export default function LandingScreen({ navigation }) {
       .from('jobs')
       .select('*')
       .eq('status', 'open')
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
     const raw = jobsData || []

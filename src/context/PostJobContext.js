@@ -20,6 +20,8 @@ const INITIAL_STATE = {
   _editJobId:       null,
   materialsType:    '',
   accessConditions: [],
+  inviteProviderId:   null,
+  inviteProviderName: null,
 }
 
 export function PostJobProvider({ children }) {

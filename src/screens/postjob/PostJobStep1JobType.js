@@ -64,6 +64,17 @@ export default function PostJobStep1JobType({ navigation, route }) {
     }
   }, [])
 
+  // Seed a direct-offer target (from a Connection) after the reset above, so it
+  // survives into the review step where the invite is created.
+  useEffect(() => {
+    if (!isEditMode && route.params?.inviteProviderId) {
+      updateJobData({
+        inviteProviderId:   route.params.inviteProviderId,
+        inviteProviderName: route.params.inviteProviderName || null,
+      })
+    }
+  }, [])
+
   // Keep context in sync with local state
   useEffect(() => {
     updateJobData({

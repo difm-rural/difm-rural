@@ -80,6 +80,7 @@ export default function JobsTabScreen({ navigation }) {
       .from('jobs')
       .select('*')
       .eq('status', 'open')
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
     const raw = (jobsData || []).filter(j => j.requester_id !== uid)

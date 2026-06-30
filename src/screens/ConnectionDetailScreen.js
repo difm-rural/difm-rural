@@ -91,6 +91,20 @@ export default function ConnectionDetailScreen({ navigation, route }) {
           )}
         </View>
 
+        {/* Offer a job directly — a private invite */}
+        <Button
+          title="Offer a job"
+          icon="briefcase-outline"
+          onPress={() => navigation.getParent()?.navigate('Jobs', {
+            screen: 'PostJob',
+            params: { inviteProviderId: providerId, inviteProviderName: provider?.full_name },
+          })}
+          accessibilityLabel={`Offer a job to ${name}`}
+        />
+        <Text style={styles.offerHint}>
+          Send {name.split(' ')[0]} a private job offer — only they'll see it, unless you choose to post it publicly.
+        </Text>
+
         {/* Re-book */}
         <Text style={styles.sectionLabel}>Book them again</Text>
         {loadingServices ? (
@@ -160,6 +174,7 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: colors.primaryLight, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   chipText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
 
+  offerHint: { fontSize: 12.5, color: colors.textSecondary, marginTop: 8, marginBottom: 20, lineHeight: 18 },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   muted: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
 

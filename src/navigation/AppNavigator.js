@@ -49,6 +49,7 @@ import ProviderProfileScreen   from '../screens/ProviderProfileScreen'
 import ReviewsListScreen       from '../screens/ReviewsListScreen'
 import ConnectionsScreen       from '../screens/ConnectionsScreen'
 import ConnectionDetailScreen  from '../screens/ConnectionDetailScreen'
+import InvitedJobsScreen       from '../screens/InvitedJobsScreen'
 import OnboardingScreen        from '../screens/OnboardingScreen'
 
 import LocationPickerScreen from '../components/LocationPickerScreen'
@@ -99,6 +100,7 @@ function HomeStackNav() {
       <HomeNav.Screen name="Notifications"       component={NotificationsScreen}      />
       <HomeNav.Screen name="Connections"         component={ConnectionsScreen}        />
       <HomeNav.Screen name="ConnectionDetail"    component={ConnectionDetailScreen}   />
+      <HomeNav.Screen name="InvitedJobs"         component={InvitedJobsScreen}        />
     </HomeNav.Navigator>
   )
 }
@@ -123,6 +125,7 @@ function JobsStackNav() {
       <JobsNav.Screen name="AreaTracer"           component={AreaTracerScreen}       />
       <JobsNav.Screen name="JobMap"               component={JobMapScreen}           />
       <JobsNav.Screen name="Notifications"        component={NotificationsScreen}    />
+      <JobsNav.Screen name="InvitedJobs"          component={InvitedJobsScreen}      />
     </JobsNav.Navigator>
   )
 }
@@ -171,6 +174,7 @@ function ActivityStackNav() {
       <ActivityNav.Screen name="ReviewsList"        component={ReviewsListScreen}      />
       <ActivityNav.Screen name="JobMap"             component={JobMapScreen}           />
       <ActivityNav.Screen name="Notifications"      component={NotificationsScreen}   />
+      <ActivityNav.Screen name="InvitedJobs"        component={InvitedJobsScreen}     />
     </ActivityNav.Navigator>
   )
 }

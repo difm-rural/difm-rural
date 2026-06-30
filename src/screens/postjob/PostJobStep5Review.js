@@ -102,10 +102,15 @@ export default function PostJobStep5Review({ navigation, route }) {
     description,
     materialsType,
     accessConditions = [],
+    inviteProviderId,
+    inviteProviderName,
   } = jobData
+
+  const isInvite = !!inviteProviderId && !isEditMode
 
   const [uploadStatus,  setUploadStatus]  = useState('')
   const [showAuthSheet, setShowAuthSheet] = useState(false)
+  const [alsoPublic,    setAlsoPublic]    = useState(false)
 
   const locationSummary = jobAddress
     || (latitude ? `${parseFloat(latitude).toFixed(4)}, ${parseFloat(longitude).toFixed(4)}` : 'No location set')
@@ -219,9 +224,11 @@ export default function PostJobStep5Review({ navigation, route }) {
       return
     }
 
+    const visibility = isInvite ? (alsoPublic ? 'public' : 'invite_only') : 'public'
+
     const { data: newJob, error: insertError } = await supabase
       .from('jobs')
-      .insert({ ...payload, requester_id: user.id, status: 'open' })
+      .insert({ ...payload, requester_id: user.id, status: 'open', visibility })
       .select('id')
       .single()
     if (insertError) { setUploadStatus(''); Alert.alert('Error', insertError.message); return }
@@ -234,16 +241,34 @@ export default function PostJobStep5Review({ navigation, route }) {
       }
     }
 
-    trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress })
+    let inviteFailed = false
+    if (isInvite) {
+      const { error: inviteError } = await supabase
+        .from('job_invites')
+        .insert({ job_id: newJob.id, requester_id: user.id, provider_id: inviteProviderId })
+      inviteFailed = !!inviteError
+    }
+
+    trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress, invited: isInvite })
     trackCategoryInterest(resolvedCategory)
     setUploadStatus('')
     resetJobData()
-    Alert.alert('Job posted!', 'Providers near you will be notified.', [
+
+    const who = inviteProviderName || 'your provider'
+    const successTitle = isInvite ? 'Offer sent!' : 'Job posted!'
+    const successBody = inviteFailed
+      ? `Your job is posted, but we couldn't notify ${who}. You can offer it from their profile.`
+      : isInvite
+        ? (alsoPublic
+            ? `${who} has been invited, and your job is also on the public board.`
+            : `${who} has been invited. Only they can see this job.`)
+        : 'Providers near you will be notified.'
+    Alert.alert(successTitle, successBody, [
       { text: 'OK', onPress: returnAfterPost },
     ])
   }
 
-  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : 'Post job')
+  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : (isInvite ? 'Send offer' : 'Post job'))
 
   return (
     <View style={styles.screen}>
@@ -257,6 +282,35 @@ export default function PostJobStep5Review({ navigation, route }) {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}>
+
+        {isInvite && (
+          <View style={styles.inviteBanner}>
+            <Icon name="person-add-outline" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.inviteTitle}>Offering this job to {inviteProviderName || 'your provider'}</Text>
+              <Text style={styles.inviteSub}>
+                {alsoPublic
+                  ? "They'll be invited directly, and it's also on the public board."
+                  : "Private offer — only they can see this job."}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {isInvite && (
+          <TouchableOpacity
+            style={styles.publicToggle}
+            onPress={() => setAlsoPublic(v => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: alsoPublic }}
+            accessibilityLabel="Also post on the public board">
+            <View style={[styles.checkbox, alsoPublic && styles.checkboxOn]}>
+              {alsoPublic && <Icon name="checkmark" size={14} color={colors.white} />}
+            </View>
+            <Text style={styles.publicToggleText}>Also post on the public board</Text>
+          </TouchableOpacity>
+        )}
 
         {mapImgUri ? (
           <Image source={{ uri: mapImgUri }} style={styles.mapThumb} resizeMode="cover" />
@@ -378,6 +432,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mapPlaceholderText: { fontSize: 14, color: colors.textMuted },
+
+  inviteBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  inviteTitle: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  inviteSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 3, lineHeight: 18 },
+  publicToggle: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, marginBottom: 12 },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 1.5, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  publicToggleText: { fontSize: 14, color: colors.textPrimary },
 
   reviewCard: {
     backgroundColor: '#fff',

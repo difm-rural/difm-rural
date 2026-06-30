@@ -24,6 +24,7 @@ import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import { fetchConnectionsForRequester, categoryColor, primaryCategory } from '../../lib/connections'
+import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { ConnectionAvatar } from '../../components/ConnectionAvatar'
 
 function getInitials(name) {
@@ -74,6 +75,7 @@ export default function HomeTabScreen({ navigation }) {
   const [notifications, setNotifications] = useState([])
   const [summary, setSummary]           = useState({})
   const [connections, setConnections]   = useState([])
+  const [invitedJobs, setInvitedJobs]   = useState([])
   const [loading, setLoading]           = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
 
@@ -94,14 +96,16 @@ export default function HomeTabScreen({ navigation }) {
     const isRequester = true              // everyone can request
     const isProvider  = canProvide(prof)  // providing is additive
 
-    const [notifs, counts, conns] = await Promise.all([
+    const [notifs, counts, conns, invited] = await Promise.all([
       fetchNotifications(8),
       fetchSummary(user.id, isRequester, isProvider),
       fetchConnectionsForRequester(user.id),
+      isProvider ? fetchInvitedJobsForProvider(user.id) : Promise.resolve([]),
     ])
     setNotifications(notifs)
     setSummary(counts)
     setConnections(conns)
+    setInvitedJobs(invited)
     setLoading(false)
     setRefreshing(false)
   }
@@ -225,6 +229,25 @@ export default function HomeTabScreen({ navigation }) {
               onPress={() => navigation.getParent()?.navigate('Account', { screen: 'CreateService' })}
             />
           </View>
+        )}
+
+        {/* Invited to you — private job offers from past requesters */}
+        {invitedJobs.length > 0 && (
+          <TouchableOpacity
+            style={styles.inviteCard}
+            onPress={() => navigation.navigate('InvitedJobs')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`You've been invited to ${invitedJobs.length} jobs`}>
+            <Icon name="mail-open-outline" size={22} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.inviteCardTitle}>
+                You've been invited to {invitedJobs.length} job{invitedJobs.length === 1 ? '' : 's'}
+              </Text>
+              <Text style={styles.inviteCardSub}>Someone you've worked with offered you work directly.</Text>
+            </View>
+            <Icon name="chevron-forward" size={18} color={colors.primary} />
+          </TouchableOpacity>
         )}
 
         {/* Your connections — re-engage people you've worked with */}
@@ -419,6 +442,18 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
+
+  inviteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  inviteCardTitle: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  inviteCardSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
 
   connStrip: { gap: 16, paddingVertical: 4, paddingRight: 4 },
   connItem:  { alignItems: 'center', width: 64 },

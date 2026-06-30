@@ -64,6 +64,7 @@ export default function JobFeedScreen({ navigation }) {
       .from('jobs')
       .select('*')
       .eq('status', 'open')
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
     if (error) {
