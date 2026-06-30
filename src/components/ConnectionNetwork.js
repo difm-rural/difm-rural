@@ -38,12 +38,15 @@ function layout(connections, size) {
 
     const recency = newest === oldest ? 1 : (+new Date(c.last_engaged_at || 0) - oldest) / (newest - oldest)
 
+    const category = primaryCategory(c.categories)
+
     return {
       conn: c,
       x,
       y,
       dia,
-      color: categoryColor(primaryCategory(c.categories)),
+      category,
+      color: categoryColor(category),
       lineLength: Math.hypot(x - cx, y - cy),
       lineAngle: angle,
       lineThickness: 1.5 + 3 * strength,
@@ -103,7 +106,7 @@ export default function ConnectionNetwork({ center, connections, onSelect, size 
       {/* Provider nodes */}
       {nodes.map((node, i) => {
         const name = node.conn.provider?.full_name || 'Provider'
-        const boxW = Math.max(node.dia + 10, 62)
+        const boxW = Math.max(node.dia + 10, 74)
         return (
           <TouchableOpacity
             key={node.conn.provider_id || i}
@@ -116,6 +119,9 @@ export default function ConnectionNetwork({ center, connections, onSelect, size 
               <ConnectionAvatar name={name} avatarUrl={node.conn.provider?.avatar_url} size={node.dia - 6} />
             </View>
             <Text style={styles.nodeLabel} numberOfLines={1}>{name.split(' ')[0]}</Text>
+            {!!node.category && (
+              <Text style={[styles.nodeCat, { color: node.color }]} numberOfLines={1}>{node.category}</Text>
+            )}
           </TouchableOpacity>
         )
       })}
@@ -145,5 +151,6 @@ const styles = StyleSheet.create({
   youPillText: { color: colors.white, fontSize: 11, fontWeight: '700' },
 
   nodeRing: { borderWidth: 3, backgroundColor: colors.white },
-  nodeLabel: { fontSize: 11, color: colors.textPrimary, marginTop: 4, maxWidth: 62, textAlign: 'center' },
+  nodeLabel: { fontSize: 11, fontWeight: '600', color: colors.textPrimary, marginTop: 4, maxWidth: 74, textAlign: 'center' },
+  nodeCat: { fontSize: 10, fontWeight: '600', marginTop: 1, maxWidth: 74, textAlign: 'center' },
 })
