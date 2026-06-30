@@ -43,6 +43,33 @@ export function timesWorkedLabel(times) {
   return `Worked together ${n} times`
 }
 
+// Type-of-work colour coding for the network view. A fixed rural palette,
+// assigned to each category by a stable hash so any category (job or service,
+// including ones added later) gets a consistent colour.
+export const CATEGORY_PALETTE = [
+  '#2d6a4f', // forest
+  '#bc6c25', // ochre
+  '#386fa4', // steel blue
+  '#9c6644', // earth brown
+  '#6a994e', // leaf
+  '#a44a3f', // clay red
+  '#8367c7', // lavender
+  '#c9a227', // mustard
+]
+
+export function categoryColor(cat) {
+  if (!cat) return '#8a8f98'
+  const s = String(cat).toLowerCase()
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return CATEGORY_PALETTE[h % CATEGORY_PALETTE.length]
+}
+
+// The category that colours a connection's node (first/most prominent).
+export function primaryCategory(categories) {
+  return (categories || []).filter(Boolean)[0] || null
+}
+
 // Up to `max` category labels joined for a compact subtitle.
 export function categoriesLabel(categories, max = 3) {
   const list = (categories || []).filter(Boolean)

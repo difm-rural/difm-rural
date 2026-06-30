@@ -24,7 +24,7 @@ import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import { fetchConnectionsForRequester } from '../../lib/connections'
-import { ConnectionAvatar } from '../ConnectionsScreen'
+import { ConnectionAvatar } from '../../components/ConnectionAvatar'
 
 function getInitials(name) {
   if (!name) return '?'

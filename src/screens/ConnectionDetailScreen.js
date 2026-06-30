@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
-import { ConnectionAvatar } from './ConnectionsScreen'
+import { ConnectionAvatar } from '../components/ConnectionAvatar'
 import { formatLastWorked, timesWorkedLabel } from '../lib/connections'
 
 export default function ConnectionDetailScreen({ navigation, route }) {
