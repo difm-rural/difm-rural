@@ -23,7 +23,7 @@ import {
 import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
-import { fetchConnectionsForRequester } from '../../lib/connections'
+import { fetchConnectionsForRequester, categoryColor, primaryCategory } from '../../lib/connections'
 import { ConnectionAvatar } from '../../components/ConnectionAvatar'
 
 function getInitials(name) {
@@ -243,20 +243,26 @@ export default function HomeTabScreen({ navigation }) {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.connStrip}>
-              {connections.slice(0, 10).map(c => (
+              {connections.slice(0, 10).map(c => {
+                const cat = primaryCategory(c.categories)
+                return (
                 <TouchableOpacity
                   key={c.provider_id}
                   style={styles.connItem}
                   onPress={() => navigation.navigate('ConnectionDetail', { connection: c })}
                   activeOpacity={0.75}
                   accessibilityRole="button"
-                  accessibilityLabel={`Open connection ${c.provider?.full_name || 'Provider'}`}>
+                  accessibilityLabel={`Open connection ${c.provider?.full_name || 'Provider'}${cat ? `, ${cat}` : ''}`}>
                   <ConnectionAvatar name={c.provider?.full_name} avatarUrl={c.provider?.avatar_url} size={54} />
                   <Text style={styles.connName} numberOfLines={1}>
                     {c.provider?.full_name?.split(' ')[0] || 'Provider'}
                   </Text>
+                  {!!cat && (
+                    <Text style={[styles.connCat, { color: categoryColor(cat) }]} numberOfLines={1}>{cat}</Text>
+                  )}
                 </TouchableOpacity>
-              ))}
+                )
+              })}
             </ScrollView>
           </View>
         )}
@@ -415,8 +421,9 @@ const styles = StyleSheet.create({
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
 
   connStrip: { gap: 16, paddingVertical: 4, paddingRight: 4 },
-  connItem:  { alignItems: 'center', width: 60 },
-  connName:  { fontSize: 12, color: colors.textPrimary, marginTop: 6, maxWidth: 60, textAlign: 'center' },
+  connItem:  { alignItems: 'center', width: 64 },
+  connName:  { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: 6, maxWidth: 64, textAlign: 'center' },
+  connCat:   { fontSize: 10, fontWeight: '600', marginTop: 1, maxWidth: 64, textAlign: 'center' },
 
   notifRow: {
     flexDirection: 'row',
