@@ -168,6 +168,51 @@ create trigger trg_notify_job_invite
   after insert on public.job_invites
   for each row execute function public.notify_job_invite();
 
+-- 8. Break the jobs/bids/job_invites RLS recursion (fixes "infinite recursion
+--    detected in policy for relation jobs" when accepting an offer). Move each
+--    cross-table check into a SECURITY DEFINER helper so policies never re-enter
+--    another table's RLS. Supersedes the policy forms created in 4 and 7 above.
+create or replace function public.job_owner_id(p_job_id uuid)
+returns uuid language sql stable security definer set search_path = public as $$
+  select requester_id from public.jobs where id = p_job_id;
+$$;
+
+create or replace function public.is_accepted_provider(p_job_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.bids
+    where job_id = p_job_id and provider_id = auth.uid() and status = 'accepted');
+$$;
+
+create or replace function public.is_invited_to_job(p_job_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.job_invites
+    where job_id = p_job_id and provider_id = auth.uid());
+$$;
+
+grant execute on function public.job_owner_id(uuid) to anon, authenticated;
+grant execute on function public.is_accepted_provider(uuid) to anon, authenticated;
+grant execute on function public.is_invited_to_job(uuid) to anon, authenticated;
+
+drop policy if exists "Offers visible to provider and job owner" on public.bids;
+create policy "Offers visible to provider and job owner"
+  on public.bids for select
+  using (auth.uid() = provider_id or auth.uid() = public.job_owner_id(job_id));
+
+drop policy if exists "Accepted provider can mark awaiting completion" on public.jobs;
+create policy "Accepted provider can mark awaiting completion"
+  on public.jobs for update to authenticated
+  using (status in ('accepted', 'in_progress') and public.is_accepted_provider(id))
+  with check (status = 'awaiting_completion' and public.is_accepted_provider(id));
+
+drop policy if exists "Jobs are viewable by audience" on public.jobs;
+create policy "Jobs are viewable by audience"
+  on public.jobs for select
+  using (
+    visibility = 'public'
+    or requester_id = auth.uid()
+    or public.is_invited_to_job(id)
+  );
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- After running: reload the app. Offers are now private end-to-end, the
 -- service/offer materials + pricing fields save correctly, and no user can
