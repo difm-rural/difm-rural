@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import AiJobAssistant from '../../components/AiJobAssistant'
 
 const STEPS = ['Job type', 'Location', 'Details', 'Budget', 'Review']
 
@@ -20,7 +21,9 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
           <Text style={styles.backText}>{currentStep === 1 ? 'Cancel' : <><Icon name="chevron-back" size={14} color="rgba(255,255,255,0.92)" /> Back</>}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{title || 'Post a job'}</Text>
-        <View style={styles.spacer} />
+        <View style={styles.assistantSlot}>
+          <AiJobAssistant />
+        </View>
       </View>
       <View style={styles.stepsRow}>
         {STEPS.map((label, i) => {
@@ -61,6 +64,7 @@ const styles = StyleSheet.create({
   backText: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '600' },
   title:    { fontSize: 17, fontWeight: '700', color: '#fff', textAlign: 'center' },
   spacer:   { minWidth: 60 },
+  assistantSlot: { minWidth: 60, alignItems: 'flex-end' },
 
   stepsRow:    { flexDirection: 'row', justifyContent: 'space-between' },
   stepItem:    { alignItems: 'center', flex: 1 },
