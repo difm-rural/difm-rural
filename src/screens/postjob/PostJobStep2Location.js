@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Alert, Image, Keyboard,
+  Alert, Keyboard,
   KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native'
-import * as ImagePicker from 'expo-image-picker'
 import * as Location from 'expo-location'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
@@ -17,17 +16,6 @@ import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
 const MAP_HEIGHT = 300
-
-function getPhotoUri(photo) { return typeof photo === 'string' ? photo : photo?.uri }
-
-function normalizeAsset(asset) {
-  return {
-    uri:      asset.uri,
-    base64:   asset.base64 || null,
-    mimeType: asset.mimeType || 'image/jpeg',
-    fileName: asset.fileName || `job-photo-${Date.now()}.jpg`,
-  }
-}
 
 function SummaryBar({ category, title }) {
   if (!category && !title) return null
@@ -64,7 +52,6 @@ export default function PostJobStep2Location({ navigation, route }) {
   const [areaPolygon,  setAreaPolygon]  = useState(jobData.areaPolygon || [])
   const [areaHectares, setAreaHectares] = useState(jobData.areaHectares)
   const [mapType,      setMapType]      = useState('satellite')
-  const [photos,       setPhotos]       = useState(jobData.photos || [])
 
   // GPS on mount for new jobs with no location yet
   useEffect(() => {
@@ -127,8 +114,8 @@ export default function PostJobStep2Location({ navigation, route }) {
 
   // Keep context in sync
   useEffect(() => {
-    updateJobData({ latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, photos })
-  }, [latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, photos])
+    updateJobData({ latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares })
+  }, [latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares])
 
   const handleLocationSelect = useCallback(async ({ latitude: lat, longitude: lng }) => {
     setLatitude(lat)
@@ -188,16 +175,6 @@ export default function PostJobStep2Location({ navigation, route }) {
       initialPoints: areaPolygon.length > 0 ? areaPolygon : [],
       returnTo:      route.name,
     })
-  }
-
-  async function handleAddPhoto() {
-    if (photos.length >= 6) return
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return }
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
-      if (!result.canceled) setPhotos(prev => [...prev, normalizeAsset(result.assets[0])])
-    } catch { Alert.alert('Photo library unavailable', 'Could not open photos.') }
   }
 
   function handleBack() {
@@ -319,14 +296,6 @@ export default function PostJobStep2Location({ navigation, route }) {
               <Text style={styles.pillText}>Trace area</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.pill}
-              onPress={handleAddPhoto}
-              accessibilityRole="button"
-              accessibilityLabel="Add a photo">
-              <Icon name="camera-outline" size={16} color={colors.primary} />
-              <Text style={styles.pillText}>Add photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               style={styles.pillSkip}
               onPress={handleSkip}
               accessibilityRole="button"
@@ -346,21 +315,6 @@ export default function PostJobStep2Location({ navigation, route }) {
             </View>
           )}
 
-          {photos.length > 0 && (
-            <View style={styles.photoRow}>
-              {photos.map((p, i) => (
-                <View key={i} style={styles.photoThumb}>
-                  <Image source={{ uri: getPhotoUri(p) }} style={styles.photoImg} />
-                  <TouchableOpacity
-                    style={styles.photoRemove}
-                    onPress={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Icon name="close" size={14} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -477,12 +431,6 @@ const styles = StyleSheet.create({
   },
   areaChipText:   { fontSize: 13, fontWeight: '700', color: '#2d6a4f' },
   areaChipRemove: { fontSize: 12, color: '#2d6a4f', fontWeight: '700' },
-
-  photoRow:        { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  photoThumb:      { width: 70, height: 70, borderRadius: 8, overflow: 'hidden', position: 'relative' },
-  photoImg:        { width: 70, height: 70 },
-  photoRemove:     { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  photoRemoveText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
   footer: {
     backgroundColor: '#fff',

@@ -169,6 +169,7 @@ function ActivityStackNav() {
       <ActivityNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <ActivityNav.Screen name="BookingConfirm"     component={BookingConfirmScreen}   />
       <ActivityNav.Screen name="LocationPicker"     component={LocationPickerScreen}   />
+      <ActivityNav.Screen name="AreaTracer"         component={AreaTracerScreen}       />
       <ActivityNav.Screen name="RequesterProfile"   component={RequesterProfileScreen} />
       <ActivityNav.Screen name="ProviderProfile"    component={ProviderProfileScreen}  />
       <ActivityNav.Screen name="ReviewsList"        component={ReviewsListScreen}      />
