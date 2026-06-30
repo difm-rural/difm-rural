@@ -148,20 +148,26 @@ export default function PostJobStep5Review({ navigation, route }) {
     navigation.goBack()
   }
 
-  // Reset the current stack to its root screen. popToTop() can throw
-  // "POP_TO_TOP was not handled" depending on how the wizard was reached, so
-  // navigate to the bottom route by name instead (always handled).
+  const TAB_ROOTS = { Home: 'Dashboard', Jobs: 'JobsBoard', Browse: 'BrowseMain', Activity: 'ActivityMain' }
+
+  // Reset the current stack to its root screen, clearing the whole wizard so
+  // Back never walks back through the steps. Used after an edit save.
   function goToStackRoot() {
     const rootName = navigation.getState()?.routes?.[0]?.name
-    if (rootName) navigation.navigate(rootName)
+    if (rootName) navigation.reset({ index: 0, routes: [{ name: rootName }] })
   }
 
-  // Clear the wizard and return to whichever tab launched it (defaults to the
-  // current stack's root when launched from there / origin unknown).
+  // After a successful post: wipe the wizard out of the Jobs stack and land on
+  // a real tab root — the launching tab, or Home by default. (A new-post wizard
+  // always lives in the Jobs stack, so JobsBoard is a safe explicit target;
+  // navigate(rootName) was unreliable because nested launches can leave the
+  // wizard screen itself as the stack root.)
   function returnAfterPost() {
-    goToStackRoot()
     const origin = route.params?.origin
-    if (origin && origin !== 'Jobs') navigation.getParent()?.navigate(origin)
+    const parent = navigation.getParent()
+    navigation.reset({ index: 0, routes: [{ name: 'JobsBoard' }] })
+    const destTab = TAB_ROOTS[origin] ? origin : 'Home'
+    if (destTab !== 'Jobs') parent?.navigate(destTab, { screen: TAB_ROOTS[destTab] })
   }
 
   function handleEditRow(popCount) {
