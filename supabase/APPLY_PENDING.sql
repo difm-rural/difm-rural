@@ -62,6 +62,38 @@ create policy "Profiles are viewable by owner"
   on public.profiles for select
   using (auth.uid() = id);
 
+-- 6. Connections — the people you've completed work with (jobs + bookings).
+--    Derived, self-filtering view powering the Connections surfaces.
+drop view if exists public.connections;
+create view public.connections
+  with (security_invoker = false) as
+  with engagements as (
+    select j.requester_id, b.provider_id, 'job'::text as kind,
+           j.category as category, j.created_at as engaged_at
+    from public.jobs j
+    join public.bids b on b.job_id = j.id and b.status = 'accepted'
+    where j.status = 'completed' and j.requester_id is not null and b.provider_id is not null
+    union all
+    select bk.requester_id, bk.provider_id, 'booking'::text as kind,
+           s.category as category, bk.created_at as engaged_at
+    from public.bookings bk
+    left join public.services s on s.id = bk.service_id
+    where bk.status = 'completed' and bk.requester_id is not null and bk.provider_id is not null
+  )
+  select
+    e.requester_id, e.provider_id,
+    count(*)::int as times_worked,
+    count(*) filter (where e.kind = 'job')::int as jobs_count,
+    count(*) filter (where e.kind = 'booking')::int as bookings_count,
+    max(e.engaged_at) as last_engaged_at,
+    min(e.engaged_at) as first_engaged_at,
+    array_remove(array_agg(distinct e.category), null) as categories
+  from engagements e
+  where auth.uid() in (e.requester_id, e.provider_id)
+  group by e.requester_id, e.provider_id;
+
+grant select on public.connections to authenticated;
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- After running: reload the app. Offers are now private end-to-end, the
 -- service/offer materials + pricing fields save correctly, and no user can

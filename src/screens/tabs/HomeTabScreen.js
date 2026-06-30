@@ -23,6 +23,8 @@ import {
 import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
+import { fetchConnectionsForRequester } from '../../lib/connections'
+import { ConnectionAvatar } from '../ConnectionsScreen'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -71,6 +73,7 @@ export default function HomeTabScreen({ navigation }) {
   const [profile, setProfile]           = useState(null)
   const [notifications, setNotifications] = useState([])
   const [summary, setSummary]           = useState({})
+  const [connections, setConnections]   = useState([])
   const [loading, setLoading]           = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
 
@@ -91,12 +94,14 @@ export default function HomeTabScreen({ navigation }) {
     const isRequester = true              // everyone can request
     const isProvider  = canProvide(prof)  // providing is additive
 
-    const [notifs, counts] = await Promise.all([
+    const [notifs, counts, conns] = await Promise.all([
       fetchNotifications(8),
       fetchSummary(user.id, isRequester, isProvider),
+      fetchConnectionsForRequester(user.id),
     ])
     setNotifications(notifs)
     setSummary(counts)
+    setConnections(conns)
     setLoading(false)
     setRefreshing(false)
   }
@@ -219,6 +224,40 @@ export default function HomeTabScreen({ navigation }) {
               variant="secondary"
               onPress={() => navigation.getParent()?.navigate('Account', { screen: 'CreateService' })}
             />
+          </View>
+        )}
+
+        {/* Your connections — re-engage people you've worked with */}
+        {connections.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your connections</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Connections')}
+                accessibilityRole="button"
+                accessibilityLabel="See all connections">
+                <Text style={styles.sectionLink}>See all ({connections.length})</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.connStrip}>
+              {connections.slice(0, 10).map(c => (
+                <TouchableOpacity
+                  key={c.provider_id}
+                  style={styles.connItem}
+                  onPress={() => navigation.navigate('ConnectionDetail', { connection: c })}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open connection ${c.provider?.full_name || 'Provider'}`}>
+                  <ConnectionAvatar name={c.provider?.full_name} avatarUrl={c.provider?.avatar_url} size={54} />
+                  <Text style={styles.connName} numberOfLines={1}>
+                    {c.provider?.full_name?.split(' ')[0] || 'Provider'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -374,6 +413,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
+
+  connStrip: { gap: 16, paddingVertical: 4, paddingRight: 4 },
+  connItem:  { alignItems: 'center', width: 60 },
+  connName:  { fontSize: 12, color: colors.textPrimary, marginTop: 6, maxWidth: 60, textAlign: 'center' },
 
   notifRow: {
     flexDirection: 'row',

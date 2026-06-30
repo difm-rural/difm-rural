@@ -47,6 +47,8 @@ import MyJobsScreen            from '../screens/MyJobsScreen'
 import RequesterProfileScreen  from '../screens/RequesterProfileScreen'
 import ProviderProfileScreen   from '../screens/ProviderProfileScreen'
 import ReviewsListScreen       from '../screens/ReviewsListScreen'
+import ConnectionsScreen       from '../screens/ConnectionsScreen'
+import ConnectionDetailScreen  from '../screens/ConnectionDetailScreen'
 import OnboardingScreen        from '../screens/OnboardingScreen'
 
 import LocationPickerScreen from '../components/LocationPickerScreen'
@@ -95,6 +97,8 @@ function HomeStackNav() {
       <HomeNav.Screen name="AreaTracer"          component={AreaTracerScreen}         />
       <HomeNav.Screen name="JobMap"              component={JobMapScreen}             />
       <HomeNav.Screen name="Notifications"       component={NotificationsScreen}      />
+      <HomeNav.Screen name="Connections"         component={ConnectionsScreen}        />
+      <HomeNav.Screen name="ConnectionDetail"    component={ConnectionDetailScreen}   />
     </HomeNav.Navigator>
   )
 }
@@ -186,6 +190,8 @@ function AccountStackNav() {
       <AccountNav.Screen name="Chat"            component={ChatScreen}            />
       <AccountNav.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       <AccountNav.Screen name="ReviewsList"     component={ReviewsListScreen}     />
+      <AccountNav.Screen name="Connections"       component={ConnectionsScreen}        />
+      <AccountNav.Screen name="ConnectionDetail"  component={ConnectionDetailScreen}   />
     </AccountNav.Navigator>
   )
 }

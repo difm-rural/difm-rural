@@ -473,6 +473,10 @@ export default function AccountTabScreen({ navigation }) {
           />
         )}
         <HubButton
+          icon="people-outline" label="Connections" sub="Providers you've worked with"
+          onPress={() => navigation.navigate('Connections')}
+        />
+        <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}
         />
