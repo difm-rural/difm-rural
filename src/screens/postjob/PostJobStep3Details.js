@@ -12,9 +12,18 @@ import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
 const MATERIALS_OPTIONS = [
-  { id: 'none',      label: 'None needed', icon: 'checkmark-circle-outline' },
+  { id: 'none',      label: 'Nothing required', icon: 'checkmark-circle-outline' },
   { id: 'requester', label: "I'll provide", icon: 'home-outline' },
   { id: 'provider',  label: 'Provider supplies', icon: 'construct-outline' },
+]
+
+const ACCESS_OPTIONS = [
+  { id: 'park_and_walk',          label: 'Park and walk — easy access', icon: 'walk-outline', sub: 'Can park nearby, short walk to job site' },
+  { id: '4wd_required',           label: '4WD required',                icon: 'car-outline',  sub: "Standard vehicle won't make it to the site" },
+  { id: 'dogs_on_property',       label: 'Dogs on property',            icon: 'paw-outline' },
+  { id: 'livestock_nearby',       label: 'Livestock nearby',            icon: 'leaf-outline' },
+  { id: 'electric_fences',        label: 'Electric fences',             icon: 'flash-outline' },
+  { id: 'contact_before_arrival', label: 'Contact before arrival',      icon: 'call-outline' },
 ]
 
 function getPhotoUri(photo) { return typeof photo === 'string' ? photo : photo?.uri }
@@ -149,88 +158,7 @@ export default function PostJobStep3Details({ navigation, route }) {
             )}
           </View>
 
-          {/* 2. Materials */}
-          <View style={styles.card}>
-            <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
-            <View style={styles.tilesRow}>
-              {MATERIALS_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[styles.tile, materialsType === opt.id && styles.tileActive]}
-                  onPress={() => setMaterialsType(opt.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: materialsType === opt.id }}>
-                  <Icon name={opt.icon} size={22} color={colors.primary} />
-                  <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* 3. Site access */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Site access</Text>
-
-            <Text style={styles.fieldLabel}>
-              Access note<Text style={styles.optional}> (optional)</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Gate code 1234, last gate on left past the woolshed..."
-              placeholderTextColor={colors.textMuted}
-              value={locationNote}
-              onChangeText={setLocationNote}
-              multiline
-              numberOfLines={2}
-              textAlignVertical="top"
-              autoCapitalize="sentences"
-              accessibilityLabel="Access note"
-            />
-
-            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Access conditions</Text>
-
-            <TouchableOpacity
-              style={styles.checkRow}
-              onPress={() => toggleCondition('park_and_walk')}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: accessConditions.includes('park_and_walk') }}>
-              <View style={[
-                styles.checkbox,
-                accessConditions.includes('park_and_walk') && styles.checkboxSelected,
-              ]}>
-                {accessConditions.includes('park_and_walk') && (
-                  <Icon name="checkmark" size={14} color="#fff" />
-                )}
-              </View>
-              <View style={styles.checkContent}>
-                <Text style={styles.checkLabel}><Icon name="walk-outline" size={14} color={colors.textSecondary} /> Park and walk — easy access</Text>
-                <Text style={styles.checkSub}>Can park nearby, short walk to job site</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.checkRow}
-              onPress={() => toggleCondition('4wd_required')}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: accessConditions.includes('4wd_required') }}>
-              <View style={[
-                styles.checkbox,
-                accessConditions.includes('4wd_required') && styles.checkboxSelected,
-              ]}>
-                {accessConditions.includes('4wd_required') && (
-                  <Icon name="checkmark" size={14} color="#fff" />
-                )}
-              </View>
-              <View style={styles.checkContent}>
-                <Text style={styles.checkLabel}><Icon name="car-outline" size={14} color={colors.textSecondary} /> 4WD required</Text>
-                <Text style={styles.checkSub}>Standard vehicle won't make it to the site</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* 4. Photos */}
+          {/* 2. Photos */}
           <View style={styles.card}>
             <View style={styles.cardQuestionRow}>
               <Text style={styles.cardQuestion}>Photos</Text>
@@ -278,6 +206,70 @@ export default function PostJobStep3Details({ navigation, route }) {
               )}
             </View>
           </View>
+
+          {/* 3. Materials */}
+          <View style={styles.card}>
+            <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
+            <View style={styles.tilesRow}>
+              {MATERIALS_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.tile, materialsType === opt.id && styles.tileActive]}
+                  onPress={() => setMaterialsType(opt.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: materialsType === opt.id }}>
+                  <Icon name={opt.icon} size={22} color={colors.primary} />
+                  <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* 4. Site access */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Site access</Text>
+
+            <Text style={styles.fieldLabel}>
+              Access note<Text style={styles.optional}> (optional)</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Gate code 1234, last gate on left past the woolshed..."
+              placeholderTextColor={colors.textMuted}
+              value={locationNote}
+              onChangeText={setLocationNote}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+              autoCapitalize="sentences"
+              accessibilityLabel="Access note"
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Access conditions</Text>
+
+            {ACCESS_OPTIONS.map(opt => {
+              const checked = accessConditions.includes(opt.id)
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={styles.checkRow}
+                  onPress={() => toggleCondition(opt.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}>
+                  <View style={[styles.checkbox, checked && styles.checkboxSelected]}>
+                    {checked && <Icon name="checkmark" size={14} color="#fff" />}
+                  </View>
+                  <View style={styles.checkContent}>
+                    <Text style={styles.checkLabel}><Icon name={opt.icon} size={14} color={colors.textSecondary} /> {opt.label}</Text>
+                    {!!opt.sub && <Text style={styles.checkSub}>{opt.sub}</Text>}
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>

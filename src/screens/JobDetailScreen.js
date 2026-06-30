@@ -27,6 +27,10 @@ const MATERIALS_LABELS = {
 const ACCESS_LABELS = {
   park_and_walk:  'Park and walk in',
   '4wd_required': '4WD required',
+  dogs_on_property: 'Dogs on property',
+  livestock_nearby: 'Livestock nearby',
+  electric_fences: 'Electric fences',
+  contact_before_arrival: 'Contact before arrival',
 }
 
 function jobStaticMapUrl(job) {
