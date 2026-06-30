@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
+import { draftToJobData } from '../../lib/draftJob'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -63,6 +64,19 @@ export default function PostJobStep1JobType({ navigation, route }) {
       resetJobData()
     }
   }, [])
+
+  // Seed everything from an AI assistant draft. The assistant lands here so the
+  // user sees the generated title first, then taps through the pre-filled steps.
+  useEffect(() => {
+    const seed = route.params?.aiSeed
+    if (!seed || isEditMode) return
+    const mapped = draftToJobData(seed)
+    updateJobData(mapped)
+    setTitle(mapped.title || '')
+    setScheduleType(mapped.scheduleType || '')
+    setScheduledDate(mapped.scheduledDate ? new Date(mapped.scheduledDate) : null)
+    navigation.setParams({ aiSeed: undefined })
+  }, [route.params?.aiSeed])
 
   // Seed a direct-offer target (from a Connection) after the reset above, so it
   // survives into the review step where the invite is created.

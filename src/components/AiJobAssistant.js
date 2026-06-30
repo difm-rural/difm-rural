@@ -8,7 +8,7 @@ import { usePostJob } from '../context/PostJobContext'
 import { colors } from '../theme/tokens'
 import Icon from './Icon'
 import Button from './Button'
-import { draftJobFromText, draftToJobData, draftBudgetText } from '../lib/draftJob'
+import { draftJobFromText, draftBudgetText } from '../lib/draftJob'
 
 const SCHEDULE_TEXT = { asap: 'As soon as possible', specific: 'On a specific day', flexible: 'Flexible timing' }
 
@@ -24,7 +24,7 @@ function DraftRow({ label, value, last }) {
 
 export default function AiJobAssistant() {
   const navigation = useNavigation()
-  const { jobData, updateJobData } = usePostJob()
+  const { jobData } = usePostJob()
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -56,11 +56,13 @@ export default function AiJobAssistant() {
 
   function handleUse() {
     if (!draft) return
-    updateJobData(draftToJobData(draft))
+    // Land on the first step ("Job type") so the user sees the generated title,
+    // then flows through the pre-filled steps. Step 1 seeds itself from aiSeed.
+    // (Route name differs between the authed and guest post flows.)
+    const names = navigation.getState()?.routeNames || []
+    const step1 = names.includes('PostJob') ? 'PostJob' : 'GuestPostJob'
     close()
-    // Land on Location next — the one thing the assistant can't know — then the
-    // pre-filled steps flow through to Review and Post.
-    navigation.navigate('PostJobStep2Location')
+    navigation.navigate(step1, { aiSeed: draft })
   }
 
   // Editing an existing job — not a fresh draft, so the assistant doesn't apply.
