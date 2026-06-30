@@ -12,8 +12,8 @@ export async function fetchInvitedJobsForProvider(uid) {
     .order('created_at', { ascending: false })
   if (error || !data) return []
 
-  // Only invites whose job still exists and is open (still offerable).
-  const rows = data.filter(r => r.job && r.job.status === 'open')
+  // Only open jobs the provider hasn't declined.
+  const rows = data.filter(r => r.job && r.job.status === 'open' && r.status !== 'declined')
   if (rows.length === 0) return []
 
   const requesterIds = [...new Set(rows.map(r => r.job.requester_id).filter(Boolean))]
@@ -30,4 +30,40 @@ export async function fetchInvitedJobsForProvider(uid) {
 export async function countInvitedJobsForProvider(uid) {
   const rows = await fetchInvitedJobsForProvider(uid)
   return rows.length
+}
+
+// Requester side: who a job has been offered to, and where each stands.
+// Each row carries the provider profile and a `hasOffered` flag (derived from
+// whether they've placed a live bid).
+export async function fetchInvitesForJob(jobId) {
+  if (!jobId) return []
+  const { data: invites } = await supabase
+    .from('job_invites')
+    .select('id, provider_id, status, created_at')
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: true })
+  if (!invites?.length) return []
+
+  const providerIds = [...new Set(invites.map(i => i.provider_id))]
+  const [{ data: profiles }, { data: bids }] = await Promise.all([
+    supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', providerIds),
+    supabase.from('bids').select('provider_id, status').eq('job_id', jobId).in('provider_id', providerIds),
+  ])
+  const pmap = {}
+  profiles?.forEach(p => { pmap[p.id] = p })
+  const offered = new Set((bids || []).filter(b => b.status !== 'rejected').map(b => b.provider_id))
+
+  return invites.map(i => ({
+    ...i,
+    provider: pmap[i.provider_id] || null,
+    hasOffered: offered.has(i.provider_id),
+  }))
+}
+
+// Human label for the requester's "Offered to" list.
+export function inviteStatusLabel(invite) {
+  if (invite.hasOffered) return 'Made an offer'
+  if (invite.status === 'declined') return 'Declined'
+  if (invite.status === 'seen') return 'Opened — no reply yet'
+  return 'Not yet opened'
 }

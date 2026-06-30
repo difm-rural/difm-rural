@@ -23,6 +23,7 @@ import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
+import { fetchInvitesForJob, inviteStatusLabel } from '../lib/invites'
 
 function timeAgo(isoString) {
   if (!isoString) return 'Unknown'
@@ -74,6 +75,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const { job: initialJob, bidCount = 0 } = route.params
   const [job, setJob] = useState(initialJob)
   const [acceptedBid, setAcceptedBid] = useState(null)
+  const [invites, setInvites] = useState([])
   const [requesterProfile, setRequesterProfile] = useState(null)
   const [loadingBid, setLoadingBid] = useState(false)
   const [bids, setBids] = useState([])
@@ -109,6 +111,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       const { data: latestJob } = await supabase
         .from('jobs').select('*').eq('id', initialJob.id).maybeSingle()
       if (active && latestJob) setJob(latestJob)
+      const inv = await fetchInvitesForJob(initialJob.id)
+      if (active) setInvites(inv)
     })()
     return () => { active = false }
   }, [initialJob.id]))
@@ -753,6 +757,40 @@ export default function ManageTaskScreen({ navigation, route }) {
           <SummaryRow icon="calendar-outline" label="Posted"    value={timeAgo(job.created_at)} last />
         </View>
 
+        {/* Offered to — providers this job was privately offered to */}
+        {invites.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Offered to</Text>
+            {invites.map((inv, idx) => {
+              const nm = inv.provider?.full_name || 'Provider'
+              return (
+                <View key={inv.id} style={[styles.bidCard, idx < invites.length - 1 && styles.bidCardBorder]}>
+                  <TouchableOpacity
+                    style={styles.bidHeader}
+                    onPress={() => navigation.navigate('ProviderProfile', { providerId: inv.provider_id })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${nm}, ${inviteStatusLabel(inv)}`}>
+                    {inv.provider?.avatar_url ? (
+                      <Image source={{ uri: inv.provider.avatar_url }} style={styles.bidAvatar} />
+                    ) : (
+                      <View style={styles.bidAvatarFallback}>
+                        <Text style={styles.bidAvatarInitials}>{getInitials(nm)}</Text>
+                      </View>
+                    )}
+                    <View style={styles.bidProviderInfo}>
+                      <Text style={styles.bidProviderName}>{nm}</Text>
+                      <Text style={[styles.inviteStatus, inv.hasOffered && styles.inviteStatusStrong]}>
+                        {inviteStatusLabel(inv)}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              )
+            })}
+          </View>
+        )}
+
         {/* Offers received — inline on open jobs */}
         {job.status === 'open' && (
           <View style={styles.card}>
@@ -1086,6 +1124,8 @@ const styles = StyleSheet.create({
   bidProviderInfo: { flex: 1 },
   bidProviderName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
   bidProviderMeta: { fontSize: 12, color: colors.textMuted, marginBottom: 2 },
+  inviteStatus:       { fontSize: 13, color: colors.textSecondary },
+  inviteStatusStrong: { color: colors.primary, fontWeight: '700' },
   bidAmount: { fontSize: 17, fontWeight: 'bold', color: colors.primary },
   bidMessage: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 8, fontStyle: 'italic' },
   bidMeta:    { fontSize: 13, color: colors.textMuted },

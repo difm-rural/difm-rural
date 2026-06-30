@@ -51,6 +51,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [alreadyBid, setAlreadyBid] = useState(false)
   const [myBid, setMyBid] = useState(null)
   const [requesterProfile, setRequesterProfile] = useState(null)
+  const [myInvite, setMyInvite] = useState(null)
   const [isWatched, setIsWatched] = useState(false)
   const [requesterReview, setRequesterReview] = useState(null)
   const [reviewVisible, setReviewVisible] = useState(false)
@@ -152,6 +153,23 @@ export default function JobDetailScreen({ route, navigation }) {
     const { data: reqProfile } = await supabase
       .from('profiles_public').select('id, full_name, avatar_url').eq('id', currentJob.requester_id).single()
     setRequesterProfile(reqProfile)
+
+    // Invited-provider context: show the "you were invited" banner, and mark the
+    // invite seen so the requester can tell it's been opened.
+    if (currentJob.visibility === 'invite_only' && currentJob.requester_id !== user.id) {
+      const { data: inv } = await supabase
+        .from('job_invites')
+        .select('id, status')
+        .eq('job_id', currentJob.id)
+        .eq('provider_id', user.id)
+        .maybeSingle()
+      setMyInvite(inv || null)
+      if (inv && inv.status === 'pending') {
+        supabase.from('job_invites').update({ status: 'seen' }).eq('id', inv.id).then(() => {})
+      }
+    } else {
+      setMyInvite(null)
+    }
 
     const { data: watchData } = await supabase
       .from('watchlist').select('id').eq('user_id', user.id).eq('job_id', currentJob.id).maybeSingle()
@@ -407,6 +425,27 @@ export default function JobDetailScreen({ route, navigation }) {
     } finally {
       setSavingReview(false)
     }
+  }
+
+  function handleDeclineInvite() {
+    if (!myInvite) return
+    Alert.alert(
+      'Decline this offer?',
+      "It'll be removed from your invites. You can still be invited again later.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Decline',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase
+              .from('job_invites').update({ status: 'declined' }).eq('id', myInvite.id)
+            if (error) { Alert.alert('Could not decline', error.message); return }
+            navigation.goBack()
+          },
+        },
+      ]
+    )
   }
 
   const isJobOwner        = currentUser?.id === job.requester_id
@@ -780,6 +819,25 @@ export default function JobDetailScreen({ route, navigation }) {
       {headerJSX}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
       <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
+
+        {myInvite && (
+          <View style={styles.invitedBanner}>
+            <Icon name="mail-open-outline" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.invitedBannerTitle}>You were invited to this job</Text>
+              <Text style={styles.invitedBannerSub}>
+                {(requesterProfile?.full_name?.split(' ')[0] || 'The requester')} offered this to you directly. Make an offer below, or decline.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleDeclineInvite}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Decline this offer">
+              <Text style={styles.declineLink}>Decline</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Job card */}
         <View style={styles.card}>
@@ -1173,6 +1231,11 @@ const styles = StyleSheet.create({
   watchBtn:       { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center', opacity: 0.55 },
   watchBtnActive: { backgroundColor: '#ede7f6', opacity: 1 },
   watchBtnText:   { fontSize: 18 },
+
+  invitedBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.primaryLight, borderRadius: 12, padding: 14, marginBottom: 16 },
+  invitedBannerTitle: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  invitedBannerSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 3, lineHeight: 18 },
+  declineLink:        { fontSize: 13, fontWeight: '700', color: colors.danger },
 
   card: { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   cardHeader:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
