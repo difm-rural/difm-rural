@@ -16,7 +16,6 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
-import { staticMapUrl } from '../lib/maps'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
 
 function parseSpecialMessage(content) {
@@ -27,10 +26,6 @@ function parseSpecialMessage(content) {
   } catch {
     return null
   }
-}
-
-function staticMapThumbUrl(lat, lng) {
-  return staticMapUrl(lat, lng, { zoom: 14, width: 400, height: 200 })
 }
 
 export default function ChatScreen({ route, navigation }) {
@@ -172,21 +167,6 @@ export default function ChatScreen({ route, navigation }) {
     return true
   }
 
-  async function sendLocationMessage() {
-    const coords = await getCurrentLocation()
-    if (!coords) {
-      Alert.alert('Location unavailable', 'Please enable location permissions in Settings.')
-      return
-    }
-    const content = JSON.stringify({
-      type: 'location',
-      latitude:  coords.latitude,
-      longitude: coords.longitude,
-      text: '📍 Shared location',
-    })
-    await insertChatMessage(content)
-  }
-
   async function sendProgressPhoto() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
     if (status !== 'granted') {
@@ -247,36 +227,14 @@ export default function ChatScreen({ route, navigation }) {
     if (special?.type === 'location') {
       return (
         <View style={[styles.bubbleWrapper, isMine ? styles.myWrapper : styles.theirWrapper]}>
-          <TouchableOpacity
-            style={[styles.bubble, styles.mapBubble, isMine ? styles.myBubble : styles.theirBubble]}
-            onPress={() => navigation.navigate('JobMap', {
-              job: {
-                latitude:      special.latitude,
-                longitude:     special.longitude,
-                title:         'Shared location',
-                location_name: 'Shared location',
-                location_note: null,
-                area_polygon:  null,
-                area_hectares: null,
-              },
-              requesterName: otherUserName,
-              viewOnly: true,
-            })}
-            activeOpacity={0.85}>
-            <Image
-              source={{ uri: staticMapThumbUrl(special.latitude, special.longitude) }}
-              style={styles.mapThumbImg}
-              resizeMode="cover"
-            />
-            <View style={styles.mapBubbleFooter}>
-              <Text style={[styles.bubbleText, isMine ? styles.myText : styles.theirText]}>
-                {special.text}
-              </Text>
-              <Text style={[styles.timestamp, isMine ? styles.myTimestamp : styles.theirTimestamp]}>
-                {ts}
-              </Text>
-            </View>
-          </TouchableOpacity>
+          <View style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}>
+            <Text style={[styles.bubbleText, isMine ? styles.myText : styles.theirText]}>
+              {special.text || 'Shared location'}
+            </Text>
+            <Text style={[styles.timestamp, isMine ? styles.myTimestamp : styles.theirTimestamp]}>
+              {ts}
+            </Text>
+          </View>
         </View>
       )
     }
@@ -371,13 +329,6 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         ) : (
           <View style={[styles.inputBar, { paddingBottom: insets.bottom + 10 }]}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={sendLocationMessage}
-              accessibilityRole="button"
-              accessibilityLabel="Share location">
-              <Icon name="location-outline" size={20} color={colors.primary} />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={sendProgressPhoto}
