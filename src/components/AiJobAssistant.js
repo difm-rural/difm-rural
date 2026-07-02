@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
-  KeyboardAvoidingView, Modal, Platform, ScrollView,
+  Keyboard, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
@@ -30,6 +30,17 @@ export default function AiJobAssistant() {
   const [loading, setLoading] = useState(false)
   const [draft, setDraft] = useState(null)
   const [error, setError] = useState(null)
+  const [kbHeight, setKbHeight] = useState(0)
+
+  // Track the keyboard so the bottom sheet lifts above it (RN modals don't
+  // resize for the keyboard on Android).
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const s = Keyboard.addListener(showEvt, e => setKbHeight(e.endCoordinates?.height || 0))
+    const h = Keyboard.addListener(hideEvt, () => setKbHeight(0))
+    return () => { s.remove(); h.remove() }
+  }, [])
 
   function close() {
     setOpen(false)
@@ -82,8 +93,7 @@ export default function AiJobAssistant() {
       <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
         <View style={styles.backdrop}>
           <TouchableOpacity style={styles.backdropTap} activeOpacity={1} onPress={close} accessibilityLabel="Close" />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={styles.sheet}>
+          <View style={[styles.sheet, { marginBottom: kbHeight }]}>
               <View style={styles.sheetHeader}>
                 <Text style={styles.sheetTitle}>
                   <Icon name="sparkles" size={16} color={colors.primary} /> Describe your job
@@ -138,8 +148,7 @@ export default function AiJobAssistant() {
                   </TouchableOpacity>
                 </ScrollView>
               )}
-            </View>
-          </KeyboardAvoidingView>
+          </View>
         </View>
       </Modal>
     </>
