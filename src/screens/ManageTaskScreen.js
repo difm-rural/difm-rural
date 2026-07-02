@@ -367,11 +367,6 @@ export default function ManageTaskScreen({ navigation, route }) {
     setReviewVisible(true)
   }
 
-  function handlePayProvider() {
-    if (!ensureTaskOwner()) return
-    Alert.alert('Coming soon', 'Provider payment will be available here in a future release.')
-  }
-
   async function handleSubmitReview({ rating, comment }) {
     if (!ensureTaskOwner()) return
     if (!currentUserId || !acceptedBid?.providerId) return
@@ -666,16 +661,6 @@ export default function ManageTaskScreen({ navigation, route }) {
           : `Rate ${acceptedBid.providerName} and leave feedback`
         : 'Rate the provider and leave feedback',
       onPress: handleLeaveReview,
-    },
-    showCompletedActions && {
-      key: 'payProvider',
-      emoji: 'card-outline',
-      iconBg: colors.infoLight,
-      label: 'Pay provider',
-      subtitle: acceptedBid?.bidAmount
-        ? `Future payment option for $${acceptedBid.bidAmount} NZD`
-        : 'Future payment option',
-      onPress: handlePayProvider,
     },
     showReviewBids && {
       key: 'reviewBids',

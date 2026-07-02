@@ -105,12 +105,12 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
   const basePaymentExplanation = isQuoteRequired
-    ? 'The provider will confirm pricing before the work goes ahead.'
+    ? 'The provider will confirm pricing before the work goes ahead. You arrange payment directly with them.'
     : service?.payment_timing === 'upfront'
-    ? 'Payment will be taken now and held securely until the service is confirmed.'
-    : 'Payment will be taken after you confirm the service is complete.'
+    ? 'This provider asks for payment upfront. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
+    : 'You arrange payment directly with the provider once the work is complete — Rural Connections doesn\'t handle payments.'
   const paymentExplanation = service?.materials === 'estimate'
-    ? `${basePaymentExplanation} Materials are estimated and charged at actual cost on completion.`
+    ? `${basePaymentExplanation} Materials are estimated and settled at actual cost on completion.`
     : basePaymentExplanation
 
   useEffect(() => {

@@ -103,7 +103,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
           ]} />
 
           <View style={styles.card}>
-            <Text style={styles.cardQuestion}>How would you like to pay?</Text>
+            <Text style={styles.cardQuestion}>How do you want to set the budget?</Text>
             <View style={styles.priceOptions}>
               {PRICE_OPTIONS.map(opt => (
                 <TouchableOpacity
@@ -147,10 +147,10 @@ export default function PostJobStep4Budget({ navigation, route }) {
             </View>
           )}
 
-          <View style={styles.escrowBox}>
-            <Icon name="lock-closed-outline" size={18} color={colors.textSecondary} />
-            <Text style={styles.escrowText}>
-              Funds held securely and released when you confirm the job is complete.
+          <View style={styles.settleBox}>
+            <Icon name="chatbubbles-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.settleText}>
+              You'll agree the price with the provider and settle up directly — Rural Connections doesn't handle payments.
             </Text>
           </View>
         </ScrollView>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     color: '#222',
   },
 
-  escrowBox: {
+  settleBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#f0faf5',
@@ -241,8 +241,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
-  escrowIcon: { fontSize: 18 },
-  escrowText: { flex: 1, fontSize: 13, color: '#2d6a4f', lineHeight: 19 },
+  settleText: { flex: 1, fontSize: 13, color: '#2d6a4f', lineHeight: 19 },
 
   footer: {
     backgroundColor: '#fff',
