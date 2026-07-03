@@ -308,14 +308,18 @@ export default function AccountTabScreen({ navigation }) {
 
   async function updateRole(newRole) {
     if (!userId) return
+    // The legacy `role` column only allows requester/provider — map 'both'.
+    const legacyRole = newRole === 'both' ? 'provider' : newRole
     const { error } = await supabase
       .from('profiles')
-      .update({ primary_role: newRole, role: newRole })
+      .update({ primary_role: newRole, role: legacyRole })
       .eq('id', userId)
-    if (!error) {
-      setProfile(p => ({ ...p, primary_role: newRole, role: newRole }))
-      Alert.alert('Updated', 'Your tabs will update next time you open the app.')
+    if (error) {
+      Alert.alert('Could not update', error.message)
+      return
     }
+    setProfile(p => ({ ...p, primary_role: newRole, role: legacyRole }))
+    Alert.alert('Updated', 'Your role has been updated.')
   }
 
   // ─── Skills & qualifications ──────────────────────────────────────────────
