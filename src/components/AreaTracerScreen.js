@@ -49,8 +49,8 @@ export default function AreaTracerScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
 
   const initPoints = route.params?.initialPoints || []
-  const initLat    = initPoints[0]?.latitude  || NZ_CENTER.latitude
-  const initLng    = initPoints[0]?.longitude || NZ_CENTER.longitude
+  const initLat    = initPoints[0]?.latitude  || route.params?.initialCenter?.latitude  || NZ_CENTER.latitude
+  const initLng    = initPoints[0]?.longitude || route.params?.initialCenter?.longitude || NZ_CENTER.longitude
 
   const [polygonPoints, setPolygonPoints] = useState(initPoints)
   const [mapType,       setMapType]       = useState('hybrid')

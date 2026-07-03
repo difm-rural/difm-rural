@@ -173,6 +173,7 @@ export default function PostJobStep2Location({ navigation, route }) {
   function handleTraceArea() {
     navigation.navigate('AreaTracer', {
       initialPoints: areaPolygon.length > 0 ? areaPolygon : [],
+      initialCenter: (latitude && longitude) ? { latitude, longitude } : null,
       returnTo:      route.name,
     })
   }
