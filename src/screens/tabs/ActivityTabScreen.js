@@ -191,6 +191,7 @@ function BookingWorkCard({
 export default function ActivityTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const [profile, setProfile] = useState(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // Requester data
   const [activeJobs, setActiveJobs]   = useState([])
@@ -215,6 +216,10 @@ export default function ActivityTabScreen({ navigation }) {
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
+
+    supabase.from('notifications').select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id).eq('read', false)
+      .then(({ count }) => setUnreadCount(count || 0))
 
     const { data: prof } = await supabase
       .from('profiles')
@@ -574,6 +579,14 @@ export default function ActivityTabScreen({ navigation }) {
                 : 'No active items'}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.bellBtn}
+            onPress={() => navigation.navigate('Notifications')}
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
+            <Icon name="notifications-outline" size={24} color={colors.primary} />
+            {unreadCount > 0 && <View style={styles.bellDot} />}
+          </TouchableOpacity>
           {isRequester && (
             <TouchableOpacity
               style={styles.myJobsBtn}
@@ -834,6 +847,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   myJobsBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  bellBtn: { padding: 8, marginBottom: 2 },
+  bellDot: { position: 'absolute', top: 5, right: 5, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.background },
   myJobsArrow:   { fontSize: 18, color: colors.primary, lineHeight: 20 },
   brandLabel: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
   headerTitle: {
