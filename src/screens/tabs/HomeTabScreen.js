@@ -250,46 +250,6 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         )}
 
-        {/* Your connections — re-engage people you've worked with */}
-        {connections.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your connections</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Connections')}
-                accessibilityRole="button"
-                accessibilityLabel="See all connections">
-                <Text style={styles.sectionLink}>See all ({connections.length})</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.connStrip}>
-              {connections.slice(0, 10).map(c => {
-                const cat = primaryCategory(c.categories)
-                return (
-                <TouchableOpacity
-                  key={c.provider_id}
-                  style={styles.connItem}
-                  onPress={() => navigation.navigate('ConnectionDetail', { connection: c })}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open connection ${c.provider?.full_name || 'Provider'}${cat ? `, ${cat}` : ''}`}>
-                  <ConnectionAvatar name={c.provider?.full_name} avatarUrl={c.provider?.avatar_url} size={54} />
-                  <Text style={styles.connName} numberOfLines={1}>
-                    {c.provider?.full_name?.split(' ')[0] || 'Provider'}
-                  </Text>
-                  {!!cat && (
-                    <Text style={[styles.connCat, { color: categoryColor(cat) }]} numberOfLines={1}>{cat}</Text>
-                  )}
-                </TouchableOpacity>
-                )
-              })}
-            </ScrollView>
-          </View>
-        )}
-
         {/* Needs attention — unread notifications */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -387,6 +347,46 @@ export default function HomeTabScreen({ navigation }) {
                   : 'Post a job or browse services to get started.'
               }
             />
+          </View>
+        )}
+
+        {/* Your connections — re-engage people you've worked with */}
+        {connections.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your connections</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Connections')}
+                accessibilityRole="button"
+                accessibilityLabel="See all connections">
+                <Text style={styles.sectionLink}>See all ({connections.length})</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.connStrip}>
+              {connections.slice(0, 10).map(c => {
+                const cat = primaryCategory(c.categories)
+                return (
+                <TouchableOpacity
+                  key={c.provider_id}
+                  style={styles.connItem}
+                  onPress={() => navigation.navigate('ConnectionDetail', { connection: c })}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open connection ${c.provider?.full_name || 'Provider'}${cat ? `, ${cat}` : ''}`}>
+                  <ConnectionAvatar name={c.provider?.full_name} avatarUrl={c.provider?.avatar_url} size={54} />
+                  <Text style={styles.connName} numberOfLines={1}>
+                    {c.provider?.full_name?.split(' ')[0] || 'Provider'}
+                  </Text>
+                  {!!cat && (
+                    <Text style={[styles.connCat, { color: categoryColor(cat) }]} numberOfLines={1}>{cat}</Text>
+                  )}
+                </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
           </View>
         )}
       </ScrollView>
