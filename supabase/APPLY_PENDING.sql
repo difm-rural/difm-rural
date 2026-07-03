@@ -213,6 +213,51 @@ create policy "Jobs are viewable by audience"
     or public.is_invited_to_job(id)
   );
 
+-- 9. Security fix pack (July 2026 review).
+--    a) CRITICAL: block is_admin self-promotion via the own-profile UPDATE
+--    b) HIGH: drop legacy "Anyone can insert notifications" (triggers create them)
+--    c) MEDIUM: job_invites — providers may only update `status`
+--    d) MEDIUM: bids — only the job owner changes offer status; job_id immutable
+create or replace function public.protect_profile_privileged_cols()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.is_admin is distinct from old.is_admin then
+    if auth.uid() is not null and not public.current_user_is_admin() then
+      raise exception 'is_admin can only be changed by an administrator';
+    end if;
+  end if;
+  return new;
+end; $$;
+
+drop trigger if exists trg_protect_profile_privileged on public.profiles;
+create trigger trg_protect_profile_privileged
+  before update on public.profiles
+  for each row execute function public.protect_profile_privileged_cols();
+
+drop policy if exists "Anyone can insert notifications" on public.notifications;
+
+revoke update on public.job_invites from authenticated;
+grant update (status) on public.job_invites to authenticated;
+
+create or replace function public.protect_bid_integrity()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.job_id is distinct from old.job_id then
+    raise exception 'An offer cannot be moved to a different job';
+  end if;
+  if new.status is distinct from old.status then
+    if auth.uid() is not null and auth.uid() <> public.job_owner_id(new.job_id) then
+      raise exception 'Only the job owner can change an offer''s status';
+    end if;
+  end if;
+  return new;
+end; $$;
+
+drop trigger if exists trg_protect_bid_integrity on public.bids;
+create trigger trg_protect_bid_integrity
+  before update on public.bids
+  for each row execute function public.protect_bid_integrity();
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- After running: reload the app. Offers are now private end-to-end, the
 -- service/offer materials + pricing fields save correctly, and no user can
