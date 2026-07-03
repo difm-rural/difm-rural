@@ -68,14 +68,14 @@ export default function PostJobStep3Details({ navigation, route }) {
       ? `${jobData.areaHectares} ha traced`
       : jobData.latitude ? 'Location set' : null
 
-  const charsLeft = 20 - description.trim().length
+  const charsLeft = 8 - description.trim().length
 
   useEffect(() => {
     updateJobData({ description, photos, materialsType, accessConditions, locationNote })
   }, [description, photos, materialsType, accessConditions, locationNote])
 
   function canProceed() {
-    return description.trim().length >= 20 && !!materialsType
+    return description.trim().length >= 8 && !!materialsType
   }
 
   function toggleCondition(condition) {
