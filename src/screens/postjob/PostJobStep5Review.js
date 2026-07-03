@@ -127,7 +127,7 @@ export default function PostJobStep5Review({ navigation, route }) {
 
   const mapImgUri = areaPolygon.length > 0
     ? staticMapPolygonUrl(areaPolygon)
-    : (latitude ? staticMapUrl(latitude, longitude, { zoom: 16 }) : null)
+    : (latitude ? staticMapUrl(latitude, longitude, { zoom: 17 }) : null)
 
   // Step order: 1=JobType, 2=Location, 3=Details, 4=Budget, 5=Review
   // popCount = screens to pop from Step5 to reach that step
