@@ -257,9 +257,9 @@ export default function HomeTabScreen({ navigation }) {
             <TouchableOpacity
               onPress={() => navigation.navigate('Notifications')}
               accessibilityRole="button"
-              accessibilityLabel="See all notifications">
+              accessibilityLabel="All notifications">
               <Text style={styles.sectionLink}>
-                {unread.length > 0 ? `See all (${unread.length})` : 'See all'}
+                {unread.length > 0 ? `All notifications (${unread.length})` : 'All notifications'}
               </Text>
             </TouchableOpacity>
           </View>
