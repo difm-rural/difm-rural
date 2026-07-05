@@ -11,21 +11,6 @@ import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
-const MATERIALS_OPTIONS = [
-  { id: 'none',      label: 'Nothing required', icon: 'checkmark-circle-outline' },
-  { id: 'requester', label: "I'll provide", icon: 'home-outline' },
-  { id: 'provider',  label: 'Provider supplies', icon: 'construct-outline' },
-]
-
-const ACCESS_OPTIONS = [
-  { id: 'park_and_walk',          label: 'Park and walk — easy access', icon: 'walk-outline', sub: 'Can park nearby, short walk to job site' },
-  { id: '4wd_required',           label: '4WD required',                icon: 'car-outline',  sub: "Standard vehicle won't make it to the site" },
-  { id: 'dogs_on_property',       label: 'Dogs on property',            icon: 'paw-outline' },
-  { id: 'livestock_nearby',       label: 'Livestock nearby',            icon: 'leaf-outline' },
-  { id: 'electric_fences',        label: 'Electric fences',             icon: 'flash-outline' },
-  { id: 'contact_before_arrival', label: 'Contact before arrival',      icon: 'call-outline' },
-]
-
 function getPhotoUri(photo) { return typeof photo === 'string' ? photo : photo?.uri }
 
 function normalizeAsset(asset) {
@@ -58,8 +43,7 @@ export default function PostJobStep3Details({ navigation, route }) {
 
   const [description,      setDescription]      = useState(jobData.description)
   const [photos,           setPhotos]           = useState(jobData.photos || [])
-  const [materialsType,    setMaterialsType]    = useState(jobData.materialsType || '')
-  const [accessConditions, setAccessConditions] = useState(jobData.accessConditions || [])
+  const [accessConditions] = useState(jobData.accessConditions || [])
   const [locationNote,     setLocationNote]     = useState(jobData.locationNote || '')
 
   const locationSummary = jobData.jobAddress
@@ -71,19 +55,11 @@ export default function PostJobStep3Details({ navigation, route }) {
   const charsLeft = 8 - description.trim().length
 
   useEffect(() => {
-    updateJobData({ description, photos, materialsType, accessConditions, locationNote })
-  }, [description, photos, materialsType, accessConditions, locationNote])
+    updateJobData({ description, photos, accessConditions, locationNote })
+  }, [description, photos, accessConditions, locationNote])
 
   function canProceed() {
-    return description.trim().length >= 8 && !!materialsType
-  }
-
-  function toggleCondition(condition) {
-    setAccessConditions(prev =>
-      prev.includes(condition)
-        ? prev.filter(c => c !== condition)
-        : [...prev, condition]
-    )
+    return description.trim().length >= 8
   }
 
   function handleBack() { navigation.goBack() }
@@ -207,27 +183,7 @@ export default function PostJobStep3Details({ navigation, route }) {
             </View>
           </View>
 
-          {/* 3. Materials */}
-          <View style={styles.card}>
-            <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
-            <View style={styles.tilesRow}>
-              {MATERIALS_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[styles.tile, materialsType === opt.id && styles.tileActive]}
-                  onPress={() => setMaterialsType(opt.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: materialsType === opt.id }}>
-                  <Icon name={opt.icon} size={22} color={colors.primary} />
-                  <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* 4. Site access */}
+          {/* 3. Site access */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Site access</Text>
 
@@ -246,28 +202,6 @@ export default function PostJobStep3Details({ navigation, route }) {
               autoCapitalize="sentences"
               accessibilityLabel="Access note"
             />
-
-            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Access conditions</Text>
-
-            {ACCESS_OPTIONS.map(opt => {
-              const checked = accessConditions.includes(opt.id)
-              return (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={styles.checkRow}
-                  onPress={() => toggleCondition(opt.id)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked }}>
-                  <View style={[styles.checkbox, checked && styles.checkboxSelected]}>
-                    {checked && <Icon name="checkmark" size={14} color="#fff" />}
-                  </View>
-                  <View style={styles.checkContent}>
-                    <Text style={styles.checkLabel}><Icon name={opt.icon} size={14} color={colors.textSecondary} /> {opt.label}</Text>
-                    {!!opt.sub && <Text style={styles.checkSub}>{opt.sub}</Text>}
-                  </View>
-                </TouchableOpacity>
-              )
-            })}
           </View>
 
         </ScrollView>

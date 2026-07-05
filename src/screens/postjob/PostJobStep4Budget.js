@@ -15,6 +15,12 @@ const PRICE_OPTIONS = [
   { id: 'open',  icon: 'pricetags-outline', label: 'Open to offers', desc: 'Let providers quote you' },
 ]
 
+const MATERIALS_OPTIONS = [
+  { id: 'none',      label: 'Nothing required', icon: 'checkmark-circle-outline' },
+  { id: 'requester', label: "I'll provide", icon: 'home-outline' },
+  { id: 'provider',  label: 'Provider supplies', icon: 'construct-outline' },
+]
+
 const SCHEDULE_LABELS = {
   asap:     'As soon as possible',
   specific: 'On a specific date',
@@ -45,8 +51,9 @@ export default function PostJobStep4Budget({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const { jobData, updateJobData } = usePostJob()
 
-  const [priceType, setPriceType] = useState(jobData.priceType || 'fixed')
-  const [price,     setPrice]     = useState(jobData.price)
+  const [priceType,     setPriceType]     = useState(jobData.priceType || 'fixed')
+  const [price,         setPrice]         = useState(jobData.price)
+  const [materialsType, setMaterialsType] = useState(jobData.materialsType || '')
 
   const locationSummary = jobData.jobAddress
     ? `${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
@@ -61,10 +68,11 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
   // Keep context in sync
   useEffect(() => {
-    updateJobData({ priceType, price })
-  }, [priceType, price])
+    updateJobData({ priceType, price, materialsType })
+  }, [priceType, price, materialsType])
 
   function canProceed() {
+    if (!materialsType) return false
     if (!priceType) return false
     if (priceType === 'open') return true
     return !!(price.trim() && parseFloat(price) > 0)
@@ -117,6 +125,25 @@ export default function PostJobStep4Budget({ navigation, route }) {
                     {opt.label}
                   </Text>
                   <Text style={styles.priceTileDesc}>{opt.desc}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
+            <View style={styles.tilesRow}>
+              {MATERIALS_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.tile, materialsType === opt.id && styles.tileActive]}
+                  onPress={() => setMaterialsType(opt.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: materialsType === opt.id }}>
+                  <Icon name={opt.icon} size={22} color={colors.primary} />
+                  <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
+                    {opt.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -215,6 +242,12 @@ const styles = StyleSheet.create({
   priceTileLabel:      { fontSize: 14, fontWeight: '700', color: '#555', textAlign: 'center', marginBottom: 4 },
   priceTileLabelActive: { color: colors.primary },
   priceTileDesc:       { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
+
+  tilesRow:        { flexDirection: 'row', gap: 8 },
+  tile:            { flex: 1, backgroundColor: '#f9f9f9', borderRadius: 10, borderWidth: 1.5, borderColor: '#e0e0e0', padding: 10, alignItems: 'center', gap: 4 },
+  tileActive:      { backgroundColor: '#f0faf5', borderColor: colors.primary },
+  tileLabel:       { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textAlign: 'center', lineHeight: 14 },
+  tileLabelActive: { color: colors.primary },
 
   amountRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   currencyTag:  { backgroundColor: colors.primaryLight, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#c3e6d4' },
