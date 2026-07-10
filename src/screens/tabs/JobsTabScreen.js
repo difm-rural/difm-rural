@@ -122,12 +122,20 @@ export default function JobsTabScreen({ navigation }) {
   async function fetchMyBids(uid) {
     const { data: bidsData } = await supabase
       .from('bids')
-      .select('*, jobs(*)')
+      .select('*')
       .eq('provider_id', uid)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
 
-    setMyBidJobs((bidsData || []).filter(b => b.jobs?.status === 'open'))
+    const bids = bidsData || []
+    if (bids.length === 0) { setMyBidJobs([]); return }
+    // Read jobs via the masking view so a pending bid can't reveal a hidden
+    // job's exact address before the provider is accepted.
+    const jobIds = [...new Set(bids.map(b => b.job_id).filter(Boolean))]
+    const { data: jobsData } = await supabase.from('jobs_public').select('*').in('id', jobIds)
+    const jobMap = {}
+    ;(jobsData || []).forEach(j => { jobMap[j.id] = j })
+    setMyBidJobs(bids.map(b => ({ ...b, jobs: jobMap[b.job_id] || null })).filter(b => b.jobs?.status === 'open'))
   }
 
   async function handleWatchToggle(jobId, currentlyWatched) {

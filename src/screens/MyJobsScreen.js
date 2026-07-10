@@ -107,27 +107,32 @@ export default function MyJobsScreen({ navigation, route }) {
   async function fetchMyBids(uid) {
     const { data: bidsData } = await supabase
       .from('bids')
-      .select('*, jobs(*)')
+      .select('*')
       .eq('provider_id', uid)
       .order('created_at', { ascending: false })
 
     const bidList = bidsData || []
     if (bidList.length === 0) { setMyBids([]); return }
 
-    const requesterIds = [...new Set(bidList.map(b => b.jobs?.requester_id).filter(Boolean))]
-    const { data: profilesData } = await supabase
-      .from('profiles_public')
-      .select('id, full_name, avatar_url')
-      .in('id', requesterIds)
+    // Read jobs via the masking view (hides a hidden job's exact address on
+    // pending bids; the accepted provider still sees it).
+    const jobIds = [...new Set(bidList.map(b => b.job_id).filter(Boolean))]
+    const { data: jobsData } = await supabase.from('jobs_public').select('*').in('id', jobIds)
+    const jobMap = {}
+    ;(jobsData || []).forEach(j => { jobMap[j.id] = j })
 
-    setMyBids(bidList.map(bid => ({
-      ...bid,
-      jobs: bid.jobs ? {
-        ...bid.jobs,
-        profiles: profilesData?.find(p => p.id === bid.jobs.requester_id) || null,
-        bidCount: 0,
-      } : null,
-    })))
+    const requesterIds = [...new Set(Object.values(jobMap).map(j => j.requester_id).filter(Boolean))]
+    const { data: profilesData } = requesterIds.length > 0
+      ? await supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', requesterIds)
+      : { data: [] }
+
+    setMyBids(bidList.map(bid => {
+      const j = jobMap[bid.job_id]
+      return {
+        ...bid,
+        jobs: j ? { ...j, profiles: profilesData?.find(p => p.id === j.requester_id) || null, bidCount: 0 } : null,
+      }
+    }))
   }
 
   function onRefresh() {

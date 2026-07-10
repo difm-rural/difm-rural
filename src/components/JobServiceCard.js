@@ -39,6 +39,7 @@ export const CATEGORY_ICONS = {
 function formatPrice(item) {
   if (item._type === 'job' || item.itemType === 'task') {
     if (item.price_type === 'fixed') return `$${item.price}`
+    if (item.price_type === 'unpaid') return 'Free'
     return 'Open'
   }
   const { pricing_type, rate, unit_label } = item
@@ -196,7 +197,7 @@ export default function JobServiceCard({
         <Text style={styles.location} numberOfLines={1}>
           {item._distanceKm != null
             ? `${item._distanceKm} km away`
-            : (item.location_name || 'Location TBC')}
+            : (item.location_name || item.location_area || 'Location TBC')}
         </Text>
 
         {/* Row 5: rating */}
