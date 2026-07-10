@@ -22,7 +22,12 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const SCHEDULE_LABELS = {
   asap:     'As soon as possible',
   specific: 'On a specific date',
+  range:    'Over a period',
   flexible: "I'm flexible",
+}
+
+function fmtDay(v) {
+  return typeof v === 'string' ? v.split('T')[0] : new Date(v).toISOString().split('T')[0]
 }
 
 const MATERIALS_LABELS = {
@@ -108,6 +113,8 @@ export default function PostJobStep5Review({ navigation, route }) {
     accessConditions = [],
     inviteProviderId,
     inviteProviderName,
+    dateFrom, dateTo,
+    hideExactLocation, locationArea,
   } = jobData
 
   const isInvite = !!inviteProviderId && !isEditMode
@@ -116,12 +123,16 @@ export default function PostJobStep5Review({ navigation, route }) {
   const [showAuthSheet, setShowAuthSheet] = useState(false)
   const [alsoPublic,    setAlsoPublic]    = useState(false)
 
-  const locationSummary = jobAddress
-    || (latitude ? `${parseFloat(latitude).toFixed(4)}, ${parseFloat(longitude).toFixed(4)}` : 'No location set')
+  const locationSummary = hideExactLocation
+    ? `${locationArea || 'Area only'} — exact address hidden until you accept`
+    : (jobAddress
+      || (latitude ? `${parseFloat(latitude).toFixed(4)}, ${parseFloat(longitude).toFixed(4)}` : 'No location set'))
 
   const scheduleLabel   = SCHEDULE_LABELS[scheduleType] || scheduleType
   const scheduleDisplay = scheduleType === 'specific' && scheduledDate
     ? `${scheduleLabel} — ${formatDate(scheduledDate)}`
+    : scheduleType === 'range' && dateFrom && dateTo
+    ? `${formatDate(dateFrom)} – ${formatDate(dateTo)}`
     : scheduleLabel
   const budgetDisplay   = priceType === 'fixed' ? `$${price} NZD (fixed price)`
     : priceType === 'unpaid' ? 'Unpaid / in-kind'
@@ -205,8 +216,12 @@ export default function PostJobStep5Review({ navigation, route }) {
       scheduled_date:    scheduleType === 'specific' && scheduledDate
         ? (typeof scheduledDate === 'string' ? scheduledDate.split('T')[0] : new Date(scheduledDate).toISOString().split('T')[0])
         : null,
+      date_from:         scheduleType === 'range' && dateFrom ? fmtDay(dateFrom) : null,
+      date_to:           scheduleType === 'range' && dateTo   ? fmtDay(dateTo)   : null,
       materials_type:    materialsType || null,
       access_conditions: accessConditions.length > 0 ? accessConditions : null,
+      hide_exact_location: !!hideExactLocation,
+      location_area:       locationArea || null,
     }
 
     if (!user) {

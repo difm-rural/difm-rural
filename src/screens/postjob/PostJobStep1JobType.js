@@ -13,9 +13,10 @@ import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
 const SCHEDULE_OPTIONS = [
-  { id: 'asap',     label: 'As soon as possible', icon: 'flash-outline' },
-  { id: 'specific', label: 'On a specific date',   icon: 'calendar-outline' },
-  { id: 'flexible', label: "I'm flexible",          icon: 'happy-outline' },
+  { id: 'asap',     label: 'As soon as possible',     icon: 'flash-outline' },
+  { id: 'specific', label: 'On a specific date',       icon: 'calendar-outline' },
+  { id: 'range',    label: 'Over a period (from–to)',  icon: 'calendar-number-outline' },
+  { id: 'flexible', label: "I'm flexible",             icon: 'happy-outline' },
 ]
 
 function formatDate(d) {
@@ -38,6 +39,18 @@ export default function PostJobStep1JobType({ navigation, route }) {
     return null
   })
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [dateFrom,       setDateFrom]       = useState(() => {
+    if (editJob?.date_from) return new Date(editJob.date_from)
+    if (jobData.dateFrom)   return new Date(jobData.dateFrom)
+    return null
+  })
+  const [dateTo,         setDateTo]         = useState(() => {
+    if (editJob?.date_to) return new Date(editJob.date_to)
+    if (jobData.dateTo)   return new Date(jobData.dateTo)
+    return null
+  })
+  const [showFromPicker, setShowFromPicker] = useState(false)
+  const [showToPicker,   setShowToPicker]   = useState(false)
 
   // Seed context from editJob on first entry into this edit session
   useEffect(() => {
@@ -47,6 +60,8 @@ export default function PostJobStep1JobType({ navigation, route }) {
         title:        editJob.title           || '',
         scheduleType: editJob.schedule_type   || '',
         scheduledDate: editJob.scheduled_date || null,
+        dateFrom:     editJob.date_from        || null,
+        dateTo:       editJob.date_to          || null,
         latitude:     editJob.latitude        || null,
         longitude:    editJob.longitude       || null,
         jobAddress:   editJob.location_name   || '',
@@ -95,11 +110,15 @@ export default function PostJobStep1JobType({ navigation, route }) {
       title,
       scheduleType,
       scheduledDate: scheduledDate ? scheduledDate.toISOString() : null,
+      dateFrom: dateFrom ? dateFrom.toISOString() : null,
+      dateTo:   dateTo   ? dateTo.toISOString()   : null,
     })
-  }, [title, scheduleType, scheduledDate])
+  }, [title, scheduleType, scheduledDate, dateFrom, dateTo])
 
   function canProceed() {
-    return !!(title.trim().length >= 3 && scheduleType)
+    if (title.trim().length < 3 || !scheduleType) return false
+    if (scheduleType === 'range') return !!(dateFrom && dateTo)
+    return true
   }
 
   function handleBack() {
@@ -200,6 +219,68 @@ export default function PostJobStep1JobType({ navigation, route }) {
                 )}
               </>
             )}
+
+            {scheduleType === 'range' && (
+              <View style={styles.rangeRow}>
+                <View style={styles.rangeCol}>
+                  <Text style={styles.rangeLabel}>From</Text>
+                  <TouchableOpacity style={styles.datePicker} onPress={() => setShowFromPicker(true)} accessibilityRole="button">
+                    <Text style={dateFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                      {dateFrom ? formatDate(dateFrom) : 'Start date'}
+                    </Text>
+                    <Icon name="calendar-outline" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.rangeCol}>
+                  <Text style={styles.rangeLabel}>To</Text>
+                  <TouchableOpacity style={styles.datePicker} onPress={() => setShowToPicker(true)} accessibilityRole="button">
+                    <Text style={dateTo ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                      {dateTo ? formatDate(dateTo) : 'End date'}
+                    </Text>
+                    <Icon name="calendar-outline" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            {showFromPicker && (
+              <>
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity style={styles.pickerDone} onPress={() => setShowFromPicker(false)}>
+                    <Text style={styles.pickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+                <DateTimePicker
+                  value={dateFrom || new Date()}
+                  mode="date"
+                  minimumDate={new Date()}
+                  onChange={(event, selected) => {
+                    if (Platform.OS === 'android') setShowFromPicker(false)
+                    if (event?.type !== 'dismissed' && selected) {
+                      setDateFrom(selected)
+                      if (dateTo && selected > dateTo) setDateTo(null)
+                    }
+                  }}
+                />
+              </>
+            )}
+            {showToPicker && (
+              <>
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity style={styles.pickerDone} onPress={() => setShowToPicker(false)}>
+                    <Text style={styles.pickerDoneText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+                <DateTimePicker
+                  value={dateTo || dateFrom || new Date()}
+                  mode="date"
+                  minimumDate={dateFrom || new Date()}
+                  onChange={(event, selected) => {
+                    if (Platform.OS === 'android') setShowToPicker(false)
+                    if (event?.type !== 'dismissed' && selected) setDateTo(selected)
+                  }}
+                />
+              </>
+            )}
           </View>
         </ScrollView>
 
@@ -251,6 +332,9 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.primary, fontWeight: '700' },
 
   scheduleList:            { gap: 8 },
+  rangeRow:   { flexDirection: 'row', gap: 10, marginTop: 8 },
+  rangeCol:   { flex: 1 },
+  rangeLabel: { fontSize: 12, color: '#666', marginBottom: 6, marginLeft: 2 },
   scheduleTile:            { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: '#ddd', gap: 12, minHeight: 52, marginTop: 4 },
   scheduleTileActive:      { borderColor: colors.primary, backgroundColor: '#f0faf5' },
   scheduleTileIcon:        { fontSize: 18 },
