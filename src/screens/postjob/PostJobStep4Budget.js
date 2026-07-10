@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
+import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -54,7 +55,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
   const [priceType,     setPriceType]     = useState(jobData.priceType || 'fixed')
   const [price,         setPrice]         = useState(jobData.price)
-  const [materialsType, setMaterialsType] = useState(jobData.materialsType || '')
+  const [materialsType, setMaterialsType] = useState(jobData.materialsType || 'none')
 
   const locationSummary = jobData.jobAddress
     ? `${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
@@ -114,7 +115,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>How do you want to set the budget?</Text>
             <View style={styles.priceOptions}>
-              {PRICE_OPTIONS.map(opt => (
+              {PRICE_OPTIONS.filter(opt => opt.id !== 'unpaid' || isHouseSitting(jobData.title)).map(opt => (
                 <TouchableOpacity
                   key={opt.id}
                   style={[styles.priceTile, priceType === opt.id && styles.priceTileActive]}

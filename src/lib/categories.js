@@ -12,3 +12,9 @@ export const SERVICE_CATEGORIES = [
   'Machinery', 'Labour', 'Water delivery', 'Animal care',
   'Maintenance', 'Fencing', 'Other',
 ]
+
+// True when a job title reads like house-sitting (used to surface the
+// house-sitting-only options: date range, unpaid/in-kind, hide exact address).
+export function isHouseSitting(title) {
+  return /house.?sit/i.test(String(title || ''))
+}

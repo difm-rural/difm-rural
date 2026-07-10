@@ -9,7 +9,7 @@ const corsHeaders = {
 
 // Keep in sync with src/lib/categories.js JOB_CATEGORIES.
 const CATEGORIES = [
-  'Fencing', 'Maintenance', 'Property Check', 'Landscaping',
+  'Fencing', 'Maintenance', 'Property Check', 'House-sitting', 'Landscaping',
   'Animal Care', 'Machinery', 'Labour', 'Spraying',
   'Water', 'General Labour', 'Other',
 ]

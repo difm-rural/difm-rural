@@ -13,6 +13,7 @@ import { trackCategoryInterest } from '../../lib/preferences'
 import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { inferJobCategory } from '../../lib/categorize'
+import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -196,9 +197,11 @@ export default function PostJobStep5Review({ navigation, route }) {
 
     // Category is auto-detected from the title + details (keep any existing one
     // on edit). Falls back to 'Other' if the AI call is unavailable.
-    const resolvedCategory = (category && category.trim())
-      ? category
-      : await inferJobCategory(title, description)
+    const resolvedCategory = isHouseSitting(title)
+      ? 'House-sitting'
+      : (category && category.trim())
+        ? category
+        : await inferJobCategory(title, description)
 
     const payload = {
       title,

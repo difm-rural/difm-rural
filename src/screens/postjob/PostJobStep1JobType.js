@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
+import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -76,9 +77,15 @@ export default function PostJobStep1JobType({ navigation, route }) {
         price:        editJob.price ? String(editJob.price) : '',
         _editJobId:   editJob.id,
       })
-    } else if (!isEditMode && !jobData._editJobId) {
-      // New job — clear any stale edit marker but keep draft data
+    } else if (!isEditMode) {
+      // New job — start clean. Clear both context AND local field state, since a
+      // still-mounted Step 1 would otherwise re-sync stale values into context.
       resetJobData()
+      setTitle(prefill?.title || '')
+      setScheduleType('')
+      setScheduledDate(null)
+      setDateFrom(null)
+      setDateTo(null)
     }
   }, [])
 
@@ -170,7 +177,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>When do you need it done?</Text>
             <View style={styles.scheduleList}>
-              {SCHEDULE_OPTIONS.map(opt => (
+              {SCHEDULE_OPTIONS.filter(opt => opt.id !== 'range' || isHouseSitting(title)).map(opt => (
                 <TouchableOpacity
                   key={opt.id}
                   style={[styles.scheduleTile, scheduleType === opt.id && styles.scheduleTileActive]}

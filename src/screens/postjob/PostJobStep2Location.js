@@ -11,6 +11,7 @@ import JobLocationMap from '../../components/JobLocationMap'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { reverseGeocode } from '../../lib/location'
 import { usePostJob } from '../../context/PostJobContext'
+import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -54,7 +55,7 @@ export default function PostJobStep2Location({ navigation, route }) {
   const [mapType,      setMapType]      = useState('satellite')
   // Default the privacy toggle ON for house-sitting.
   const [hideExactLocation, setHideExactLocation] = useState(
-    jobData.hideExactLocation || jobData.category === 'House-sitting'
+    jobData.hideExactLocation || isHouseSitting(jobData.title)
   )
   const [locationArea, setLocationArea] = useState(jobData.locationArea || '')
 
