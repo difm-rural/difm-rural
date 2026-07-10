@@ -24,6 +24,10 @@ function formatDate(d) {
   return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+function formatShort(d) {
+  return d ? d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : ''
+}
+
 export default function PostJobStep1JobType({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const { jobData, updateJobData, resetJobData } = usePostJob()
@@ -250,7 +254,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
                       </View>
                       {rangeDays != null && (
                         <Text style={styles.rangeDaysText}>
-                          <Icon name="time-outline" size={13} color={colors.primary} /> {rangeDays} {rangeDays === 1 ? 'day' : 'days'} between these dates
+                          <Icon name="moon-outline" size={13} color={colors.primary} /> {rangeDays} {rangeDays === 1 ? 'night' : 'nights'} · {formatShort(dateFrom)} – {formatShort(dateTo)}
                         </Text>
                       )}
                       {showFromPicker && (
