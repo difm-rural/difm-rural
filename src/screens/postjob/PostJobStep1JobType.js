@@ -62,6 +62,8 @@ export default function PostJobStep1JobType({ navigation, route }) {
         scheduledDate: editJob.scheduled_date || null,
         dateFrom:     editJob.date_from        || null,
         dateTo:       editJob.date_to          || null,
+        hideExactLocation: editJob.hide_exact_location || false,
+        locationArea:      editJob.location_area || '',
         latitude:     editJob.latitude        || null,
         longitude:    editJob.longitude       || null,
         jobAddress:   editJob.location_name   || '',

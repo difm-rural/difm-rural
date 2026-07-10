@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert, Keyboard,
   KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
 import * as Location from 'expo-location'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -52,6 +52,11 @@ export default function PostJobStep2Location({ navigation, route }) {
   const [areaPolygon,  setAreaPolygon]  = useState(jobData.areaPolygon || [])
   const [areaHectares, setAreaHectares] = useState(jobData.areaHectares)
   const [mapType,      setMapType]      = useState('satellite')
+  // Default the privacy toggle ON for house-sitting.
+  const [hideExactLocation, setHideExactLocation] = useState(
+    jobData.hideExactLocation || jobData.category === 'House-sitting'
+  )
+  const [locationArea, setLocationArea] = useState(jobData.locationArea || '')
 
   // GPS on mount for new jobs with no location yet
   useEffect(() => {
@@ -114,8 +119,16 @@ export default function PostJobStep2Location({ navigation, route }) {
 
   // Keep context in sync
   useEffect(() => {
-    updateJobData({ latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares })
-  }, [latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares])
+    updateJobData({ latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, hideExactLocation, locationArea })
+  }, [latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, hideExactLocation, locationArea])
+
+  // Prefill the public area from the chosen address (coarse: town, region).
+  useEffect(() => {
+    if (jobAddress && !locationArea) {
+      const parts = String(jobAddress).split(',').map(s => s.trim()).filter(Boolean)
+      if (parts.length) setLocationArea(parts.slice(-2).join(', '))
+    }
+  }, [jobAddress])
 
   const handleLocationSelect = useCallback(async ({ latitude: lat, longitude: lng }) => {
     setLatitude(lat)
@@ -316,6 +329,41 @@ export default function PostJobStep2Location({ navigation, route }) {
             </View>
           )}
 
+          <View style={styles.privacyBox}>
+            <TouchableOpacity
+              style={styles.privacyToggle}
+              onPress={() => setHideExactLocation(v => !v)}
+              activeOpacity={0.7}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: hideExactLocation }}
+              accessibilityLabel="Hide exact address until I accept an offer">
+              <View style={[styles.checkbox, hideExactLocation && styles.checkboxOn]}>
+                {hideExactLocation && <Icon name="checkmark" size={14} color="#fff" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
+                <Text style={styles.privacySub}>
+                  Only your area shows publicly. The exact address is shared with the provider you accept.
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {hideExactLocation && (
+              <View style={styles.areaField}>
+                <Text style={styles.areaLabel}>Public area</Text>
+                <TextInput
+                  style={styles.areaInput}
+                  placeholder="e.g. Near Fairlie, Canterbury"
+                  placeholderTextColor={colors.textMuted}
+                  value={locationArea}
+                  onChangeText={setLocationArea}
+                  autoCapitalize="words"
+                  accessibilityLabel="Public area"
+                />
+              </View>
+            )}
+          </View>
+
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -432,6 +480,16 @@ const styles = StyleSheet.create({
   },
   areaChipText:   { fontSize: 13, fontWeight: '700', color: '#2d6a4f' },
   areaChipRemove: { fontSize: 12, color: '#2d6a4f', fontWeight: '700' },
+
+  privacyBox:    { backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#e0e0e0', padding: 14, marginTop: 4 },
+  privacyToggle: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  checkbox:      { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#ccc', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  checkboxOn:    { backgroundColor: colors.primary, borderColor: colors.primary },
+  privacyTitle:  { fontSize: 14, fontWeight: '700', color: '#222' },
+  privacySub:    { fontSize: 12, color: colors.textSecondary, marginTop: 3, lineHeight: 17 },
+  areaField:     { marginTop: 12 },
+  areaLabel:     { fontSize: 12, color: '#666', marginBottom: 6 },
+  areaInput:     { backgroundColor: '#f9f9f9', borderRadius: 8, padding: 12, fontSize: 14, borderWidth: 0.5, borderColor: '#e0e0e0', color: '#222' },
 
   footer: {
     backgroundColor: '#fff',
