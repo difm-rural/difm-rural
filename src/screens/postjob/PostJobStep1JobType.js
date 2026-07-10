@@ -130,6 +130,10 @@ export default function PostJobStep1JobType({ navigation, route }) {
     return true
   }
 
+  const rangeDays = scheduleType === 'range' && dateFrom && dateTo
+    ? Math.max(0, Math.round((dateTo - dateFrom) / 86400000))
+    : null
+
   function handleBack() {
     navigation.goBack()
   }
@@ -178,118 +182,122 @@ export default function PostJobStep1JobType({ navigation, route }) {
             <Text style={styles.cardQuestion}>When do you need it done?</Text>
             <View style={styles.scheduleList}>
               {SCHEDULE_OPTIONS.filter(opt => opt.id !== 'range' || isHouseSitting(title)).map(opt => (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[styles.scheduleTile, scheduleType === opt.id && styles.scheduleTileActive]}
-                  onPress={() => setScheduleType(opt.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: scheduleType === opt.id }}>
-                  <Icon name={opt.icon} size={18} color={colors.primary} />
-                  <Text style={[styles.scheduleTileLabel, scheduleType === opt.id && styles.scheduleTileLabelActive]}>
-                    {opt.label}
-                  </Text>
-                  <View style={[styles.radio, scheduleType === opt.id && styles.radioActive]}>
-                    {scheduleType === opt.id && <View style={styles.radioDot} />}
-                  </View>
-                </TouchableOpacity>
+                <React.Fragment key={opt.id}>
+                  <TouchableOpacity
+                    style={[styles.scheduleTile, scheduleType === opt.id && styles.scheduleTileActive]}
+                    onPress={() => setScheduleType(opt.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: scheduleType === opt.id }}>
+                    <Icon name={opt.icon} size={18} color={colors.primary} />
+                    <Text style={[styles.scheduleTileLabel, scheduleType === opt.id && styles.scheduleTileLabelActive]}>
+                      {opt.label}
+                    </Text>
+                    <View style={[styles.radio, scheduleType === opt.id && styles.radioActive]}>
+                      {scheduleType === opt.id && <View style={styles.radioDot} />}
+                    </View>
+                  </TouchableOpacity>
+
+                  {opt.id === 'specific' && scheduleType === 'specific' && (
+                    <View style={styles.scheduleSub}>
+                      <TouchableOpacity style={styles.datePicker} onPress={() => setShowDatePicker(true)} accessibilityRole="button">
+                        <Text style={scheduledDate ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                          {scheduledDate ? formatDate(scheduledDate) : 'Select a date'}
+                        </Text>
+                        <Icon name="calendar-outline" size={18} color={colors.textMuted} />
+                      </TouchableOpacity>
+                      {showDatePicker && (
+                        <>
+                          {Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.pickerDone} onPress={() => setShowDatePicker(false)}>
+                              <Text style={styles.pickerDoneText}>Done</Text>
+                            </TouchableOpacity>
+                          )}
+                          <DateTimePicker
+                            value={scheduledDate || new Date()}
+                            mode="date"
+                            minimumDate={new Date()}
+                            onChange={(event, selected) => {
+                              if (Platform.OS === 'android') setShowDatePicker(false)
+                              if (event?.type !== 'dismissed' && selected) setScheduledDate(selected)
+                            }}
+                          />
+                        </>
+                      )}
+                    </View>
+                  )}
+
+                  {opt.id === 'range' && scheduleType === 'range' && (
+                    <View style={styles.scheduleSub}>
+                      <View style={styles.rangeRow}>
+                        <View style={styles.rangeCol}>
+                          <Text style={styles.rangeLabel}>From</Text>
+                          <TouchableOpacity style={styles.datePicker} onPress={() => setShowFromPicker(true)} accessibilityRole="button">
+                            <Text style={dateFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                              {dateFrom ? formatDate(dateFrom) : 'Start date'}
+                            </Text>
+                            <Icon name="calendar-outline" size={18} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.rangeCol}>
+                          <Text style={styles.rangeLabel}>To</Text>
+                          <TouchableOpacity style={styles.datePicker} onPress={() => setShowToPicker(true)} accessibilityRole="button">
+                            <Text style={dateTo ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                              {dateTo ? formatDate(dateTo) : 'End date'}
+                            </Text>
+                            <Icon name="calendar-outline" size={18} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      {rangeDays != null && (
+                        <Text style={styles.rangeDaysText}>
+                          <Icon name="time-outline" size={13} color={colors.primary} /> {rangeDays} {rangeDays === 1 ? 'day' : 'days'} between these dates
+                        </Text>
+                      )}
+                      {showFromPicker && (
+                        <>
+                          {Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.pickerDone} onPress={() => setShowFromPicker(false)}>
+                              <Text style={styles.pickerDoneText}>Done</Text>
+                            </TouchableOpacity>
+                          )}
+                          <DateTimePicker
+                            value={dateFrom || new Date()}
+                            mode="date"
+                            minimumDate={new Date()}
+                            onChange={(event, selected) => {
+                              if (Platform.OS === 'android') setShowFromPicker(false)
+                              if (event?.type !== 'dismissed' && selected) {
+                                setDateFrom(selected)
+                                if (dateTo && selected > dateTo) setDateTo(null)
+                              }
+                            }}
+                          />
+                        </>
+                      )}
+                      {showToPicker && (
+                        <>
+                          {Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.pickerDone} onPress={() => setShowToPicker(false)}>
+                              <Text style={styles.pickerDoneText}>Done</Text>
+                            </TouchableOpacity>
+                          )}
+                          <DateTimePicker
+                            value={dateTo || dateFrom || new Date()}
+                            mode="date"
+                            minimumDate={dateFrom || new Date()}
+                            onChange={(event, selected) => {
+                              if (Platform.OS === 'android') setShowToPicker(false)
+                              if (event?.type !== 'dismissed' && selected) setDateTo(selected)
+                            }}
+                          />
+                        </>
+                      )}
+                    </View>
+                  )}
+                </React.Fragment>
               ))}
             </View>
 
-            {scheduleType === 'specific' && (
-              <>
-                <TouchableOpacity
-                  style={styles.datePicker}
-                  onPress={() => setShowDatePicker(true)}
-                  accessibilityRole="button">
-                  <Text style={scheduledDate ? styles.datePickerValue : styles.datePickerPlaceholder}>
-                    {scheduledDate ? formatDate(scheduledDate) : 'Select a date'}
-                  </Text>
-                  <Icon name="calendar-outline" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-                {showDatePicker && (
-                  <>
-                    {Platform.OS === 'ios' && (
-                      <TouchableOpacity
-                        style={styles.pickerDone}
-                        onPress={() => setShowDatePicker(false)}>
-                        <Text style={styles.pickerDoneText}>Done</Text>
-                      </TouchableOpacity>
-                    )}
-                    <DateTimePicker
-                      value={scheduledDate || new Date()}
-                      mode="date"
-                      minimumDate={new Date()}
-                      onChange={(event, selected) => {
-                        if (Platform.OS === 'android') setShowDatePicker(false)
-                        if (event?.type !== 'dismissed' && selected) setScheduledDate(selected)
-                      }}
-                    />
-                  </>
-                )}
-              </>
-            )}
-
-            {scheduleType === 'range' && (
-              <View style={styles.rangeRow}>
-                <View style={styles.rangeCol}>
-                  <Text style={styles.rangeLabel}>From</Text>
-                  <TouchableOpacity style={styles.datePicker} onPress={() => setShowFromPicker(true)} accessibilityRole="button">
-                    <Text style={dateFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
-                      {dateFrom ? formatDate(dateFrom) : 'Start date'}
-                    </Text>
-                    <Icon name="calendar-outline" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.rangeCol}>
-                  <Text style={styles.rangeLabel}>To</Text>
-                  <TouchableOpacity style={styles.datePicker} onPress={() => setShowToPicker(true)} accessibilityRole="button">
-                    <Text style={dateTo ? styles.datePickerValue : styles.datePickerPlaceholder}>
-                      {dateTo ? formatDate(dateTo) : 'End date'}
-                    </Text>
-                    <Icon name="calendar-outline" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-            {showFromPicker && (
-              <>
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity style={styles.pickerDone} onPress={() => setShowFromPicker(false)}>
-                    <Text style={styles.pickerDoneText}>Done</Text>
-                  </TouchableOpacity>
-                )}
-                <DateTimePicker
-                  value={dateFrom || new Date()}
-                  mode="date"
-                  minimumDate={new Date()}
-                  onChange={(event, selected) => {
-                    if (Platform.OS === 'android') setShowFromPicker(false)
-                    if (event?.type !== 'dismissed' && selected) {
-                      setDateFrom(selected)
-                      if (dateTo && selected > dateTo) setDateTo(null)
-                    }
-                  }}
-                />
-              </>
-            )}
-            {showToPicker && (
-              <>
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity style={styles.pickerDone} onPress={() => setShowToPicker(false)}>
-                    <Text style={styles.pickerDoneText}>Done</Text>
-                  </TouchableOpacity>
-                )}
-                <DateTimePicker
-                  value={dateTo || dateFrom || new Date()}
-                  mode="date"
-                  minimumDate={dateFrom || new Date()}
-                  onChange={(event, selected) => {
-                    if (Platform.OS === 'android') setShowToPicker(false)
-                    if (event?.type !== 'dismissed' && selected) setDateTo(selected)
-                  }}
-                />
-              </>
-            )}
           </View>
         </ScrollView>
 
@@ -341,9 +349,11 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.primary, fontWeight: '700' },
 
   scheduleList:            { gap: 8 },
-  rangeRow:   { flexDirection: 'row', gap: 10, marginTop: 8 },
+  scheduleSub:   { marginTop: 4, marginBottom: 4 },
+  rangeRow:   { flexDirection: 'row', gap: 10, marginTop: 4 },
   rangeCol:   { flex: 1 },
   rangeLabel: { fontSize: 12, color: '#666', marginBottom: 6, marginLeft: 2 },
+  rangeDaysText: { fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 8, marginLeft: 2 },
   scheduleTile:            { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: '#ddd', gap: 12, minHeight: 52, marginTop: 4 },
   scheduleTileActive:      { borderColor: colors.primary, backgroundColor: '#f0faf5' },
   scheduleTileIcon:        { fontSize: 18 },
