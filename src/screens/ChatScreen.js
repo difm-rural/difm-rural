@@ -39,6 +39,7 @@ export default function ChatScreen({ route, navigation }) {
   const [text, setText] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
   const [jobStatus, setJobStatus] = useState(null)
+  const [jobInfo, setJobInfo] = useState(null)
   const flatListRef = useRef(null)
 
   useEffect(() => {
@@ -58,10 +59,11 @@ export default function ChatScreen({ route, navigation }) {
       } else {
         const { data: jobData } = await supabase
           .from('jobs')
-          .select('status')
+          .select('status, requester_id, hide_exact_location, location_name, location_area')
           .eq('id', jobId)
           .single()
         setJobStatus(jobData?.status || null)
+        setJobInfo(jobData || null)
       }
 
       // Stored newest-first to match the inverted FlatList (no per-render copy).
@@ -165,6 +167,11 @@ export default function ChatScreen({ route, navigation }) {
       setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [data, ...prev]))
     }
     return true
+  }
+
+  async function handleShareAddress() {
+    if (!jobInfo?.location_name) return
+    await insertChatMessage(`📍 My address: ${jobInfo.location_name}`)
   }
 
   async function sendProgressPhoto() {
@@ -328,6 +335,18 @@ export default function ChatScreen({ route, navigation }) {
             </Text>
           </View>
         ) : (
+          <>
+          {!isServiceBookingChat && jobInfo?.hide_exact_location && currentUserId === jobInfo?.requester_id && jobInfo?.location_name && (
+            <TouchableOpacity
+              style={styles.shareAddrBar}
+              onPress={handleShareAddress}
+              accessibilityRole="button"
+              accessibilityLabel="Share your exact address">
+              <Icon name="location-outline" size={16} color={colors.primary} />
+              <Text style={styles.shareAddrText}>Share your exact address with {otherUserName?.split(' ')[0] || 'them'}</Text>
+              <Icon name="chevron-forward" size={14} color={colors.primary} />
+            </TouchableOpacity>
+          )}
           <View style={[styles.inputBar, { paddingBottom: insets.bottom + 10 }]}>
             <TouchableOpacity
               style={styles.iconBtn}
@@ -358,6 +377,7 @@ export default function ChatScreen({ route, navigation }) {
               <Text style={styles.sendText}>Send</Text>
             </TouchableOpacity>
           </View>
+          </>
         )}
 
       </KeyboardAvoidingView>
@@ -418,6 +438,17 @@ const styles = StyleSheet.create({
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
   emptyBody:  { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21 },
+
+  // ─── Share address bar ─────────────────────────────────────────────
+  shareAddrBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  shareAddrText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.primary },
 
   // ─── Input bar ─────────────────────────────────────────────────────
   inputBar: {
