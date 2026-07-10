@@ -22,6 +22,10 @@ const INITIAL_STATE = {
   accessConditions: [],
   inviteProviderId:   null,
   inviteProviderName: null,
+  dateFrom:           null,
+  dateTo:             null,
+  hideExactLocation:  false,
+  locationArea:       '',
 }
 
 export function PostJobProvider({ children }) {

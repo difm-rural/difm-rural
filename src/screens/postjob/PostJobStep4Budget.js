@@ -11,8 +11,9 @@ import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
 const PRICE_OPTIONS = [
-  { id: 'fixed', icon: 'cash-outline', label: 'Fixed price',  desc: 'Set your budget upfront' },
-  { id: 'open',  icon: 'pricetags-outline', label: 'Open to offers', desc: 'Let providers quote you' },
+  { id: 'fixed',  icon: 'cash-outline',      label: 'Fixed price',    desc: 'Set your budget upfront' },
+  { id: 'open',   icon: 'pricetags-outline', label: 'Open to offers', desc: 'Let providers quote you' },
+  { id: 'unpaid', icon: 'heart-outline',     label: 'Unpaid / in-kind', desc: 'Free help or in exchange, e.g. house-sitting' },
 ]
 
 const MATERIALS_OPTIONS = [
@@ -74,7 +75,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
   function canProceed() {
     if (!materialsType) return false
     if (!priceType) return false
-    if (priceType === 'open') return true
+    if (priceType === 'open' || priceType === 'unpaid') return true
     return !!(price.trim() && parseFloat(price) > 0)
   }
 
