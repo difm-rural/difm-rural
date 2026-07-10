@@ -40,6 +40,24 @@ function jobStaticMapUrl(job) {
   return staticMapUrl(parseFloat(job.latitude), parseFloat(job.longitude), { zoom: 13, width: 700, height: 200 })
 }
 
+function jobBudget(job) {
+  return job.price_type === 'fixed' ? `$${job.price} NZD`
+    : job.price_type === 'unpaid' ? 'Free / in-kind'
+    : 'Open to offers'
+}
+
+function jobLocation(job) {
+  return job.location_name || job.location_area || "Location shared once you're accepted"
+}
+
+function jobDates(job) {
+  if (!job.date_from || !job.date_to) return null
+  try {
+    const opt = { day: 'numeric', month: 'short', year: 'numeric' }
+    return `${new Date(job.date_from).toLocaleDateString('en-NZ', opt)} – ${new Date(job.date_to).toLocaleDateString('en-NZ', opt)}`
+  } catch { return null }
+}
+
 export default function JobDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { job: initialJob } = route.params
@@ -483,7 +501,7 @@ export default function JobDetailScreen({ route, navigation }) {
   if (isAcceptedProvider) {
     const requesterFirstName = requesterProfile?.full_name?.split(' ')[0] || 'the requester'
     const otherBidCount = Math.max(0, bids.length - 1)
-    const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to offers'
+    const budgetText = jobBudget(job)
     const isCompleted = job.status === 'completed'
     const isCancelled = job.status === 'cancelled'
     const isAwaitingCompletion = job.status === 'awaiting_completion'
@@ -536,7 +554,7 @@ export default function JobDetailScreen({ route, navigation }) {
               </View>
             </View>
             <Text style={styles.title}>{job.title}</Text>
-            <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
+            <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {jobLocation(job)}</Text>
             {isCancelled ? (
               <View style={styles.cancelBox}>
                 <Text style={styles.cancelBoxTitle}>This job was cancelled by the requester</Text>
@@ -582,7 +600,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Location</Text>
-              <Text style={styles.detailValue}>{job.location_name}</Text>
+              <Text style={styles.detailValue}>{jobLocation(job)}</Text>
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Budget</Text>
@@ -848,7 +866,7 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.cardHeader}>
             <Text style={styles.category}>{job.category}</Text>
             <Text style={styles.price}>
-              {job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to Offers'}
+              {jobBudget(job)}
             </Text>
           </View>
           <Text style={styles.title} accessibilityRole="header">{job.title}</Text>
@@ -899,8 +917,12 @@ export default function JobDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
+          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {jobLocation(job)}</Text>
+          {job.hide_exact_location && !job.location_name ? (
+            <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
+          ) : null}
           {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}
+          {jobDates(job) ? <Text style={styles.locationNote}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> {jobDates(job)}</Text> : null}
           <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
         </View>
 

@@ -62,11 +62,11 @@ export default function GuestJobDetailScreen({ route, navigation }) {
         <View style={styles.badgeRow}>
           <Text style={styles.category}>{job.category}</Text>
           <Text style={styles.price}>
-            {job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to Offers'}
+            {job.price_type === 'fixed' ? `$${job.price} NZD` : job.price_type === 'unpaid' ? 'Free / in-kind' : 'Open to Offers'}
           </Text>
         </View>
 
-        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name}</Text>
+        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name || job.location_area || "Location shared once you're accepted"}</Text>
         <Text style={styles.description}>{job.description}</Text>
 
         <Button

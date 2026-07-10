@@ -149,7 +149,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
 
     if (meta.job_id) {
       const { data: job, error } = await supabase
-        .from('jobs')
+        .from('jobs_public')
         .select('*')
         .eq('id', meta.job_id)
         .maybeSingle()
