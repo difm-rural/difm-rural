@@ -3,7 +3,7 @@
 // (requires migrating existing rows) — tracked from the June 2026 UX review.
 
 export const JOB_CATEGORIES = [
-  'Fencing', 'Maintenance', 'Property Check', 'Landscaping',
+  'Fencing', 'Maintenance', 'Property Check', 'House-sitting', 'Landscaping',
   'Animal Care', 'Machinery', 'Labour', 'Spraying',
   'Water', 'General Labour', 'Other',
 ]

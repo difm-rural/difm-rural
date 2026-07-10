@@ -258,6 +258,48 @@ create trigger trg_protect_bid_integrity
   before update on public.bids
   for each row execute function public.protect_bid_integrity();
 
+-- 10. House-sitting + two-tier job location privacy. New job fields, an
+--     "unpaid" price type, and a masking view (jobs_public) that hides the exact
+--     location from the public board when a job opts in — revealing it only to
+--     the owner and the accepted provider.
+alter table public.jobs add column if not exists hide_exact_location boolean not null default false;
+alter table public.jobs add column if not exists location_area text;
+alter table public.jobs add column if not exists date_from date;
+alter table public.jobs add column if not exists date_to   date;
+
+alter table public.jobs drop constraint if exists jobs_price_type_check;
+alter table public.jobs add constraint jobs_price_type_check
+  check (price_type = any (array['fixed'::text, 'open'::text, 'unpaid'::text]));
+
+create or replace function public.can_see_job_location(p_job_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case
+    when coalesce((select hide_exact_location from public.jobs where id = p_job_id), false) = false then true
+    when auth.uid() = (select requester_id from public.jobs where id = p_job_id) then true
+    when public.is_accepted_provider(p_job_id) then true
+    else false
+  end;
+$$;
+grant execute on function public.can_see_job_location(uuid) to anon, authenticated;
+
+drop view if exists public.jobs_public;
+create view public.jobs_public with (security_invoker = true) as
+  select
+    j.id, j.requester_id, j.title, j.description, j.category,
+    j.price_type, j.price, j.status, j.visibility,
+    j.hide_exact_location, j.location_area,
+    j.schedule_type, j.scheduled_date, j.date_from, j.date_to,
+    j.materials_type, j.access_conditions, j.photos, j.area_hectares,
+    j.cancellation_reason, j.cancellation_note, j.created_at,
+    case when public.can_see_job_location(j.id) then j.location_name else null end as location_name,
+    case when public.can_see_job_location(j.id) then j.latitude      else null end as latitude,
+    case when public.can_see_job_location(j.id) then j.longitude     else null end as longitude,
+    case when public.can_see_job_location(j.id) then j.location_note else null end as location_note,
+    case when public.can_see_job_location(j.id) then j.area_polygon  else null end as area_polygon
+  from public.jobs j;
+
+grant select on public.jobs_public to anon, authenticated;
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- After running: reload the app. Offers are now private end-to-end, the
 -- service/offer materials + pricing fields save correctly, and no user can
