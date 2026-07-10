@@ -30,6 +30,13 @@ function getStatusText(job) {
   return jobStatusLabel(job.status)
 }
 
+function fmtRange(from, to) {
+  try {
+    const opt = { day: 'numeric', month: 'short' }
+    return `${new Date(from).toLocaleDateString('en-NZ', opt)} – ${new Date(to).toLocaleDateString('en-NZ', opt)}`
+  } catch { return '' }
+}
+
 function postedAgo(createdAt) {
   if (!createdAt) return 'Posted recently'
   const created = new Date(createdAt)
@@ -51,7 +58,9 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
   const paidAmount = job.completedAmount ?? job.acceptedBidAmount
   const budgetText = job.status === 'completed' && paidAmount != null
     ? `$${paidAmount} NZD`
-    : job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open'
+    : job.price_type === 'fixed' ? `$${job.price} NZD`
+    : job.price_type === 'unpaid' ? 'Free'
+    : 'Open'
   const statusText = getStatusText(job)
   const photoUrl = Array.isArray(job.photos) && job.photos.length > 0 ? job.photos[0] : null
   const showCompletedSummary = job.status === 'completed' && (
@@ -110,8 +119,13 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
       {/* Location */}
       <Text style={styles.location}>
-        <Icon name="location-outline" size={11} color={colors.textMuted} /> {job.location_name}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
+        <Icon name="location-outline" size={11} color={colors.textMuted} /> {job.location_name || job.location_area || 'Location shared on accept'}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
       </Text>
+      {job.date_from && job.date_to ? (
+        <Text style={styles.datesLine}>
+          <Icon name="calendar-outline" size={11} color={colors.textMuted} /> {fmtRange(job.date_from, job.date_to)}
+        </Text>
+      ) : null}
 
       <Text style={styles.postedDate}>{postedAgo(job.created_at)}</Text>
 
@@ -227,6 +241,7 @@ const styles = StyleSheet.create({
   avatarInitials: { fontSize: 16, fontWeight: '700', color: colors.primary },
   description:    { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
   location:       { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+  datesLine:      { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
   postedDate:     { fontSize: 12, color: colors.textMuted, marginBottom: 12 },
   completedSummary: {
     backgroundColor: colors.primaryLight,

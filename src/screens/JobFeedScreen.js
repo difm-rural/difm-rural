@@ -61,7 +61,7 @@ export default function JobFeedScreen({ navigation }) {
 
   async function fetchJobs(region = regionRef.current, uid = userIdRef.current) {
     const { data: jobsData, error } = await supabase
-      .from('jobs')
+      .from('jobs_public')
       .select('*')
       .eq('status', 'open')
       .eq('visibility', 'public')

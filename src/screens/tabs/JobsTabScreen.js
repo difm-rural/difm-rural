@@ -77,7 +77,7 @@ export default function JobsTabScreen({ navigation }) {
 
   async function fetchBoard(uid) {
     const { data: jobsData } = await supabase
-      .from('jobs')
+      .from('jobs_public')
       .select('*')
       .eq('status', 'open')
       .eq('visibility', 'public')

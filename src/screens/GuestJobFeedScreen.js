@@ -103,7 +103,7 @@ export default function GuestJobFeedScreen({ navigation }) {
 
   async function fetchJobs() {
     const { data: jobsData } = await supabase
-      .from('jobs')
+      .from('jobs_public')
       .select('*')
       .eq('status', 'open')
       .eq('visibility', 'public')
