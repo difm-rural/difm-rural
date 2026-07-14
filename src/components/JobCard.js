@@ -106,7 +106,11 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
       {/* Middle: avatar + description preview */}
       <View style={styles.middleRow}>
         <View style={styles.avatarWrap}>
-          {profile.avatar_url ? (
+          {job.category === 'House-sitting' ? (
+            <View style={styles.avatarFallback} accessibilityLabel="House-sitting">
+              <Icon name="home-outline" size={22} color={colors.primary} />
+            </View>
+          ) : profile.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarFallback}>

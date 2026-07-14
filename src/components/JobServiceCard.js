@@ -171,7 +171,11 @@ export default function JobServiceCard({
         {/* Row 1: avatar + first name + price */}
         <View style={styles.row1}>
           <View style={styles.miniAvatarWrap}>
-            {profile.avatar_url ? (
+            {!isService && item.category === 'House-sitting' ? (
+              <View style={styles.miniAvatarFallback} accessibilityLabel="House-sitting">
+                <Icon name="home-outline" size={16} color={colors.primary} />
+              </View>
+            ) : profile.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.miniAvatarImg} />
             ) : (
               <View style={styles.miniAvatarFallback}>
