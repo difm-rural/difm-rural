@@ -168,37 +168,37 @@ export default function HomeTabScreen({ navigation }) {
 
   return (
     <View style={styles.screen}>
+      {/* Fixed header — stays put while content scrolls (matches the other tabs) */}
+      <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.kicker}>Rural Connections</Text>
+          <Text style={styles.title}>
+            {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {totalActive > 0
+              ? `${totalActive} active item${totalActive === 1 ? '' : 's'} on the go`
+              : `Good to see you, ${firstName}`}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.avatarButton}
+          onPress={() => navigation.getParent()?.navigate('Account')}
+          accessibilityRole="button"
+          accessibilityLabel="Open account">
+          {profile?.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+          ) : (
+            <Text style={styles.avatarText}>{initials}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 88 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: insets.bottom + 88 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>Rural Connections</Text>
-            <Text style={styles.title}>
-              {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {totalActive > 0
-                ? `${totalActive} active item${totalActive === 1 ? '' : 's'} on the go`
-                : `Good to see you, ${firstName}`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.avatarButton}
-            onPress={() => navigation.getParent()?.navigate('Account')}
-            accessibilityRole="button"
-            accessibilityLabel="Open account">
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-            ) : (
-              <Text style={styles.avatarText}>{initials}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
 
         {/* Request — everyone can do this */}
         <View style={styles.actionsGrid}>
@@ -398,7 +398,13 @@ export default function HomeTabScreen({ navigation }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
 
-  header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+    backgroundColor: colors.background,
+  },
   kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
   title:    { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
