@@ -122,10 +122,11 @@ export default function HomeTabScreen({ navigation }) {
       ? supabase.from('bookings').select('id', { count: 'exact', head: true })
           .eq('requester_id', uid).in('status', activeBookingStatuses)
       : Promise.resolve({ count: 0 }))
-    tasks.push(isProvider
-      ? supabase.from('bids').select('id, jobs!inner(status)')
-          .eq('provider_id', uid).in('status', ['pending', 'accepted'])
-      : Promise.resolve({ data: [] }))
+    // Anyone can place an offer, so always look for offers to track (not just
+    // provider accounts).
+    tasks.push(
+      supabase.from('bids').select('id, jobs!inner(status)')
+        .eq('provider_id', uid).in('status', ['pending', 'accepted']))
     tasks.push(isProvider
       ? supabase.from('bookings').select('id', { count: 'exact', head: true })
           .eq('provider_id', uid).in('status', activeBookingStatuses)

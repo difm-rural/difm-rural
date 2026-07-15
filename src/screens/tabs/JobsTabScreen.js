@@ -68,7 +68,9 @@ export default function JobsTabScreen({ navigation }) {
     await Promise.all([
       fetchBoard(user?.id),
       user?.id && isRequester ? fetchMyOpenJobs(user.id) : Promise.resolve(),
-      user?.id && isProvider ? fetchMyBids(user.id) : Promise.resolve(),
+      // Anyone (not just providers) can place an offer, so anyone may have offers
+      // to track — fetch regardless of the provider flag.
+      user?.id ? fetchMyBids(user.id) : Promise.resolve(),
       user?.id ? fetchWatchlistIds(user.id).then(setWatchedIds) : Promise.resolve(),
     ])
     setLoading(false)
@@ -226,8 +228,8 @@ export default function JobsTabScreen({ navigation }) {
         </View>
       )}
 
-      {/* Provider: bids awaiting an answer */}
-      {isProvider && myBidJobs.length > 0 && (
+      {/* Offers you've placed, awaiting an answer */}
+      {myBidJobs.length > 0 && (
         <View style={styles.railSection}>
           <Text style={styles.railTitle}>Your offers</Text>
           <FlatList
