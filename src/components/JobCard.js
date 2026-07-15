@@ -2,6 +2,7 @@ import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import { jobStatusLabel } from '../lib/lifecycle'
+import { categoryVisual } from './JobServiceCard'
 import Icon from './Icon'
 
 function truncateWords(text, max = 30) {
@@ -63,6 +64,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
     : 'Open'
   const statusText = getStatusText(job)
   const photoUrl = Array.isArray(job.photos) && job.photos.length > 0 ? job.photos[0] : null
+  const cat      = categoryVisual(job.category)
   const showCompletedSummary = job.status === 'completed' && (
     paidAmount != null ||
     job.providerRatingGiven ||
@@ -101,7 +103,11 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
       {photoUrl ? (
         <Image source={{ uri: photoUrl }} style={styles.jobPhoto} />
-      ) : null}
+      ) : (
+        <View style={[styles.jobPhoto, styles.photoPlaceholder, { backgroundColor: cat.bg }]}>
+          <Icon name={cat.icon} size={40} color={cat.fg} />
+        </View>
+      )}
 
       {/* Middle: avatar + description preview */}
       <View style={styles.middleRow}>
@@ -183,6 +189,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.background,
   },
+  photoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
   topRow: {
     flexDirection: 'row',

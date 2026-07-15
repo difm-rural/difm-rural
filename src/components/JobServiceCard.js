@@ -9,30 +9,27 @@ export const CARD_WIDTH    = 155
 export const CARD_GAP      = 10
 export const SNAP_INTERVAL = CARD_WIDTH + CARD_GAP
 
-export const CATEGORY_COLORS = {
-  Fencing:           { bg: '#d1fae5', fg: '#5a8a45' },
-  Machinery:         { bg: '#ede9fe', fg: '#7e57c2' },
-  'Water delivery':  { bg: '#ccfbf1', fg: '#00897b' },
-  Landscaping:       { bg: '#dcfce7', fg: '#388e3c' },
-  Maintenance:       { bg: '#ffedd5', fg: '#fb8c00' },
-  'Animal care':     { bg: '#fef3c7', fg: '#f57c00' },
-  Labour:            { bg: '#dbeafe', fg: '#1565c0' },
-  'General labour':  { bg: '#dbeafe', fg: '#1565c0' },
-  'Property check':  { bg: '#e0f2f1', fg: '#00838f' },
-  Other:             { bg: '#f3f4f6', fg: '#546e7a' },
+// Colour + icon per category, keyed lowercase so both job ("Animal Care") and
+// service ("Animal care") casings resolve. Used as the card placeholder when a
+// listing has no photo.
+export const CATEGORY_VISUALS = {
+  fencing:          { bg: '#d1fae5', fg: '#5a8a45', icon: 'grid-outline' },
+  maintenance:      { bg: '#ffedd5', fg: '#fb8c00', icon: 'construct-outline' },
+  'property check': { bg: '#e0f2f1', fg: '#00838f', icon: 'home-outline' },
+  'house-sitting':  { bg: '#e8f0fe', fg: '#3b6ea5', icon: 'home-outline' },
+  landscaping:      { bg: '#dcfce7', fg: '#388e3c', icon: 'leaf-outline' },
+  'animal care':    { bg: '#fef3c7', fg: '#f57c00', icon: 'paw-outline' },
+  machinery:        { bg: '#ede9fe', fg: '#7e57c2', icon: 'cog-outline' },
+  labour:           { bg: '#dbeafe', fg: '#1565c0', icon: 'people-outline' },
+  'general labour': { bg: '#dbeafe', fg: '#1565c0', icon: 'people-outline' },
+  spraying:         { bg: '#e0f2fe', fg: '#0277bd', icon: 'color-fill-outline' },
+  water:            { bg: '#ccfbf1', fg: '#00897b', icon: 'water-outline' },
+  'water delivery': { bg: '#ccfbf1', fg: '#00897b', icon: 'water-outline' },
+  other:            { bg: '#f3f4f6', fg: '#546e7a', icon: 'pricetag-outline' },
 }
 
-export const CATEGORY_ICONS = {
-  Fencing:           'grid-outline',
-  Machinery:         'cog-outline',
-  'Water delivery':  'water-outline',
-  Landscaping:       'leaf-outline',
-  Maintenance:       'construct-outline',
-  'Animal care':     'paw-outline',
-  Labour:            'people-outline',
-  'General labour':  'people-outline',
-  'Property check':  'home-outline',
-  Other:             'pricetag-outline',
+export function categoryVisual(category) {
+  return CATEGORY_VISUALS[String(category || '').toLowerCase()] || CATEGORY_VISUALS.other
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,8 +95,7 @@ export default function JobServiceCard({
   const profile   = isService ? (item.profile || {}) : (item.profiles || {})
   const photoUrl  = Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0] : null
   const category  = item.category || 'Other'
-  const catStyle  = CATEGORY_COLORS[category] || CATEGORY_COLORS.Other
-  const catIcon   = CATEGORY_ICONS[category]  || 'pricetag-outline'
+  const cat       = categoryVisual(category)
   const initials  = getInitials(profile.full_name)
   const firstName = getFirstName(profile.full_name)
   const price     = formatPrice(item)
@@ -137,8 +133,8 @@ export default function JobServiceCard({
         {photoUrl ? (
           <Image source={{ uri: photoUrl }} style={styles.photo} />
         ) : (
-          <View style={[styles.placeholder, { backgroundColor: catStyle.bg }]}>
-            <Icon name={catIcon} size={34} color={catStyle.fg} />
+          <View style={[styles.placeholder, { backgroundColor: cat.bg }]}>
+            <Icon name={cat.icon} size={34} color={cat.fg} />
           </View>
         )}
 
