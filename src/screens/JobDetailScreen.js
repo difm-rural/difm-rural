@@ -19,6 +19,8 @@ import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 import { staticMapUrl, staticMapPolygonUrl } from '../lib/maps'
 import { coarseSuburb, stripPlusCode } from '../lib/location'
+import { canProvide } from '../lib/roles'
+import { useUser } from '../context/UserContext'
 
 const MATERIALS_LABELS = {
   none:      'No materials needed',
@@ -66,6 +68,7 @@ export default function JobDetailScreen({ route, navigation }) {
   // hide the "Manage job" shortcut so Back returns straight to Manage rather
   // than stacking another management screen.
   const fromManage = route.params?.fromManage === true
+  const { refreshProfile } = useUser()
   const [job, setJob] = useState(initialJob)
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(false)
@@ -324,6 +327,28 @@ export default function JobDetailScreen({ route, navigation }) {
       .map(li => ({ label: li.label, amount: parseFloat(li.amount) || 0 }))
   }
 
+  function handleEnableProviding() {
+    Alert.alert(
+      'Enable providing?',
+      'This lets you make offers on jobs and advertise your own services. You can still request help as usual.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Enable',
+          onPress: async () => {
+            const { error } = await supabase
+              .from('profiles')
+              .update({ primary_role: 'both', role: 'provider' })
+              .eq('id', currentUser.id)
+            if (error) { Alert.alert('Could not enable', error.message); return }
+            await refreshProfile()   // update the tabs
+            await fetchData()        // refresh this screen's profile → reveals the offer form
+          },
+        },
+      ]
+    )
+  }
+
   async function handlePlaceBid() {
     const total = getBidTotal()
     if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter an offer amount'); return }
@@ -474,7 +499,11 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   const isJobOwner        = currentUser?.id === job.requester_id
-  const canBid            = !isJobOwner && job.status === 'open'
+  const canProvideJobs    = canProvide(profile)
+  const canBid            = !isJobOwner && job.status === 'open' && canProvideJobs
+  // Requester-only account looking at an open job they don't own: offer needs
+  // them to enable providing first.
+  const needsProviderOptIn = !isJobOwner && job.status === 'open' && !!profile && !canProvideJobs
   const isAcceptedProvider = !isJobOwner && myBid?.status === 'accepted'
   // House-sitting seen by anyone who isn't the owner or the accepted provider:
   // show the suburb only and no navigation, so location stays discreet.
@@ -1126,6 +1155,23 @@ export default function JobDetailScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* Requester-only account: prompt to enable providing before offering */}
+        {needsProviderOptIn && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Make an offer</Text>
+            <Text style={styles.optInBody}>
+              Offering on jobs is a provider feature. Enable providing on your account to make an offer — you can still request help as usual.
+            </Text>
+            <Button
+              title="Enable providing"
+              icon="briefcase-outline"
+              onPress={handleEnableProviding}
+              style={{ marginTop: 12 }}
+              accessibilityLabel="Enable providing to make an offer"
+            />
+          </View>
+        )}
+
         {/* Bids list for job owner */}
         {isJobOwner && (
           <View style={styles.section}>
@@ -1285,6 +1331,7 @@ const styles = StyleSheet.create({
 
   section:      { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 14 },
+  optInBody: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
 
   input:     { backgroundColor: colors.background, borderRadius: 8, padding: 14, fontSize: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
   multiline: { height: 90, textAlignVertical: 'top' },
