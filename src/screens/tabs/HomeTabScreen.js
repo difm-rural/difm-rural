@@ -23,9 +23,8 @@ import {
 import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
-import { fetchConnectionsForRequester, categoryColor, primaryCategory } from '../../lib/connections'
+import { fetchConnectionsForRequester } from '../../lib/connections'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
-import { ConnectionAvatar } from '../../components/ConnectionAvatar'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -351,44 +350,21 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
-        {/* Your connections — re-engage people you've worked with */}
+        {/* Your connections — a button to the full list */}
         {connections.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your connections</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Connections')}
-                accessibilityRole="button"
-                accessibilityLabel="See all connections">
-                <Text style={styles.sectionLink}>See all ({connections.length})</Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.connCard}
+            onPress={() => navigation.navigate('Connections')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Your connections, ${connections.length}`}>
+            <Icon name="people-outline" size={22} color={colors.primary} />
+            <Text style={styles.connCardTitle}>Your connections</Text>
+            <View style={styles.summaryCount}>
+              <Text style={styles.summaryCountText}>{connections.length}</Text>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.connStrip}>
-              {connections.slice(0, 10).map(c => {
-                const cat = primaryCategory(c.categories)
-                return (
-                <TouchableOpacity
-                  key={c.provider_id}
-                  style={styles.connItem}
-                  onPress={() => navigation.navigate('ConnectionDetail', { connection: c })}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open connection ${c.provider?.full_name || 'Provider'}${cat ? `, ${cat}` : ''}`}>
-                  <ConnectionAvatar name={c.provider?.full_name} avatarUrl={c.provider?.avatar_url} size={54} />
-                  <Text style={styles.connName} numberOfLines={1}>
-                    {c.provider?.full_name?.split(' ')[0] || 'Provider'}
-                  </Text>
-                  {!!cat && (
-                    <Text style={[styles.connCat, { color: categoryColor(cat) }]} numberOfLines={1}>{cat}</Text>
-                  )}
-                </TouchableOpacity>
-                )
-              })}
-            </ScrollView>
-          </View>
+            <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
         )}
       </ScrollView>
     </View>
@@ -462,10 +438,18 @@ const styles = StyleSheet.create({
   inviteCardTitle: { fontSize: 15, fontWeight: '700', color: colors.primary },
   inviteCardSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
 
-  connStrip: { gap: 16, paddingVertical: 4, paddingRight: 4 },
-  connItem:  { alignItems: 'center', width: 64 },
-  connName:  { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: 6, maxWidth: 64, textAlign: 'center' },
-  connCat:   { fontSize: 10, fontWeight: '600', marginTop: 1, maxWidth: 64, textAlign: 'center' },
+  connCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  connCardTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary },
 
   notifRow: {
     flexDirection: 'row',
