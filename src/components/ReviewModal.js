@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   StyleSheet,
@@ -26,12 +25,23 @@ export default function ReviewModal({
 }) {
   const [rating, setRating] = useState(initialRating || 0)
   const [comment, setComment] = useState(initialComment || '')
+  const [kbHeight, setKbHeight] = useState(0)
 
   useEffect(() => {
     if (!visible) return
     setRating(initialRating || 0)
     setComment(initialComment || '')
   }, [visible, initialRating, initialComment])
+
+  // Lift the sheet above the keyboard. KeyboardAvoidingView is unreliable for a
+  // bottom-anchored sheet inside a Modal (esp. iOS), so track height directly.
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const showSub = Keyboard.addListener(showEvt, e => setKbHeight(e.endCoordinates?.height || 0))
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0))
+    return () => { showSub.remove(); hideSub.remove() }
+  }, [])
 
   function handleSubmit() {
     if (!rating || saving) return
@@ -40,13 +50,11 @@ export default function ReviewModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.backdrop}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { marginBottom: kbHeight }]}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
@@ -101,7 +109,7 @@ export default function ReviewModal({
             />
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
