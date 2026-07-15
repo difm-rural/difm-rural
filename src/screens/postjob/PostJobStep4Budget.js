@@ -6,15 +6,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
-import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
 const PRICE_OPTIONS = [
-  { id: 'fixed',  icon: 'cash-outline',      label: 'Fixed price',    desc: 'Set your budget upfront' },
-  { id: 'open',   icon: 'pricetags-outline', label: 'Open to offers', desc: 'Let providers quote you' },
-  { id: 'unpaid', icon: 'heart-outline',     label: 'Unpaid / in-kind', desc: 'Free help or in exchange, e.g. house-sitting' },
+  { id: 'fixed', icon: 'cash-outline',      label: 'Fixed price',    desc: 'Set your budget upfront' },
+  { id: 'open',  icon: 'pricetags-outline', label: 'Open to offers', desc: 'Let providers quote you' },
 ]
 
 const MATERIALS_OPTIONS = [
@@ -76,7 +74,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
   function canProceed() {
     if (!materialsType) return false
     if (!priceType) return false
-    if (priceType === 'open' || priceType === 'unpaid') return true
+    if (priceType === 'open') return true
     return !!(price.trim() && parseFloat(price) > 0)
   }
 
@@ -115,7 +113,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>How do you want to set the budget?</Text>
             <View style={styles.priceOptions}>
-              {PRICE_OPTIONS.filter(opt => opt.id !== 'unpaid' || isHouseSitting(jobData.title)).map(opt => (
+              {PRICE_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt.id}
                   style={[styles.priceTile, priceType === opt.id && styles.priceTileActive]}

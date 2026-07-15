@@ -135,9 +135,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     : scheduleType === 'range' && dateFrom && dateTo
     ? `${formatDate(dateFrom)} – ${formatDate(dateTo)}`
     : scheduleLabel
-  const budgetDisplay   = priceType === 'fixed' ? `$${price} NZD (fixed price)`
-    : priceType === 'unpaid' ? 'Unpaid / in-kind'
-    : 'Open to offers'
+  const budgetDisplay   = priceType === 'fixed' ? `$${price} NZD (fixed price)` : 'Open to offers'
 
   const mapImgUri = areaPolygon.length > 0
     ? staticMapPolygonUrl(areaPolygon)
