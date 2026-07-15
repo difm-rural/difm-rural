@@ -57,8 +57,10 @@ export default function ChatScreen({ route, navigation }) {
           .single()
         setJobStatus(bookingData?.status || null)
       } else {
+        // jobs_public masks location_name for anyone who isn't the owner or the
+        // accepted provider — the requester still gets it for the share-address bar.
         const { data: jobData } = await supabase
-          .from('jobs')
+          .from('jobs_public')
           .select('status, requester_id, hide_exact_location, location_name, location_area')
           .eq('id', jobId)
           .single()

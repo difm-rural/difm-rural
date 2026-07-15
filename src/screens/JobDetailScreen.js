@@ -124,7 +124,9 @@ export default function JobDetailScreen({ route, navigation }) {
     const { data: { user } } = await supabase.auth.getUser()
     setCurrentUser(user)
 
-    const { data: latestJob } = await supabase.from('jobs').select('*').eq('id', initialJob.id).single()
+    // Read through jobs_public so the exact address stays masked for viewers who
+    // aren't the owner or the accepted provider (can_see_job_location decides).
+    const { data: latestJob } = await supabase.from('jobs_public').select('*').eq('id', initialJob.id).single()
     const currentJob = latestJob || initialJob
     setJob(currentJob)
 
