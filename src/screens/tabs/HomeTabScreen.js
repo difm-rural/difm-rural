@@ -312,7 +312,7 @@ export default function HomeTabScreen({ navigation }) {
             )}
             {summary.pendingBids > 0 && (
               <SummaryRow
-                label={`bid${summary.pendingBids === 1 ? '' : 's'} awaiting an answer`}
+                label={`offer${summary.pendingBids === 1 ? '' : 's'} awaiting a response`}
                 count={summary.pendingBids}
                 onPress={() => navigation.getParent()?.navigate('Jobs')}
               />

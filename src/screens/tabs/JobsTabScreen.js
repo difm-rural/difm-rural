@@ -180,6 +180,9 @@ export default function JobsTabScreen({ navigation }) {
     return items
   })()
 
+  // Board jobs the viewing provider has already offered on → surfaced on the card.
+  const myOfferByJobId = new Map(myBidJobs.map(b => [b.job_id, b.amount]))
+
   const listHeader = (
     <View>
       {/* Requester: post CTA + open jobs awaiting bids */}
@@ -321,6 +324,8 @@ export default function JobsTabScreen({ navigation }) {
               distanceKm={job._distanceKm}
               isWatched={watchedIds.has(job.id)}
               onWatchToggle={userId ? handleWatchToggle : undefined}
+              offered={myOfferByJobId.has(job.id)}
+              offerAmount={myOfferByJobId.get(job.id) ?? null}
               onPress={() => navigation.navigate('JobDetail', { job })}
             />
           </View>

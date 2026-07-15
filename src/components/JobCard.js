@@ -51,7 +51,7 @@ function postedAgo(createdAt) {
   return diffMonths === 1 ? 'Posted 1 month ago' : `Posted ${diffMonths} months ago`
 }
 
-export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle, actionLabel = 'View', distanceKm = null }) {
+export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, onWatchToggle, actionLabel = 'View', distanceKm = null, offered = false, offerAmount = null }) {
   const profile    = job.profiles || {}
   const isOpen     = job.status === 'open'
   const initials   = getInitials(profile.full_name)
@@ -63,7 +63,9 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
     : job.price_type === 'fixed' ? `$${job.price} NZD`
     : job.price_type === 'unpaid' ? 'Free'
     : 'Open'
-  const statusText = getStatusText(job)
+  // When the viewing provider has already offered on this board job, surface it
+  // rather than showing a plain "Open" card as if it were untouched.
+  const statusText = offered ? 'Awaiting response' : getStatusText(job)
   const photoUrl = Array.isArray(job.photos) && job.photos.length > 0 ? job.photos[0] : null
   const cat      = categoryVisual(job.category)
   const showCompletedSummary = job.status === 'completed' && (
@@ -74,17 +76,25 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
   return (
     <TouchableOpacity
-      style={[styles.card, style]}
+      style={[styles.card, offered && styles.cardHighlight, style]}
       onPress={onPress}
       activeOpacity={0.75}
       accessibilityRole="button"
-      accessibilityLabel={`${job.title}, ${job.category}`}>
+      accessibilityLabel={`${job.title}, ${job.category}${offered ? ', offer sent, awaiting response' : ''}`}>
 
       {/* Top row: title+category left, watch+budget right */}
       <View style={styles.topRow}>
         <View style={styles.topLeft}>
           <Text style={styles.title} numberOfLines={2}>{job.title}</Text>
           <Text style={styles.category}>{job.category}</Text>
+          {offered && (
+            <View style={styles.offeredPill}>
+              <Icon name="checkmark-circle" size={12} color={colors.primary} />
+              <Text style={styles.offeredPillText}>
+                Offer sent{offerAmount != null ? ` · $${offerAmount} NZD` : ''}
+              </Text>
+            </View>
+          )}
         </View>
         <View style={styles.topRight}>
           {onWatchToggle && (
@@ -163,7 +173,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
       <View style={styles.footer}>
         <Text style={styles.footerName} numberOfLines={1}>★ 0.0 New · {name}</Text>
         <View style={styles.footerRight}>
-          <Text style={styles.statusText}>{statusText}</Text>
+          <Text style={[styles.statusText, offered && styles.statusTextOffered]}>{statusText}</Text>
           <View style={[styles.viewBtn, !isOpen && styles.viewBtnOutline]}>
             <Text style={[styles.viewBtnText, !isOpen && styles.viewBtnTextOutline]}>{actionLabel}</Text>
           </View>
@@ -202,6 +212,18 @@ const styles = StyleSheet.create({
   topLeft:      { flex: 1 },
   title:        { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
   category:     { fontSize: 12, color: colors.textMuted },
+  offeredPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primaryLight,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 6,
+  },
+  offeredPillText: { fontSize: 11, fontWeight: '700', color: colors.primary },
   topRight:     { alignItems: 'flex-end', flexShrink: 0 },
   watchBtn: {
     width: 28,
@@ -283,6 +305,7 @@ const styles = StyleSheet.create({
   footerName:  { fontSize: 13, color: colors.textMuted, flex: 1, marginRight: 8 },
   footerRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   statusText:  { fontSize: 12, color: colors.textMuted },
+  statusTextOffered: { color: colors.primary, fontWeight: '700' },
   viewBtn: {
     backgroundColor: colors.primary,
     borderRadius: 8,
