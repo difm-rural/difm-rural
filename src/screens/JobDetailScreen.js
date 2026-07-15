@@ -18,6 +18,7 @@ import { addToWatchlist, removeFromWatchlist } from '../lib/watchlist'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 import { staticMapUrl, staticMapPolygonUrl } from '../lib/maps'
+import { coarseSuburb } from '../lib/location'
 
 const MATERIALS_LABELS = {
   none:      'No materials needed',
@@ -473,6 +474,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const isJobOwner        = currentUser?.id === job.requester_id
   const canBid            = !isJobOwner && job.status === 'open'
   const isAcceptedProvider = !isJobOwner && myBid?.status === 'accepted'
+  // House-sitting seen by anyone who isn't the owner or the accepted provider:
+  // show the suburb only and no navigation, so location stays discreet.
+  const discreetHouseSit = job.category === 'House-sitting' && !isJobOwner && !isAcceptedProvider
 
   const headerJSX = (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -901,7 +905,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </ScrollView>
           )}
 
-          {!!(job.latitude && job.longitude) && (
+          {!!(job.latitude && job.longitude) && !discreetHouseSit && (
             <TouchableOpacity style={styles.mapThumbWrap}
               onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
               activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="View job on map">
@@ -917,8 +921,8 @@ export default function JobDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {jobLocation(job)}</Text>
-          {job.hide_exact_location && !job.location_name ? (
+          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {discreetHouseSit ? (coarseSuburb(job.location_area || job.location_name) || job.location_area || 'Area shared privately') : jobLocation(job)}</Text>
+          {(discreetHouseSit || (job.hide_exact_location && !job.location_name)) ? (
             <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
           ) : null}
           {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}

@@ -3,6 +3,7 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { colors } from '../theme/tokens'
+import { coarseSuburb } from '../lib/location'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 
@@ -66,7 +67,9 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.location_name || job.location_area || "Location shared once you're accepted"}</Text>
+        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.category === 'House-sitting'
+          ? (coarseSuburb(job.location_area || job.location_name) || 'Area shared privately')
+          : (job.location_name || job.location_area || "Location shared once you're accepted")}</Text>
         <Text style={styles.description}>{job.description}</Text>
 
         <Button

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import JobLocationMap from '../../components/JobLocationMap'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
-import { reverseGeocode } from '../../lib/location'
+import { reverseGeocode, coarseSuburb } from '../../lib/location'
 import { usePostJob } from '../../context/PostJobContext'
 import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
@@ -123,11 +123,11 @@ export default function PostJobStep2Location({ navigation, route }) {
     updateJobData({ latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, hideExactLocation, locationArea })
   }, [latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, hideExactLocation, locationArea])
 
-  // Prefill the public area from the chosen address (coarse: town, region).
+  // Prefill the public area from the chosen address (suburb / town only).
   useEffect(() => {
     if (jobAddress && !locationArea) {
-      const parts = String(jobAddress).split(',').map(s => s.trim()).filter(Boolean)
-      if (parts.length) setLocationArea(parts.slice(-2).join(', '))
+      const suburb = coarseSuburb(jobAddress)
+      if (suburb) setLocationArea(suburb)
     }
   }, [jobAddress])
 

@@ -19,6 +19,16 @@ export async function getCurrentLocation() {
   return loc.coords
 }
 
+// Coarse "suburb / town + postcode" from a full address, dropping the street
+// line and a trailing country. e.g.
+//   "165 Ireland Road, Waitoki 0871, New Zealand" -> "Waitoki 0871"
+export function coarseSuburb(address) {
+  if (!address) return ''
+  let parts = String(address).split(',').map(s => s.trim()).filter(Boolean)
+  if (parts.length && /new zealand|aotearoa|^nz$/i.test(parts[parts.length - 1])) parts = parts.slice(0, -1)
+  return parts.length ? parts[parts.length - 1] : ''
+}
+
 export function haversineDistance(lat1, lng1, lat2, lng2) {
   const R    = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
