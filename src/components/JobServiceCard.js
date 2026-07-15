@@ -2,6 +2,7 @@ import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import { statusLabel, statusTone } from '../lib/lifecycle'
+import { stripPlusCode } from '../lib/location'
 import Icon from './Icon'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -197,7 +198,7 @@ export default function JobServiceCard({
         <Text style={styles.location} numberOfLines={1}>
           {item._distanceKm != null
             ? `${item._distanceKm} km away`
-            : (item.location_name || item.location_area || 'Location TBC')}
+            : (stripPlusCode(item.location_name) || item.location_area || 'Location TBC')}
         </Text>
 
         {/* Row 5: rating */}

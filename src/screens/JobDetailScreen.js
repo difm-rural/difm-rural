@@ -18,7 +18,7 @@ import { addToWatchlist, removeFromWatchlist } from '../lib/watchlist'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 import { staticMapUrl, staticMapPolygonUrl } from '../lib/maps'
-import { coarseSuburb } from '../lib/location'
+import { coarseSuburb, stripPlusCode } from '../lib/location'
 
 const MATERIALS_LABELS = {
   none:      'No materials needed',
@@ -48,7 +48,7 @@ function jobBudget(job) {
 }
 
 function jobLocation(job) {
-  return job.location_name || job.location_area || "Location shared once you're accepted"
+  return stripPlusCode(job.location_name) || job.location_area || "Location shared once you're accepted"
 }
 
 function jobDates(job) {

@@ -2,6 +2,7 @@ import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import { jobStatusLabel } from '../lib/lifecycle'
+import { stripPlusCode } from '../lib/location'
 import { categoryVisual } from './JobServiceCard'
 import Icon from './Icon'
 
@@ -129,7 +130,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
       {/* Location */}
       <Text style={styles.location}>
-        <Icon name="location-outline" size={11} color={colors.textMuted} /> {job.location_name || job.location_area || 'Location shared on accept'}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
+        <Icon name="location-outline" size={11} color={colors.textMuted} /> {stripPlusCode(job.location_name) || job.location_area || 'Location shared on accept'}{distanceKm != null ? `  ·  ${distanceKm} km away` : ''}
       </Text>
       {job.date_from && job.date_to ? (
         <Text style={styles.datesLine}>

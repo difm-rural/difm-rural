@@ -127,7 +127,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   const locationSummary = hideExactLocation
     ? `${locationArea || 'Area only'} — exact address hidden until you accept`
     : (jobAddress
-      || (latitude ? `${parseFloat(latitude).toFixed(4)}, ${parseFloat(longitude).toFixed(4)}` : 'No location set'))
+      || (latitude ? 'Pinned on map (no street address)' : 'No location set'))
 
   const scheduleLabel   = SCHEDULE_LABELS[scheduleType] || scheduleType
   const scheduleDisplay = scheduleType === 'specific' && scheduledDate

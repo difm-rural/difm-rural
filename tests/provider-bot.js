@@ -38,7 +38,7 @@ const POLL_MS            = 6000    // how often to check for new jobs / replies
 const COMPLETE_DELAY_MS  = 45000   // wait after your chat reply before marking done
 const DEFAULT_BID        = 150     // used when the job has no fixed price
 
-const QUESTION_TEXT = 'Kia ora — keen to help with this. Is there vehicle access to the site, and is the timing flexible?'
+const QUESTION_TEXT = 'Keen to help with this. Is there vehicle access to the site, and is the timing flexible?'
 const BID_MESSAGE   = "Happy to take this on — I've done plenty of similar work nearby and can start soon."
 const CHAT_TEXT     = "Thanks for accepting! I'll get this sorted. Anything I should know before I head out — gate codes, dogs, where to park?"
 
