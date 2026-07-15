@@ -264,12 +264,10 @@ export default function HomeTabScreen({ navigation }) {
             </TouchableOpacity>
           </View>
           {attention.length === 0 ? (
-            <EmptyState
-              compact
-              tone="positive"
-              icon="checkmark-circle-outline"
-              body="All caught up — nothing waiting on you."
-            />
+            <View style={styles.attentionClear}>
+              <Icon name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={styles.attentionClearText}>All caught up — nothing waiting on you.</Text>
+            </View>
           ) : (
             attention.map((n, i) => (
               <TouchableOpacity
@@ -378,7 +376,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingBottom: 18,
+    paddingBottom: 14,
     backgroundColor: colors.background,
   },
   kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
@@ -398,7 +396,7 @@ const styles = StyleSheet.create({
   avatar:     { width: 44, height: 44 },
   avatarText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
 
-  actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 15 },
   actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 104 },
   primaryAction:   { backgroundColor: colors.primary },
   secondaryAction: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
@@ -413,7 +411,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -421,10 +419,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
+
+  attentionClear: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
+  attentionClearText: { fontSize: 13, color: colors.textMuted },
 
   inviteCard: {
     flexDirection: 'row',
@@ -433,7 +434,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   inviteCardTitle: { fontSize: 15, fontWeight: '700', color: colors.primary },
   inviteCardSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
@@ -445,7 +446,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },

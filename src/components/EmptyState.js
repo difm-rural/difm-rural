@@ -23,20 +23,21 @@ export default function EmptyState({
   actionIcon,
   tone = 'neutral',
   compact = false,
+  panel = false,
   style,
 }) {
   const tint = tone === 'positive' ? colors.successLight : colors.primaryLight
   const iconColor = tone === 'positive' ? colors.success : colors.primary
 
   return (
-    <View style={[compact ? styles.wrapCompact : styles.wrap, style]}>
+    <View style={[compact ? styles.wrapCompact : styles.wrap, panel && styles.panel, style]}>
       <View
         style={[
           styles.iconCircle,
           compact && styles.iconCircleCompact,
           { backgroundColor: tint },
         ]}>
-        <Icon name={icon} size={compact ? 22 : 30} color={iconColor} />
+        <Icon name={icon} size={compact ? 20 : 26} color={iconColor} />
       </View>
 
       {!!title && (
@@ -67,28 +68,37 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxxl + spacing.lg,
-    paddingHorizontal: spacing.xxxl,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
   },
   wrapCompact: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  // Contained panel look for list/section empties that would otherwise float in
+  // a large area.
+  panel: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    marginHorizontal: spacing.lg,
   },
 
   iconCircle: {
-    width: 64,
-    height: 64,
+    width: 54,
+    height: 54,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   iconCircleCompact: {
-    width: 44,
-    height: 44,
-    marginBottom: spacing.md,
+    width: 40,
+    height: 40,
+    marginBottom: spacing.sm,
   },
 
   title: {
@@ -124,7 +134,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 13,
     paddingHorizontal: spacing.xxl,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     minHeight: 48,
   },
   btnText: {

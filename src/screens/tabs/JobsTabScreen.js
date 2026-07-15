@@ -346,12 +346,14 @@ export default function JobsTabScreen({ navigation }) {
         ListEmptyComponent={
           filter !== 'All' || search.trim() ? (
             <EmptyState
+              panel
               icon="search-outline"
               title="No jobs match"
               body="Try a different category or search term."
             />
           ) : (
             <EmptyState
+              panel
               icon="briefcase-outline"
               title="No open jobs right now"
               body="Check back soon — new jobs appear here as neighbours post them."
@@ -375,11 +377,11 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   brandLabel:  { color: colors.accent, fontSize: 12, letterSpacing: 1.5, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6 },
   headerTitle: { color: colors.textPrimary, fontSize: 28, fontWeight: '700' },
-  headerSub:   { color: colors.textSecondary, fontSize: 14, marginTop: 2, marginBottom: 12 },
+  headerSub:   { color: colors.textSecondary, fontSize: 14, marginTop: 2, marginBottom: 9 },
   searchInput: {
     backgroundColor: colors.white,
     borderRadius: 12,
@@ -398,19 +400,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginHorizontal: 16,
-    marginTop: 16,
+    marginTop: 12,
   },
   postCtaTitle: { color: colors.white, fontSize: 17, fontWeight: '700' },
   postCtaSub:   { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2, lineHeight: 18 },
   postCtaArrow: { color: colors.white, fontSize: 22, fontWeight: '700', marginLeft: 10 },
 
-  railSection: { marginTop: 18 },
+  railSection: { marginTop: 14 },
   railTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
     paddingHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   railContent: { paddingHorizontal: 16 },
   bidLabel: {
@@ -426,15 +428,15 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: colors.primary,
     marginHorizontal: 16,
-    marginTop: 22,
+    marginTop: 16,
   },
   boardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 10,
+    marginTop: 11,
+    marginBottom: 8,
   },
   boardTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   localNote: {
