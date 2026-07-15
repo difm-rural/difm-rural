@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert, Keyboard,
   KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native'
 import * as Location from 'expo-location'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -115,13 +115,12 @@ export default function PostJobStep2Location({ navigation, route }) {
     updateJobData({ latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, hideExactLocation, locationArea })
   }, [latitude, longitude, jobAddress, locationNote, areaPolygon, areaHectares, hideExactLocation, locationArea])
 
-  // Prefill the public area from the chosen address (suburb / town only).
+  // The public area is the coarse form of the address (suburb / town). While the
+  // exact address is hidden, keep it in sync — this is what shows publicly, and
+  // is the short text the address field displays.
   useEffect(() => {
-    if (jobAddress && !locationArea) {
-      const suburb = coarseSuburb(jobAddress)
-      if (suburb) setLocationArea(suburb)
-    }
-  }, [jobAddress])
+    if (hideExactLocation) setLocationArea(coarseSuburb(jobAddress) || '')
+  }, [jobAddress, hideExactLocation])
 
   const handleLocationSelect = useCallback(async ({ latitude: lat, longitude: lng }) => {
     setLatitude(lat)
@@ -269,25 +268,12 @@ export default function PostJobStep2Location({ navigation, route }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
               <Text style={styles.privacySub}>
-                Only your area shows publicly. The exact address is shared with the provider you accept.
+                {hideExactLocation && shortAddr
+                  ? `Only “${shortAddr}” shows publicly. The exact address is shared with the provider you accept.`
+                  : 'Only your area shows publicly. The exact address is shared with the provider you accept.'}
               </Text>
             </View>
           </TouchableOpacity>
-
-          {hideExactLocation && (
-            <View style={styles.areaField}>
-              <Text style={styles.areaLabel}>Public area</Text>
-              <TextInput
-                style={styles.areaInput}
-                placeholder="e.g. Near Fairlie, Canterbury"
-                placeholderTextColor={colors.textMuted}
-                value={locationArea}
-                onChangeText={setLocationArea}
-                autoCapitalize="words"
-                accessibilityLabel="Public area"
-              />
-            </View>
-          )}
         </View>
       </View>
 
@@ -495,9 +481,6 @@ const styles = StyleSheet.create({
   checkboxOn:    { backgroundColor: colors.primary, borderColor: colors.primary },
   privacyTitle:  { fontSize: 14, fontWeight: '700', color: '#222' },
   privacySub:    { fontSize: 12, color: colors.textSecondary, marginTop: 3, lineHeight: 17 },
-  areaField:     { marginTop: 12 },
-  areaLabel:     { fontSize: 12, color: '#666', marginBottom: 6 },
-  areaInput:     { backgroundColor: '#f9f9f9', borderRadius: 8, padding: 12, fontSize: 14, borderWidth: 0.5, borderColor: '#e0e0e0', color: '#222' },
 
   footer: {
     backgroundColor: '#fff',
