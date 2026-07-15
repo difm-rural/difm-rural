@@ -16,24 +16,16 @@ import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
 
-const MAP_HEIGHT = 300
+const MAP_HEIGHT = 260
 
-function SummaryBar({ category, title }) {
-  if (!category && !title) return null
+function SummaryBar({ category }) {
+  if (!category) return null
   return (
     <View style={styles.summaryBar}>
-      {!!category && (
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Category</Text>
-          <Text style={styles.summaryValue} numberOfLines={1}>{category}</Text>
-        </View>
-      )}
-      {!!title && (
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Title</Text>
-          <Text style={styles.summaryValue} numberOfLines={1}>{title}</Text>
-        </View>
-      )}
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>Category</Text>
+        <Text style={styles.summaryValue} numberOfLines={1}>{category}</Text>
+      </View>
     </View>
   )
 }
@@ -217,6 +209,9 @@ export default function PostJobStep2Location({ navigation, route }) {
   }
 
   const hasArea = areaPolygon.length > 0
+  // When the exact address is hidden, show only the coarse area in the search
+  // field — the full address stays in state for the provider you accept.
+  const shortAddr = coarseSuburb(jobAddress) || locationArea || ''
 
   return (
     <View style={styles.screen}>
@@ -225,9 +220,75 @@ export default function PostJobStep2Location({ navigation, route }) {
       <View style={styles.searchBarWrap}>
         <AddressAutocomplete
           placeholder="Search for job location..."
-          value={jobAddress}
+          value={hideExactLocation ? shortAddr : jobAddress}
           onSelect={handleAddressSelect}
         />
+      </View>
+
+      <View style={styles.controlsRegion}>
+        <View style={styles.pillsRow}>
+          <TouchableOpacity
+            style={styles.pill}
+            onPress={handleTraceArea}
+            accessibilityRole="button"
+            accessibilityLabel="Trace work area">
+            <Icon name="map-outline" size={16} color={colors.primary} />
+            <Text style={styles.pillText}>Trace area</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.pillSkip}
+            onPress={handleSkip}
+            accessibilityRole="button"
+            accessibilityLabel="Skip location">
+            <Text style={styles.pillSkipText}>Skip location</Text>
+          </TouchableOpacity>
+        </View>
+
+        {hasArea && (
+          <View style={styles.areaChip}>
+            <Text style={styles.areaChipText}><Icon name="checkmark" size={12} color={colors.primary} /> {areaHectares} ha traced</Text>
+            <TouchableOpacity
+              onPress={() => { setAreaPolygon([]); setAreaHectares(null) }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icon name="close" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.privacyBox}>
+          <TouchableOpacity
+            style={styles.privacyToggle}
+            onPress={() => setHideExactLocation(v => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: hideExactLocation }}
+            accessibilityLabel="Hide exact address until I accept an offer">
+            <View style={[styles.checkbox, hideExactLocation && styles.checkboxOn]}>
+              {hideExactLocation && <Icon name="checkmark" size={14} color="#fff" />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
+              <Text style={styles.privacySub}>
+                Only your area shows publicly. The exact address is shared with the provider you accept.
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {hideExactLocation && (
+            <View style={styles.areaField}>
+              <Text style={styles.areaLabel}>Public area</Text>
+              <TextInput
+                style={styles.areaInput}
+                placeholder="e.g. Near Fairlie, Canterbury"
+                placeholderTextColor={colors.textMuted}
+                value={locationArea}
+                onChangeText={setLocationArea}
+                autoCapitalize="words"
+                accessibilityLabel="Public area"
+              />
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.mapHint}>
@@ -299,71 +360,7 @@ export default function PostJobStep2Location({ navigation, route }) {
           automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
 
-          <SummaryBar category={jobData.category} title={jobData.title} />
-
-          <View style={styles.pillsRow}>
-            <TouchableOpacity
-              style={styles.pill}
-              onPress={handleTraceArea}
-              accessibilityRole="button"
-              accessibilityLabel="Trace work area">
-              <Icon name="map-outline" size={16} color={colors.primary} />
-              <Text style={styles.pillText}>Trace area</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.pillSkip}
-              onPress={handleSkip}
-              accessibilityRole="button"
-              accessibilityLabel="Skip location">
-              <Text style={styles.pillSkipText}>Skip location</Text>
-            </TouchableOpacity>
-          </View>
-
-          {hasArea && (
-            <View style={styles.areaChip}>
-              <Text style={styles.areaChipText}><Icon name="checkmark" size={12} color={colors.primary} /> {areaHectares} ha traced</Text>
-              <TouchableOpacity
-                onPress={() => { setAreaPolygon([]); setAreaHectares(null) }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Icon name="close" size={14} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.privacyBox}>
-            <TouchableOpacity
-              style={styles.privacyToggle}
-              onPress={() => setHideExactLocation(v => !v)}
-              activeOpacity={0.7}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: hideExactLocation }}
-              accessibilityLabel="Hide exact address until I accept an offer">
-              <View style={[styles.checkbox, hideExactLocation && styles.checkboxOn]}>
-                {hideExactLocation && <Icon name="checkmark" size={14} color="#fff" />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
-                <Text style={styles.privacySub}>
-                  Only your area shows publicly. The exact address is shared with the provider you accept.
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {hideExactLocation && (
-              <View style={styles.areaField}>
-                <Text style={styles.areaLabel}>Public area</Text>
-                <TextInput
-                  style={styles.areaInput}
-                  placeholder="e.g. Near Fairlie, Canterbury"
-                  placeholderTextColor={colors.textMuted}
-                  value={locationArea}
-                  onChangeText={setLocationArea}
-                  autoCapitalize="words"
-                  accessibilityLabel="Public area"
-                />
-              </View>
-            )}
-          </View>
+          <SummaryBar category={jobData.category} />
 
         </ScrollView>
 
@@ -412,6 +409,16 @@ const styles = StyleSheet.create({
     elevation: 999,
     padding: 10,
     backgroundColor: colors.primary,
+  },
+
+  // Sits between the address field and the map. Low zIndex so the address
+  // autocomplete dropdown overlays it.
+  controlsRegion: {
+    zIndex: 1,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 4,
+    backgroundColor: '#f5f5f5',
   },
 
   mapContainer: { height: MAP_HEIGHT, position: 'relative' },
