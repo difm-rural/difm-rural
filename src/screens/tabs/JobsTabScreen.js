@@ -185,10 +185,18 @@ export default function JobsTabScreen({ navigation }) {
   // Board jobs the viewing provider has already offered on → surfaced on the card.
   const myOfferByJobId = new Map(myBidJobs.map(b => [b.job_id, b.amount]))
 
+  // Any personal section above the board? If so, draw a divider before it so the
+  // switch from "your stuff" to the open board reads clearly.
+  const hasPersonalSection =
+    (isRequester && !isProvider) ||
+    (isRequester && myOpenJobs.length > 0) ||
+    myBidJobs.length > 0
+
   const listHeader = (
     <View>
-      {/* Requester: post CTA + open jobs awaiting bids */}
-      {isRequester && (
+      {/* Post CTA — hidden for providers (they come here to find work; they can
+          still post from Home). Shown for requester-only accounts. */}
+      {isRequester && !isProvider && (
         <TouchableOpacity
           style={styles.postCta}
           onPress={() => navigation.navigate('PostJob', { origin: 'Jobs' })}
@@ -254,6 +262,9 @@ export default function JobsTabScreen({ navigation }) {
           />
         </View>
       )}
+
+      {/* Divider marks the switch from your own items to the open board */}
+      {hasPersonalSection && <View style={styles.sectionDivider} />}
 
       {/* Board heading + filters */}
       <View style={styles.boardHeader}>
@@ -410,12 +421,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
 
+  sectionDivider: {
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.primary,
+    marginHorizontal: 16,
+    marginTop: 22,
+  },
   boardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    marginTop: 22,
+    marginTop: 14,
     marginBottom: 10,
   },
   boardTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
