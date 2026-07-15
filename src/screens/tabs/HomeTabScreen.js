@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react'
 import {
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,11 +24,6 @@ import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import { fetchConnectionsForRequester } from '../../lib/connections'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
-
-function getInitials(name) {
-  if (!name) return '?'
-  return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
-}
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   const isPrimary = variant === 'primary'
@@ -151,7 +145,6 @@ export default function HomeTabScreen({ navigation }) {
   const isRequester = true
   const isProvider  = canProvide(profile)
   const firstName   = profile?.full_name?.split(' ')[0] || 'there'
-  const initials    = getInitials(profile?.full_name)
   const unread      = notifications.filter(n => !n.read)
   const attention   = unread.slice(0, 5)
   const totalActive = (summary.activeJobs || 0) + (summary.reqBookings || 0)
@@ -180,17 +173,6 @@ export default function HomeTabScreen({ navigation }) {
               : `Good to see you, ${firstName}`}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.avatarButton}
-          onPress={() => navigation.getParent()?.navigate('Account')}
-          accessibilityRole="button"
-          accessibilityLabel="Open account">
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-          ) : (
-            <Text style={styles.avatarText}>{initials}</Text>
-          )}
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -382,19 +364,6 @@ const styles = StyleSheet.create({
   kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
   title:    { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
-
-  avatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginLeft: 12,
-  },
-  avatar:     { width: 44, height: 44 },
-  avatarText: { color: colors.primary, fontWeight: '700', fontSize: 16 },
 
   actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 15 },
   actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 104 },
