@@ -13,20 +13,23 @@ export const SNAP_INTERVAL = CARD_WIDTH + CARD_GAP
 // Colour + icon per category, keyed lowercase so both job ("Animal Care") and
 // service ("Animal care") casings resolve. Used as the card placeholder when a
 // listing has no photo.
+// Filled Ionicons chosen to read as a category at a glance (fencing = horizontal
+// wire lines, not a generic square). Used as the card placeholder when a listing
+// has no photo.
 export const CATEGORY_VISUALS = {
-  fencing:          { bg: '#d1fae5', fg: '#5a8a45', icon: 'grid-outline' },
-  maintenance:      { bg: '#ffedd5', fg: '#fb8c00', icon: 'construct-outline' },
-  'property check': { bg: '#e0f2f1', fg: '#00838f', icon: 'home-outline' },
-  'house-sitting':  { bg: '#e8f0fe', fg: '#3b6ea5', icon: 'home-outline' },
-  landscaping:      { bg: '#dcfce7', fg: '#388e3c', icon: 'leaf-outline' },
-  'animal care':    { bg: '#fef3c7', fg: '#f57c00', icon: 'paw-outline' },
-  machinery:        { bg: '#ede9fe', fg: '#7e57c2', icon: 'cog-outline' },
-  labour:           { bg: '#dbeafe', fg: '#1565c0', icon: 'people-outline' },
-  'general labour': { bg: '#dbeafe', fg: '#1565c0', icon: 'people-outline' },
-  spraying:         { bg: '#e0f2fe', fg: '#0277bd', icon: 'color-fill-outline' },
-  water:            { bg: '#ccfbf1', fg: '#00897b', icon: 'water-outline' },
-  'water delivery': { bg: '#ccfbf1', fg: '#00897b', icon: 'water-outline' },
-  other:            { bg: '#f3f4f6', fg: '#546e7a', icon: 'pricetag-outline' },
+  fencing:          { bg: '#d1fae5', fg: '#5a8a45', icon: 'reorder-four' },
+  maintenance:      { bg: '#ffedd5', fg: '#fb8c00', icon: 'construct' },
+  'property check': { bg: '#e0f2f1', fg: '#00838f', icon: 'shield-checkmark' },
+  'house-sitting':  { bg: '#e8f0fe', fg: '#3b6ea5', icon: 'home' },
+  landscaping:      { bg: '#dcfce7', fg: '#388e3c', icon: 'leaf' },
+  'animal care':    { bg: '#fef3c7', fg: '#f57c00', icon: 'paw' },
+  machinery:        { bg: '#ede9fe', fg: '#7e57c2', icon: 'cog' },
+  labour:           { bg: '#dbeafe', fg: '#1565c0', icon: 'people' },
+  'general labour': { bg: '#dbeafe', fg: '#1565c0', icon: 'people' },
+  spraying:         { bg: '#e0f2fe', fg: '#0277bd', icon: 'rainy' },
+  water:            { bg: '#ccfbf1', fg: '#00897b', icon: 'water' },
+  'water delivery': { bg: '#ccfbf1', fg: '#00897b', icon: 'water' },
+  other:            { bg: '#f3f4f6', fg: '#546e7a', icon: 'pricetag' },
 }
 
 export function categoryVisual(category) {
@@ -135,7 +138,7 @@ export default function JobServiceCard({
           <Image source={{ uri: photoUrl }} style={styles.photo} />
         ) : (
           <View style={[styles.placeholder, { backgroundColor: cat.bg }]}>
-            <Icon name={cat.icon} size={34} color={cat.fg} />
+            <Icon name={cat.icon} size={40} color={cat.fg} />
           </View>
         )}
 

@@ -116,7 +116,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
         <Image source={{ uri: photoUrl }} style={styles.jobPhoto} />
       ) : (
         <View style={[styles.jobPhoto, styles.photoPlaceholder, { backgroundColor: cat.bg }]}>
-          <Icon name={cat.icon} size={40} color={cat.fg} />
+          <Icon name={cat.icon} size={48} color={cat.fg} />
         </View>
       )}
 
