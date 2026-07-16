@@ -266,7 +266,14 @@ export default function PostJobStep2Location({ navigation, route }) {
               {hideExactLocation && <Icon name="checkmark" size={14} color="#fff" />}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
+              <View style={styles.privacyTitleRow}>
+                <Icon
+                  name={hideExactLocation ? 'lock-closed' : 'lock-open-outline'}
+                  size={14}
+                  color={hideExactLocation ? colors.primary : colors.textMuted}
+                />
+                <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
+              </View>
               <Text style={styles.privacySub}>
                 {hideExactLocation && shortAddr
                   ? `Only “${shortAddr}” shows publicly. The exact address is shared with the provider you accept.`
@@ -357,7 +364,7 @@ export default function PostJobStep2Location({ navigation, route }) {
               onPress={handleBack}
               accessibilityRole="button"
               accessibilityLabel="Go back">
-              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
+              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.textSecondary} /> Back</Text>
             </TouchableOpacity>
             <Button
               title="Next — Details"
@@ -479,7 +486,8 @@ const styles = StyleSheet.create({
   privacyToggle: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   checkbox:      { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#ccc', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   checkboxOn:    { backgroundColor: colors.primary, borderColor: colors.primary },
-  privacyTitle:  { fontSize: 14, fontWeight: '700', color: '#222' },
+  privacyTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  privacyTitle:  { fontSize: 14, fontWeight: '700', color: '#222', flexShrink: 1 },
   privacySub:    { fontSize: 12, color: colors.textSecondary, marginTop: 3, lineHeight: 17 },
 
   footer: {
@@ -490,6 +498,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerBtns:  { flexDirection: 'row', gap: 10 },
-  backBtn:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  backBtnText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  // Neutral so it doesn't compete with the primary green "Next".
+  backBtn:     { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  backBtnText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 })

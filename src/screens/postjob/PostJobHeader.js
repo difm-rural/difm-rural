@@ -5,7 +5,9 @@ import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import AiJobAssistant from '../../components/AiJobAssistant'
 
-const STEPS = ['Job type', 'Location', 'Details', 'Budget', 'Review']
+// Step 1 is really title + timing — the category is inferred later, so "Basics"
+// rather than "Job type" (which implies a category picker that isn't there).
+const STEPS = ['Basics', 'Location', 'Details', 'Budget', 'Review']
 
 export default function PostJobHeader({ currentStep, title, onBack }) {
   const insets = useSafeAreaInsets()

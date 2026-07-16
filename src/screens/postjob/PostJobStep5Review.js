@@ -123,6 +123,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   const [uploadStatus,  setUploadStatus]  = useState('')
   const [showAuthSheet, setShowAuthSheet] = useState(false)
   const [alsoPublic,    setAlsoPublic]    = useState(false)
+  const [mapFailed,     setMapFailed]     = useState(false)
 
   const locationSummary = hideExactLocation
     ? `${locationArea || 'Area only'} — exact address hidden until you accept`
@@ -340,11 +341,19 @@ export default function PostJobStep5Review({ navigation, route }) {
           </TouchableOpacity>
         )}
 
-        {mapImgUri ? (
-          <Image source={{ uri: mapImgUri }} style={styles.mapThumb} resizeMode="cover" />
+        {mapImgUri && !mapFailed ? (
+          <Image
+            source={{ uri: mapImgUri }}
+            style={styles.mapThumb}
+            resizeMode="cover"
+            onError={() => setMapFailed(true)}
+          />
         ) : (
           <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapPlaceholderText}><Icon name="location-outline" size={13} color={colors.textMuted} /> No location set</Text>
+            <Text style={styles.mapPlaceholderText}>
+              <Icon name="location-outline" size={13} color={colors.textMuted} />{' '}
+              {mapImgUri ? 'Map preview unavailable' : 'No location set'}
+            </Text>
           </View>
         )}
 
@@ -384,7 +393,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         )}
 
         <View style={styles.infoBox}>
-          <Icon name="flash-outline" size={18} color={colors.primary} />
+          <Icon name="information-circle-outline" size={18} color={colors.info} />
           <Text style={styles.infoText}>
             Your job will be visible to providers{' '}
             {latitude || areaPolygon.length > 0
@@ -410,7 +419,7 @@ export default function PostJobStep5Review({ navigation, route }) {
             onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Go back">
-            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
+            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.textSecondary} /> Back</Text>
           </TouchableOpacity>
           <Button
             title={submitLabel}
@@ -495,19 +504,20 @@ const styles = StyleSheet.create({
   reviewValue:     { fontSize: 14, color: '#222', lineHeight: 20 },
   editLink:        { fontSize: 13, color: colors.primary, textDecorationLine: 'underline', paddingTop: 2, marginLeft: 8, flexShrink: 0 },
 
+  // Informational, not a warning — kept visually distinct from the amber photo
+  // reminder that sits next to it.
   infoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#fffbeb',
+    backgroundColor: colors.infoLight,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#fcd34d',
+    borderColor: colors.info,
     gap: 10,
     marginBottom: 12,
   },
-  infoIcon: { fontSize: 18 },
-  infoText: { flex: 1, fontSize: 13, color: '#92400e', lineHeight: 19 },
+  infoText: { flex: 1, fontSize: 13, color: colors.info, lineHeight: 19 },
   photoReminder: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -543,8 +553,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerBtns:        { flexDirection: 'row', gap: 10 },
-  backBtn:           { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  backBtnText:       { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  // Neutral so it doesn't compete with the primary green "Post job".
+  backBtn:           { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  backBtnText:       { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 
   absoluteFill: { ...StyleSheet.absoluteFillObject },
   backdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },

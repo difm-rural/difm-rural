@@ -213,7 +213,7 @@ export default function PostJobStep3Details({ navigation, route }) {
               onPress={handleBack}
               accessibilityRole="button"
               accessibilityLabel="Go back">
-              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
+              <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.textSecondary} /> Back</Text>
             </TouchableOpacity>
             <Button
               title="Next — Budget"
@@ -352,6 +352,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerBtns:      { flexDirection: 'row', gap: 10 },
-  backBtn:         { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
-  backBtnText:     { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  // Neutral so it doesn't compete with the primary green "Next".
+  backBtn:         { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  backBtnText:     { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 })
