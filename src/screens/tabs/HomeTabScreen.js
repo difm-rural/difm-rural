@@ -44,23 +44,6 @@ function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   )
 }
 
-function SummaryRow({ label, count, onPress, last }) {
-  return (
-    <TouchableOpacity
-      style={[styles.summaryRow, !last && styles.summaryRowBorder]}
-      onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={`${count} ${label}`}>
-      <View style={styles.summaryCount}>
-        <Text style={styles.summaryCountText}>{count}</Text>
-      </View>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-    </TouchableOpacity>
-  )
-}
-
 export default function HomeTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const [userId, setUserId]             = useState(null)
@@ -149,6 +132,14 @@ export default function HomeTabScreen({ navigation }) {
   const attention   = unread.slice(0, 5)
   const totalActive = (summary.activeJobs || 0) + (summary.reqBookings || 0)
     + (summary.pendingBids || 0) + (summary.jobsDoing || 0) + (summary.provBookings || 0)
+
+  // Three stat tiles for the "Your activity" row (mock-style): posts you've made,
+  // offers you've placed, and everything active/booked.
+  const activityTiles = [
+    { label: 'Open jobs',   count: summary.activeJobs || 0,  target: 'Activity' },
+    { label: 'Offers made', count: summary.pendingBids || 0, target: 'Jobs' },
+    { label: 'In progress', count: (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0), target: 'Activity' },
+  ]
 
   if (loading) {
     return (
@@ -270,48 +261,24 @@ export default function HomeTabScreen({ navigation }) {
           )}
         </View>
 
-        {/* Active work summary */}
+        {/* Active work summary — stat tiles */}
         {totalActive > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your activity</Text>
+          <View style={styles.activitySection}>
+            <Text style={styles.activityHeading}>Your activity</Text>
+            <View style={styles.statRow}>
+              {activityTiles.map(t => (
+                <TouchableOpacity
+                  key={t.label}
+                  style={styles.statTile}
+                  onPress={() => navigation.getParent()?.navigate(t.target)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t.count} ${t.label}`}>
+                  <Text style={styles.statNumber}>{t.count}</Text>
+                  <Text style={styles.statLabel}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            {summary.activeJobs > 0 && (
-              <SummaryRow
-                label={`active job post${summary.activeJobs === 1 ? '' : 's'}`}
-                count={summary.activeJobs}
-                onPress={() => navigation.getParent()?.navigate('Activity')}
-              />
-            )}
-            {summary.reqBookings > 0 && (
-              <SummaryRow
-                label={`service booking${summary.reqBookings === 1 ? '' : 's'}`}
-                count={summary.reqBookings}
-                onPress={() => navigation.getParent()?.navigate('Activity')}
-              />
-            )}
-            {summary.pendingBids > 0 && (
-              <SummaryRow
-                label={`offer${summary.pendingBids === 1 ? '' : 's'} awaiting a response`}
-                count={summary.pendingBids}
-                onPress={() => navigation.getParent()?.navigate('Jobs')}
-              />
-            )}
-            {summary.jobsDoing > 0 && (
-              <SummaryRow
-                label={`job${summary.jobsDoing === 1 ? '' : 's'} you're doing`}
-                count={summary.jobsDoing}
-                onPress={() => navigation.getParent()?.navigate('Activity')}
-              />
-            )}
-            {summary.provBookings > 0 && (
-              <SummaryRow
-                label={`booking${summary.provBookings === 1 ? '' : 's'} for your services`}
-                count={summary.provBookings}
-                onPress={() => navigation.getParent()?.navigate('Activity')}
-                last
-              />
-            )}
           </View>
         )}
 
@@ -433,13 +400,7 @@ const styles = StyleSheet.create({
   notifTime: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   notifDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 6 },
 
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  summaryRowBorder: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
+  // Connections button count pill
   summaryCount: {
     minWidth: 30,
     height: 30,
@@ -450,7 +411,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   summaryCountText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-  summaryLabel:     { flex: 1, fontSize: 14, color: colors.textPrimary },
-  summaryChevron:   { fontSize: 20, color: colors.textMuted },
+
+  // "Your activity" stat tiles
+  activitySection: { marginBottom: 12 },
+  activityHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  statRow:  { flexDirection: 'row', gap: 10 },
+  statTile: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  statNumber: { fontSize: 22, fontWeight: '800', color: colors.primary },
+  statLabel:  { fontSize: 11, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
 
 })
