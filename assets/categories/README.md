@@ -11,21 +11,24 @@ no photo of its own. One per category.
 
 Images bundle with the app and ship over EAS Update (no native rebuild needed).
 
-## Filenames (all 12)
+## Filenames (all 12) — mapped in src/lib/categoryImages.js
 | Category | Filename |
 |---|---|
-| Fencing & Gates | `fencing-gates.jpg` |
-| Animals & Farm Sitting | `animals-farm-sitting.jpg` |
-| Water & Drainage | `water-drainage.jpg` |
-| Spraying & Pest Control | `spraying-pest-control.jpg` |
-| Land & Vegetation | `land-vegetation.jpg` |
-| Cropping, Hay & Feed | `cropping-hay-feed.jpg` |
-| Earthworks & Driveways | `earthworks-driveways.jpg` |
-| Machinery & Repairs | `machinery-repairs.jpg` |
-| Buildings & Maintenance | `buildings-maintenance.jpg` |
-| Transport & Delivery | `transport-delivery.jpg` |
-| Property & House Sitting | `property-house-sitting.jpg` |
-| General Rural Help | `general-rural-help.jpg` |
+| Fencing & Gates | `fencing.jpg` |
+| Animals & Farm Sitting | `animals.jpg` |
+| Water & Drainage | `water.jpg` |
+| Spraying & Pest Control | `spraying.jpg` |
+| Land & Vegetation | `land.jpg` |
+| Cropping, Hay & Feed | `cropping.jpg` |
+| Earthworks & Driveways | `earthworks.jpg` |
+| Machinery & Repairs | `machinery.jpg` |
+| Buildings & Maintenance | `buildings.jpg` |
+| Transport & Delivery | `transport.jpg` |
+| Property & House Sitting | `property.jpg` |
+| General Rural Help | `general.jpg` |
+
+To replace an image, overwrite the file (keep the same name). The files are
+currently flat illustrations exported as `.jpg` (PNG data — RN renders fine).
 
 ## Specs
 - **Format:** JPG for photos (smaller). PNG only if you need transparency. If you
