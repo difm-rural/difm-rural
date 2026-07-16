@@ -505,9 +505,9 @@ export default function JobDetailScreen({ route, navigation }) {
   // them to enable providing first.
   const needsProviderOptIn = !isJobOwner && job.status === 'open' && !!profile && !canProvideJobs
   const isAcceptedProvider = !isJobOwner && myBid?.status === 'accepted'
-  // House-sitting seen by anyone who isn't the owner or the accepted provider:
-  // show the suburb only and no navigation, so location stays discreet.
-  const discreetHouseSit = job.category === 'House-sitting' && !isJobOwner && !isAcceptedProvider
+  // Hidden-location job seen by anyone who isn't the owner or the accepted
+  // provider: show the suburb only and no navigation, so location stays discreet.
+  const discreetHouseSit = job.hide_exact_location && !isJobOwner && !isAcceptedProvider
 
   const headerJSX = (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>

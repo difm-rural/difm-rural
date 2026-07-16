@@ -16,20 +16,20 @@ export const SNAP_INTERVAL = CARD_WIDTH + CARD_GAP
 // Filled Ionicons chosen to read as a category at a glance (fencing = horizontal
 // wire lines, not a generic square). Used as the card placeholder when a listing
 // has no photo.
+// Filled Ionicons per unified category (keyed lowercase; see categoryVisual).
 export const CATEGORY_VISUALS = {
-  fencing:          { bg: '#d1fae5', fg: '#5a8a45', icon: 'reorder-four' },
-  maintenance:      { bg: '#ffedd5', fg: '#fb8c00', icon: 'construct' },
-  'property check': { bg: '#e0f2f1', fg: '#00838f', icon: 'shield-checkmark' },
-  'house-sitting':  { bg: '#e8f0fe', fg: '#3b6ea5', icon: 'home' },
-  landscaping:      { bg: '#dcfce7', fg: '#388e3c', icon: 'leaf' },
-  'animal care':    { bg: '#fef3c7', fg: '#f57c00', icon: 'paw' },
-  machinery:        { bg: '#ede9fe', fg: '#7e57c2', icon: 'cog' },
-  labour:           { bg: '#dbeafe', fg: '#1565c0', icon: 'people' },
-  'general labour': { bg: '#dbeafe', fg: '#1565c0', icon: 'people' },
-  spraying:         { bg: '#e0f2fe', fg: '#0277bd', icon: 'rainy' },
-  water:            { bg: '#ccfbf1', fg: '#00897b', icon: 'water' },
-  'water delivery': { bg: '#ccfbf1', fg: '#00897b', icon: 'water' },
-  other:            { bg: '#f3f4f6', fg: '#546e7a', icon: 'pricetag' },
+  'fencing & gates':         { bg: '#d1fae5', fg: '#5a8a45', icon: 'reorder-four' },
+  'animals & farm sitting':  { bg: '#fef3c7', fg: '#f57c00', icon: 'paw' },
+  'water & drainage':        { bg: '#ccfbf1', fg: '#00897b', icon: 'water' },
+  'spraying & pest control': { bg: '#e0f2fe', fg: '#0277bd', icon: 'rainy' },
+  'land & vegetation':       { bg: '#dcfce7', fg: '#388e3c', icon: 'leaf' },
+  'earthworks & driveways':  { bg: '#efe3d0', fg: '#8a5a2b', icon: 'construct' },
+  'machinery & repairs':     { bg: '#ede9fe', fg: '#7e57c2', icon: 'cog' },
+  'buildings & maintenance': { bg: '#ffedd5', fg: '#fb8c00', icon: 'hammer' },
+  'transport & delivery':    { bg: '#dbeafe', fg: '#1565c0', icon: 'car' },
+  'property & house sitting':{ bg: '#e8f0fe', fg: '#3b6ea5', icon: 'home' },
+  'general rural help':      { bg: '#f3f4f6', fg: '#546e7a', icon: 'people' },
+  other:                     { bg: '#f3f4f6', fg: '#546e7a', icon: 'pricetag' },
 }
 
 export function categoryVisual(category) {
@@ -171,7 +171,7 @@ export default function JobServiceCard({
         {/* Row 1: avatar + first name + price */}
         <View style={styles.row1}>
           <View style={styles.miniAvatarWrap}>
-            {!isService && item.category === 'House-sitting' ? (
+            {!isService && item.hide_exact_location ? (
               <View style={styles.miniAvatarFallback} accessibilityLabel="House-sitting">
                 <Icon name="home-outline" size={16} color={colors.primary} />
               </View>

@@ -19,17 +19,9 @@ import Icon from '../components/Icon'
 import EmptyState from '../components/EmptyState'
 import { SkeletonList } from '../components/SkeletonCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
+import { CATEGORY_FILTERS } from '../lib/categories'
 
-const FILTERS = [
-  { id: 'All',            label: 'All' },
-  { id: 'Fencing',        label: 'Fencing' },
-  { id: 'Machinery',      label: 'Machinery' },
-  { id: 'Water delivery', label: 'Water' },
-  { id: 'Animal care',    label: 'Animal care' },
-  { id: 'Maintenance',    label: 'Maintenance' },
-  { id: 'Labour',         label: 'Labour' },
-  { id: 'Other',          label: 'Other' },
-]
+const FILTERS = CATEGORY_FILTERS
 
 function isNearUser(item, userRegion) {
   if (!userRegion || !userRegion.length || !item.location_name) return false

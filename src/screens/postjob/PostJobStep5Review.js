@@ -194,9 +194,9 @@ export default function PostJobStep5Review({ navigation, route }) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Category is auto-detected from the title + details (keep any existing one
-    // on edit). Falls back to 'Other' if the AI call is unavailable.
+    // on edit). Falls back to 'General Rural Help' if the AI call is unavailable.
     const resolvedCategory = isHouseSitting(title)
-      ? 'House-sitting'
+      ? 'Property & House Sitting'
       : (category && category.trim())
         ? category
         : await inferJobCategory(title, description)

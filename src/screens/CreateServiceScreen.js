@@ -22,10 +22,10 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
+import { CATEGORIES } from '../lib/categories'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-const CATEGORIES = ['Machinery', 'Labour', 'Water delivery', 'Animal care', 'Maintenance', 'Fencing', 'Other']
 const PRICING_TYPES = [
   { id: 'fixed', label: 'Fixed price' },
   { id: 'hourly', label: 'Hourly rate' },

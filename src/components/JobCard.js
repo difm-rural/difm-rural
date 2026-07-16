@@ -123,7 +123,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
       {/* Middle: avatar + description preview */}
       <View style={styles.middleRow}>
         <View style={styles.avatarWrap}>
-          {job.category === 'House-sitting' ? (
+          {job.hide_exact_location ? (
             <View style={styles.avatarFallback} accessibilityLabel="House-sitting">
               <Icon name="home-outline" size={22} color={colors.primary} />
             </View>

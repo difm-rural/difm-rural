@@ -1,17 +1,18 @@
 // Infers a job category from its title + description.
 // Returns { category } — always one of the known categories, defaulting to
-// "Other" on any error so job posting is never blocked.
+// "General Rural Help" on any error so job posting is never blocked.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Keep in sync with src/lib/categories.js JOB_CATEGORIES.
+// Keep in sync with src/lib/categories.js CATEGORIES.
 const CATEGORIES = [
-  'Fencing', 'Maintenance', 'Property Check', 'House-sitting', 'Landscaping',
-  'Animal Care', 'Machinery', 'Labour', 'Spraying',
-  'Water', 'General Labour', 'Other',
+  'Fencing & Gates', 'Animals & Farm Sitting', 'Water & Drainage',
+  'Spraying & Pest Control', 'Land & Vegetation', 'Earthworks & Driveways',
+  'Machinery & Repairs', 'Buildings & Maintenance', 'Transport & Delivery',
+  'Property & House Sitting', 'General Rural Help',
 ]
 
 function jsonResponse(body: unknown, status = 200) {
@@ -28,11 +29,13 @@ function extractOutputText(result: any): string | null {
   return text || null
 }
 
+const FALLBACK = 'General Rural Help'
+
 function pickCategory(raw: string | null): string {
-  if (!raw) return 'Other'
+  if (!raw) return FALLBACK
   const cleaned = raw.trim()
   const match = CATEGORIES.find(c => c.toLowerCase() === cleaned.toLowerCase())
-  return match || 'Other'
+  return match || FALLBACK
 }
 
 Deno.serve(async (req) => {
@@ -40,17 +43,17 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
-  if (!openAiApiKey) return jsonResponse({ category: 'Other' })
+  if (!openAiApiKey) return jsonResponse({ category: FALLBACK })
 
   try {
     const { title, description } = await req.json()
     const combined = [title, description].filter(Boolean).join('\n').trim()
-    if (!combined) return jsonResponse({ category: 'Other' })
+    if (!combined) return jsonResponse({ category: FALLBACK })
 
     const prompt = `You categorise rural job listings for a New Zealand marketplace.
 Choose the single best category from this exact list:
 ${CATEGORIES.join(', ')}
-Reply with ONLY the category name, exactly as written above. If unsure, reply "Other".
+Reply with ONLY the category name, exactly as written above. If unsure, reply "General Rural Help".
 
 Job title: ${title || '(none)'}
 Job details: ${description || '(none)'}`
@@ -67,12 +70,12 @@ Job details: ${description || '(none)'}`
     const result = await response.json()
     if (!response.ok) {
       console.error('categorize-job: OpenAI error', result?.error?.message || response.status)
-      return jsonResponse({ category: 'Other' })
+      return jsonResponse({ category: FALLBACK })
     }
 
     return jsonResponse({ category: pickCategory(extractOutputText(result)) })
   } catch (error) {
     console.error('categorize-job: failed', error instanceof Error ? error.message : error)
-    return jsonResponse({ category: 'Other' })
+    return jsonResponse({ category: FALLBACK })
   }
 })

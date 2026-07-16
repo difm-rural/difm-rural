@@ -20,19 +20,9 @@ import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../compo
 import EmptyState from '../../components/EmptyState'
 import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
+import { CATEGORY_FILTERS } from '../../lib/categories'
 
-const FILTERS = [
-  { id: 'All',         label: 'All' },
-  { id: 'Machinery',   label: 'Machinery' },
-  { id: 'Labour',      label: 'Labour' },
-  { id: 'Fencing',     label: 'Fencing' },
-  { id: 'Water',       label: 'Water' },
-  { id: 'Animal care', label: 'Animal care' },
-  { id: 'Maintenance', label: 'Maintenance' },
-  { id: 'Landscaping', label: 'Landscaping' },
-  { id: 'Spraying',    label: 'Spraying' },
-  { id: 'Other',       label: 'Other' },
-]
+const FILTERS = CATEGORY_FILTERS
 
 function itemMatchesSearch(item, query) {
   if (!query.trim()) return true

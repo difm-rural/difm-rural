@@ -67,7 +67,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.category === 'House-sitting'
+        <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {job.hide_exact_location
           ? (coarseSuburb(job.location_area || job.location_name) || 'Area shared privately')
           : (stripPlusCode(job.location_name) || job.location_area || "Location shared once you're accepted")}</Text>
         <Text style={styles.description}>{job.description}</Text>
