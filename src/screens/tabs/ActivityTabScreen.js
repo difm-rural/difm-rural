@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react'
 import {
   Alert,
   FlatList,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -587,7 +588,9 @@ export default function ActivityTabScreen({ navigation }) {
             accessibilityRole="button"
             accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
             <Icon name="notifications-outline" size={24} color={colors.primary} />
-            {unreadCount > 0 && <View style={styles.bellDot} />}
+            {unreadCount > 0 && (
+              <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.bellBadge} />
+            )}
           </TouchableOpacity>
           {isRequester && (
             <TouchableOpacity
@@ -864,7 +867,7 @@ const styles = StyleSheet.create({
   },
   myJobsBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
   bellBtn: { padding: 8, marginBottom: 2 },
-  bellDot: { position: 'absolute', top: 5, right: 5, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger, borderWidth: 1.5, borderColor: colors.background },
+  bellBadge: { position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: 5 },
   myJobsArrow:   { fontSize: 18, color: colors.primary, lineHeight: 20 },
   brandLabel: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 },
   headerTitle: {

@@ -77,9 +77,9 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   thumb: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 10,
     backgroundColor: colors.background,
     flexShrink: 0,
   },

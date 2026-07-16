@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -319,6 +320,12 @@ export default function LoginScreen({ navigation, route }) {
         automaticallyAdjustKeyboardInsets={true}
         showsVerticalScrollIndicator={false}>
 
+        <View style={styles.brandLockup}>
+          <Image source={require('../assets/brand/barn-badge-red.png')} style={styles.brandLockupBadge} />
+          <Text style={styles.brandLockupName}>Rural Connect</Text>
+          <Text style={styles.brandLockupSub}>Post jobs, make offers & book services</Text>
+        </View>
+
         <Text style={styles.title} accessibilityRole="header">
           {isRegister ? 'Create your account' : 'Sign in'}
         </Text>
@@ -396,6 +403,11 @@ const styles = StyleSheet.create({
   tagline:   { color: '#95d5b2', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase' },
 
   formArea: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+
+  brandLockup:      { alignItems: 'center', marginBottom: 24 },
+  brandLockupBadge: { width: 72, height: 72, borderRadius: 18, marginBottom: 12 },
+  brandLockupName:  { fontSize: 22, fontWeight: '700', color: colors.textPrimary },
+  brandLockupSub:   { fontSize: 13, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
 
   title: {
     fontSize: 34,
