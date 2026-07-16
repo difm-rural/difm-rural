@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react'
 import {
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -155,9 +156,12 @@ export default function HomeTabScreen({ navigation }) {
       <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>Rural Connections</Text>
-          <Text style={styles.title}>
-            {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
-          </Text>
+          <View style={styles.titleRow}>
+            <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.brandBadge} />
+            <Text style={styles.title}>
+              {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
+            </Text>
+          </View>
           <Text style={styles.subtitle}>
             {totalActive > 0
               ? `${totalActive} active item${totalActive === 1 ? '' : 's'} on the go`
@@ -328,8 +332,10 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     backgroundColor: colors.background,
   },
-  kicker:   { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
-  title:    { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary },
+  kicker:     { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
+  titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandBadge: { width: 30, height: 30, borderRadius: 8 },
+  title:      { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 
   actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 15 },

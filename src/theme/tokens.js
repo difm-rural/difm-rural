@@ -12,6 +12,7 @@ export const colors = {
   textPrimary:    '#222222',
   textSecondary:  '#666666',
   textMuted:      '#999999',
+  textGhost:      '#c9c9c9',
   textOnPrimary:  '#ffffff',
   danger:         '#c0392b',
   dangerLight:    '#fdecea',

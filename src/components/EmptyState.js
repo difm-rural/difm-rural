@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors, radius, spacing, typography } from '../theme/tokens'
 import Icon from './Icon'
 
@@ -16,6 +16,7 @@ import Icon from './Icon'
 //   compact     smaller footprint for inline / per-section empties
 export default function EmptyState({
   icon = 'file-tray-outline',
+  image,
   title,
   body,
   actionLabel,
@@ -31,14 +32,22 @@ export default function EmptyState({
 
   return (
     <View style={[compact ? styles.wrapCompact : styles.wrap, panel && styles.panel, style]}>
-      <View
-        style={[
-          styles.iconCircle,
-          compact && styles.iconCircleCompact,
-          { backgroundColor: tint },
-        ]}>
-        <Icon name={icon} size={compact ? 20 : 26} color={iconColor} />
-      </View>
+      {image ? (
+        <Image
+          source={image}
+          style={[styles.ghost, compact && styles.ghostCompact]}
+          resizeMode="contain"
+        />
+      ) : (
+        <View
+          style={[
+            styles.iconCircle,
+            compact && styles.iconCircleCompact,
+            { backgroundColor: tint },
+          ]}>
+          <Icon name={icon} size={compact ? 20 : 26} color={iconColor} />
+        </View>
+      )}
 
       {!!title && (
         <Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>
@@ -100,6 +109,10 @@ const styles = StyleSheet.create({
     height: 40,
     marginBottom: spacing.sm,
   },
+
+  // Ghost barn mark (brand empty states)
+  ghost:        { width: 84, height: 84, opacity: 0.7, marginBottom: spacing.md },
+  ghostCompact: { width: 56, height: 56, marginBottom: spacing.sm },
 
   title: {
     fontSize: typography.sizeLg,

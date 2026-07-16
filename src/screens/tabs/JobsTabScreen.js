@@ -390,10 +390,10 @@ export default function JobsTabScreen({ navigation }) {
       let title, body
       if (search.trim()) {
         title = 'No jobs match your search'
-        body = `Nothing matches “${search.trim()}”.`
+        body = `Nothing matches “${search.trim()}”. Try a different term.`
       } else if (filter !== 'All') {
-        title = `No open ${filter.toLowerCase()} jobs`
-        body = 'Nothing in this category right now.'
+        title = 'No jobs in this category yet'
+        body = 'Try a different category, or widen your search radius.'
       } else {
         title = `No jobs within ${radius} km`
         body = 'Try a wider distance, or clear filters to see everything.'
@@ -401,7 +401,7 @@ export default function JobsTabScreen({ navigation }) {
       return (
         <EmptyState
           panel
-          icon="search-outline"
+          image={require('../../assets/brand/barn-ghost.png')}
           title={title}
           body={body}
           actionLabel="Clear filters"
@@ -413,7 +413,7 @@ export default function JobsTabScreen({ navigation }) {
     return (
       <EmptyState
         panel
-        icon="briefcase-outline"
+        image={require('../../assets/brand/barn-ghost.png')}
         title="No open jobs right now"
         body="Check back soon — new jobs appear here as neighbours post them."
       />
