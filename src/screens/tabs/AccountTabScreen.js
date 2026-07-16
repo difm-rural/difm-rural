@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -288,18 +289,6 @@ export default function AccountTabScreen({ navigation }) {
 
   // ─── Role ──────────────────────────────────────────────────────────────────
 
-  function handleRoleChange() {
-    Alert.alert(
-      'How do you use Rural Connections?',
-      'You can always post jobs and book services. Providing adds tools to advertise services and take on jobs.',
-      [
-        { text: 'I just need help', onPress: () => updateRole('requester') },
-        { text: 'I also provide',   onPress: () => updateRole('both') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    )
-  }
-
   async function updateRole(newRole) {
     if (!userId) return
     // The legacy `role` column only allows requester/provider — map 'both'.
@@ -314,6 +303,11 @@ export default function AccountTabScreen({ navigation }) {
     }
     setProfile(p => ({ ...p, primary_role: newRole, role: legacyRole }))
     Alert.alert('Updated', 'Your role has been updated.')
+  }
+
+  // Main-screen "I also provide" switch: on → both, off → requester.
+  function handleProvideToggle(value) {
+    updateRole(value ? 'both' : 'requester')
   }
 
   // ─── Skills & qualifications ──────────────────────────────────────────────
@@ -412,7 +406,6 @@ export default function AccountTabScreen({ navigation }) {
   const ratingText = ratingSummary.count > 0
     ? `${Number(ratingSummary.average || 0).toFixed(1)} / 5 · ${ratingSummary.count} review${ratingSummary.count === 1 ? '' : 's'}`
     : 'No reviews yet'
-  const roleLabel  = canProvide(profile) ? 'Provider' : 'Requester'
   const isProvider = canProvide(profile)
   const isAdmin = !!profile?.is_admin
   const locationDisplay = getDisplayLocation(profile.address) || profile.address || '—'
@@ -463,6 +456,21 @@ export default function AccountTabScreen({ navigation }) {
         </View>
       </View>
 
+      <View style={styles.provideCard}>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={styles.provideTitle}>I also provide</Text>
+          <Text style={styles.provideSub}>Make offers on jobs and list your own services.</Text>
+        </View>
+        <Switch
+          value={isProvider}
+          onValueChange={handleProvideToggle}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={colors.white}
+          ios_backgroundColor={colors.border}
+          accessibilityLabel="I also provide"
+        />
+      </View>
+
       <View style={styles.hubButtons}>
         {isAdmin && (
           <HubButton
@@ -497,24 +505,6 @@ export default function AccountTabScreen({ navigation }) {
   // ─── Profile section ────────────────────────────────────────────────────────
   const profileContent = (
     <View style={styles.body}>
-      <Text style={styles.sectionLabel}>Your role</Text>
-      <TouchableOpacity
-        style={styles.roleCard}
-        onPress={handleRoleChange}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={`Role: ${roleLabel}. Tap to change`}>
-        <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={styles.roleCardTitle}>{isProvider ? <><Icon name="construct-outline" size={15} color={colors.textPrimary} /> Provider</> : <><Icon name="home-outline" size={15} color={colors.textPrimary} /> Requester</>}</Text>
-          <Text style={styles.roleCardSub}>
-            {isProvider
-              ? 'You can post jobs, book services, and advertise your own services.'
-              : 'You can post jobs and book services. Tap to also offer your own.'}
-          </Text>
-        </View>
-        <Text style={styles.roleCardAction}>Change</Text>
-      </TouchableOpacity>
-
       <Text style={styles.sectionLabel}>About you</Text>
       <View style={styles.card}>
         <MenuRow
@@ -952,19 +942,20 @@ const styles = StyleSheet.create({
   },
   qualConfirmText: { color: colors.white, fontWeight: '700', fontSize: 13 },
 
-  roleCard: {
+  // "I also provide" toggle card on the main Account screen
+  provideCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ececec',
+    borderColor: colors.border,
     padding: 16,
-    marginBottom: 22,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
-  roleCardTitle:  { fontSize: 16, fontWeight: '700', color: colors.primary },
-  roleCardSub:    { fontSize: 12, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
-  roleCardAction: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  provideTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  provideSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
 
   // ─── Location modal ───────────────────────────────────────────────────────
   locationOverlay: {

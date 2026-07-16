@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react'
 import {
-  FlatList,
   Keyboard,
   RefreshControl,
   ScrollView,
@@ -16,7 +15,7 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import { useUser } from '../../context/UserContext'
-import JobServiceCard, { CARD_GAP, CARD_WIDTH, SNAP_INTERVAL } from '../../components/JobServiceCard'
+import ServiceListCard from '../../components/ServiceListCard'
 import EmptyState from '../../components/EmptyState'
 import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
@@ -46,37 +45,22 @@ function getServiceCoords(item) {
   return { lat: parseFloat(lat), lng: parseFloat(lng) }
 }
 
-function HorizontalSection({ title, items, onPressItem }) {
+function ServiceSection({ title, items, onPressItem }) {
   if (!items.length) return null
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
-      <FlatList
-        horizontal
-        data={items}
-        keyExtractor={item => `service-${item.id}`}
-        renderItem={({ item }) => (
-          <View style={styles.serviceCardWrap}>
-            <JobServiceCard
-              item={item}
-              onPress={() => onPressItem(item)}
-            />
-            {item.is_active === false && (
-              <View style={styles.pausedBadge}>
-                <Text style={styles.pausedBadgeText}>Advertising paused</Text>
-              </View>
-            )}
-          </View>
-        )}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.hListContent}
-        ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-        ListFooterComponent={<View style={{ width: 40 }} />}
-        snapToInterval={SNAP_INTERVAL}
-        decelerationRate="fast"
-      />
+      <View style={styles.vList}>
+        {items.map(item => (
+          <ServiceListCard
+            key={`service-${item.id}`}
+            item={item}
+            onPress={() => onPressItem(item)}
+          />
+        ))}
+      </View>
     </View>
   )
 }
@@ -306,13 +290,13 @@ export default function BrowseTabScreen({ navigation }) {
 
           {isProvider ? (
             <>
-              <HorizontalSection
+              <ServiceSection
                 title="Your services"
                 items={yourServices}
                 onPressItem={handlePress}
               />
 
-              <HorizontalSection
+              <ServiceSection
                 title="Other services"
                 items={otherServices}
                 onPressItem={handlePress}
@@ -320,13 +304,13 @@ export default function BrowseTabScreen({ navigation }) {
             </>
           ) : (
             <>
-              <HorizontalSection
+              <ServiceSection
                 title="Near you"
                 items={nearYou}
                 onPressItem={handlePress}
               />
 
-              <HorizontalSection
+              <ServiceSection
                 title="All services"
                 items={allServices}
                 onPressItem={handlePress}
@@ -423,18 +407,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-  hListContent: { paddingLeft: 14 },
-  serviceCardWrap: { width: CARD_WIDTH },
-  pausedBadge: {
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    marginTop: 6,
-  },
-  pausedBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
+  vList: { paddingHorizontal: 16, gap: 10 },
 
   noMore:     { paddingVertical: 20, alignItems: 'center' },
   noMoreText: { fontSize: 13, color: colors.textMuted },
