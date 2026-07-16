@@ -62,6 +62,7 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/brand/barn-notification-icon.png",
           "color": "#2d6a4f"
         }
       ],
