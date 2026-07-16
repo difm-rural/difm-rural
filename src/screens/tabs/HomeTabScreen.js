@@ -157,7 +157,7 @@ export default function HomeTabScreen({ navigation }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>Rural Connections</Text>
           <View style={styles.titleRow}>
-            <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.brandBadge} />
+            <Image source={require('../../../assets/brand/barn-badge-red.png')} style={styles.brandBadge} />
             <Text style={styles.title}>
               {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
             </Text>

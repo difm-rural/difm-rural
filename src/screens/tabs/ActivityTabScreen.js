@@ -589,7 +589,7 @@ export default function ActivityTabScreen({ navigation }) {
             accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
             <Icon name="notifications-outline" size={24} color={colors.primary} />
             {unreadCount > 0 && (
-              <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.bellBadge} />
+              <Image source={require('../../../assets/brand/barn-badge-red.png')} style={styles.bellBadge} />
             )}
           </TouchableOpacity>
           {isRequester && (

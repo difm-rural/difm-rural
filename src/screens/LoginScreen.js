@@ -321,7 +321,7 @@ export default function LoginScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}>
 
         <View style={styles.brandLockup}>
-          <Image source={require('../assets/brand/barn-badge-red.png')} style={styles.brandLockupBadge} />
+          <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.brandLockupBadge} />
           <Text style={styles.brandLockupName}>Rural Connect</Text>
           <Text style={styles.brandLockupSub}>Post jobs, make offers & book services</Text>
         </View>

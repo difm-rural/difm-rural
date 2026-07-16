@@ -401,7 +401,7 @@ export default function JobsTabScreen({ navigation }) {
       return (
         <EmptyState
           panel
-          image={require('../../assets/brand/barn-ghost.png')}
+          image={require('../../../assets/brand/barn-ghost.png')}
           title={title}
           body={body}
           actionLabel="Clear filters"
@@ -413,7 +413,7 @@ export default function JobsTabScreen({ navigation }) {
     return (
       <EmptyState
         panel
-        image={require('../../assets/brand/barn-ghost.png')}
+        image={require('../../../assets/brand/barn-ghost.png')}
         title="No open jobs right now"
         body="Check back soon — new jobs appear here as neighbours post them."
       />
