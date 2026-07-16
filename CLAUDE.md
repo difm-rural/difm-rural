@@ -47,13 +47,15 @@ A guest can complete the full job wizard (and service booking). The draft is sav
 
 ### Notifications (requester↔provider loop)
 
-All notifications are created by **database triggers** (`src/lib/notifications_triggers.sql`) — clients never insert into `notifications` directly. `src/lib/notifications.js` reads/renders them; `NotificationsScreen` marks them read; tab badges refresh via `src/lib/badgeEvents.js`. No push yet (foreground only).
+All notifications are created by **database triggers** (`supabase/legacy-sql/notifications_triggers.sql` — the single source of truth for them) — clients never insert into `notifications` directly. `src/lib/notifications.js` reads/renders them; `NotificationsScreen` marks them read; tab badges refresh via `src/lib/badgeEvents.js`.
+
+**Push notifications work** on physical devices: a `device_push_tokens` table + the `send-push` edge function (fired by a Database Webhook on `notifications` INSERT, authed via the `PUSH_WEBHOOK_SECRET` header) → Expo push API. Client registration lives in `src/lib/push.js`; tapping a push routes to Activity → Notifications. Push does **not** work in Expo Go or on emulators (`push.js` skips registration when `!Device.isDevice`).
 
 ### Supabase tables (key columns)
 
 | Table | Notes |
 |---|---|
-| `jobs` | `requester_id`, `status` (open/accepted/in_progress/completed/cancelled), `price_type`, `price`, `category`, `location_name`, lat/lng, `area_polygon`, `photos[]`, `cancellation_reason/note` |
+| `jobs` | `requester_id`, `status` (open/accepted/in_progress/completed/cancelled), `price_type`, `price`, `category`, `location_name`, lat/lng, `area_polygon`, `photos[]`, `cancellation_reason/note`, `hide_exact_location`, `location_area`, `date_from`/`date_to`. **Viewer-facing reads must go through the `jobs_public` view** — see Location privacy below |
 | `bids` | `provider_id`, `job_id`, `amount`, `status` (pending/accepted/rejected), `line_items`, `available_from`, `estimated_duration` |
 | `services` | `provider_id`, `title`, `category`, `pricing_type` (hourly/fixed/per_unit/day_rate/quote_required), `rate`, `travel_range_km`, `is_active` |
 | `bookings` | `service_id`, `requester_id`, `provider_id`, `status` (pending→quote_sent→confirmed→in_progress→awaiting_completion→completed; +withdrawn/cancelled/declined/cancellation_requested), `quote_amount`, `total_amount` |
@@ -64,7 +66,17 @@ All notifications are created by **database triggers** (`src/lib/notifications_t
 | `notifications` | `user_id`, `type`, `body`, `metadata` jsonb, `read` |
 | `watchlist`, `user_preferences`, `user_activity`, `job_checkins` | |
 
-Base tables (`jobs`, `profiles`, `bids`, `messages`, etc.) were created directly in Supabase and have **no migration file** in the repo.
+Base tables (`jobs`, `profiles`, `bids`, `messages`, etc.) were created directly in Supabase and are captured in the baseline migration rather than individual ones.
+
+### Location privacy (two-tier) — read this before touching job reads
+
+A requester can hide a job's exact address (`jobs.hide_exact_location`). Only the coarse `location_area` shows publicly; the exact address is revealed to the provider they accept. This is enforced **in the database**, not just the UI: the `jobs_public` view (`security_invoker = true`, so the normal audience RLS still applies) masks `location_name`, `latitude`, `longitude`, `location_note`, and `area_polygon` via `can_see_job_location(job_id)` (true for the owner, the accepted provider, or a job that isn't hidden).
+
+**Rules:**
+- Viewer-facing job reads go through **`jobs_public`** (board, feeds, job detail, chat, notifications) — never base `jobs`.
+- Owner-management and own-job reads (e.g. "my jobs", the post-job edit flow) may use base `jobs`.
+- **PostgREST embeds bypass the view** — `bids.select('*, jobs(*)')` reads the base table. Only use such embeds when filtered to accepted/completed bids (where the viewer is authorised); otherwise read ids first, then `jobs_public`.
+- UI that hides an address should key off `hide_exact_location`, not the category.
 
 ### Library modules (`src/lib/`)
 
@@ -76,13 +88,17 @@ Base tables (`jobs`, `profiles`, `bids`, `messages`, etc.) were created directly
 - `biometrics.js` — wraps `expo-local-authentication` + `expo-secure-store`; stores **session tokens** (not password) under `difm_*` keys. Tokens are saved without enabling; biometric only turns on after explicit consent (`enableBiometric`).
 - `jobPhotos.js` — `uploadJobPhotos(jobId, photos)`, shared by the wizard and pending-draft flush
 - `maps.js` / `location.js` — Google Maps via the `maps-proxy` edge function; **no Google key in JS** (only the Android SDK key in `app.json`). `constants.js` exports `MAPS_PROXY_URL`.
-- `categories.js` — `JOB_CATEGORIES` / `SERVICE_CATEGORIES` (currently two separate lists — unifying is a known TODO)
+- `categories.js` — the **single unified taxonomy** shared by both marketplaces: `CATEGORIES` (12 browse categories; `JOB_CATEGORIES`/`SERVICE_CATEGORIES` are aliases of it), `CATEGORY_CAPABILITIES` (a second, more detailed provider-capability layer under each category — what used to be the flat "skills" list; selections stored in `profiles.skills`, rendered by `components/CapabilityPicker.js`), and `CATEGORY_FILTERS` for the `{id,label}` filter bars. Card icons live in `CATEGORY_VISUALS` (`components/JobServiceCard.js`); placeholder artwork in `categoryImages.js` → `assets/categories/`. If you change the list, also update `CATEGORY_VISUALS`, the `categorize-job` edge function (**then redeploy it**), and add a migration remapping existing `jobs.category` / `services.category` rows.
 - `uploadAvatar.js` — resizes, uploads, updates profile, and deletes prior avatars
 
 ### Edge functions (`supabase/functions/`)
 
 - `maps-proxy` — proxies Static Maps / Geocoding / Places (key held as the `GOOGLE_MAPS_API_KEY` secret)
+- `categorize-job` — OpenAI: infers a job's category from title + description. Its `CATEGORIES` list is a hand-copied duplicate of `src/lib/categories.js` — **keep in sync and redeploy** when the taxonomy changes
+- `draft-job-from-text` — OpenAI: drafts a job from the AI assistant's free text
 - `create-service-draft-from-photo` — OpenAI vision draft for the "advertise from a photo" flow
+- `send-push` — Database-Webhook target on `notifications` INSERT → Expo push API
+- `daily-digest` — daily summary for users who opted in
 
 ### Database changes / SQL
 
@@ -90,6 +106,13 @@ The live schema is captured in `supabase/migrations/00000000000000_baseline.sql`
 (a full `pg_dump --schema-only`, already marked applied on the remote). New
 schema changes go through the CLI: `supabase migration new <name>`, edit the
 generated file, then `supabase db push`. See `supabase/README.md`.
+
+Migration history was **reconciled in July 2026** — every migration is recorded
+on the remote and `supabase db push --dry-run` reports "Remote database is up to
+date". Keep it that way: prefer `migration new` + `db push`. If you ever apply
+SQL by hand in the dashboard, follow it with
+`supabase migration repair --status applied <version>` so the history doesn't
+drift again.
 
 The older hand-applied scripts are archived in `supabase/legacy-sql/` for
 reference — they're already represented in the baseline; don't re-run them
