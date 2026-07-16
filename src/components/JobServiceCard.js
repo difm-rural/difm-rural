@@ -3,6 +3,7 @@ import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import { colors } from '../theme/tokens'
 import { statusLabel, statusTone } from '../lib/lifecycle'
 import { stripPlusCode } from '../lib/location'
+import { categoryImage } from '../lib/categoryImages'
 import Icon from './Icon'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -101,6 +102,7 @@ export default function JobServiceCard({
   const photoUrl  = Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0] : null
   const category  = item.category || 'Other'
   const cat       = categoryVisual(category)
+  const catImg    = categoryImage(category)
   const initials  = getInitials(profile.full_name)
   const firstName = getFirstName(profile.full_name)
   const price     = formatPrice(item)
@@ -137,6 +139,8 @@ export default function JobServiceCard({
       <View style={styles.imageBox}>
         {photoUrl ? (
           <Image source={{ uri: photoUrl }} style={styles.photo} />
+        ) : catImg ? (
+          <Image source={catImg} style={styles.photo} resizeMode="cover" />
         ) : (
           <View style={[styles.placeholder, { backgroundColor: cat.bg }]}>
             <Icon name={cat.icon} size={40} color={cat.fg} />

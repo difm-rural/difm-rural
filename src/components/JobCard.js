@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import { jobStatusLabel } from '../lib/lifecycle'
 import { stripPlusCode } from '../lib/location'
+import { categoryImage } from '../lib/categoryImages'
 import { categoryVisual } from './JobServiceCard'
 import Icon from './Icon'
 
@@ -68,6 +69,7 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
   const statusText = offered ? 'Awaiting response' : getStatusText(job)
   const photoUrl = Array.isArray(job.photos) && job.photos.length > 0 ? job.photos[0] : null
   const cat      = categoryVisual(job.category)
+  const catImg   = categoryImage(job.category)
   const showCompletedSummary = job.status === 'completed' && (
     paidAmount != null ||
     job.providerRatingGiven ||
@@ -114,6 +116,8 @@ export default function JobCard({ job, bidCount = 0, onPress, style, isWatched, 
 
       {photoUrl ? (
         <Image source={{ uri: photoUrl }} style={styles.jobPhoto} />
+      ) : catImg ? (
+        <Image source={catImg} style={styles.jobPhoto} resizeMode="cover" />
       ) : (
         <View style={[styles.jobPhoto, styles.photoPlaceholder, { backgroundColor: cat.bg }]}>
           <Icon name={cat.icon} size={48} color={cat.fg} />
