@@ -178,7 +178,7 @@ export default function JobFeedScreen({ navigation }) {
           )}
           keyExtractor={item => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}
         />
       )}
     </View>
