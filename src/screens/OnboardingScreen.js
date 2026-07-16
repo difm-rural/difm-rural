@@ -19,13 +19,7 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
-
-const SKILLS = [
-  'Fencing', 'General labour', 'Machinery operation', 'Animal care',
-  'Water systems', 'Property maintenance', 'Landscaping', 'Irrigation',
-  'Welding', 'Electrical', 'Plumbing', 'Spraying',
-  'Trucking', 'Shearing', 'Chainsaw', 'Tractor operation', 'Other',
-]
+import CapabilityPicker from '../components/CapabilityPicker'
 
 // Everyone can request (post jobs, book services). "I also provide" adds the
 // provider tools on top — it never removes the ability to request.
@@ -499,28 +493,10 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           <Text style={styles.introText}>
-            Select any skills you have — this helps match you with relevant jobs
+            Select what you can help with — grouped by category. This helps match you with relevant jobs.
           </Text>
 
-          <Text style={styles.fieldLabel}>Skills</Text>
-          <View style={styles.chipGrid}>
-            {SKILLS.map(skill => {
-              const selected = skills.includes(skill)
-              return (
-                <TouchableOpacity
-                  key={skill}
-                  style={[styles.chip, selected && styles.chipSelected]}
-                  onPress={() => toggleSkill(skill)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={skill}>
-                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                    {skill}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
+          <CapabilityPicker selected={skills} onToggle={toggleSkill} />
 
           <Text style={[styles.fieldLabel, { marginTop: 20 }]}>
             Qualifications <Text style={styles.optional}>(optional)</Text>

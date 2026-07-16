@@ -10,9 +10,9 @@ const corsHeaders = {
 // Keep in sync with src/lib/categories.js CATEGORIES.
 const CATEGORIES = [
   'Fencing & Gates', 'Animals & Farm Sitting', 'Water & Drainage',
-  'Spraying & Pest Control', 'Land & Vegetation', 'Earthworks & Driveways',
-  'Machinery & Repairs', 'Buildings & Maintenance', 'Transport & Delivery',
-  'Property & House Sitting', 'General Rural Help',
+  'Spraying & Pest Control', 'Land & Vegetation', 'Cropping, Hay & Feed',
+  'Earthworks & Driveways', 'Machinery & Repairs', 'Buildings & Maintenance',
+  'Transport & Delivery', 'Property & House Sitting', 'General Rural Help',
 ]
 
 function jsonResponse(body: unknown, status = 200) {

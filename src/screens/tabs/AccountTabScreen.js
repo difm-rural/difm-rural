@@ -26,6 +26,7 @@ import Button from '../../components/Button'
 import { canProvide } from '../../lib/roles'
 import { loadUserPreferences, updateUserPreferences } from '../../lib/preferences'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
+import CapabilityPicker from '../../components/CapabilityPicker'
 import {
   authenticate,
   clearSession,
@@ -35,13 +36,6 @@ import {
   isBiometricEnabled,
   saveSession,
 } from '../../lib/biometrics'
-
-const ALL_SKILLS = [
-  'Fencing', 'General labour', 'Machinery operation', 'Animal care',
-  'Water systems', 'Property maintenance', 'Landscaping', 'Irrigation',
-  'Welding', 'Electrical', 'Plumbing', 'Spraying',
-  'Trucking', 'Shearing', 'Chainsaw', 'Tractor operation', 'Other',
-]
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -546,24 +540,7 @@ export default function AccountTabScreen({ navigation }) {
           <Text style={styles.sectionLabel}>Skills</Text>
           <View style={[styles.card, { padding: 14 }]}>
             {savingSkills && <Text style={styles.savingText}>Saving…</Text>}
-            <View style={styles.chipGrid}>
-              {ALL_SKILLS.map(skill => {
-                const selected = skills.includes(skill)
-                return (
-                  <TouchableOpacity
-                    key={skill}
-                    style={[styles.chip, selected && styles.chipSelected]}
-                    onPress={() => toggleSkill(skill)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={skill}>
-                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                      {skill}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
+            <CapabilityPicker selected={skills} onToggle={toggleSkill} />
           </View>
 
           <Text style={styles.sectionLabel}>Qualifications</Text>

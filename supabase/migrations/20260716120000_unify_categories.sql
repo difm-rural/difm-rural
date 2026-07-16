@@ -28,7 +28,7 @@ where category in (
 update public.services set category = case category
   when 'Machinery'      then 'Machinery & Repairs'
   when 'Labour'         then 'General Rural Help'
-  when 'Water delivery' then 'Transport & Delivery'
+  when 'Water delivery' then 'Water & Drainage'
   when 'Animal care'    then 'Animals & Farm Sitting'
   when 'Maintenance'    then 'Buildings & Maintenance'
   when 'Fencing'        then 'Fencing & Gates'

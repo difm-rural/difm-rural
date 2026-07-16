@@ -23,6 +23,7 @@ export const CATEGORY_VISUALS = {
   'water & drainage':        { bg: '#ccfbf1', fg: '#00897b', icon: 'water' },
   'spraying & pest control': { bg: '#e0f2fe', fg: '#0277bd', icon: 'rainy' },
   'land & vegetation':       { bg: '#dcfce7', fg: '#388e3c', icon: 'leaf' },
+  'cropping, hay & feed':    { bg: '#fef9c3', fg: '#b7791f', icon: 'basket' },
   'earthworks & driveways':  { bg: '#efe3d0', fg: '#8a5a2b', icon: 'construct' },
   'machinery & repairs':     { bg: '#ede9fe', fg: '#7e57c2', icon: 'cog' },
   'buildings & maintenance': { bg: '#ffedd5', fg: '#fb8c00', icon: 'hammer' },
