@@ -14,6 +14,10 @@
 //  and it re-derives what to do from the database each poll, so it's safe to
 //  stop and restart at any time.
 //
+//  Seed sample jobs (one-shot): `node tests/provider-bot.js --seed` posts a
+//  spread of sample jobs so the board has other-user listings to look at, then
+//  exits. View the board from a DIFFERENT account to see them.
+//
 //  Setup (one-off): create the provider account (see tests/e2e-job-flow.js) and
 //  make sure its profile has primary_role = 'provider' (or 'both').
 //
@@ -29,9 +33,25 @@ const SUPABASE_ANON = 'sb_publishable_Gz5PRvktub4RA5QsIN7n1w_4VGzkLri'
 const PROVIDER = { email: 'test.provider@difmrural.test', password: 'TestPass123!' }
 
 // The job categories this provider will respond to (must match the app's
-// JOB_CATEGORIES exactly). Add/remove to taste.
+// unified CATEGORIES exactly). Add/remove to taste.
 const WATCH_CATEGORIES = [
-  'Fencing', 'Animal Care', 'Machinery', 'Labour', 'General Labour', 'Spraying', 'Water',
+  'Fencing & Gates', 'Animals & Farm Sitting', 'Water & Drainage',
+  'Spraying & Pest Control', 'Machinery & Repairs', 'Transport & Delivery',
+  'General Rural Help',
+]
+
+// Sample jobs for `--seed` mode — posts a spread of other-user listings so the
+// Jobs board has something to show (real accounts hide their own jobs from the
+// board). North Canterbury locations so GPS distance/sort works.
+const SAMPLE_JOBS = [
+  { title: 'Replace 200m boundary fence', category: 'Fencing & Gates', price_type: 'fixed', price: 1800, location_name: 'Culverden, North Canterbury', location_area: 'Culverden', latitude: -42.7833, longitude: 172.8500, description: 'Old post-and-wire boundary fence is down after the storm. About 200m to replace along a flat paddock edge. Good vehicle access.' },
+  { title: 'Clear blocked farm drain', category: 'Water & Drainage', price_type: 'fixed', price: 350, location_name: 'Waiau', location_area: 'Waiau', latitude: -42.6500, longitude: 173.0500, description: 'Culvert and open drain blocked with silt after heavy rain. Need it cleared before the next downpour.' },
+  { title: 'Feed & check lifestyle-block animals, 2 weeks', category: 'Animals & Farm Sitting', price_type: 'open', price: null, location_name: 'Hanmer Springs', location_area: 'Hanmer Springs', latitude: -42.5200, longitude: 172.8300, description: 'Away for two weeks over the school holidays. A few sheep, chooks and two dogs to feed and check daily.' },
+  { title: "Quad bike won't start", category: 'Machinery & Repairs', price_type: 'open', price: null, location_name: 'Culverden', location_area: 'Culverden', latitude: -42.7900, longitude: 172.8600, description: 'Farm quad turns over but won\'t fire. After someone who can take a look and hopefully sort it on site.' },
+  { title: 'Gorse spraying, 3ha block', category: 'Spraying & Pest Control', price_type: 'fixed', price: 600, location_name: 'Waikari', location_area: 'Waikari', latitude: -42.9600, longitude: 172.6800, description: 'Roughly 3ha of regenerating gorse on a hillside block. Need it sprayed before it seeds.' },
+  { title: 'Cart 40 bales to the yards', category: 'Transport & Delivery', price_type: 'fixed', price: 250, location_name: 'Rotherham', location_area: 'Rotherham', latitude: -42.7000, longitude: 172.9600, description: 'Move 40 small square bales from the shed to the yards, about 4km up the road. Trailer or truck needed.' },
+  { title: 'Regrade the driveway before winter', category: 'Earthworks & Driveways', price_type: 'open', price: null, location_name: 'Culverden', location_area: 'Culverden', latitude: -42.7800, longitude: 172.8400, description: 'Long gravel driveway is rutted and holds water. Would like it regraded and a bit more metal spread.' },
+  { title: "Weekly house check while we're away", category: 'Property & House Sitting', price_type: 'open', price: null, hide_exact_location: true, location_name: '18 Douglas Road, Amberley', location_area: 'Near Amberley', latitude: -43.1500, longitude: 172.7300, description: 'Overseas for a month. After weekly checks of the house and garden, mail collected, and a look over the section.' },
 ]
 
 const POLL_MS            = 6000    // how often to check for new jobs / replies
@@ -150,7 +170,45 @@ async function tick() {
   }
 }
 
+// One-shot: post the sample jobs (skips any already posted by this account, so
+// it's safe to re-run). Posts as the bot account, so view the board from a
+// different account to see them.
+async function seedJobs() {
+  const { data: existing } = await supabase
+    .from('jobs').select('title').eq('requester_id', me).in('title', SAMPLE_JOBS.map(j => j.title))
+  const have = new Set((existing || []).map(j => j.title))
+  const toInsert = SAMPLE_JOBS
+    .filter(j => !have.has(j.title))
+    // Set every column on every row — PostgREST bulk insert uses NULL (not the
+    // DB default) for keys missing on some rows.
+    .map(j => ({
+      requester_id: me, status: 'open', visibility: 'public',
+      schedule_type: 'flexible', materials_type: 'none',
+      hide_exact_location: j.hide_exact_location || false,
+      price: j.price ?? null,
+      title: j.title, description: j.description, category: j.category,
+      price_type: j.price_type, location_name: j.location_name,
+      location_area: j.location_area, latitude: j.latitude, longitude: j.longitude,
+    }))
+
+  if (toInsert.length === 0) {
+    console.log('\n🌱 All sample jobs already exist — nothing to seed.\n')
+    return
+  }
+  const { data, error } = await supabase.from('jobs').insert(toInsert).select('id, title, category')
+  if (error) {
+    console.error(`\n❌ Seed failed: ${error.message}\n`)
+    process.exit(1)
+  }
+  console.log(`\n🌱 Seeded ${data.length} sample job${data.length === 1 ? '' : 's'} as ${PROVIDER.email}:`)
+  data.forEach(j => console.log(`   • ${j.title}  (${j.category})`))
+  console.log('\n   View the Jobs board from any OTHER account to see them. To remove them later,')
+  console.log('   delete these jobs in the app or via the dashboard.\n')
+}
+
 async function main() {
+  const seedMode = process.argv.slice(2).some(a => a === '--seed' || a === 'seed')
+
   const { data: session, error } = await supabase.auth.signInWithPassword(PROVIDER)
   if (error) {
     console.error(`\n❌ Login failed for ${PROVIDER.email}: ${error.message}`)
@@ -158,6 +216,11 @@ async function main() {
     process.exit(1)
   }
   me = session.user.id
+
+  if (seedMode) {
+    await seedJobs()
+    process.exit(0)
+  }
 
   console.log('\n🤖 Provider bot online')
   console.log(`   as: ${PROVIDER.email}`)
