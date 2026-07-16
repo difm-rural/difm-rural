@@ -204,7 +204,7 @@ export default function ActivityTabScreen({ navigation }) {
   const [completedCount, setCompletedCount] = useState(0)
   const [completedJobs, setCompletedJobs] = useState([])
   const [completedBookings, setCompletedBookings] = useState([])
-  const [showCompleted, setShowCompleted] = useState(false)
+  const [activityView, setActivityView] = useState('progress')  // 'progress' | 'history'
   const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [reviewContext, setReviewContext] = useState(null)
@@ -574,9 +574,11 @@ export default function ActivityTabScreen({ navigation }) {
             <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
             <Text style={styles.headerTitle} accessibilityRole="header">Activity</Text>
             <Text style={styles.headerSub}>
-              {totalActive > 0
-                ? `${totalActive} active item${totalActive === 1 ? '' : 's'}`
-                : 'No active items'}
+              {activityView === 'history'
+                ? `${completedCount} completed`
+                : totalActive > 0
+                  ? `${totalActive} active item${totalActive === 1 ? '' : 's'}`
+                  : 'No active items'}
             </Text>
           </View>
           <TouchableOpacity
@@ -598,6 +600,19 @@ export default function ActivityTabScreen({ navigation }) {
             </TouchableOpacity>
           )}
         </View>
+
+        <View style={styles.segment}>
+          {[['progress', 'In progress'], ['history', 'History']].map(([id, label]) => (
+            <TouchableOpacity
+              key={id}
+              style={[styles.segmentBtn, activityView === id && styles.segmentBtnActive]}
+              onPress={() => setActivityView(id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: activityView === id }}>
+              <Text style={[styles.segmentText, activityView === id && styles.segmentTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <ScrollView
@@ -607,7 +622,7 @@ export default function ActivityTabScreen({ navigation }) {
         showsVerticalScrollIndicator={false}>
 
         {/* Empty state */}
-        {totalActive === 0 && (
+        {activityView === 'progress' && totalActive === 0 && (
           <EmptyState
             tone="positive"
             icon="checkmark-circle-outline"
@@ -624,6 +639,9 @@ export default function ActivityTabScreen({ navigation }) {
           />
         )}
 
+        {/* ── In-progress view ── */}
+        {activityView === 'progress' && (
+        <>
         {/* Requester: Posted tasks */}
         {isRequester && activeJobs.length > 0 && (
           <View style={styles.cardSection}>
@@ -733,76 +751,74 @@ export default function ActivityTabScreen({ navigation }) {
           </View>
         )}
 
-        {/* Completed footer link */}
-        {completedCount > 0 && (
-          <>
-            <TouchableOpacity
-              style={styles.completedBtn}
-              onPress={() => setShowCompleted(v => !v)}
-              accessibilityRole="button"
-              accessibilityLabel={`${showCompleted ? 'Hide' : 'View'} ${completedCount} completed items`}>
-              <Text style={styles.completedBtnText}>
-                {showCompleted ? 'Hide' : 'View'} {completedCount} completed task{completedCount === 1 ? '' : 's'} & service{completedCount === 1 ? '' : 's'}
-              </Text>
-            </TouchableOpacity>
+        </>
+        )}
 
-            {showCompleted && (
-              <>
-                {completedJobs.length > 0 && (
-                  <View style={styles.cardSection}>
-                    <Text style={styles.sectionLabel}>Completed jobs</Text>
-                    <FlatList
-                      horizontal
-                      data={completedJobs}
-                      keyExtractor={job => `comp-job-${job._viewerRole}-${job.id}`}
-                      renderItem={({ item: job }) => (
-                        <JobServiceCard
-                          item={job}
-                          showStatusBadge
-                          status="completed"
-                          onPress={() => {
-                            if (job._viewerRole === 'requester') navigation.navigate('ManageTask', { job, bidCount: 0 })
-                            else navigation.navigate('JobDetail', { job })
-                          }}
-                        />
-                      )}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.hListContent}
-                      ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-                      ListFooterComponent={<View style={{ width: 40 }} />}
-                      snapToInterval={SNAP_INTERVAL}
-                      decelerationRate="fast"
-                    />
-                  </View>
-                )}
+        {/* ── History view — completed jobs & services ── */}
+        {activityView === 'history' && (
+          completedCount === 0 ? (
+            <EmptyState
+              tone="positive"
+              icon="time-outline"
+              title="No history yet"
+              body="Completed jobs and services will show up here once they're done."
+            />
+          ) : (
+            <>
+              {completedJobs.length > 0 && (
+                <View style={styles.cardSection}>
+                  <Text style={styles.sectionLabel}>Completed jobs</Text>
+                  <FlatList
+                    horizontal
+                    data={completedJobs}
+                    keyExtractor={job => `comp-job-${job._viewerRole}-${job.id}`}
+                    renderItem={({ item: job }) => (
+                      <JobServiceCard
+                        item={job}
+                        showStatusBadge
+                        status="completed"
+                        onPress={() => {
+                          if (job._viewerRole === 'requester') navigation.navigate('ManageTask', { job, bidCount: 0 })
+                          else navigation.navigate('JobDetail', { job })
+                        }}
+                      />
+                    )}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.hListContent}
+                    ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
+                    ListFooterComponent={<View style={{ width: 40 }} />}
+                    snapToInterval={SNAP_INTERVAL}
+                    decelerationRate="fast"
+                  />
+                </View>
+              )}
 
-                {completedBookings.length > 0 && (
-                  <View style={styles.cardSection}>
-                    <Text style={styles.sectionLabel}>Completed services</Text>
-                    <FlatList
-                      horizontal
-                      data={completedBookings}
-                      keyExtractor={b => `comp-booking-${b._viewerRole}-${b.id}`}
-                      renderItem={({ item: b }) => (
-                        <BookingWorkCard
-                          booking={{ ...b, status: 'completed' }}
-                          viewerRole={b._viewerRole}
-                          onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: b._viewerRole })}
-                          onReview={() => openBookingReview(b)}
-                        />
-                      )}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.hListContent}
-                      ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-                      ListFooterComponent={<View style={{ width: 40 }} />}
-                      snapToInterval={SNAP_INTERVAL}
-                      decelerationRate="fast"
-                    />
-                  </View>
-                )}
-              </>
-            )}
-          </>
+              {completedBookings.length > 0 && (
+                <View style={styles.cardSection}>
+                  <Text style={styles.sectionLabel}>Completed services</Text>
+                  <FlatList
+                    horizontal
+                    data={completedBookings}
+                    keyExtractor={b => `comp-booking-${b._viewerRole}-${b.id}`}
+                    renderItem={({ item: b }) => (
+                      <BookingWorkCard
+                        booking={{ ...b, status: 'completed' }}
+                        viewerRole={b._viewerRole}
+                        onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: b._viewerRole })}
+                        onReview={() => openBookingReview(b)}
+                      />
+                    )}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.hListContent}
+                    ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
+                    ListFooterComponent={<View style={{ width: 40 }} />}
+                    snapToInterval={SNAP_INTERVAL}
+                    decelerationRate="fast"
+                  />
+                </View>
+              )}
+            </>
+          )
         )}
       </ScrollView>
       <CancelModal
@@ -915,14 +931,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  completedBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+  // In progress / History segmented control
+  segment: {
+    flexDirection: 'row',
     backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: 3,
+    marginTop: 12,
   },
-  completedBtnText: { fontSize: 14, fontWeight: '600', color: colors.primary },
+  segmentBtn:       { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
+  segmentBtnActive: { backgroundColor: colors.primaryLight },
+  segmentText:      { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  segmentTextActive:{ color: colors.primary },
 })

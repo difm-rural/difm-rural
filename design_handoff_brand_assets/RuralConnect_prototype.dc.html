@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<style>
+  body { margin: 0; }
+  ::-webkit-scrollbar { display: none; }
+  * { -ms-overflow-style: none; scrollbar-width: none; box-sizing: border-box; }
+  a { color: #2d6a4f; }
+  a:hover { color: #085041; }
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#e5e5e5;padding:40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+    {{ screen }}
+  </x-import>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const PRIMARY = '#2d6a4f', PRIMARY_LIGHT = '#e8f5e9', PRIMARY_DARK = '#085041', PRIMARY_MUTED = '#95d5b2';
+const ACCENT = '#c71418', ACCENT_LIGHT = '#fce9e9';
+const BG = '#f5f5f5', CARD = '#ffffff', BORDER = '#e0e0e0';
+const TEXT = '#222222', TEXT_SEC = '#666666', TEXT_MUTED = '#999999', TEXT_ON_PRIMARY = '#ffffff';
+const DANGER = '#c0392b', DANGER_LIGHT = '#fdecea', WARNING = '#BA7517', WARNING_LIGHT = '#fff3e0';
+const INFO = '#1565c0', INFO_LIGHT = '#e3f2fd', AMBER = '#FFD700';
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+const CATEGORIES = [
+  { id: 'fencing', name: 'Fencing & Gates', bg: '#d1fae5', fg: '#5a8a45' },
+  { id: 'animals', name: 'Animals & Farm Sitting', bg: '#fef3c7', fg: '#b45309' },
+  { id: 'water', name: 'Water & Drainage', bg: '#ccfbf1', fg: '#0f766e' },
+  { id: 'spraying', name: 'Spraying & Pest Control', bg: ACCENT_LIGHT, fg: ACCENT },
+  { id: 'land', name: 'Land & Vegetation', bg: '#ecfccb', fg: '#4d7c0f' },
+  { id: 'cropping', name: 'Cropping, Hay & Feed', bg: '#fef9c3', fg: '#a16207' },
+  { id: 'earthworks', name: 'Earthworks & Driveways', bg: '#e7e5e4', fg: '#78716c' },
+  { id: 'machinery', name: 'Machinery & Repairs', bg: '#ede9fe', fg: '#6d28d9' },
+  { id: 'buildings', name: 'Buildings & Maintenance', bg: '#e0e7ff', fg: '#4338ca' },
+  { id: 'transport', name: 'Transport & Delivery', bg: '#ffedd5', fg: '#c2410c' },
+  { id: 'property', name: 'Property & House Sitting', bg: PRIMARY_LIGHT, fg: PRIMARY },
+  { id: 'general', name: 'General Rural Help', bg: BG, fg: TEXT_SEC },
+];
+const catById = id => CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
+
+const JOBS = [
+  { id: 1, cat: 'fencing', title: 'Replace 200m boundary fence', area: 'Culverden', hidden: false, distance: '4.2 km', budget: '$1,800 fixed', offers: 3, posted: '2h ago' },
+  { id: 2, cat: 'property', title: "Weekly house check while we're away", area: 'Near Amberley', hidden: true, distance: '8 km', budget: 'Open to offers', offers: 1, posted: '5h ago' },
+  { id: 3, cat: 'water', title: 'Clear blocked farm drain', area: 'Waiau', hidden: false, distance: '12 km', budget: '$350 fixed', offers: 0, posted: '1d ago' },
+  { id: 4, cat: 'animals', title: 'Feed & water lifestyle block animals, 2 weeks', area: 'Hanmer Springs', hidden: false, distance: '15 km', budget: '$40 / day', offers: 2, posted: '3h ago' },
+  { id: 5, cat: 'machinery', title: "Quad bike won't start, need a look", area: 'Culverden', hidden: false, distance: '3 km', budget: 'Open to offers', offers: 4, posted: '6h ago' },
+  { id: 6, cat: 'spraying', title: 'Gorse spraying, 3ha block', area: 'Waikari', hidden: false, distance: '20 km', budget: '$600 fixed', offers: 1, posted: '2d ago' },
+  { id: 7, cat: 'transport', title: 'Cart 40 bales to yards', area: 'Rotherham', hidden: false, distance: '6 km', budget: '$250 fixed', offers: 0, posted: '4h ago' },
+  { id: 8, cat: 'earthworks', title: 'Regrade driveway before winter', area: 'Culverden', hidden: false, distance: '2 km', budget: 'Open to offers', offers: 2, posted: '1d ago' },
+];
+
+const SERVICES = [
+  { id: 1, cat: 'machinery', title: 'Mobile mechanic — farm equipment', provider: "Dave's Mobile Mechanical", rating: 4.8, reviews: 32, price: 'From $95/hr' },
+  { id: 2, cat: 'spraying', title: 'Drone spraying — gorse & broom', provider: 'Highcountry Aerial', rating: 4.9, reviews: 58, price: 'From $18/ha' },
+  { id: 3, cat: 'fencing', title: 'Contract fencing — all types', provider: 'Braided River Fencing', rating: 4.7, reviews: 21, price: 'Quote on request' },
+  { id: 4, cat: 'transport', title: 'Stock cartage — local & regional', provider: 'McKenzie Transport', rating: 4.6, reviews: 14, price: 'From $120/trip' },
+  { id: 5, cat: 'land', title: 'Digger hire with operator', provider: 'Hurunui Earthmoving', rating: 4.9, reviews: 40, price: 'From $110/hr' },
+  { id: 6, cat: 'property', title: 'House & farm sitting', provider: 'Rural Relief Sitters', rating: 5.0, reviews: 9, price: 'From $60/day' },
+];
+
+const ACTIVITY_PROGRESS = [
+  { id: 1, title: 'Boundary fence job', sub: '3 new offers to review', status: 'info' },
+  { id: 2, title: 'House-sit booking', sub: 'Awaiting your confirmation', status: 'warning' },
+  { id: 3, title: 'Drone spraying quote', sub: 'Requested from Highcountry Aerial', status: 'info' },
+];
+const ACTIVITY_HISTORY = [
+  { id: 4, title: 'Driveway regrade', sub: 'Completed — you left a review', status: 'success' },
+  { id: 5, title: 'Quad bike repair', sub: 'Completed', status: 'success' },
+  { id: 6, title: 'Gorse spraying', sub: 'Cancelled', status: 'danger' },
+];
+
+const NOTIFICATIONS = [
+  { id: 1, text: '3 new offers on your fencing job', time: '2h ago' },
+  { id: 2, text: "Confirm today's house-sit booking", time: '5h ago' },
+  { id: 3, text: 'Leave a review for Hurunui Earthmoving', time: '1d ago' },
+];
+
+const CONNECTIONS = [
+  { id: 1, name: 'Dave R.', bg: '#e7c9bd', fg: '#8a4a2f' },
+  { id: 2, name: 'Hurunui Earthmoving', bg: '#c9dcc7', fg: '#4c6b45' },
+  { id: 3, name: 'Sarah M.', bg: '#d6cfe8', fg: '#5c4a8a' },
+  { id: 4, name: 'Braided River Fencing', bg: '#ecd9a8', fg: '#8a6d1f' },
+];
+
+const statusColor = s => ({
+  info: { bg: INFO_LIGHT, fg: INFO }, warning: { bg: WARNING_LIGHT, fg: WARNING },
+  success: { bg: PRIMARY_LIGHT, fg: PRIMARY }, danger: { bg: DANGER_LIGHT, fg: DANGER },
+}[s]);
+
+class Component extends DCLogic {
+  state = { tab: 'home', sheetJob: null, providing: false, jobCat: 'all', activityFilter: 'progress', showEnablePrompt: false };
+
+  setTab = t => this.setState({ tab: t, sheetJob: null });
+  openJob = job => this.setState({ sheetJob: job, showEnablePrompt: false });
+  closeSheet = () => this.setState({ sheetJob: null, showEnablePrompt: false });
+  selectCat = id => this.setState({ jobCat: id });
+  toggleProviding = () => this.setState(s => ({ providing: !s.providing }));
+  tryOffer = () => {
+    if (this.state.providing) { this.setState({ sheetJob: null, showEnablePrompt: false }); }
+    else { this.setState({ showEnablePrompt: true }); }
+  };
+  enableProviding = () => this.setState({ providing: true, showEnablePrompt: false });
+  setActivityFilter = f => this.setState({ activityFilter: f });
+
+  pill(label, id) {
+    const active = this.state.jobCat === id;
+    return React.createElement('div', null); // unused placeholder
+  }
+
+  // ---- header ----
+  header(title, kicker, showMark) {
+    return React.createElement('div', {
+      style: { padding: '54px 20px 14px', background: CARD, borderBottom: `1px solid ${BORDER}` },
+    },
+      kicker && React.createElement('div', { style: { fontSize: 11, fontWeight: 800, color: ACCENT, letterSpacing: 1.2, marginBottom: 4 } }, kicker),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+        showMark && React.createElement('img', { src: 'assets/brand/barn-badge-red.png', style: { width: 30, height: 30, borderRadius: 8, flexShrink: 0 } }),
+        React.createElement('div', { style: { fontSize: 26, fontWeight: 700, color: TEXT, letterSpacing: -0.3 } }, title))
+    );
+  }
+
+  tabBar() {
+    const tabs = [
+      { id: 'home', label: 'Home' }, { id: 'jobs', label: 'Jobs' }, { id: 'services', label: 'Services' },
+      { id: 'activity', label: 'Activity' }, { id: 'account', label: 'Account' },
+    ];
+    const iconFor = (id, color) => {
+      const s = { width: 24, height: 24, position: 'relative' };
+      if (id === 'home') return React.createElement('div', { style: s },
+        React.createElement('div', { style: { position: 'absolute', top: 0, left: 3, width: 0, height: 0, borderLeft: '9px solid transparent', borderRight: '9px solid transparent', borderBottom: `8px solid ${color}` } }),
+        React.createElement('div', { style: { position: 'absolute', top: 8, left: 4, width: 16, height: 13, background: color, borderRadius: 2 } }));
+      if (id === 'jobs') return React.createElement('div', { style: s },
+        React.createElement('div', { style: { position: 'absolute', top: 4, left: 8, width: 8, height: 4, border: `2px solid ${color}`, borderBottom: 'none', borderRadius: '2px 2px 0 0' } }),
+        React.createElement('div', { style: { position: 'absolute', top: 8, left: 2, width: 20, height: 13, background: color, borderRadius: 3 } }));
+      if (id === 'services') return React.createElement('div', { style: { ...s, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, padding: 3 } },
+        [0, 1, 2, 3].map(i => React.createElement('div', { key: i, style: { background: color, borderRadius: 2 } })));
+      if (id === 'activity') return React.createElement('div', { style: s },
+        React.createElement('div', { style: { position: 'absolute', top: 3, left: 6, width: 12, height: 12, background: color, borderRadius: '7px 7px 2px 2px' } }),
+        React.createElement('div', { style: { position: 'absolute', top: 15, left: 4, width: 16, height: 3, background: color, borderRadius: 2 } }),
+        React.createElement('div', { style: { position: 'absolute', top: 19, left: 9, width: 6, height: 4, background: color, borderRadius: '0 0 4px 4px' } }));
+      return React.createElement('div', { style: s },
+        React.createElement('div', { style: { position: 'absolute', top: 2, left: 8, width: 8, height: 8, background: color, borderRadius: '50%' } }),
+        React.createElement('div', { style: { position: 'absolute', top: 11, left: 3, width: 18, height: 11, background: color, borderRadius: '8px 8px 3px 3px' } }));
+    };
+    return React.createElement('div', {
+      style: { display: 'flex', borderTop: `1px solid ${BORDER}`, background: CARD, paddingBottom: 22, paddingTop: 8 },
+    }, tabs.map(t => {
+      const active = this.state.tab === t.id;
+      const color = active ? PRIMARY : TEXT_MUTED;
+      return React.createElement('div', {
+        key: t.id, onClick: () => this.setTab(t.id),
+        style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' },
+      },
+        iconFor(t.id, color),
+        React.createElement('div', { style: { fontSize: 10, fontWeight: 600, color } }, t.label));
+    }));
+  }
+
+  emptyState(title, sub) {
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '48px 30px', gap: 10 } },
+      React.createElement('img', { src: 'assets/brand/barn-ghost.png', style: { width: 84, height: 84, opacity: 0.7 } }),
+      React.createElement('div', { style: { fontSize: 15, fontWeight: 700, color: TEXT_SEC } }, title),
+      React.createElement('div', { style: { fontSize: 13, color: TEXT_MUTED, maxWidth: 240 } }, sub));
+  }
+
+  categoryChip(name, fg) {
+    return React.createElement('div', {
+      style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: catById(name).bg, color: catById(name).fg, fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999 },
+    });
+  }
+
+  jobCard(job) {
+    const c = catById(job.cat);
+    return React.createElement('div', {
+      key: job.id, onClick: () => this.openJob(job),
+      style: { display: 'flex', gap: 12, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 14, cursor: 'pointer' },
+    },
+      React.createElement('img', { src: `assets/categories/${job.cat}.jpg`, style: { width: 60, height: 60, borderRadius: 10, flexShrink: 0, objectFit: 'cover', background: c.bg } }),
+      React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+        React.createElement('div', { style: { fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 3 } }, job.title),
+        React.createElement('div', { style: { fontSize: 12, color: TEXT_MUTED, marginBottom: 6 } },
+          (job.hidden ? job.area + ' · exact address hidden' : job.area) + ' · ' + job.distance + ' · ' + job.posted),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: PRIMARY } }, job.budget),
+          job.offers > 0 && React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: TEXT_SEC, background: BG, padding: '2px 8px', borderRadius: 999 } }, job.offers + ' offer' + (job.offers > 1 ? 's' : '')))));
+  }
+
+  serviceCard(svc) {
+    const c = catById(svc.cat);
+    return React.createElement('div', {
+      key: svc.id,
+      style: { display: 'flex', gap: 12, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 14 },
+    },
+      React.createElement('img', { src: `assets/categories/${svc.cat}.jpg`, style: { width: 60, height: 60, borderRadius: 10, flexShrink: 0, objectFit: 'cover', background: c.bg } }),
+      React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+        React.createElement('div', { style: { fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 2 } }, svc.title),
+        React.createElement('div', { style: { fontSize: 12, color: TEXT_SEC, marginBottom: 6 } }, svc.provider),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          React.createElement('div', { style: { fontSize: 12, fontWeight: 700, color: TEXT } }, '★ ' + svc.rating + ' (' + svc.reviews + ')'),
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: PRIMARY } }, svc.price))));
+  }
+
+  // ---- screens ----
+  screenHome() {
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
+      this.header('Rural Connect', 'RURAL CONNECTIONS', true),
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', background: BG, padding: '16px 20px 24px', display: 'flex', flexDirection: 'column', gap: 20 } },
+        React.createElement('div', { style: { display: 'flex', gap: 10 } },
+          React.createElement('div', { onClick: () => this.setTab('jobs'), style: { flex: 1, background: PRIMARY, color: TEXT_ON_PRIMARY, borderRadius: 14, padding: '16px 14px', fontWeight: 700, fontSize: 14, cursor: 'pointer' } }, '+ Post a job'),
+          React.createElement('div', { onClick: () => this.setTab('services'), style: { flex: 1, background: CARD, border: `1px solid ${BORDER}`, color: TEXT, borderRadius: 14, padding: '16px 14px', fontWeight: 700, fontSize: 14, cursor: 'pointer' } }, 'Browse services')),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: TEXT_SEC, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Needs attention'),
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+            NOTIFICATIONS.map(n => React.createElement('div', { key: n.id, style: { display: 'flex', justifyContent: 'space-between', gap: 10, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '12px 14px' } },
+              React.createElement('div', { style: { fontSize: 13, color: TEXT, fontWeight: 600 } }, n.text),
+              React.createElement('div', { style: { fontSize: 11, color: TEXT_MUTED, flexShrink: 0 } }, n.time))))),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: TEXT_SEC, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Your activity'),
+          React.createElement('div', { style: { display: 'flex', gap: 10 } },
+            [['Open jobs', '2'], ['Offers made', '5'], ['Bookings', '1']].map(([l, v]) => React.createElement('div', { key: l, style: { flex: 1, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '12px 10px', textAlign: 'center' } },
+              React.createElement('div', { style: { fontSize: 20, fontWeight: 800, color: PRIMARY } }, v),
+              React.createElement('div', { style: { fontSize: 11, color: TEXT_MUTED, marginTop: 2 } }, l))))),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: TEXT_SEC, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Connections'),
+          React.createElement('div', { style: { display: 'flex', gap: 14 } },
+            CONNECTIONS.map(p => React.createElement('div', { key: p.id, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 56 } },
+              React.createElement('div', { style: { width: 44, height: 44, borderRadius: '50%', background: p.bg, color: p.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15 } }, p.name.split(' ').map(w => w[0]).slice(0, 2).join('')),
+              React.createElement('div', { style: { fontSize: 10, color: TEXT_SEC, textAlign: 'center', lineHeight: 1.2 } }, p.name)))))));
+  }
+
+  screenJobs() {
+    const filtered = this.state.jobCat === 'all' ? JOBS : JOBS.filter(j => j.cat === this.state.jobCat);
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
+      React.createElement('div', { style: { padding: '54px 20px 12px', background: CARD, borderBottom: `1px solid ${BORDER}` } },
+        React.createElement('div', { style: { fontSize: 26, fontWeight: 700, color: TEXT, marginBottom: 10 } }, 'Jobs'),
+        React.createElement('div', { style: { display: 'flex', gap: 8, background: BG, borderRadius: 10, padding: '10px 12px', fontSize: 13, color: TEXT_MUTED, marginBottom: 10 } }, 'Search jobs nearby…'),
+        React.createElement('div', { style: { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 } },
+          [{ id: 'all', name: 'All' }, ...CATEGORIES].slice(0, 8).map(c => {
+            const active = this.state.jobCat === c.id;
+            return React.createElement('div', {
+              key: c.id, onClick: () => this.selectCat(c.id),
+              style: { flexShrink: 0, fontSize: 12, fontWeight: 700, padding: '6px 12px', borderRadius: 999, cursor: 'pointer', background: active ? PRIMARY : BG, color: active ? TEXT_ON_PRIMARY : TEXT_SEC },
+            }, c.name);
+          }))),
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', background: BG, padding: '14px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 } },
+        filtered.length > 0 && React.createElement('div', { style: { fontSize: 12, color: TEXT_MUTED, marginBottom: 2 } }, filtered.length + ' jobs within 25 km'),
+        filtered.length > 0 ? filtered.map(j => this.jobCard(j)) : this.emptyState('No jobs in this category yet', 'Try a different category, or widen your search radius.')));
+  }
+
+  screenServices() {
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
+      this.header('Services'),
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', background: BG, padding: '16px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 } },
+        SERVICES.map(s => this.serviceCard(s))));
+  }
+
+  screenActivity() {
+    const list = this.state.activityFilter === 'progress' ? ACTIVITY_PROGRESS : ACTIVITY_HISTORY;
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
+      React.createElement('div', { style: { padding: '54px 20px 12px', background: CARD, borderBottom: `1px solid ${BORDER}` } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+          React.createElement('div', { style: { fontSize: 26, fontWeight: 700, color: TEXT } }, 'Activity'),
+          React.createElement('div', { style: { position: 'relative', width: 34, height: 34 } },
+            React.createElement('div', { style: { width: 34, height: 34, borderRadius: '50%', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+              React.createElement('div', { style: { width: 14, height: 14, background: TEXT_SEC, borderRadius: '7px 7px 2px 2px' } })),
+            React.createElement('img', { src: 'assets/brand/barn-badge-red.png', style: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: 5 } }))),
+        React.createElement('div', { style: { display: 'flex', background: BG, borderRadius: 10, padding: 3 } },
+          [['progress', 'In progress'], ['history', 'History']].map(([id, label]) => {
+            const active = this.state.activityFilter === id;
+            return React.createElement('div', {
+              key: id, onClick: () => this.setActivityFilter(id),
+              style: { flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '7px 0', borderRadius: 8, cursor: 'pointer', background: active ? CARD : 'transparent', color: active ? TEXT : TEXT_MUTED, boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' },
+            }, label);
+          }))),
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', background: BG, padding: '14px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 } },
+        list.map(a => {
+          const sc = statusColor(a.status);
+          return React.createElement('div', { key: a.id, style: { display: 'flex', alignItems: 'center', gap: 12, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 14 } },
+            React.createElement('div', { style: { width: 8, height: 8, borderRadius: '50%', background: sc.fg, flexShrink: 0 } }),
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('div', { style: { fontSize: 14, fontWeight: 700, color: TEXT } }, a.title),
+              React.createElement('div', { style: { fontSize: 12, color: TEXT_SEC, marginTop: 2 } }, a.sub)),
+            React.createElement('div', { style: { fontSize: 10, fontWeight: 700, color: sc.fg, background: sc.bg, padding: '3px 8px', borderRadius: 999 } }, a.status));
+        })));
+  }
+
+  screenAuth() {
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100%', background: CARD } },
+      React.createElement('div', { style: { padding: '54px 20px 0' } },
+        React.createElement('div', { onClick: () => this.setTab('account'), style: { fontSize: 14, color: TEXT_SEC, cursor: 'pointer', marginBottom: 20 } }, '‹ Back')),
+      React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 28px 40px' } },
+        React.createElement('img', { src: 'assets/brand/barn-badge-red.png', style: { width: 72, height: 72, borderRadius: 18, marginBottom: 14 } }),
+        React.createElement('div', { style: { fontSize: 22, fontWeight: 700, color: TEXT, marginBottom: 4 } }, 'Rural Connect'),
+        React.createElement('div', { style: { fontSize: 13, color: TEXT_MUTED, marginBottom: 32 } }, 'Sign in to post jobs, make offers & book services'),
+        React.createElement('div', { style: { width: '100%', display: 'flex', flexDirection: 'column', gap: 12 } },
+          React.createElement('div', { style: { border: `1px solid ${BORDER}`, borderRadius: 10, padding: '13px 14px', fontSize: 14, color: TEXT_MUTED } }, 'Email address'),
+          React.createElement('div', { style: { border: `1px solid ${BORDER}`, borderRadius: 10, padding: '13px 14px', fontSize: 14, color: TEXT_MUTED } }, 'Password'),
+          React.createElement('div', { onClick: () => this.setTab('account'), style: { background: PRIMARY, color: TEXT_ON_PRIMARY, textAlign: 'center', fontWeight: 700, fontSize: 15, padding: '13px 0', borderRadius: 10, cursor: 'pointer', marginTop: 6 } }, 'Sign in'),
+          React.createElement('div', { style: { textAlign: 'center', fontSize: 13, color: TEXT_MUTED, marginTop: 4 } }, "Don't have an account? ",
+            React.createElement('span', { style: { color: PRIMARY, fontWeight: 700 } }, 'Sign up')))));
+  }
+
+  screenAccount() {
+    const providing = this.state.providing;
+    return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } },
+      this.header('Account'),
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', background: BG, padding: '16px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 } },
+        React.createElement('div', { onClick: () => this.setTab('auth'), style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: PRIMARY_LIGHT, borderRadius: 12, padding: '12px 16px', cursor: 'pointer' } },
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: PRIMARY_DARK } }, 'Sign in to sync your account'),
+          React.createElement('div', { style: { color: PRIMARY_DARK, fontSize: 16 } }, '›')),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 14, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 16 } },
+          React.createElement('div', { style: { width: 52, height: 52, borderRadius: '50%', background: PRIMARY_LIGHT, color: PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18 } }, 'JT'),
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 16, fontWeight: 700, color: TEXT } }, 'Jamie Thompson'),
+            React.createElement('div', { style: { fontSize: 12, color: TEXT_MUTED } }, 'Culverden, North Canterbury'))),
+        React.createElement('div', { style: { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, padding: 16 } },
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontSize: 14, fontWeight: 700, color: TEXT } }, 'I also provide'),
+              React.createElement('div', { style: { fontSize: 12, color: TEXT_SEC, marginTop: 2, maxWidth: 220 } }, 'Turn this on to make offers on jobs and list your own services')),
+            React.createElement('div', {
+              onClick: this.toggleProviding,
+              style: { width: 46, height: 27, borderRadius: 999, background: providing ? PRIMARY : BORDER, position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background .15s' },
+            },
+              React.createElement('div', { style: { position: 'absolute', top: 2, left: providing ? 21 : 2, width: 23, height: 23, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'left .15s' } })))),
+        React.createElement('div', { style: { background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, overflow: 'hidden' } },
+          ['Skills & capabilities', 'Reviews', 'Notification settings', 'Location privacy', 'Help & support'].map((l, i, arr) =>
+            React.createElement('div', { key: l, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${BORDER}` : 'none' } },
+              React.createElement('div', { style: { fontSize: 14, color: TEXT, fontWeight: 600 } }, l),
+              React.createElement('div', { style: { color: TEXT_MUTED, fontSize: 16 } }, '›'))))));
+  }
+
+  sheet() {
+    const job = this.state.sheetJob;
+    if (!job) return null;
+    const c = catById(job.cat);
+    return React.createElement('div', {
+      style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', zIndex: 80 },
+      onClick: this.closeSheet,
+    },
+      React.createElement('div', {
+        onClick: e => e.stopPropagation(),
+        style: { width: '100%', background: CARD, borderRadius: '24px 24px 0 0', padding: '10px 20px 34px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '80%', overflow: 'auto' },
+      },
+        React.createElement('div', { style: { width: 36, height: 5, borderRadius: 3, background: BORDER, alignSelf: 'center', margin: '6px 0' } }),
+        React.createElement('div', { style: { display: 'inline-flex', alignSelf: 'flex-start', fontSize: 11, fontWeight: 700, color: c.fg, background: c.bg, padding: '4px 10px', borderRadius: 999 } }, c.name),
+        React.createElement('div', { style: { fontSize: 19, fontWeight: 700, color: TEXT } }, job.title),
+        React.createElement('div', { style: { fontSize: 13, color: TEXT_SEC } }, (job.hidden ? job.area + ' · exact address shared after you accept an offer' : job.area) + ' · ' + job.distance + ' · posted ' + job.posted),
+        React.createElement('div', { style: { fontSize: 15, fontWeight: 700, color: PRIMARY } }, job.budget),
+        React.createElement('div', { style: { fontSize: 13, color: TEXT_SEC, lineHeight: 1.5 } }, job.offers + ' provider' + (job.offers === 1 ? '' : 's') + ' have made an offer so far. Review offers and message the requester before accepting.'),
+        this.state.showEnablePrompt && React.createElement('div', { style: { background: PRIMARY_LIGHT, borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 } },
+          React.createElement('div', { style: { fontSize: 13, color: PRIMARY_DARK, fontWeight: 600 } }, "You'll need to enable providing to make offers on jobs."),
+          React.createElement('div', { onClick: this.enableProviding, style: { alignSelf: 'flex-start', background: PRIMARY, color: TEXT_ON_PRIMARY, fontWeight: 700, fontSize: 13, padding: '9px 16px', borderRadius: 10, cursor: 'pointer' } }, 'Enable providing')),
+        React.createElement('div', { onClick: this.tryOffer, style: { background: PRIMARY, color: TEXT_ON_PRIMARY, textAlign: 'center', fontWeight: 700, fontSize: 15, padding: '13px 0', borderRadius: 12, cursor: 'pointer' } }, 'Make an offer')));
+  }
+
+  renderVals() {
+    const screens = { home: this.screenHome, jobs: this.screenJobs, services: this.screenServices, activity: this.screenActivity, account: this.screenAccount, auth: this.screenAuth };
+    const showTabBar = this.state.tab !== 'auth';
+    const screen = React.createElement('div', { style: { height: '100%', position: 'relative', fontFamily: FONT } },
+      React.createElement('div', { style: { height: '100%', display: 'flex', flexDirection: 'column' } },
+        React.createElement('div', { style: { flex: 1, minHeight: 0 } }, screens[this.state.tab].call(this)),
+        showTabBar && this.tabBar()),
+      this.sheet());
+    return { screen };
+  }
+}
+
+</script>
+</body>
+</html>
