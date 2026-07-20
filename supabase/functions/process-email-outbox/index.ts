@@ -73,12 +73,14 @@ function escapeHtml(value: string) {
 // Falls back to the wordmark alone when unset.
 const BRAND_LOGO_URL = Deno.env.get('BRAND_LOGO_URL') ?? ''
 
-// Deep link into the app. The scheme is declared in app.json ("difmrural").
-const APP_SCHEME = 'difmrural'
+// Links must be https: Outlook (and Gmail) refuse to linkify custom schemes
+// like difmrural://, so a raw deep link renders inert. We point at the public
+// `open` function, which bounces the visitor into the app.
+const OPEN_ENDPOINT = `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/open`
 
 function emailHtml(body: string, notificationId: string) {
   const safeBody = escapeHtml(body)
-  const deepLink = `${APP_SCHEME}://notification/${encodeURIComponent(notificationId)}`
+  const deepLink = `${OPEN_ENDPOINT}?n=${encodeURIComponent(notificationId)}`
   const logo = BRAND_LOGO_URL
     ? `<img src="${escapeHtml(BRAND_LOGO_URL)}" width="48" height="48" alt="Rural Connections"
            style="display:block;width:48px;height:48px;border:0;border-radius:12px;margin:0 0 14px" />`
@@ -210,7 +212,7 @@ Deno.serve(async (req) => {
           from: FROM,
           to: [recipient],
           subject,
-          text: `${body}\n\nOpen Rural Connections to view the details and respond:\n${APP_SCHEME}://notification/${notification.id}`,
+          text: `${body}\n\nOpen Rural Connections to view the details and respond:\n${OPEN_ENDPOINT}?n=${notification.id}`,
           html: emailHtml(body, notification.id),
           reply_to: REPLY_TO,
         }),
