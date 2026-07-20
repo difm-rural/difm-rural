@@ -74,6 +74,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const submittingBidRef = useRef(false)
   const [alreadyBid, setAlreadyBid] = useState(false)
   const [myBid, setMyBid] = useState(null)
   const [requesterProfile, setRequesterProfile] = useState(null)
@@ -352,6 +353,10 @@ export default function JobDetailScreen({ route, navigation }) {
   async function handlePlaceBid() {
     const total = getBidTotal()
     if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter an offer amount'); return }
+    // Claim the submit synchronously — setState is async, so without this a fast
+    // double-tap can insert two offers (same bug that duplicated posted jobs).
+    if (submittingBidRef.current) return
+    submittingBidRef.current = true
     setLoading(true)
     const { error } = await supabase.from('bids').insert({
       job_id:             job.id,
@@ -375,6 +380,7 @@ export default function JobDetailScreen({ route, navigation }) {
       fetchData()
     }
     setLoading(false)
+    submittingBidRef.current = false
   }
 
   async function handleUpdateBid() {

@@ -124,6 +124,10 @@ export default function PostJobStep5Review({ navigation, route }) {
   const [showAuthSheet, setShowAuthSheet] = useState(false)
   const [alsoPublic,    setAlsoPublic]    = useState(false)
   const [mapFailed,     setMapFailed]     = useState(false)
+  // Guards against a double-tap posting the job twice. A ref (not state)
+  // because setState is async — a second tap can fire before the re-render
+  // disables the button, which is exactly how duplicates got created.
+  const submittingRef = useRef(false)
 
   const locationSummary = hideExactLocation
     ? `${locationArea || 'Area only'} — exact address hidden until you accept`
@@ -192,6 +196,24 @@ export default function PostJobStep5Review({ navigation, route }) {
   }
 
   async function handleSubmit() {
+    // Claim the submit synchronously, before any await, so a second tap during
+    // the auth + category-inference pause can't start a second insert.
+    if (submittingRef.current) return
+    submittingRef.current = true
+    // Show the busy state immediately rather than after the awaits below.
+    setUploadStatus(isEditMode ? 'Saving...' : 'Posting...')
+
+    try {
+      await submitJob()
+    } catch (e) {
+      setUploadStatus('')
+      Alert.alert('Something went wrong', e?.message || 'Please try again.')
+    } finally {
+      submittingRef.current = false
+    }
+  }
+
+  async function submitJob() {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Category is auto-detected from the title + details (keep any existing one
@@ -230,11 +252,10 @@ export default function PostJobStep5Review({ navigation, route }) {
       // Save photos with the draft so they survive the login round-trip.
       const pendingPhotos = (photos || []).map(toStorablePhoto)
       await AsyncStorage.setItem('pendingJob', JSON.stringify({ ...payload, _photos: pendingPhotos }))
+      setUploadStatus('')          // sign-in interrupts the post; drop the busy state
       setShowAuthSheet(true)
       return
     }
-
-    setUploadStatus(isEditMode ? 'Saving...' : 'Posting...')
 
     if (isEditMode && editJob) {
       const { error } = await supabase
@@ -425,6 +446,7 @@ export default function PostJobStep5Review({ navigation, route }) {
             title={submitLabel}
             onPress={handleSubmit}
             loading={!!uploadStatus}
+            disabled={!!uploadStatus}
             style={{ flex: 1 }}
             accessibilityLabel={submitLabel}
           />
