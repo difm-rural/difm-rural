@@ -25,6 +25,8 @@ import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import { fetchConnectionsForRequester } from '../../lib/connections'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
+import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
+import SeasonalReminderCard from '../../components/SeasonalReminderCard'
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   const isPrimary = variant === 'primary'
@@ -53,6 +55,7 @@ export default function HomeTabScreen({ navigation }) {
   const [summary, setSummary]           = useState({})
   const [connections, setConnections]   = useState([])
   const [invitedJobs, setInvitedJobs]   = useState([])
+  const [seasonalReminders, setSeasonalReminders] = useState([])
   const [loading, setLoading]           = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
 
@@ -73,16 +76,19 @@ export default function HomeTabScreen({ navigation }) {
     const isRequester = true              // everyone can request
     const isProvider  = canProvide(prof)  // providing is additive
 
-    const [notifs, counts, conns, invited] = await Promise.all([
+    const [notifs, counts, conns, invited, reminders] = await Promise.all([
       fetchNotifications(8),
       fetchSummary(user.id, isRequester, isProvider),
       fetchConnectionsForRequester(user.id),
       isProvider ? fetchInvitedJobsForProvider(user.id) : Promise.resolve([]),
+      fetchSeasonalReminders(),
     ])
     setNotifications(notifs)
     setSummary(counts)
     setConnections(conns)
     setInvitedJobs(invited)
+    setSeasonalReminders(reminders)
+    reminders.forEach(reminder => recordSeasonalEvent(reminder.id, 'impression'))
     setLoading(false)
     setRefreshing(false)
   }
@@ -124,6 +130,22 @@ export default function HomeTabScreen({ navigation }) {
   function onRefresh() {
     setRefreshing(true)
     load()
+  }
+
+  function dismissSeasonalReminder(campaign) {
+    setSeasonalReminders(items => items.filter(item => item.id !== campaign.id))
+    recordSeasonalEvent(campaign.id, 'dismiss')
+  }
+
+  function openSeasonalAction(campaign) {
+    recordSeasonalEvent(campaign.id, 'action')
+    if (campaign.primary_action === 'post_job') {
+      navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })
+    } else if (campaign.primary_action === 'browse_services') {
+      navigation.getParent()?.navigate('Browse')
+    } else if (campaign.primary_action === 'manage_profile') {
+      navigation.getParent()?.navigate('Account', { screen: 'Profile' })
+    }
   }
 
   const isRequester = true
@@ -301,6 +323,20 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
+        {seasonalReminders.length > 0 && (
+          <View style={styles.seasonalSection}>
+            <Text style={styles.activityHeading}>Useful right now</Text>
+            {seasonalReminders.map(campaign => (
+              <SeasonalReminderCard
+                key={campaign.id}
+                campaign={campaign}
+                onAction={openSeasonalAction}
+                onDismiss={dismissSeasonalReminder}
+              />
+            ))}
+          </View>
+        )}
+
         {/* Your connections — a button to the full list */}
         {connections.length > 0 && (
           <TouchableOpacity
@@ -420,6 +456,7 @@ const styles = StyleSheet.create({
 
   // "Your activity" stat tiles
   activitySection: { marginBottom: 12 },
+  seasonalSection: { marginTop: 1 },
   activityHeading: {
     fontSize: 13,
     fontWeight: '700',

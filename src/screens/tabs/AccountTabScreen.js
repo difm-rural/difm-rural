@@ -139,6 +139,7 @@ export default function AccountTabScreen({ navigation }) {
   const [dailyDigest,        setDailyDigest]        = useState(false)
   const [emailTransactional, setEmailTransactional] = useState(true)
   const [emailMessages,      setEmailMessages]      = useState(true)
+  const [emailSeasonal,      setEmailSeasonal]      = useState(false)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
   const [editModal, setEditModal]           = useState({
     visible: false, field: '', label: '', value: '', keyboardType: 'default',
@@ -200,6 +201,7 @@ export default function AccountTabScreen({ navigation }) {
     setDailyDigest(!!prefs?.daily_digest)
     setEmailTransactional(prefs?.email_transactional !== false)
     setEmailMessages(prefs?.email_messages !== false)
+    setEmailSeasonal(!!prefs?.email_seasonal)
 
     setLoading(false)
   }
@@ -221,6 +223,12 @@ export default function AccountTabScreen({ navigation }) {
     const next = !emailMessages
     setEmailMessages(next)
     await updateUserPreferences({ email_messages: next })
+  }
+
+  async function handleEmailSeasonalToggle() {
+    const next = !emailSeasonal
+    setEmailSeasonal(next)
+    await updateUserPreferences({ email_seasonal: next })
   }
 
   // ─── Biometric toggle ──────────────────────────────────────────────────────
@@ -489,10 +497,16 @@ export default function AccountTabScreen({ navigation }) {
 
       <View style={styles.hubButtons}>
         {isAdmin && (
-          <HubButton
-            icon="speedometer-outline" label="Admin" sub="Jobs, services, bookings, activity"
-            onPress={() => navigation.navigate('Admin')}
-          />
+          <>
+            <HubButton
+              icon="speedometer-outline" label="Admin" sub="Jobs, services, bookings, activity"
+              onPress={() => navigation.navigate('Admin')}
+            />
+            <HubButton
+              icon="leaf-outline" label="Seasonal rural reminders" sub="Campaigns, timing, audiences"
+              onPress={() => navigation.navigate('SeasonalRemindersAdmin')}
+            />
+          </>
         )}
         <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
@@ -658,6 +672,13 @@ export default function AccountTabScreen({ navigation }) {
           sub="Email me when a message is still unread after 20 minutes"
           value={emailMessages ? 'On' : 'Off'}
           onPress={handleEmailMessagesToggle}
+        />
+        <MenuRow
+          icon="leaf-outline"
+          label="Seasonal reminder emails"
+          sub="Occasional, relevant reminders for your region"
+          value={emailSeasonal ? 'On' : 'Off'}
+          onPress={handleEmailSeasonalToggle}
         />
         <MenuRow
           icon="notifications-outline"

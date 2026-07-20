@@ -1,8 +1,14 @@
 # process-email-outbox
 
-Scheduled worker for transactional email. It claims due `email_outbox` rows,
-rechecks current user preferences, suppresses chat email already read in-app,
-loads the recipient from Supabase Auth, and sends through Resend.
+Scheduled worker for transactional and opted-in seasonal email. It claims due
+`email_outbox` rows, rechecks current user preferences and campaign eligibility,
+suppresses chat email already read in-app, loads the recipient from Supabase
+Auth, and sends through Resend.
+
+Seasonal rows are queued each NZ morning by
+`public.queue_due_seasonal_campaign_emails()`. The queue enforces active dates,
+audience, exact profile-region targeting, the monthly email cap, the global
+email switch, the campaign email switch, and the user's `email_seasonal` opt-in.
 
 ## Deploy
 

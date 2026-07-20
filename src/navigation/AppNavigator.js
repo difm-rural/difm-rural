@@ -41,6 +41,7 @@ import CreateServiceScreen  from '../screens/CreateServiceScreen'
 import MyServicesScreen     from '../screens/MyServicesScreen'
 import ProfileScreen        from '../screens/ProfileScreen'
 import AdminScreen          from '../screens/AdminScreen'
+import SeasonalRemindersAdminScreen from '../screens/SeasonalRemindersAdminScreen'
 
 import JobFeedScreen           from '../screens/JobFeedScreen'
 import MyJobsScreen            from '../screens/MyJobsScreen'
@@ -188,6 +189,7 @@ function AccountStackNav() {
       <AccountNav.Screen name="CreateService" component={CreateServiceScreen} />
       <AccountNav.Screen name="Profile"       component={ProfileScreen}      />
       <AccountNav.Screen name="Admin"         component={AdminScreen}        />
+      <AccountNav.Screen name="SeasonalRemindersAdmin" component={SeasonalRemindersAdminScreen} />
       <AccountNav.Screen name="ServiceDetail"  component={ServiceDetailScreen}  />
       <AccountNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <AccountNav.Screen name="BookingConfirm" component={BookingConfirmScreen} />

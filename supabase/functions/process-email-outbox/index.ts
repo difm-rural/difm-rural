@@ -39,7 +39,8 @@ const SUBJECTS: Record<string, string> = {
 type OutboxRow = {
   id: string
   user_id: string
-  notification_id: string
+  notification_id: string | null
+  campaign_id: string | null
   email_type: string
   attempts: number
   notification: {
@@ -48,6 +49,18 @@ type OutboxRow = {
     body: string | null
     type: string
     metadata: Record<string, unknown> | null
+  } | null
+  campaign: {
+    id: string
+    title: string
+    body: string
+    category: string | null
+    is_active: boolean
+    email_enabled: boolean
+    starts_on: string
+    ends_on: string
+    audience: 'requester' | 'provider' | 'both'
+    regions: string[]
   } | null
 }
 
@@ -85,7 +98,7 @@ const BRAND_LOGO_URL = Deno.env.get('BRAND_LOGO_URL') ?? ''
 // The real fix is Universal Links / App Links, which needs web hosting on
 // ruralconnections.nz plus a native rebuild. The app-side handler and the
 // `open` function are already written and waiting for that.
-function emailHtml(body: string) {
+function emailHtml(body: string, seasonal = false) {
   const safeBody = escapeHtml(body)
   const logo = BRAND_LOGO_URL
     ? `<img src="${escapeHtml(BRAND_LOGO_URL)}" width="48" height="48" alt="Rural Connections"
@@ -99,9 +112,9 @@ function emailHtml(body: string) {
         ${logo}
         <div style="font-size:13px;font-weight:700;letter-spacing:1.4px;color:#2d6a4f;margin-bottom:22px">RURAL CONNECTIONS</div>
         <p style="font-size:17px;line-height:1.55;margin:0 0 22px">${safeBody}</p>
-        <p style="font-size:14px;line-height:1.5;color:#66736b;margin:0">Open Rural Connections to view the details and respond.</p>
+        <p style="font-size:14px;line-height:1.5;color:#66736b;margin:0">${seasonal ? 'Open Rural Connections to get started.' : 'Open Rural Connections to view the details and respond.'}</p>
       </div>
-      <p style="font-size:12px;line-height:1.5;color:#7a847e;text-align:center;margin:18px 0 0">You can manage email updates in Account settings.</p>
+      <p style="font-size:12px;line-height:1.5;color:#7a847e;text-align:center;margin:18px 0 0">You can manage ${seasonal ? 'seasonal reminders' : 'email updates'} in Account settings.</p>
     </div>
   </body>
 </html>`
@@ -139,7 +152,7 @@ Deno.serve(async (req) => {
 
   const { data, error: loadError } = await supabase
     .from('email_outbox')
-    .select('id, user_id, notification_id, email_type, attempts, notification:notification_id(id, read, body, type, metadata)')
+    .select('id, user_id, notification_id, campaign_id, email_type, attempts, notification:notification_id(id, read, body, type, metadata), campaign:campaign_id(id, title, body, category, is_active, email_enabled, starts_on, ends_on, audience, regions)')
     .eq('status', 'pending')
     .lte('scheduled_for', new Date().toISOString())
     .order('scheduled_for', { ascending: true })
@@ -164,14 +177,21 @@ Deno.serve(async (req) => {
     if (!claimed) continue // another worker claimed it
 
     const notification = candidate.notification
-    if (!notification) {
+    const campaign = candidate.campaign
+    const isSeasonal = candidate.email_type === 'seasonal_reminder'
+    if (!isSeasonal && !notification) {
       await supabase.from('email_outbox').update({ status: 'cancelled', last_error: 'Notification no longer exists' }).eq('id', candidate.id)
+      stats.cancelled++
+      continue
+    }
+    if (isSeasonal && !campaign) {
+      await supabase.from('email_outbox').update({ status: 'cancelled', last_error: 'Campaign no longer exists' }).eq('id', candidate.id)
       stats.cancelled++
       continue
     }
 
     // A delayed chat email is no longer useful after the notification is read.
-    if (candidate.email_type === 'new_message' && notification.read) {
+    if (candidate.email_type === 'new_message' && notification?.read) {
       await supabase.from('email_outbox').update({ status: 'cancelled', last_error: null }).eq('id', candidate.id)
       stats.cancelled++
       continue
@@ -179,12 +199,34 @@ Deno.serve(async (req) => {
 
     const { data: prefs } = await supabase
       .from('user_preferences')
-      .select('email_transactional, email_messages')
+      .select('email_transactional, email_messages, email_seasonal')
       .eq('user_id', candidate.user_id)
       .maybeSingle()
-    const allowed = candidate.email_type === 'new_message'
+    let allowed = candidate.email_type === 'new_message'
       ? prefs?.email_messages !== false
-      : prefs?.email_transactional !== false
+      : isSeasonal
+        ? prefs?.email_seasonal === true
+        : prefs?.email_transactional !== false
+
+    if (isSeasonal && allowed && campaign) {
+      const [{ data: settings }, { data: profile }] = await Promise.all([
+        supabase.from('seasonal_reminder_settings').select('email_enabled').eq('singleton', true).maybeSingle(),
+        supabase.from('profiles').select('primary_role, role, region').eq('id', candidate.user_id).maybeSingle(),
+      ])
+      const today = new Date().toISOString().slice(0, 10)
+      const role = profile?.primary_role || profile?.role || 'requester'
+      const audienceMatches = campaign.audience === 'both'
+        || (campaign.audience === 'requester' && ['requester', 'both'].includes(role))
+        || (campaign.audience === 'provider' && ['provider', 'both'].includes(role))
+      const targetRegions = campaign.regions || []
+      const regionMatches = targetRegions.length === 0 || targetRegions.some(
+        region => region.trim().toLowerCase() === String(profile?.region || '').trim().toLowerCase(),
+      )
+      allowed = settings?.email_enabled === true
+        && campaign.is_active && campaign.email_enabled
+        && campaign.starts_on <= today && campaign.ends_on >= today
+        && audienceMatches && regionMatches
+    }
     if (!allowed) {
       await supabase.from('email_outbox').update({ status: 'cancelled', last_error: null }).eq('id', candidate.id)
       stats.cancelled++
@@ -199,8 +241,12 @@ Deno.serve(async (req) => {
       continue
     }
 
-    const subject = SUBJECTS[candidate.email_type] ?? 'Rural Connections update'
-    const body = notification.body?.trim() || 'There is an update waiting for you in Rural Connections.'
+    const subject = isSeasonal && campaign
+      ? campaign.title
+      : SUBJECTS[candidate.email_type] ?? 'Rural Connections update'
+    const body = isSeasonal && campaign
+      ? campaign.body.trim()
+      : notification?.body?.trim() || 'There is an update waiting for you in Rural Connections.'
     const attempts = candidate.attempts + 1
 
     try {
@@ -215,8 +261,8 @@ Deno.serve(async (req) => {
           from: FROM,
           to: [recipient],
           subject,
-          text: `${body}\n\nOpen Rural Connections to view the details and respond.`,
-          html: emailHtml(body),
+          text: `${body}\n\n${isSeasonal ? 'Open Rural Connections to get started.' : 'Open Rural Connections to view the details and respond.'}`,
+          html: emailHtml(body, isSeasonal),
           reply_to: REPLY_TO,
         }),
       })
@@ -229,6 +275,14 @@ Deno.serve(async (req) => {
         provider_message_id: result?.id ?? null, last_error: null,
         updated_at: new Date().toISOString(),
       }).eq('id', candidate.id)
+      if (isSeasonal && candidate.campaign_id) {
+        await supabase.from('seasonal_campaign_deliveries').upsert({
+          campaign_id: candidate.campaign_id,
+          user_id: candidate.user_id,
+          email_sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'campaign_id,user_id' })
+      }
       stats.sent++
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
