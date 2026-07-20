@@ -73,14 +73,20 @@ function escapeHtml(value: string) {
 // Falls back to the wordmark alone when unset.
 const BRAND_LOGO_URL = Deno.env.get('BRAND_LOGO_URL') ?? ''
 
-// Links must be https: Outlook (and Gmail) refuse to linkify custom schemes
-// like difmrural://, so a raw deep link renders inert. We point at the public
-// `open` function, which bounces the visitor into the app.
-const OPEN_ENDPOINT = `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/open`
-
-function emailHtml(body: string, notificationId: string) {
+// NOTE — no click-through link, deliberately (parked July 2026).
+// Two dead ends were tried and both are blocked:
+//   1. A raw difmrural:// link — Outlook/Gmail refuse to linkify custom schemes,
+//      so it renders completely inert.
+//   2. An https bridge (the `open` function) that 302s to the scheme — Chrome
+//      blocks server-initiated redirects to an external protocol (needs a user
+//      gesture), so it dies on a blank page. Outlook Safe Links adds a hop too.
+// A Supabase-hosted HTML tap-through page is also out: the edge gateway forces
+// Content-Type: text/plain and a `sandbox` CSP, which neuters scripts/links.
+// The real fix is Universal Links / App Links, which needs web hosting on
+// ruralconnections.nz plus a native rebuild. The app-side handler and the
+// `open` function are already written and waiting for that.
+function emailHtml(body: string) {
   const safeBody = escapeHtml(body)
-  const deepLink = `${OPEN_ENDPOINT}?n=${encodeURIComponent(notificationId)}`
   const logo = BRAND_LOGO_URL
     ? `<img src="${escapeHtml(BRAND_LOGO_URL)}" width="48" height="48" alt="Rural Connections"
            style="display:block;width:48px;height:48px;border:0;border-radius:12px;margin:0 0 14px" />`
@@ -93,10 +99,7 @@ function emailHtml(body: string, notificationId: string) {
         ${logo}
         <div style="font-size:13px;font-weight:700;letter-spacing:1.4px;color:#2d6a4f;margin-bottom:22px">RURAL CONNECTIONS</div>
         <p style="font-size:17px;line-height:1.55;margin:0 0 22px">${safeBody}</p>
-        <p style="font-size:14px;line-height:1.5;color:#66736b;margin:0">
-          <a href="${deepLink}" style="color:#2d6a4f;font-weight:700;text-decoration:underline">Open Rural Connections</a>
-          to view the details and respond.
-        </p>
+        <p style="font-size:14px;line-height:1.5;color:#66736b;margin:0">Open Rural Connections to view the details and respond.</p>
       </div>
       <p style="font-size:12px;line-height:1.5;color:#7a847e;text-align:center;margin:18px 0 0">You can manage email updates in Account settings.</p>
     </div>
@@ -212,8 +215,8 @@ Deno.serve(async (req) => {
           from: FROM,
           to: [recipient],
           subject,
-          text: `${body}\n\nOpen Rural Connections to view the details and respond:\n${OPEN_ENDPOINT}?n=${notification.id}`,
-          html: emailHtml(body, notification.id),
+          text: `${body}\n\nOpen Rural Connections to view the details and respond.`,
+          html: emailHtml(body),
           reply_to: REPLY_TO,
         }),
       })

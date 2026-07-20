@@ -1,3 +1,9 @@
+// PARKED (July 2026) — deployed but nothing links to it. See the note in
+// process-email-outbox: Chrome blocks server-initiated redirects to a custom
+// scheme, so this can't work on its own. Kept because it's the right shape to
+// reuse once Universal Links / App Links are set up (needs web hosting on
+// ruralconnections.nz + a native rebuild).
+//
 // Public https bridge into the app: /functions/v1/open?n=<notification_id>
 //
 // Why this exists: emails can't carry a difmrural:// link — Outlook (and Gmail)
