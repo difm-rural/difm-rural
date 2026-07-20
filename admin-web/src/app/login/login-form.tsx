@@ -1,13 +1,14 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { ArrowRight, CheckCircle2, LoaderCircle, LockKeyhole } from 'lucide-react'
+import { ArrowLeft, ArrowRight, LoaderCircle, LockKeyhole } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [token, setToken] = useState('')
   const [error, setError] = useState('')
 
   async function submit(event: FormEvent) {
@@ -24,15 +25,37 @@ export function LoginForm() {
     else setSent(true)
   }
 
+  async function verify(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    const supabase = createClient()
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: token.trim(),
+      type: 'email',
+    })
+    setLoading(false)
+    if (verifyError) setError('That code is invalid or has expired. Request a new code and try again.')
+    else window.location.assign('/')
+  }
+
   if (sent) {
     return (
-      <div className="login-confirmation">
-        <CheckCircle2 size={26} />
-        <div>
-          <h2>Check your inbox</h2>
-          <p>We sent a secure sign-in link to {email}.</p>
+      <form onSubmit={verify} className="login-form otp-form">
+        <div className="otp-heading">
+          <button type="button" className="back-email" onClick={() => { setSent(false); setToken(''); setError('') }} aria-label="Use a different email"><ArrowLeft size={16} /></button>
+          <div><h2>Enter your sign-in code</h2><p>We sent a code to {email}.</p></div>
         </div>
-      </div>
+        <label htmlFor="token">Email code</label>
+        <input id="token" className="otp-input" value={token} onChange={event => setToken(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" required autoFocus />
+        {error && <p className="form-error">{error}</p>}
+        <button type="submit" disabled={loading || token.length < 6}>
+          {loading ? <LoaderCircle className="spin" size={17} /> : <LockKeyhole size={17} />}
+          Verify and sign in
+          {!loading && <ArrowRight size={17} />}
+        </button>
+      </form>
     )
   }
 
@@ -43,7 +66,7 @@ export function LoginForm() {
       {error && <p className="form-error">{error}</p>}
       <button type="submit" disabled={loading}>
         {loading ? <LoaderCircle className="spin" size={17} /> : <LockKeyhole size={17} />}
-        Send secure sign-in link
+        Send sign-in code
         {!loading && <ArrowRight size={17} />}
       </button>
     </form>

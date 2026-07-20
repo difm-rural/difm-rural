@@ -120,6 +120,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .login-confirmation { display: flex; gap: 12px; align-items: flex-start; margin-top: 28px; padding: 16px; border-radius: 10px; background: var(--forest-soft); color: var(--forest); }
 .login-confirmation h2 { margin: 0 0 4px; font-size: 15px; }
 .login-confirmation p { margin: 0; font-size: 11px; line-height: 1.45; }
+.otp-form { margin-top: 28px; }
+.otp-heading { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 22px; }
+.otp-heading h2 { margin: 0 0 4px; font-size: 17px; }
+.otp-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+.back-email { width: 30px; height: 30px; display: grid; place-items: center; flex: none; margin: 0; border: 1px solid var(--line) !important; border-radius: 8px !important; background: white !important; color: var(--forest) !important; }
+.login-form .otp-input { font-size: 22px; font-weight: 800; letter-spacing: .28em; text-align: center; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .message-page { min-height: 100vh; display: grid; place-items: center; padding: 30px; }

@@ -21,7 +21,7 @@ export default async function LoginPage() {
           <div className="brand-mark">RC</div>
           <p className="eyebrow">Admin console</p>
           <h2>Welcome back</h2>
-          <p className="muted">Use the same email address as your administrator account in the app.</p>
+          <p className="muted">Use the same email address as your administrator account in the app. We will email you a one-time sign-in code.</p>
           <LoginForm />
         </div>
       </section>
