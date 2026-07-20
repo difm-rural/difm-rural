@@ -137,6 +137,8 @@ export default function AccountTabScreen({ navigation }) {
   const [biometricEnabled,   setBiometricEnabled]   = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
   const [dailyDigest,        setDailyDigest]        = useState(false)
+  const [emailTransactional, setEmailTransactional] = useState(true)
+  const [emailMessages,      setEmailMessages]      = useState(true)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
   const [editModal, setEditModal]           = useState({
     visible: false, field: '', label: '', value: '', keyboardType: 'default',
@@ -196,6 +198,8 @@ export default function AccountTabScreen({ navigation }) {
 
     const prefs = await loadUserPreferences()
     setDailyDigest(!!prefs?.daily_digest)
+    setEmailTransactional(prefs?.email_transactional !== false)
+    setEmailMessages(prefs?.email_messages !== false)
 
     setLoading(false)
   }
@@ -205,6 +209,18 @@ export default function AccountTabScreen({ navigation }) {
     const next = !dailyDigest
     setDailyDigest(next)                              // optimistic
     await updateUserPreferences({ daily_digest: next })
+  }
+
+  async function handleEmailTransactionalToggle() {
+    const next = !emailTransactional
+    setEmailTransactional(next)
+    await updateUserPreferences({ email_transactional: next })
+  }
+
+  async function handleEmailMessagesToggle() {
+    const next = !emailMessages
+    setEmailMessages(next)
+    await updateUserPreferences({ email_messages: next })
   }
 
   // ─── Biometric toggle ──────────────────────────────────────────────────────
@@ -631,8 +647,22 @@ export default function AccountTabScreen({ navigation }) {
       <View style={styles.card}>
         <MenuRow
           icon="mail-outline"
-          label="Daily summary"
-          sub="A morning notification of your jobs and bookings in flight"
+          label="Email activity updates"
+          sub="Offers, questions, bookings and important status changes"
+          value={emailTransactional ? 'On' : 'Off'}
+          onPress={handleEmailTransactionalToggle}
+        />
+        <MenuRow
+          icon="chatbubble-ellipses-outline"
+          label="Unread message emails"
+          sub="Email me when a message is still unread after 20 minutes"
+          value={emailMessages ? 'On' : 'Off'}
+          onPress={handleEmailMessagesToggle}
+        />
+        <MenuRow
+          icon="notifications-outline"
+          label="Daily push summary"
+          sub="A morning push notification about work in flight"
           value={dailyDigest ? 'On' : 'Off'}
           last
           onPress={handleDailyDigestToggle}

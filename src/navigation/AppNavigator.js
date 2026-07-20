@@ -2,7 +2,7 @@ import { NavigationContainer, useNavigationContainerRef, getFocusedRouteNameFrom
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, AppState, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
@@ -419,6 +419,38 @@ export default function AppNavigator() {
       }
     })
     return () => sub.remove()
+  }, [])
+
+  // Email deep links: difmrural://notification/<id>. We hand the id to the
+  // Notifications screen rather than routing here, because the eventual targets
+  // (Chat, JobDetail, ServiceBookingDetail) are nested inside that stack and
+  // need a screen-level navigation object.
+  useEffect(() => {
+    let cancelled = false
+
+    async function handleUrl(url) {
+      if (!url) return
+      const match = url.match(/notification\/([0-9a-fA-F-]{8,})/)
+      if (!match) return
+      const openNotificationId = match[1]
+
+      // Cold start: wait briefly for navigation and the restored session.
+      for (let i = 0; i < 40; i++) {
+        if (cancelled) return
+        if (navigationRef.isReady() && sessionRef.current) break
+        await new Promise(resolve => setTimeout(resolve, 250))
+      }
+      if (cancelled || !navigationRef.isReady() || !sessionRef.current) return
+
+      navigationRef.navigate('Activity', {
+        screen: 'Notifications',
+        params: { openNotificationId },
+      })
+    }
+
+    Linking.getInitialURL().then(handleUrl).catch(() => {})
+    const sub = Linking.addEventListener('url', event => handleUrl(event.url))
+    return () => { cancelled = true; sub.remove() }
   }, [])
 
   useEffect(() => {

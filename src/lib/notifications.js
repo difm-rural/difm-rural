@@ -41,7 +41,7 @@ export async function fetchNotifications(limit = 50) {
 // Marks the current user's unread notifications for a given job or booking as
 // read — call when the user resolves the underlying item (e.g. confirms a
 // booking) so stale "please confirm" prompts leave the Needs-attention feed.
-export async function markNotificationsReadFor({ bookingId, jobId } = {}) {
+export async function markNotificationsReadFor({ bookingId, jobId, type } = {}) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
@@ -53,6 +53,7 @@ export async function markNotificationsReadFor({ bookingId, jobId } = {}) {
     if (bookingId) q = q.eq('metadata->>booking_id', bookingId)
     else if (jobId) q = q.eq('metadata->>job_id', jobId)
     else return
+    if (type) q = q.eq('type', type)
     await q
     requestBadgeRefresh()
   } catch {

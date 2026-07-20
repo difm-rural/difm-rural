@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
+import { markNotificationsReadFor } from '../lib/notifications'
 
 function parseSpecialMessage(content) {
   try {
@@ -41,6 +42,12 @@ export default function ChatScreen({ route, navigation }) {
   const [jobStatus, setJobStatus] = useState(null)
   const [jobInfo, setJobInfo] = useState(null)
   const flatListRef = useRef(null)
+
+  const markChatNotificationsRead = () => markNotificationsReadFor({
+    bookingId,
+    jobId,
+    type: 'new_message',
+  })
 
   useEffect(() => {
     let channel
@@ -76,6 +83,7 @@ export default function ChatScreen({ route, navigation }) {
         .order('created_at', { ascending: false })
 
       setMessages(data || [])
+      await markChatNotificationsRead()
 
       channel = supabase
         .channel(`${messageTable}-${chatId}`)
@@ -87,6 +95,7 @@ export default function ChatScreen({ route, navigation }) {
               if (prev.some(m => m.id === payload.new.id)) return prev
               return [payload.new, ...prev]
             })
+            markChatNotificationsRead()
           }
         )
       if (isServiceBookingChat) {

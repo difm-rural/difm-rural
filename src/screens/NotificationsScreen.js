@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
   FlatList,
   RefreshControl,
@@ -23,12 +23,13 @@ import {
 } from '../lib/notifications'
 import { requestBadgeRefresh } from '../lib/badgeEvents'
 
-export default function NotificationsScreen({ navigation }) {
+export default function NotificationsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const [userId, setUserId] = useState(null)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const autoOpenedRef = useRef(null)
 
   useFocusEffect(useCallback(() => { load() }, []))
 
@@ -43,6 +44,18 @@ export default function NotificationsScreen({ navigation }) {
     setItems(list.map(n => ({ ...n, _wasUnread: !n.read })))
     setLoading(false)
     setRefreshing(false)
+
+    // Arrived from an email deep link (difmrural://notification/<id>): open the
+    // same target a row tap would. Done here because openNotificationTarget
+    // navigates to screens nested in this stack, so it needs this screen's
+    // navigation object rather than the root container ref.
+    const openId = route?.params?.openNotificationId
+    if (openId && autoOpenedRef.current !== openId && user?.id) {
+      autoOpenedRef.current = openId
+      navigation.setParams({ openNotificationId: undefined })
+      const target = list.find(n => n.id === openId)
+      if (target) await openNotificationTarget(navigation, user.id, target)
+    }
   }
 
   function onRefresh() {
