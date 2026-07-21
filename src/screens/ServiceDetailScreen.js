@@ -226,15 +226,38 @@ export default function ServiceDetailScreen({ route, navigation }) {
         )}
 
         {photos.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.photoStrip}
-            style={styles.photoStripWrap}>
-            {photos.map((url, i) => (
-              <Image key={`${url}-${i}`} source={{ uri: url }} style={styles.servicePhoto} resizeMode="contain" />
-            ))}
-          </ScrollView>
+          <>
+            <View style={styles.serviceHero}>
+              <Image source={{ uri: photos[0] }} style={styles.serviceHeroPhoto} resizeMode="cover" />
+              {!!service.card_headline && (
+                <View style={[
+                  styles.cardMessage,
+                  service.card_style === 'bold' && styles.cardMessageBold,
+                  service.card_style === 'clean' && styles.cardMessageClean,
+                ]}>
+                  <Text style={[styles.cardHeadline, service.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={3}>
+                    {service.card_headline}
+                  </Text>
+                  {!!service.card_supporting_text && (
+                    <Text style={[styles.cardSupporting, service.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={3}>
+                      {service.card_supporting_text}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+            {photos.length > 1 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.photoStrip}
+                style={styles.photoStripWrap}>
+                {photos.slice(1).map((url, i) => (
+                  <Image key={`${url}-${i}`} source={{ uri: url }} style={styles.servicePhoto} resizeMode="cover" />
+                ))}
+              </ScrollView>
+            )}
+          </>
         )}
 
         {/* Provider section */}
@@ -415,6 +438,30 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16 },
   photoStripWrap: { marginBottom: 14 },
   photoStrip: { gap: 10 },
+  serviceHero: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 16,
+    backgroundColor: colors.border,
+    marginBottom: 14,
+  },
+  serviceHeroPhoto: { width: '100%', height: '100%' },
+  cardMessage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    backgroundColor: 'rgba(15,45,33,0.78)',
+  },
+  cardMessageBold: { top: 0, justifyContent: 'center', backgroundColor: 'rgba(15,45,33,0.60)' },
+  cardMessageClean: { left: 12, right: 12, bottom: 12, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.90)' },
+  cardHeadline: { color: colors.white, fontSize: 21, lineHeight: 25, fontWeight: '800' },
+  cardSupporting: { color: colors.white, fontSize: 13, lineHeight: 18, marginTop: 6 },
+  cardMessageTextClean: { color: colors.primaryDark },
   servicePhoto: {
     width: 260,
     height: 160,

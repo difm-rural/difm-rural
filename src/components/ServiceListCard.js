@@ -29,16 +29,32 @@ export default function ServiceListCard({ item, onPress }) {
   const ratingText   = ratingCount > 0 ? `★ ${Number(item.ratingAverage || 0).toFixed(1)} (${ratingCount})` : '★ New'
   const providerName = profile.full_name || 'Provider'
   const paused    = item.is_active === false
+  const creative  = !!(photoUrl && item.card_headline)
+  const clean     = item.card_style === 'clean'
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, creative && styles.creativeCard]}
       onPress={onPress}
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={`${item.title} by ${providerName}`}>
 
-      {photoUrl ? (
+      {creative ? (
+        <View style={styles.creativeHero}>
+          <Image source={{ uri: photoUrl }} style={styles.creativePhoto} resizeMode="cover" />
+          <View style={[
+            styles.cardMessage,
+            item.card_style === 'bold' && styles.cardMessageBold,
+            clean && styles.cardMessageClean,
+          ]}>
+            <Text style={[styles.cardHeadline, clean && styles.cardMessageTextClean]} numberOfLines={2}>{item.card_headline}</Text>
+            {!!item.card_supporting_text && (
+              <Text style={[styles.cardSupporting, clean && styles.cardMessageTextClean]} numberOfLines={2}>{item.card_supporting_text}</Text>
+            )}
+          </View>
+        </View>
+      ) : photoUrl ? (
         <Image source={{ uri: photoUrl }} style={styles.thumb} resizeMode="contain" />
       ) : catImg ? (
         <Image source={catImg} style={styles.thumb} resizeMode="cover" />
@@ -48,7 +64,7 @@ export default function ServiceListCard({ item, onPress }) {
         </View>
       )}
 
-      <View style={styles.content}>
+      <View style={[styles.content, creative && styles.creativeContent]}>
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.provider} numberOfLines={1}>{providerName}</Text>
         <View style={styles.bottomRow}>
@@ -76,6 +92,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
   },
+  creativeCard: { flexDirection: 'column', padding: 0, gap: 0, overflow: 'hidden' },
+  creativeHero: { width: '100%', height: 154, position: 'relative', backgroundColor: colors.background },
+  creativePhoto: { width: '100%', height: '100%' },
+  creativeContent: { padding: 12 },
+  cardMessage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(15,45,33,0.78)',
+  },
+  cardMessageBold: { top: 0, justifyContent: 'center', backgroundColor: 'rgba(15,45,33,0.60)' },
+  cardMessageClean: { left: 10, right: 10, bottom: 10, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.90)' },
+  cardHeadline: { color: colors.white, fontSize: 17, lineHeight: 20, fontWeight: '800' },
+  cardSupporting: { color: colors.white, fontSize: 11, lineHeight: 15, marginTop: 4 },
+  cardMessageTextClean: { color: colors.primaryDark },
   thumb: {
     width: 60,
     height: 60,
