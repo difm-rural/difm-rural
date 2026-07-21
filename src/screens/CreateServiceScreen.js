@@ -836,12 +836,17 @@ export default function CreateServiceScreen({ navigation, route }) {
         let contentType = photo.mimeType || 'image/jpeg'
         let fileData
         if (photo.fromWebsite) {
-          const response = await fetch(photo.uri)
-          if (!response.ok) throw new Error('The selected website image is no longer available.')
-          contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase()
-          if (!contentType.startsWith('image/')) throw new Error('The selected website file is not an image.')
-          fileData = await response.arrayBuffer()
-          if (fileData.byteLength > 5 * 1024 * 1024) throw new Error('The selected website image is larger than 5 MB.')
+          const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
+            body: {
+              copy_website_image: true,
+              service_id: serviceId,
+              website_image_url: photo.uri,
+            },
+          })
+          if (error) throw new Error(await edgeFunctionErrorMessage(error, 'Could not copy the website image.'))
+          if (!data?.photo_url) throw new Error('The website image copy did not return a stored photo.')
+          urls.push(data.photo_url)
+          continue
         } else {
           fileData = photo.base64
             ? base64ToArrayBuffer(photo.base64)

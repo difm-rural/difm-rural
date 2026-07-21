@@ -68,15 +68,17 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-async function hasSignedInUser(req: Request) {
+async function signedInUser(req: Request) {
   const authorization = req.headers.get('authorization')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  if (!authorization || !supabaseUrl || !anonKey) return false
+  if (!authorization || !supabaseUrl || !anonKey) return null
   const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: { Authorization: authorization, apikey: anonKey },
   })
-  return response.ok
+  if (!response.ok) return null
+  const user = await response.json()
+  return typeof user?.id === 'string' ? user : null
 }
 
 function safeParseJson(text: string) {
@@ -439,18 +441,109 @@ function extractOutputText(result: Record<string, unknown>) {
   return null
 }
 
+async function downloadPublicWebsiteImage(value: unknown) {
+  let imageUrl = publicWebsiteUrl(value)
+  for (let redirect = 0; redirect < 3; redirect++) {
+    const response = await fetch(imageUrl, {
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'RuralConnectionsServiceImageBot/1.0',
+        Accept: 'image/webp,image/png,image/jpeg',
+      },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location')
+      response.body?.cancel().catch(() => {})
+      if (!location) throw new Error('The website image redirect was incomplete.')
+      imageUrl = publicWebsiteUrl(new URL(location, imageUrl).toString())
+      continue
+    }
+    if (!response.ok) throw new Error(`The website image returned ${response.status}.`)
+    const contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase()
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+      response.body?.cancel().catch(() => {})
+      throw new Error('The website image format is not supported.')
+    }
+    const declaredSize = Number(response.headers.get('content-length') || 0)
+    if (declaredSize > 5 * 1024 * 1024) {
+      response.body?.cancel().catch(() => {})
+      throw new Error('The website image is larger than 5 MB.')
+    }
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength > 5 * 1024 * 1024) throw new Error('The website image is larger than 5 MB.')
+    return { bytes, contentType }
+  }
+  throw new Error('The website image redirected too many times.')
+}
+
+async function copyWebsiteImageToService(serviceId: unknown, imageValue: unknown, userId: string) {
+  if (typeof serviceId !== 'string' || !/^[0-9a-f-]{36}$/i.test(serviceId)) {
+    throw new Error('A valid service is required before copying the image.')
+  }
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceRoleKey) throw new Error('Service image storage is not configured.')
+
+  const ownershipResponse = await fetch(
+    `${supabaseUrl}/rest/v1/services?id=eq.${encodeURIComponent(serviceId)}&provider_id=eq.${encodeURIComponent(userId)}&select=id`,
+    { headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey } }
+  )
+  const ownedServices = ownershipResponse.ok ? await ownershipResponse.json() : []
+  if (!Array.isArray(ownedServices) || ownedServices.length !== 1) {
+    throw new Error('You can only add an image to your own service.')
+  }
+
+  const image = await downloadPublicWebsiteImage(imageValue)
+  const extensions: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+  const extension = extensions[image.contentType] || 'jpg'
+  const fileName = `website_${crypto.randomUUID()}.${extension}`
+  const objectPath = `${serviceId}/${fileName}`
+  const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/service-photos/${objectPath}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      'Content-Type': image.contentType,
+      'x-upsert': 'false',
+    },
+    body: image.bytes,
+  })
+  if (!uploadResponse.ok) {
+    const detail = await uploadResponse.text()
+    throw new Error(`Could not store the website image${detail ? `: ${detail.slice(0, 160)}` : '.'}`)
+  }
+  return `${supabaseUrl}/storage/v1/object/public/service-photos/${objectPath}`
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  if (!(await hasSignedInUser(req))) return jsonResponse({ error: 'Unauthorized' }, 401)
-
-  const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
-  if (!openAiApiKey) {
-    return jsonResponse({ error: 'OPENAI_API_KEY is not configured for this Supabase function.' }, 500)
-  }
+  const user = await signedInUser(req)
+  if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
   try {
-    const { image_base64, mime_type, image_size_bytes, website_url, allow_website_scan, current_draft } = await req.json()
+    const {
+      image_base64,
+      mime_type,
+      image_size_bytes,
+      website_url,
+      allow_website_scan,
+      current_draft,
+      copy_website_image,
+      service_id,
+      website_image_url,
+    } = await req.json()
+
+    if (copy_website_image === true) {
+      const photoUrl = await copyWebsiteImageToService(service_id, website_image_url, user.id)
+      return jsonResponse({ photo_url: photoUrl })
+    }
+
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openAiApiKey) {
+      return jsonResponse({ error: 'OPENAI_API_KEY is not configured for this Supabase function.' }, 500)
+    }
 
     if (allow_website_scan === true) {
       if (!website_url) return jsonResponse({ error: 'website_url is required.' }, 400)
