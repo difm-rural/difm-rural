@@ -138,6 +138,15 @@ function base64ToArrayBuffer(base64) {
   return new Uint8Array(bytes).buffer
 }
 
+async function edgeFunctionErrorMessage(error, fallback) {
+  try {
+    const body = await error?.context?.clone?.().json()
+    return body?.error || error?.message || fallback
+  } catch {
+    return error?.message || fallback
+  }
+}
+
 export default function CreateServiceScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const editingService = route?.params?.service || null
@@ -145,6 +154,8 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [creationMode, setCreationMode] = useState(isEditing ? 'manual' : (route?.params?.startMode || 'choose'))
   const [sourcePhoto, setSourcePhoto] = useState(null)
   const [useSourceAsPhoto, setUseSourceAsPhoto] = useState(false)
+  const [websiteInput, setWebsiteInput] = useState('')
+  const [websiteError, setWebsiteError] = useState('')
   const [draftSource, setDraftSource] = useState(isEditing ? 'manual' : null)
   const [draftMissingFields, setDraftMissingFields] = useState([])
   const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
@@ -217,7 +228,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     return ''
   }
 
-  function applyAiDraft(draft) {
+  function applyAiDraft(draft, source = 'photo') {
     const nextTitle = draft?.title || ''
     const nextCategory = normalizeCategory(draft?.category)
     const nextDescription = draft?.full_description || draft?.description || draft?.short_description || ''
@@ -237,7 +248,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setIncludesEquipment(nextEquipment)
     setDraftMissingFields(Array.isArray(draft?.missing_fields) ? draft.missing_fields.map(formatMissingField).filter(Boolean) : [])
     setDraftConfidenceNotes(Array.isArray(draft?.confidence_notes) ? draft.confidence_notes : [])
-    setDraftSource('photo')
+    setDraftSource(source)
     setCreationMode('manual')
     setStep(1)
   }
@@ -252,7 +263,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   function finishPhotoDraft(draft) {
     includeSourcePhotoIfSelected()
-    applyAiDraft(draft)
+    applyAiDraft(draft, 'photo')
   }
 
   async function enrichDraftFromWebsite(draft, websiteUrl) {
@@ -268,12 +279,39 @@ export default function CreateServiceScreen({ navigation, route }) {
     setCreatingDraft(false)
 
     if (error) {
-      Alert.alert('Website scan unavailable', 'The photo draft is still ready. You can review and complete it manually.')
+      const message = await edgeFunctionErrorMessage(error, 'The website could not be read.')
+      Alert.alert('Website scan unavailable', `${message}\n\nThe photo draft is still ready, so you can review and complete it manually.`)
       finishPhotoDraft(draft)
       return
     }
 
     finishPhotoDraft(data?.draft || data)
+  }
+
+  async function createDraftFromWebsite() {
+    const websiteUrl = websiteInput.trim()
+    if (!websiteUrl || !websiteUrl.includes('.')) {
+      setWebsiteError('Enter a complete public website address, such as example.co.nz.')
+      return
+    }
+
+    setCreatingDraft(true)
+    setWebsiteError('')
+    const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
+      body: {
+        website_url: websiteUrl,
+        allow_website_scan: true,
+        current_draft: {},
+      },
+    })
+    setCreatingDraft(false)
+
+    if (error) {
+      setWebsiteError(await edgeFunctionErrorMessage(error, 'The website could not be read. Check the address or create the service manually.'))
+      return
+    }
+
+    applyAiDraft(data?.draft || data, 'website')
   }
 
   async function chooseSourcePhoto(fromCamera) {
@@ -322,7 +360,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setCreatingDraft(false)
 
     if (error) {
-      setDraftError(error.message || 'The draft assistant is not available yet.')
+      setDraftError(await edgeFunctionErrorMessage(error, 'The draft assistant is not available yet.'))
       setDraftMissingFields(['Add service title', 'Choose category', 'Add service area', 'Add pricing'])
       return
     }
@@ -369,7 +407,7 @@ export default function CreateServiceScreen({ navigation, route }) {
             accessibilityRole="button"
             accessibilityLabel="Create service manually">
             <View style={styles.startIconWrap}>
-              <Text style={styles.startIcon}>+</Text>
+              <Icon name="create-outline" size={23} color={colors.primary} />
             </View>
             <View style={styles.startCopy}>
               <Text style={styles.startTitle}>Create manually</Text>
@@ -384,7 +422,7 @@ export default function CreateServiceScreen({ navigation, route }) {
             accessibilityRole="button"
             accessibilityLabel="Create service from photo">
             <View style={styles.startIconWrap}>
-              <Text style={styles.startIcon}>[]</Text>
+              <Icon name="camera-outline" size={23} color={colors.primary} />
             </View>
             <View style={styles.startCopy}>
               <Text style={styles.startTitle}>Create from photo</Text>
@@ -392,6 +430,86 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
             <Text style={styles.startArrow}>{'>'}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.startOption}
+            onPress={() => { setWebsiteError(''); setCreationMode('website') }}
+            accessibilityRole="button"
+            accessibilityLabel="Create service from website">
+            <View style={styles.startIconWrap}>
+              <Icon name="globe-outline" size={23} color={colors.primary} />
+            </View>
+            <View style={styles.startCopy}>
+              <Text style={styles.startTitle}>Create from website</Text>
+              <Text style={styles.startBody}>Enter your public website and review the service details we find.</Text>
+            </View>
+            <Text style={styles.startArrow}>{'>'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    )
+  }
+
+  function renderWebsiteDraft() {
+    return (
+      <View style={styles.screen}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity
+            style={styles.headerBackBtn}
+            onPress={() => setCreationMode('choose')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
+            <Text style={styles.headerBackBtnText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.kicker}>Website-to-draft</Text>
+          <Text style={styles.headerTitle} accessibilityRole="header">Create from website</Text>
+          <Text style={styles.headerSub}>Use your existing public website to create a service draft.</Text>
+        </View>
+
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.startContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.fieldLabel}>Website address</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="example.co.nz"
+            placeholderTextColor={colors.textMuted}
+            value={websiteInput}
+            onChangeText={value => { setWebsiteInput(value); setWebsiteError('') }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            accessibilityLabel="Public website address"
+          />
+
+          <View style={styles.helpBox}>
+            <Text style={styles.helpBoxTitle}>You stay in control</Text>
+            <Text style={styles.helpBoxText}>We will read public service information only. Contact details and instructions to book outside Rural Connections will not be added to the listing.</Text>
+          </View>
+
+          {!!websiteError && (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningTitle}>Website unavailable</Text>
+              <Text style={styles.warningText}>{websiteError}</Text>
+            </View>
+          )}
+
+          {creatingDraft && (
+            <View style={styles.draftProgress}>
+              <ActivityIndicator color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.draftProgressTitle}>Reading your website...</Text>
+                <Text style={styles.draftProgressBody}>Finding service, pricing and coverage details.</Text>
+              </View>
+            </View>
+          )}
+
+          <Button
+            title="Scan website"
+            onPress={createDraftFromWebsite}
+            loading={creatingDraft}
+            disabled={!websiteInput.trim()}
+            accessibilityLabel="Scan website and create service draft"
+          />
         </ScrollView>
       </View>
     )
@@ -707,9 +825,9 @@ export default function CreateServiceScreen({ navigation, route }) {
       <>
         <Text style={styles.stepHeading}>What service can you offer?</Text>
 
-        {draftSource === 'photo' && (
+        {!!draftSource && (
           <View style={styles.sourceNote}>
-            <Text style={styles.sourceNoteTitle}>Draft created from your photo</Text>
+            <Text style={styles.sourceNoteTitle}>Draft created from your {draftSource === 'website' ? 'website' : 'photo'}</Text>
             <Text style={styles.sourceNoteText}>Start here and check each pre-filled step before publishing.</Text>
           </View>
         )}
@@ -1007,10 +1125,10 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     return (
       <>
-        <Text style={styles.stepHeading}>{draftSource === 'photo' ? 'Review your draft' : 'Ready to publish?'}</Text>
-        {draftSource === 'photo' && (
+        <Text style={styles.stepHeading}>{draftSource ? 'Review your draft' : 'Ready to publish?'}</Text>
+        {!!draftSource && (
           <View style={styles.sourceNote}>
-            <Text style={styles.sourceNoteTitle}>Draft created from your photo</Text>
+            <Text style={styles.sourceNoteTitle}>Draft created from your {draftSource === 'website' ? 'website' : 'photo'}</Text>
             <Text style={styles.sourceNoteText}>Please check every detail before publishing.</Text>
           </View>
         )}
@@ -1099,6 +1217,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   if (creationMode === 'choose') return renderStartChoice()
   if (creationMode === 'photo') return renderPhotoDraft()
+  if (creationMode === 'website') return renderWebsiteDraft()
 
   return (
     <View style={styles.screen}>

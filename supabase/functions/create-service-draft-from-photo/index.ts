@@ -162,6 +162,52 @@ async function readLimitedText(response: Response, limit = 350_000) {
   return text + decoder.decode()
 }
 
+function decodeHtml(value: string) {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+}
+
+function tagAttribute(tag: string, name: string) {
+  const match = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, 'i'))
+  return match ? decodeHtml(match[1].trim()) : ''
+}
+
+function readableWebsiteText(html: string) {
+  const metadata: string[] = []
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+  if (title) metadata.push(`Page title: ${decodeHtml(title.replace(/<[^>]+>/g, ' ').trim())}`)
+
+  for (const tag of html.match(/<meta\s+[^>]*>/gi) || []) {
+    const key = (tagAttribute(tag, 'name') || tagAttribute(tag, 'property')).toLowerCase()
+    if (!['description', 'og:title', 'og:description', 'twitter:title', 'twitter:description'].includes(key)) continue
+    const content = tagAttribute(tag, 'content')
+    if (content) metadata.push(`${key}: ${content}`)
+  }
+
+  for (const match of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      metadata.push(`Structured business data: ${JSON.stringify(JSON.parse(match[1]))}`)
+    } catch {
+      // Ignore malformed structured data and continue with visible metadata.
+    }
+  }
+
+  const visible = decodeHtml(html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return [...new Set([...metadata, visible].filter(Boolean))].join('\n').slice(0, 45_000)
+}
+
 async function readPublicWebsite(value: unknown) {
   let url = publicWebsiteUrl(value)
   for (let redirect = 0; redirect < 4; redirect++) {
@@ -182,18 +228,7 @@ async function readPublicWebsite(value: unknown) {
       throw new Error('The website did not return a readable page.')
     }
     const html = await readLimitedText(response)
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'")
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 45_000)
+    const text = readableWebsiteText(html)
     if (text.length < 80) throw new Error('The website did not contain enough readable service information.')
     return { url: url.toString(), text }
   }
