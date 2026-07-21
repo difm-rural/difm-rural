@@ -122,9 +122,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .login-confirmation p { margin: 0; font-size: 11px; line-height: 1.45; }
 .otp-form { margin-top: 28px; }
 .otp-heading { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 22px; }
+.otp-heading > div { min-width: 0; flex: 1; }
 .otp-heading h2 { margin: 0 0 4px; font-size: 17px; }
-.otp-heading p { margin: 0; color: var(--muted); font-size: 11px; }
-.back-email { width: 30px; height: 30px; display: grid; place-items: center; flex: none; margin: 0; border: 1px solid var(--line) !important; border-radius: 8px !important; background: white !important; color: var(--forest) !important; }
+.otp-heading p { margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.login-form .back-email { width: 30px; min-height: 30px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--forest); }
 .login-form .otp-input { font-size: 22px; font-weight: 800; letter-spacing: .28em; text-align: center; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
