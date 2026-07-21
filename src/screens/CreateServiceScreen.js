@@ -156,6 +156,8 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [useSourceAsPhoto, setUseSourceAsPhoto] = useState(false)
   const [websiteInput, setWebsiteInput] = useState('')
   const [websiteError, setWebsiteError] = useState('')
+  const [websiteDraftPreview, setWebsiteDraftPreview] = useState(null)
+  const [useWebsiteImage, setUseWebsiteImage] = useState(false)
   const [draftSource, setDraftSource] = useState(isEditing ? 'manual' : null)
   const [draftMissingFields, setDraftMissingFields] = useState([])
   const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
@@ -297,6 +299,8 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     setCreatingDraft(true)
     setWebsiteError('')
+    setWebsiteDraftPreview(null)
+    setUseWebsiteImage(false)
     const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
       body: {
         website_url: websiteUrl,
@@ -311,7 +315,28 @@ export default function CreateServiceScreen({ navigation, route }) {
       return
     }
 
-    applyAiDraft(data?.draft || data, 'website')
+    const draft = data?.draft || data
+    if (draft?.website_image_url) {
+      setWebsiteDraftPreview(draft)
+      return
+    }
+    applyAiDraft(draft, 'website')
+  }
+
+  function continueWebsiteDraft() {
+    if (!websiteDraftPreview) return
+    if (useWebsiteImage && websiteDraftPreview.website_image_url) {
+      setPhotos(prev => prev.length >= 4 || prev.some(photo => getPhotoUri(photo) === websiteDraftPreview.website_image_url)
+        ? prev
+        : [...prev, {
+          uri: websiteDraftPreview.website_image_url,
+          mimeType: null,
+          fileName: `website-service-${Date.now()}.jpg`,
+          fromWebsite: true,
+        }])
+    }
+    applyAiDraft(websiteDraftPreview, 'website')
+    setWebsiteDraftPreview(null)
   }
 
   async function chooseSourcePhoto(fromCamera) {
@@ -456,7 +481,11 @@ export default function CreateServiceScreen({ navigation, route }) {
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity
             style={styles.headerBackBtn}
-            onPress={() => setCreationMode('choose')}
+            onPress={() => {
+              setWebsiteDraftPreview(null)
+              setUseWebsiteImage(false)
+              setCreationMode('choose')
+            }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
             accessibilityLabel="Go back">
@@ -474,7 +503,12 @@ export default function CreateServiceScreen({ navigation, route }) {
             placeholder="example.co.nz"
             placeholderTextColor={colors.textMuted}
             value={websiteInput}
-            onChangeText={value => { setWebsiteInput(value); setWebsiteError('') }}
+            onChangeText={value => {
+              setWebsiteInput(value)
+              setWebsiteError('')
+              setWebsiteDraftPreview(null)
+              setUseWebsiteImage(false)
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -493,6 +527,34 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
           )}
 
+          {!!websiteDraftPreview?.website_image_url && (
+            <View style={styles.websiteImageCard}>
+              <Text style={styles.websiteImageTitle}>Website image found</Text>
+              <Image
+                source={{ uri: websiteDraftPreview.website_image_url }}
+                style={styles.websiteImagePreview}
+                resizeMode="contain"
+                accessibilityLabel="Image found on the website"
+              />
+              <TouchableOpacity
+                style={[styles.sourcePhotoOption, styles.websiteImageOption]}
+                onPress={() => setUseWebsiteImage(value => !value)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: useWebsiteImage }}>
+                <Icon name={useWebsiteImage ? 'checkbox' : 'square-outline'} size={22} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sourcePhotoOptionTitle}>Use this as the service photo</Text>
+                  <Text style={styles.sourcePhotoOptionBody}>Select this only if you own the image or have permission to publish it. We will copy it into Rural Connections rather than link to the website.</Text>
+                </View>
+              </TouchableOpacity>
+              <Button
+                title="Continue with draft"
+                onPress={continueWebsiteDraft}
+                accessibilityLabel="Continue with website service draft"
+              />
+            </View>
+          )}
+
           {creatingDraft && (
             <View style={styles.draftProgress}>
               <ActivityIndicator color={colors.primary} />
@@ -503,13 +565,15 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
           )}
 
-          <Button
-            title="Scan website"
-            onPress={createDraftFromWebsite}
-            loading={creatingDraft}
-            disabled={!websiteInput.trim()}
-            accessibilityLabel="Scan website and create service draft"
-          />
+          {!websiteDraftPreview && (
+            <Button
+              title="Scan website"
+              onPress={createDraftFromWebsite}
+              loading={creatingDraft}
+              disabled={!websiteInput.trim()}
+              accessibilityLabel="Scan website and create service draft"
+            />
+          )}
         </ScrollView>
       </View>
     )
@@ -639,14 +703,26 @@ export default function CreateServiceScreen({ navigation, route }) {
           urls.push(photo)
           continue
         }
-        const ext = (photo.fileName || photo.uri || 'jpg').split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg'
+        let contentType = photo.mimeType || 'image/jpeg'
+        let fileData
+        if (photo.fromWebsite) {
+          const response = await fetch(photo.uri)
+          if (!response.ok) throw new Error('The selected website image is no longer available.')
+          contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase()
+          if (!contentType.startsWith('image/')) throw new Error('The selected website file is not an image.')
+          fileData = await response.arrayBuffer()
+          if (fileData.byteLength > 5 * 1024 * 1024) throw new Error('The selected website image is larger than 5 MB.')
+        } else {
+          fileData = photo.base64
+            ? base64ToArrayBuffer(photo.base64)
+            : await (await fetch(photo.uri)).arrayBuffer()
+        }
+        const extensionByType = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
+        const ext = extensionByType[contentType] || (photo.fileName || photo.uri || 'jpg').split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg'
         const path = `${serviceId}/${Date.now()}_${i}.${ext}`
-        const fileData = photo.base64
-          ? base64ToArrayBuffer(photo.base64)
-          : await (await fetch(photo.uri)).arrayBuffer()
         const { error } = await supabase.storage
           .from('service-photos')
-          .upload(path, fileData, { contentType: photo.mimeType || 'image/jpeg', upsert: false })
+          .upload(path, fileData, { contentType, upsert: false })
         if (error) {
           failed += 1
           if (!firstError) firstError = error.message || 'Storage upload failed.'
@@ -1475,6 +1551,22 @@ const styles = StyleSheet.create({
   },
   sourcePhotoOptionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
   sourcePhotoOptionBody: { fontSize: 12, lineHeight: 18, color: colors.textSecondary },
+  websiteImageCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 12,
+  },
+  websiteImageTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  websiteImagePreview: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 10,
+    backgroundColor: colors.background,
+  },
+  websiteImageOption: { marginBottom: 0 },
   draftProgress: {
     flexDirection: 'row',
     alignItems: 'center',

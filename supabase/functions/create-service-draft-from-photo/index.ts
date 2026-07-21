@@ -208,6 +208,24 @@ function readableWebsiteText(html: string) {
   return [...new Set([...metadata, visible].filter(Boolean))].join('\n').slice(0, 45_000)
 }
 
+function websiteImageFromHtml(html: string, pageUrl: URL) {
+  for (const tag of html.match(/<meta\s+[^>]*>/gi) || []) {
+    const key = (tagAttribute(tag, 'property') || tagAttribute(tag, 'name')).toLowerCase()
+    if (!['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src'].includes(key)) continue
+    const content = tagAttribute(tag, 'content')
+    if (!content) continue
+    try {
+      const imageUrl = publicWebsiteUrl(new URL(content, pageUrl).toString())
+      // Only offer an image hosted by the scanned site. This avoids turning the
+      // website scanner into a proxy for unrelated third-party URLs.
+      if (imageUrl.hostname === pageUrl.hostname) return imageUrl.toString()
+    } catch {
+      // Ignore malformed or non-public image metadata and try the next candidate.
+    }
+  }
+  return null
+}
+
 async function readPublicWebsite(value: unknown) {
   let url = publicWebsiteUrl(value)
   for (let redirect = 0; redirect < 4; redirect++) {
@@ -230,7 +248,7 @@ async function readPublicWebsite(value: unknown) {
     const html = await readLimitedText(response)
     const text = readableWebsiteText(html)
     if (text.length < 80) throw new Error('The website did not contain enough readable service information.')
-    return { url: url.toString(), text }
+    return { url: url.toString(), text, imageUrl: websiteImageFromHtml(html, url) }
   }
   throw new Error('The website redirected too many times.')
 }
@@ -297,7 +315,14 @@ Approved website URL: ${website.url}
 Readable website text:
 ${website.text}`
       const draft = await callOpenAi(openAiApiKey, [{ type: 'input_text', text: enrichmentPrompt }])
-      return jsonResponse({ draft: { ...draft, website_url: website.url, website_scanned: true } })
+      return jsonResponse({
+        draft: {
+          ...draft,
+          website_url: website.url,
+          website_scanned: true,
+          website_image_url: website.imageUrl,
+        },
+      })
     }
 
     if (!image_base64 || typeof image_base64 !== 'string') {
