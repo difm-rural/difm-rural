@@ -57,7 +57,10 @@ Rules:
 - Prefer one of these categories: ${categories.join(', ')}.
 - If pricing is unclear, use "unknown" and add pricing to missing_fields.
 - Keep descriptions concise and suitable for a rural marketplace service card.
+- Write generated descriptions and supporting copy in the service provider's own voice, as though the business owner wrote the listing. Prefer "we", "our", "I", and "my" according to the voice used in the source material, and address customers as "you" where natural.
+- Do not narrate the provider from the outside. Avoid third-person phrases such as "they offer", "the business provides", or repeating the provider's name in generated descriptions.
 - When website copy is supplied, return exactly three distinct card_options grounded in that copy. Preserve a strong existing headline or tagline verbatim when useful. Do not invent claims.
+- When website copy is supplied, retain its tone and point of view. Exact taglines may remain unchanged, but all newly composed copy must sound like the website owner speaking directly to a prospective customer.
 - Keep each card headline under 55 characters and each supporting line under 125 characters.
 `
 
@@ -553,6 +556,8 @@ Deno.serve(async (req) => {
 You are now improving an existing photo-created draft using text from a public website that the user explicitly approved scanning.
 - Preserve useful facts already present in the draft unless the website clearly provides a correction or more detail.
 - Use only service information supported by the supplied draft or website text.
+- Rewrite any third-person wording in the existing draft into the provider's own voice. Follow the website's use of "we/our" or "I/my"; if it is unclear, default to "we/our".
+- Speak directly to the prospective customer where natural. Never describe the provider as "they", "the business", or by repeatedly naming the business.
 - Never copy testimonials, unverifiable superlatives, phone numbers, email addresses, or instructions to contact the provider outside Rural Connections into descriptions.
 - Set website_url to the supplied public URL and website_scanned to true.
 - Create three genuinely useful card_options: one preserving the strongest website headline, one concise practical summary, and one warm problem/solution treatment.
