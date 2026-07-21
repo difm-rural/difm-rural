@@ -44,6 +44,11 @@ const MATERIALS_OPTIONS = [
 ]
 const materialsLabel = (id) => MATERIALS_OPTIONS.find(o => o.id === id)?.label || '—'
 const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Review']
+const CARD_TREATMENTS = [
+  { id: 'bold', label: 'Bold overlay' },
+  { id: 'bottom', label: 'Bottom band' },
+  { id: 'clean', label: 'Clean panel' },
+]
 const AI_FUNCTION_NAME = 'create-service-draft-from-photo'
 
 function getPhotoUri(photo) {
@@ -1077,6 +1082,11 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function renderStep2() {
+    const manualPreviewImage = photos.length > 0
+      ? { uri: getPhotoUri(photos[0]) }
+      : categoryImage(category)
+    const selectedTreatment = cardStyle || 'bottom'
+
     return (
       <>
         <Text style={styles.stepHeading}>Describe your Service</Text>
@@ -1095,61 +1105,12 @@ export default function CreateServiceScreen({ navigation, route }) {
           accessibilityLabel="Service description"
         />
 
-        <Text style={styles.fieldLabel}>Card headline <Text style={styles.optional}>(optional)</Text></Text>
-        <TextInput
-          style={[styles.input, styles.cardHeadlineInput]}
-          placeholder="A short line that catches attention"
-          placeholderTextColor={colors.textMuted}
-          value={cardHeadline}
-          onChangeText={value => setCardHeadline(value.slice(0, 55))}
-          maxLength={55}
-          multiline
-          numberOfLines={2}
-          textAlignVertical="top"
-          accessibilityLabel="Service card headline"
-        />
-
-        <Text style={styles.fieldLabel}>Supporting line <Text style={styles.optional}>(optional)</Text></Text>
-        <TextInput
-          style={[styles.input, styles.supportingInput]}
-          placeholder="Explain the benefit in one concise sentence"
-          placeholderTextColor={colors.textMuted}
-          value={cardSupportingText}
-          onChangeText={value => setCardSupportingText(value.slice(0, 125))}
-          maxLength={125}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-          accessibilityLabel="Service card supporting line"
-        />
-
-        {!!cardHeadline && (
-          <>
-            <Text style={styles.fieldLabel}>Card treatment</Text>
-            <View style={styles.segmentGrid}>
-              {[
-                { id: 'bold', label: 'Bold overlay' },
-                { id: 'bottom', label: 'Bottom band' },
-                { id: 'clean', label: 'Clean panel' },
-              ].map(option => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[styles.segmentBtn, cardStyle === option.id && styles.segmentBtnActive]}
-                  onPress={() => setCardStyle(option.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: cardStyle === option.id }}>
-                  <Text style={[styles.segmentText, cardStyle === option.id && styles.segmentTextActive]}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        <Text style={styles.fieldLabel}>Photos <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={styles.fieldLabel}>Service photo <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={styles.fieldHelp}>Add a photo to make your card more recognisable. You can take one now or choose one from your phone.</Text>
         <View style={styles.photoGrid}>
           {photos.map((photo, idx) => (
             <View key={`${getPhotoUri(photo)}-${idx}`} style={styles.photoThumb}>
-              <Image source={{ uri: getPhotoUri(photo) }} style={styles.photoImg} resizeMode="contain" />
+              <Image source={{ uri: getPhotoUri(photo) }} style={styles.photoImg} resizeMode="cover" />
               <TouchableOpacity
                 style={styles.photoRemove}
                 onPress={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
@@ -1166,6 +1127,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                 onPress={() => pickPhoto(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Take service photo">
+                <Icon name="camera-outline" size={21} color={colors.primary} />
                 <Text style={styles.photoAddText}>Take photo</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1173,11 +1135,89 @@ export default function CreateServiceScreen({ navigation, route }) {
                 onPress={() => pickPhoto(false)}
                 accessibilityRole="button"
                 accessibilityLabel="Choose service photo">
+                <Icon name="images-outline" size={21} color={colors.primary} />
                 <Text style={styles.photoAddText}>Choose photo</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
+
+        <Text style={styles.fieldLabel}>Tagline / card headline <Text style={styles.optional}>(optional)</Text></Text>
+        <TextInput
+          style={[styles.input, styles.cardHeadlineInput]}
+          placeholder="e.g. Too much garden, not enough time?"
+          placeholderTextColor={colors.textMuted}
+          value={cardHeadline}
+          onChangeText={value => {
+            const nextValue = value.slice(0, 55)
+            setCardHeadline(nextValue)
+            if (nextValue.trim() && !cardStyle) setCardStyle('bottom')
+          }}
+          maxLength={55}
+          multiline
+          numberOfLines={2}
+          textAlignVertical="top"
+          accessibilityLabel="Service card headline"
+        />
+
+        <Text style={styles.fieldLabel}>Supporting line <Text style={styles.optional}>(optional)</Text></Text>
+        <TextInput
+          style={[styles.input, styles.supportingInput]}
+          placeholder="Tell customers how you can help in one concise sentence"
+          placeholderTextColor={colors.textMuted}
+          value={cardSupportingText}
+          onChangeText={value => setCardSupportingText(value.slice(0, 125))}
+          maxLength={125}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+          accessibilityLabel="Service card supporting line"
+        />
+
+        {!!cardHeadline && (
+          <>
+            <Text style={styles.fieldLabel}>Choose how your message appears</Text>
+            <Text style={styles.fieldHelp}>Select the card treatment that best suits your service.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.websiteOptionRow}>
+              {CARD_TREATMENTS.map(option => {
+                const selected = selectedTreatment === option.id
+                const clean = option.id === 'clean'
+                return (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[styles.creativeOption, selected && styles.creativeOptionSelected]}
+                  onPress={() => setCardStyle(option.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${option.label}: ${cardHeadline}`}>
+                  <View style={styles.creativeImageWrap}>
+                    {manualPreviewImage ? (
+                      <Image source={manualPreviewImage} style={styles.creativeImage} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.creativeImage, styles.creativeFallback]} />
+                    )}
+                    <View style={[
+                      styles.creativeOverlay,
+                      option.id === 'bold' && styles.creativeOverlayBold,
+                      option.id === 'bottom' && styles.creativeOverlayBottom,
+                      clean && styles.creativeOverlayClean,
+                    ]}>
+                      <Text style={[styles.creativeHeadline, clean && styles.creativeTextClean]} numberOfLines={3}>{cardHeadline}</Text>
+                      {!!cardSupportingText && (
+                        <Text style={[styles.creativeSupporting, clean && styles.creativeTextClean]} numberOfLines={3}>{cardSupportingText}</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.creativeOptionFooter}>
+                    <Text style={styles.creativeOptionLabel}>{option.label}</Text>
+                    <Icon name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={selected ? colors.primary : colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
+          </>
+        )}
       </>
     )
   }
@@ -1580,6 +1620,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 28 },
   stepHeading: { fontSize: 24, lineHeight: 30, fontWeight: '700', color: colors.textPrimary, marginBottom: 16, letterSpacing: 0 },
   fieldLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, marginTop: 14 },
+  fieldHelp: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: -2, marginBottom: 10 },
   optional: { fontSize: 13, fontWeight: '400', color: colors.textMuted },
   input: {
     backgroundColor: colors.white,
@@ -1635,6 +1676,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     paddingHorizontal: 10,
   },
   photoAddText: { fontSize: 13, color: colors.primary, fontWeight: '700', textAlign: 'center' },
