@@ -196,9 +196,6 @@ export default function ProviderProfileScreen({ route, navigation }) {
   const maxTravel    = travelRanges.length > 0 ? Math.max(...travelRanges) : 0
   const region       = getDisplayLocation(profile?.address) || profile?.region || services[0]?.location_name || null
 
-  // Equipment
-  const hasEquipment = services.some(s => s.includes_equipment)
-
   // Availability union across all services
   const availDays = new Set(services.flatMap(s => Array.isArray(s.availability) ? s.availability : []))
 
@@ -386,9 +383,9 @@ export default function ProviderProfileScreen({ route, navigation }) {
         )}
 
         {/* ── Coverage & Equipment ──────────────────────────────── */}
-        {services.length > 0 && (
+        {services.length > 0 && (maxTravel > 0 || availDays.size > 0) && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Coverage & equipment</Text>
+            <Text style={styles.cardTitle}>Coverage</Text>
 
             {maxTravel > 0 && region ? (
               <View style={styles.coverageRow}>
@@ -398,13 +395,6 @@ export default function ProviderProfileScreen({ route, navigation }) {
                 </Text>
               </View>
             ) : null}
-
-            {hasEquipment && (
-              <View style={styles.coverageRow}>
-                <Icon name="construct-outline" size={16} color={colors.primary} />
-                <Text style={[styles.coverageText, { color: colors.primary }]}><Icon name="checkmark" size={13} color={colors.primary} /> Equipment included in some services</Text>
-              </View>
-            )}
 
             {availDays.size > 0 && (
               <View style={styles.daysWrap}>

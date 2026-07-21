@@ -23,6 +23,7 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import { CATEGORIES } from '../lib/categories'
+import { categoryImage } from '../lib/categoryImages'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -42,7 +43,7 @@ const MATERIALS_OPTIONS = [
   { id: 'requester_supplies', label: 'Requester supplies' },
 ]
 const materialsLabel = (id) => MATERIALS_OPTIONS.find(o => o.id === id)?.label || '—'
-const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Equipment', 'Review']
+const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Review']
 const AI_FUNCTION_NAME = 'create-service-draft-from-photo'
 
 function getPhotoUri(photo) {
@@ -205,7 +206,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [travelRange, setTravelRange] = useState(editingService?.travel_range_km != null ? String(editingService.travel_range_km) : '')
   const [availableFrom,   setAvailableFrom]   = useState(toDateValue(editingService?.availability))
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [includesEquipment, setIncludesEquipment] = useState(!!editingService?.includes_equipment)
   const [serviceActive, setServiceActive] = useState(editingService?.is_active !== false)
 
   const [submitting, setSubmitting] = useState(false)
@@ -227,8 +227,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     if (step === 2) return true
     if (step === 3) return !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
     if (step === 4) return !!locationName.trim()
-    if (step === 5) return true
-    if (step === 6) return !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
+    if (step === 5) return !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
     return true
   }
 
@@ -263,7 +262,6 @@ export default function CreateServiceScreen({ navigation, route }) {
     const nextPricingType = normalizePricingType(draft?.pricing_type)
     const nextRate = draft?.price_amount != null ? String(draft.price_amount) : ''
     const nextLocation = draft?.service_area || draft?.location_name || ''
-    const nextEquipment = Array.isArray(draft?.equipment) ? draft.equipment.length > 0 : !!draft?.includes_equipment
 
     setTitle(nextTitle)
     setCategory(nextCategory)
@@ -273,8 +271,9 @@ export default function CreateServiceScreen({ navigation, route }) {
     setUnitLabel(nextPricingType === 'per_unit' ? (draft?.unit_label || 'job') : '')
     setLocationName(nextLocation)
     setTravelRange(draft?.travel_range_km != null ? String(draft.travel_range_km) : '')
-    setIncludesEquipment(nextEquipment)
-    setDraftMissingFields(Array.isArray(draft?.missing_fields) ? draft.missing_fields.map(formatMissingField).filter(Boolean) : [])
+    setDraftMissingFields(Array.isArray(draft?.missing_fields)
+      ? draft.missing_fields.map(formatMissingField).filter(item => item && !/equipment/i.test(item))
+      : [])
     setDraftConfidenceNotes(Array.isArray(draft?.confidence_notes) ? draft.confidence_notes : [])
     setCardHeadline(draft?.card_headline || '')
     setCardSupportingText(draft?.card_supporting_text || '')
@@ -894,7 +893,6 @@ export default function CreateServiceScreen({ navigation, route }) {
       rate: publishRate,
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
       minimum_units: 1,
-      includes_equipment: includesEquipment,
       card_headline: cardHeadline.trim() || null,
       card_supporting_text: cardSupportingText.trim() || null,
       card_style: cardStyle || null,
@@ -1027,7 +1025,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   function renderProgress() {
     return (
       <View style={styles.progressWrap}>
-        {[1, 2, 3, 4, 5, 6].map(s => (
+        {STEP_LABELS.map((_, index) => index + 1).map(s => (
           <View key={s} style={[styles.progressPill, s <= step && styles.progressPillActive]} />
         ))}
       </View>
@@ -1048,11 +1046,14 @@ export default function CreateServiceScreen({ navigation, route }) {
 
         <Text style={styles.fieldLabel}>Service title</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, styles.titleInput]}
           placeholder="e.g. Tractor topping with operator"
           placeholderTextColor={colors.textMuted}
           value={title}
           onChangeText={setTitle}
+          multiline
+          numberOfLines={2}
+          textAlignVertical="top"
           autoCapitalize="sentences"
           accessibilityLabel="Service title"
         />
@@ -1078,17 +1079,17 @@ export default function CreateServiceScreen({ navigation, route }) {
   function renderStep2() {
     return (
       <>
-        <Text style={styles.stepHeading}>Describe and present your service</Text>
+        <Text style={styles.stepHeading}>Describe your Service</Text>
 
         <Text style={styles.fieldLabel}>Description <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
-          style={[styles.input, styles.multiline]}
+          style={[styles.input, styles.descriptionInput]}
           placeholder="What is included, what gear you use, and what area you cover..."
           placeholderTextColor={colors.textMuted}
           value={description}
           onChangeText={setDescription}
           multiline
-          numberOfLines={4}
+          numberOfLines={8}
           textAlignVertical="top"
           autoCapitalize="sentences"
           accessibilityLabel="Service description"
@@ -1096,24 +1097,29 @@ export default function CreateServiceScreen({ navigation, route }) {
 
         <Text style={styles.fieldLabel}>Card headline <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, styles.cardHeadlineInput]}
           placeholder="A short line that catches attention"
           placeholderTextColor={colors.textMuted}
           value={cardHeadline}
           onChangeText={value => setCardHeadline(value.slice(0, 55))}
           maxLength={55}
+          multiline
+          numberOfLines={2}
+          textAlignVertical="top"
           accessibilityLabel="Service card headline"
         />
 
         <Text style={styles.fieldLabel}>Supporting line <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
-          style={[styles.input, styles.multiline]}
+          style={[styles.input, styles.supportingInput]}
           placeholder="Explain the benefit in one concise sentence"
           placeholderTextColor={colors.textMuted}
           value={cardSupportingText}
           onChangeText={value => setCardSupportingText(value.slice(0, 125))}
           maxLength={125}
           multiline
+          numberOfLines={4}
+          textAlignVertical="top"
           accessibilityLabel="Service card supporting line"
         />
 
@@ -1334,32 +1340,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function renderStep5() {
-    return (
-      <>
-        <Text style={styles.stepHeading}>Is equipment included?</Text>
-
-        <Text style={styles.fieldLabel}>Equipment</Text>
-        <View style={styles.segmentGrid}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, !includesEquipment && styles.segmentBtnActive]}
-            onPress={() => setIncludesEquipment(false)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: !includesEquipment }}>
-            <Text style={[styles.segmentText, !includesEquipment && styles.segmentTextActive]}>Labour only</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, includesEquipment && styles.segmentBtnActive]}
-            onPress={() => setIncludesEquipment(true)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: includesEquipment }}>
-            <Text style={[styles.segmentText, includesEquipment && styles.segmentTextActive]}>Equipment included</Text>
-          </TouchableOpacity>
-        </View>
-      </>
-    )
-  }
-
-  function renderStep6() {
     const missingItems = [
       !title.trim() && 'Add service title',
       !category && 'Choose category',
@@ -1369,26 +1349,18 @@ export default function CreateServiceScreen({ navigation, route }) {
       ...draftMissingFields,
     ].filter(Boolean)
     const uniqueMissingItems = [...new Set(missingItems)]
-    const rows = [
-      { label: 'Service', value: title },
-      { label: 'Category', value: category },
-      { label: 'Rate', value: formatRate() },
-      { label: 'Payment', value: paymentTiming === 'upfront' ? 'Pay upfront' : 'On completion' },
-      { label: 'Materials', value: materialsLabel(materials) },
-      { label: 'Location', value: locationName },
-      travelRange && { label: 'Travel', value: `${travelRange} km` },
-      { label: 'Equipment', value: includesEquipment ? 'Included' : 'Not included' },
-      formatDisplayDate(availableFrom) && { label: 'Available', value: formatDisplayDate(availableFrom) },
-      photos.length > 0 && { label: 'Photos', value: `${photos.length} photo${photos.length === 1 ? '' : 's'}` },
-    ].filter(Boolean)
+    const previewImage = photos.length > 0
+      ? { uri: getPhotoUri(photos[0]) }
+      : categoryImage(category)
+    const previewCardStyle = cardStyle || 'bottom'
 
     return (
       <>
-        <Text style={styles.stepHeading}>{draftSource ? 'Review your draft' : 'Ready to publish?'}</Text>
+        <Text style={styles.stepHeading}>Review your service</Text>
         {!!draftSource && (
           <View style={styles.sourceNote}>
             <Text style={styles.sourceNoteTitle}>Draft created from your {draftSource === 'website' ? 'website' : 'photo'}</Text>
-            <Text style={styles.sourceNoteText}>Please check every detail before publishing.</Text>
+            <Text style={styles.sourceNoteText}>This is how your service card will appear. Use Back to change anything before publishing.</Text>
           </View>
         )}
         {uniqueMissingItems.length > 0 && (
@@ -1400,6 +1372,9 @@ export default function CreateServiceScreen({ navigation, route }) {
             <View style={styles.reviewActions}>
               <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(1)}>
                 <Text style={styles.reviewActionText}>Edit basics</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(2)}>
+                <Text style={styles.reviewActionText}>Edit details</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(3)}>
                 <Text style={styles.reviewActionText}>Edit pricing</Text>
@@ -1415,6 +1390,9 @@ export default function CreateServiceScreen({ navigation, route }) {
             <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(1)}>
               <Text style={styles.reviewActionText}>Edit basics</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(2)}>
+              <Text style={styles.reviewActionText}>Edit details</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.reviewActionBtn} onPress={() => setStep(3)}>
               <Text style={styles.reviewActionText}>Edit pricing</Text>
             </TouchableOpacity>
@@ -1423,13 +1401,48 @@ export default function CreateServiceScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
         )}
-        <View style={styles.reviewCard}>
-          {rows.map((row, i) => (
-            <View key={row.label} style={[styles.reviewRow, i < rows.length - 1 && styles.reviewRowBorder]}>
-              <Text style={styles.reviewLabel}>{row.label}</Text>
-              <Text style={styles.reviewValue} numberOfLines={2}>{row.value}</Text>
+        <View style={styles.finalCard}>
+          <View style={styles.finalCardImageWrap}>
+            {previewImage ? (
+              <Image source={previewImage} style={styles.finalCardImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.finalCardPlaceholder}>
+                <Icon name="construct-outline" size={38} color={colors.primary} />
+              </View>
+            )}
+            {!!cardHeadline && (
+              <View style={[
+                styles.finalCardMessage,
+                previewCardStyle === 'bold' && styles.finalCardMessageBold,
+                previewCardStyle === 'clean' && styles.finalCardMessageClean,
+              ]}>
+                <Text style={[
+                  styles.finalCardHeadline,
+                  previewCardStyle === 'clean' && styles.finalCardTextClean,
+                ]}>{cardHeadline}</Text>
+                {!!cardSupportingText && (
+                  <Text
+                    style={[
+                      styles.finalCardSupporting,
+                      previewCardStyle === 'clean' && styles.finalCardSupportingClean,
+                    ]}
+                    numberOfLines={3}>
+                    {cardSupportingText}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+          <View style={styles.finalCardBody}>
+            <Text style={styles.finalCardTitle}>{title || 'Your service title'}</Text>
+            <View style={styles.finalCardPriceBadge}>
+              <Text style={styles.finalCardPriceText}>{formatRate()}</Text>
             </View>
-          ))}
+            <Text style={styles.finalCardStatus}>{serviceActive ? 'Advertising live' : 'Advertising paused'}</Text>
+            <Text style={styles.finalCardMeta}>{category}{locationName ? `  ·  ${locationName}` : ''}</Text>
+            {!!description && <Text style={styles.finalCardDescription}>{description}</Text>}
+            <Text style={styles.finalCardPublishNote}>{isEditing ? 'Ready to save' : 'Ready to publish'}</Text>
+          </View>
         </View>
         {isEditing && (
           <View style={styles.managementCard}>
@@ -1454,12 +1467,6 @@ export default function CreateServiceScreen({ navigation, route }) {
             />
           </View>
         )}
-        {!!description && (
-          <View style={styles.descCard}>
-            <Text style={styles.reviewLabel}>Description</Text>
-            <Text style={styles.descText}>{description}</Text>
-          </View>
-        )}
         {draftConfidenceNotes.length > 0 && (
           <View style={styles.descCard}>
             <Text style={styles.reviewLabel}>Notes</Text>
@@ -1472,7 +1479,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     )
   }
 
-  const RENDERERS = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6]
+  const RENDERERS = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5]
 
   if (creationMode === 'choose') return renderStartChoice()
   if (creationMode === 'photo') return renderPhotoDraft()
@@ -1531,7 +1538,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               onPress={() => animateStep(step - 1, 'backward')}
               accessibilityLabel="Previous step"
             />
-            {step < 6 ? (
+            {step < 5 ? (
               <Button
                 title="Next"
                 onPress={() => animateStep(step + 1, 'forward')}
@@ -1583,7 +1590,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
+  titleInput: { minHeight: 76, textAlignVertical: 'top' },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
+  descriptionInput: { minHeight: 180, textAlignVertical: 'top' },
+  cardHeadlineInput: { minHeight: 76, textAlignVertical: 'top' },
+  supportingInput: { minHeight: 112, textAlignVertical: 'top' },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 15,
@@ -1650,6 +1661,64 @@ const styles = StyleSheet.create({
   reviewRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
   reviewLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '700', width: 88, flexShrink: 0 },
   reviewValue: { fontSize: 14, color: colors.textPrimary, flex: 1, fontWeight: '600', textAlign: 'right' },
+  finalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  finalCardImageWrap: { height: 224, backgroundColor: colors.primaryLight, position: 'relative' },
+  finalCardImage: { width: '100%', height: '100%' },
+  finalCardPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
+  finalCardMessage: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(8, 80, 65, 0.92)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  finalCardMessageBold: {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 0,
+    backgroundColor: 'rgba(8, 80, 65, 0.66)',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  finalCardMessageClean: { backgroundColor: 'rgba(255, 255, 255, 0.92)' },
+  finalCardHeadline: { color: colors.white, fontSize: 20, lineHeight: 24, fontWeight: '800' },
+  finalCardSupporting: { color: 'rgba(255, 255, 255, 0.9)', fontSize: 13, lineHeight: 18, marginTop: 5 },
+  finalCardTextClean: { color: colors.primaryDark },
+  finalCardSupportingClean: { color: colors.textSecondary },
+  finalCardBody: { padding: 16 },
+  finalCardTitle: { color: colors.textPrimary, fontSize: 19, lineHeight: 24, fontWeight: '800' },
+  finalCardPriceBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primaryLight,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 10,
+  },
+  finalCardPriceText: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+  finalCardStatus: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 10 },
+  finalCardMeta: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 5 },
+  finalCardDescription: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 12 },
+  finalCardPublishNote: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
   managementCard: {
     backgroundColor: colors.white,
     borderRadius: 12,

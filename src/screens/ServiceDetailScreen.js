@@ -321,7 +321,6 @@ export default function ServiceDetailScreen({ route, navigation }) {
               value={`${service.minimum_units}`}
             />
           )}
-          <DetailRow label="Equipment" value={service.includes_equipment ? 'Included' : 'Not included'} />
           {service.materials ? (
             <DetailRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
           ) : null}
