@@ -208,19 +208,110 @@ function readableWebsiteText(html: string) {
   return [...new Set([...metadata, visible].filter(Boolean))].join('\n').slice(0, 45_000)
 }
 
-function websiteImageFromHtml(html: string, pageUrl: URL) {
+function websiteImageCandidates(html: string, pageUrl: URL) {
+  const candidates: string[] = []
   for (const tag of html.match(/<meta\s+[^>]*>/gi) || []) {
     const key = (tagAttribute(tag, 'property') || tagAttribute(tag, 'name')).toLowerCase()
     if (!['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src'].includes(key)) continue
     const content = tagAttribute(tag, 'content')
-    if (!content) continue
+    if (content) candidates.push(content)
+  }
+  for (const tag of html.match(/<(?:img|source)\s+[^>]*>/gi) || []) {
+    const src = tagAttribute(tag, 'src') || tagAttribute(tag, 'srcset').split(/\s|,/)[0]
+    if (src) candidates.push(src)
+  }
+  for (const match of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
     try {
-      const imageUrl = publicWebsiteUrl(new URL(content, pageUrl).toString())
-      // Only offer an image hosted by the scanned site. This avoids turning the
-      // website scanner into a proxy for unrelated third-party URLs.
-      if (imageUrl.hostname === pageUrl.hostname) return imageUrl.toString()
+      const structured = JSON.parse(match[1])
+      const items = Array.isArray(structured) ? structured : [structured]
+      for (const item of items) {
+        const image = item?.image
+        if (typeof image === 'string') candidates.push(image)
+        else if (typeof image?.url === 'string') candidates.push(image.url)
+      }
     } catch {
-      // Ignore malformed or non-public image metadata and try the next candidate.
+      // Malformed structured data is already ignored by the text extractor.
+    }
+  }
+  return candidates.flatMap(candidate => {
+    try {
+      const imageUrl = publicWebsiteUrl(new URL(candidate, pageUrl).toString())
+      return imageUrl.hostname === pageUrl.hostname ? [imageUrl.toString()] : []
+    } catch {
+      return []
+    }
+  })
+}
+
+async function validWebsiteImage(value: string, pageUrl: URL) {
+  let imageUrl = publicWebsiteUrl(value)
+  if (imageUrl.hostname !== pageUrl.hostname) return null
+  for (let redirect = 0; redirect < 3; redirect++) {
+    const response = await fetch(imageUrl, {
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'RuralConnectionsServiceDraftBot/1.0',
+        Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*',
+        Range: 'bytes=0-1023',
+      },
+      signal: AbortSignal.timeout(8_000),
+    })
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location')
+      response.body?.cancel().catch(() => {})
+      if (!location) return null
+      imageUrl = publicWebsiteUrl(new URL(location, imageUrl).toString())
+      if (imageUrl.hostname !== pageUrl.hostname) return null
+      continue
+    }
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    const contentLength = Number(response.headers.get('content-length') || 0)
+    response.body?.cancel().catch(() => {})
+    return response.ok && contentType.startsWith('image/') && (!contentLength || contentLength <= 5 * 1024 * 1024)
+      ? imageUrl.toString()
+      : null
+  }
+  return null
+}
+
+async function websiteImageFromHtml(html: string, pageUrl: URL) {
+  const directCandidates = websiteImageCandidates(html, pageUrl)
+  for (const candidate of [...new Set(directCandidates)]) {
+    const valid = await validWebsiteImage(candidate, pageUrl).catch(() => null)
+    if (valid) return valid
+  }
+
+  // JavaScript-rendered sites often keep their hero image in the main module
+  // rather than the initial HTML. Inspect same-site modules only, and favour
+  // filenames that describe a listing-friendly image over logos and portraits.
+  for (const tag of (html.match(/<script\s+[^>]*src=["'][^"']+["'][^>]*>/gi) || []).slice(0, 2)) {
+    const src = tagAttribute(tag, 'src')
+    if (!src) continue
+    let scriptUrl: URL
+    try {
+      scriptUrl = publicWebsiteUrl(new URL(src, pageUrl).toString())
+      if (scriptUrl.hostname !== pageUrl.hostname) continue
+    } catch {
+      continue
+    }
+    try {
+      const response = await fetch(scriptUrl, {
+        headers: { 'User-Agent': 'RuralConnectionsServiceDraftBot/1.0', Accept: 'text/javascript,application/javascript' },
+        signal: AbortSignal.timeout(8_000),
+      })
+      if (!response.ok) continue
+      const script = await readLimitedText(response, 500_000)
+      const assets = [...script.matchAll(/["']([^"']+\.(?:jpe?g|png|webp|avif))["']/gi)]
+        .map(match => match[1])
+        .filter(path => !/(logo|icon|avatar|portrait)/i.test(path))
+        .sort((a, b) => Number(/(hero|banner|cover|service)/i.test(b)) - Number(/(hero|banner|cover|service)/i.test(a)))
+      for (const asset of [...new Set(assets)].slice(0, 10)) {
+        const candidate = new URL(asset, scriptUrl).toString()
+        const valid = await validWebsiteImage(candidate, pageUrl).catch(() => null)
+        if (valid) return valid
+      }
+    } catch {
+      // A missing bundle image should not prevent the service draft itself.
     }
   }
   return null
@@ -248,7 +339,7 @@ async function readPublicWebsite(value: unknown) {
     const html = await readLimitedText(response)
     const text = readableWebsiteText(html)
     if (text.length < 80) throw new Error('The website did not contain enough readable service information.')
-    return { url: url.toString(), text, imageUrl: websiteImageFromHtml(html, url) }
+    return { url: url.toString(), text, imageUrl: await websiteImageFromHtml(html, url) }
   }
   throw new Error('The website redirected too many times.')
 }

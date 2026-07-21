@@ -158,6 +158,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [websiteError, setWebsiteError] = useState('')
   const [websiteDraftPreview, setWebsiteDraftPreview] = useState(null)
   const [useWebsiteImage, setUseWebsiteImage] = useState(false)
+  const [websiteImageError, setWebsiteImageError] = useState(false)
   const [draftSource, setDraftSource] = useState(isEditing ? 'manual' : null)
   const [draftMissingFields, setDraftMissingFields] = useState([])
   const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
@@ -301,6 +302,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setWebsiteError('')
     setWebsiteDraftPreview(null)
     setUseWebsiteImage(false)
+    setWebsiteImageError(false)
     const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
       body: {
         website_url: websiteUrl,
@@ -484,6 +486,7 @@ export default function CreateServiceScreen({ navigation, route }) {
             onPress={() => {
               setWebsiteDraftPreview(null)
               setUseWebsiteImage(false)
+              setWebsiteImageError(false)
               setCreationMode('choose')
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -508,6 +511,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               setWebsiteError('')
               setWebsiteDraftPreview(null)
               setUseWebsiteImage(false)
+              setWebsiteImageError(false)
             }}
             autoCapitalize="none"
             autoCorrect={false}
@@ -535,18 +539,29 @@ export default function CreateServiceScreen({ navigation, route }) {
                 style={styles.websiteImagePreview}
                 resizeMode="contain"
                 accessibilityLabel="Image found on the website"
+                onError={() => {
+                  setWebsiteImageError(true)
+                  setUseWebsiteImage(false)
+                }}
               />
-              <TouchableOpacity
-                style={[styles.sourcePhotoOption, styles.websiteImageOption]}
-                onPress={() => setUseWebsiteImage(value => !value)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: useWebsiteImage }}>
-                <Icon name={useWebsiteImage ? 'checkbox' : 'square-outline'} size={22} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sourcePhotoOptionTitle}>Use this as the service photo</Text>
-                  <Text style={styles.sourcePhotoOptionBody}>Select this only if you own the image or have permission to publish it. We will copy it into Rural Connections rather than link to the website.</Text>
+              {websiteImageError ? (
+                <View style={[styles.warningBox, styles.websiteImageOption]}>
+                  <Text style={styles.warningTitle}>Image unavailable</Text>
+                  <Text style={styles.warningText}>The website image could not be loaded. You can continue without it and add a photo later.</Text>
                 </View>
-              </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.sourcePhotoOption, styles.websiteImageOption]}
+                  onPress={() => setUseWebsiteImage(value => !value)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: useWebsiteImage }}>
+                  <Icon name={useWebsiteImage ? 'checkbox' : 'square-outline'} size={22} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sourcePhotoOptionTitle}>Use this as the service photo</Text>
+                    <Text style={styles.sourcePhotoOptionBody}>Select this only if you own the image or have permission to publish it. We will copy it into Rural Connections rather than link to the website.</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
               <Button
                 title="Continue with draft"
                 onPress={continueWebsiteDraft}
