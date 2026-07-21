@@ -266,16 +266,17 @@ function websiteImageCandidates(html: string, pageUrl: URL) {
   return candidates.flatMap(candidate => {
     try {
       const imageUrl = publicWebsiteUrl(new URL(candidate, pageUrl).toString())
-      return imageUrl.hostname === pageUrl.hostname ? [imageUrl.toString()] : []
+      // Images explicitly declared by the scanned page may be hosted by its
+      // publishing CDN (for example Squarespace or Cloudinary).
+      return [imageUrl.toString()]
     } catch {
       return []
     }
   })
 }
 
-async function validWebsiteImage(value: string, pageUrl: URL) {
+async function validWebsiteImage(value: string, _pageUrl: URL) {
   let imageUrl = publicWebsiteUrl(value)
-  if (imageUrl.hostname !== pageUrl.hostname) return null
   for (let redirect = 0; redirect < 3; redirect++) {
     const response = await fetch(imageUrl, {
       redirect: 'manual',
@@ -291,7 +292,6 @@ async function validWebsiteImage(value: string, pageUrl: URL) {
       response.body?.cancel().catch(() => {})
       if (!location) return null
       imageUrl = publicWebsiteUrl(new URL(location, imageUrl).toString())
-      if (imageUrl.hostname !== pageUrl.hostname) return null
       continue
     }
     const contentType = (response.headers.get('content-type') || '').toLowerCase()
