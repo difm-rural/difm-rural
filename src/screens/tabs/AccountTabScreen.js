@@ -169,7 +169,7 @@ export default function AccountTabScreen({ navigation }) {
 
     const [{ data: profileData }, { data: reviewsData }, { count: jobCount }, { count: serviceCount }] = await Promise.all([
       supabase.from('profiles')
-        .select('full_name, phone, region, avatar_url, primary_role, role, is_admin, display_name, bio, skills, qualifications, address, latitude, longitude')
+        .select('full_name, phone, region, avatar_url, primary_role, role, display_name, bio, skills, qualifications, address, latitude, longitude')
         .eq('id', user.id)
         .single(),
       supabase.from('reviews').select('rating').eq('reviewee_id', user.id),
@@ -431,7 +431,6 @@ export default function AccountTabScreen({ navigation }) {
     ? `${Number(ratingSummary.average || 0).toFixed(1)} / 5 · ${ratingSummary.count} review${ratingSummary.count === 1 ? '' : 's'}`
     : 'No reviews yet'
   const isProvider = canProvide(profile)
-  const isAdmin = !!profile?.is_admin
   const locationDisplay = getDisplayLocation(profile.address) || profile.address || '—'
 
   const onboardYears = Math.floor(monthsOnboard / 12)
@@ -496,18 +495,6 @@ export default function AccountTabScreen({ navigation }) {
       </View>
 
       <View style={styles.hubButtons}>
-        {isAdmin && (
-          <>
-            <HubButton
-              icon="speedometer-outline" label="Admin" sub="Jobs, services, bookings, activity"
-              onPress={() => navigation.navigate('Admin')}
-            />
-            <HubButton
-              icon="leaf-outline" label="Seasonal rural reminders" sub="Campaigns, timing, audiences"
-              onPress={() => navigation.navigate('SeasonalRemindersAdmin')}
-            />
-          </>
-        )}
         <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}
