@@ -21,7 +21,7 @@ export function AppShell({ children, adminName }: { children: React.ReactNode; a
         <nav className="sidebar-nav" aria-label="Admin navigation">
           <p className="nav-label">Workspace</p>
           {navigation.map(item => {
-            const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+            const active = item.href === '/' ? pathname === '/' || pathname.startsWith('/details') : pathname.startsWith(item.href)
             const Icon = item.icon
             return (
               <Link key={item.href} href={item.href} className={active ? 'nav-item active' : 'nav-item'}>

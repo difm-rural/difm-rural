@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, BriefcaseBusiness, Clock3, Handshake, Megaphone, UsersRound, Wrench } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, BriefcaseBusiness, Clock3, Handshake, Megaphone, UsersRound, Wrench } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { CategoryBars, JobsTimeline, StatusBars } from '@/components/dashboard-charts'
 import { getDashboardData } from '@/lib/dashboard'
@@ -10,12 +10,13 @@ function formatLifecycle(hours: number | null) {
   return `${(hours / 24).toFixed(1)} days`
 }
 
-function KpiCard({ label, value, detail, icon: Icon, tone }: { label: string; value: string | number; detail: string; icon: typeof UsersRound; tone?: string }) {
+function KpiCard({ label, value, detail, icon: Icon, href, tone }: { label: string; value: string | number; detail: string; icon: typeof UsersRound; href: string; tone?: string }) {
   return (
-    <article className={`kpi-card ${tone || ''}`}>
+    <Link className={`kpi-card kpi-link ${tone || ''}`} href={href} aria-label={`View ${label.toLowerCase()} details`}>
       <div className="kpi-icon"><Icon size={19} /></div>
+      <ArrowUpRight className="kpi-link-icon" size={15} />
       <p>{label}</p><strong>{value}</strong><span>{detail}</span>
-    </article>
+    </Link>
   )
 }
 
@@ -36,11 +37,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </header>
 
       <section className="kpi-grid" aria-label="Marketplace summary">
-        <KpiCard label="Open jobs" value={data.kpis.openJobs} detail={`${data.kpis.jobsPosted} posted in this period`} icon={BriefcaseBusiness} tone="amber" />
-        <KpiCard label="Active services" value={data.kpis.activeServices} detail="Available to book now" icon={Wrench} />
-        <KpiCard label="Active bookings" value={data.kpis.activeBookings} detail="Moving through delivery" icon={Handshake} />
-        <KpiCard label="New users" value={data.kpis.newUsers} detail={`${data.kpis.users} total accounts`} icon={UsersRound} />
-        <KpiCard label="Average lifecycle" value={formatLifecycle(data.kpis.averageLifecycleHours)} detail="Posting to confirmed completion" icon={Clock3} />
+        <KpiCard label="Open jobs" value={data.kpis.openJobs} detail={`${data.kpis.jobsPosted} posted in this period`} icon={BriefcaseBusiness} href={`/details/open-jobs?range=${days}`} tone="amber" />
+        <KpiCard label="Active services" value={data.kpis.activeServices} detail="Available to book now" icon={Wrench} href={`/details/active-services?range=${days}`} />
+        <KpiCard label="Active bookings" value={data.kpis.activeBookings} detail="Moving through delivery" icon={Handshake} href={`/details/active-bookings?range=${days}`} />
+        <KpiCard label="New users" value={data.kpis.newUsers} detail={`${data.kpis.users} total accounts`} icon={UsersRound} href={`/details/new-users?range=${days}`} />
+        <KpiCard label="Average lifecycle" value={formatLifecycle(data.kpis.averageLifecycleHours)} detail="Posting to confirmed completion" icon={Clock3} href={`/details/lifecycle?range=${days}`} />
       </section>
 
       <section className="dashboard-grid primary-grid">
