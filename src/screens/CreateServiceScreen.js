@@ -256,6 +256,27 @@ export default function CreateServiceScreen({ navigation, route }) {
     setStep(1)
   }
 
+  function cancelCreation() {
+    const hasChanges = isEditing || !!(
+      title.trim() || category || description.trim() || photos.length || sourcePhoto ||
+      websiteInput.trim() || pricingType || locationName.trim() || draftSource
+    )
+    if (!hasChanges) {
+      navigation.goBack()
+      return
+    }
+    Alert.alert(
+      isEditing ? 'Discard your changes?' : 'Discard this service?',
+      isEditing
+        ? 'Any changes made on this screen will be lost.'
+        : 'The service has not been published. Any details, photos, or generated draft will be lost.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
+      ]
+    )
+  }
+
   function includeSourcePhotoIfSelected() {
     if (!useSourceAsPhoto || !sourcePhoto) return
     const listingPhoto = sourcePhoto.listingPhoto || sourcePhoto
@@ -414,14 +435,17 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity
-            style={styles.headerBackBtn}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel and go back">
-            <Text style={styles.headerBackBtnText}>Back</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <View />
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={cancelCreation}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel creating service">
+              <Text style={styles.headerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.kicker}>Rural Connections</Text>
           <Text style={styles.headerTitle} accessibilityRole="header">Advertise a service</Text>
           <Text style={styles.headerSub}>How would you like to start?</Text>
@@ -481,19 +505,29 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity
-            style={styles.headerBackBtn}
-            onPress={() => {
-              setWebsiteDraftPreview(null)
-              setUseWebsiteImage(false)
-              setWebsiteImageError(false)
-              setCreationMode('choose')
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <Text style={styles.headerBackBtnText}>Back</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => {
+                setWebsiteDraftPreview(null)
+                setUseWebsiteImage(false)
+                setWebsiteImageError(false)
+                setCreationMode('choose')
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Go back">
+              <Text style={styles.headerBackBtnText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={cancelCreation}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel creating service">
+              <Text style={styles.headerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.kicker}>Website-to-draft</Text>
           <Text style={styles.headerTitle} accessibilityRole="header">Create from website</Text>
           <Text style={styles.headerSub}>Use your existing public website to create a service draft.</Text>
@@ -598,14 +632,24 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <View style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity
-            style={styles.headerBackBtn}
-            onPress={() => sourcePhoto ? setSourcePhoto(null) : setCreationMode('choose')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <Text style={styles.headerBackBtnText}>Back</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => sourcePhoto ? setSourcePhoto(null) : setCreationMode('choose')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Go back">
+              <Text style={styles.headerBackBtnText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={cancelCreation}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel creating service">
+              <Text style={styles.headerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.kicker}>Photo-to-draft</Text>
           <Text style={styles.headerTitle} accessibilityRole="header">Create from photo</Text>
           <Text style={styles.headerSub}>Take or upload a clear photo that shows your service details.</Text>
@@ -1313,14 +1357,17 @@ export default function CreateServiceScreen({ navigation, route }) {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={styles.headerBackBtn}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel and go back">
-          <Text style={styles.headerBackBtnText}>Back</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <View />
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={cancelCreation}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={isEditing ? 'Cancel editing service' : 'Cancel creating service'}>
+            <Text style={styles.headerCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.kicker}>Rural Connections</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit service' : 'Advertise a service'}</Text>
         <Text style={styles.headerSub}>{STEP_LABELS[step - 1]}</Text>
@@ -1388,8 +1435,10 @@ export default function CreateServiceScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 14, backgroundColor: colors.background },
-  headerBackBtn: { minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start', marginBottom: 4 },
   headerBackBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  headerActions: { minHeight: 36, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  headerActionBtn: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 2 },
+  headerCancelText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0 },
   headerSub: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 14 },
