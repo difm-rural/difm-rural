@@ -370,6 +370,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setWebsiteDraftPreview(draft)
     setWebsiteCardOptions(buildWebsiteCardOptions(draft))
     setSelectedWebsiteCard(0)
+    setUseWebsiteImage(!!draft?.website_image_url)
   }
 
   function continueWebsiteDraft() {
@@ -661,8 +662,8 @@ export default function CreateServiceScreen({ navigation, route }) {
                   accessibilityState={{ checked: useWebsiteImage }}>
                   <Icon name={useWebsiteImage ? 'checkbox' : 'square-outline'} size={22} color={colors.primary} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.sourcePhotoOptionTitle}>Use this as the service photo</Text>
-                    <Text style={styles.sourcePhotoOptionBody}>Select this only if you own the image or have permission to publish it. We will copy it into Rural Connections rather than link to the website.</Text>
+                    <Text style={styles.sourcePhotoOptionTitle}>Include the website image</Text>
+                    <Text style={styles.sourcePhotoOptionBody}>Included with your selected card. Leave this on only if you own the image or have permission to publish it. We will copy it into Rural Connections.</Text>
                   </View>
                 </TouchableOpacity>
               ) : null}
