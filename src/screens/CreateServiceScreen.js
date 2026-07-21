@@ -394,12 +394,6 @@ export default function CreateServiceScreen({ navigation, route }) {
     setWebsiteDraftPreview(null)
   }
 
-  function updateSelectedWebsiteCard(field, value) {
-    setWebsiteCardOptions(options => options.map((option, index) => (
-      index === selectedWebsiteCard ? { ...option, [field]: value } : option
-    )))
-  }
-
   async function chooseSourcePhoto(fromCamera) {
     setDraftError('')
     try {
@@ -606,7 +600,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           {!!websiteDraftPreview && (
             <View style={styles.websiteImageCard}>
               <Text style={styles.websiteImageTitle}>Choose your card message</Text>
-              <Text style={styles.websiteChoiceIntro}>We found three ways to present your service. Choose one, then adjust the wording if needed.</Text>
+              <Text style={styles.websiteChoiceIntro}>We found three ways to present your service. Choose the one that suits you best.</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.websiteOptionRow}>
                 {websiteCardOptions.map((option, index) => {
                   const selected = selectedWebsiteCard === index
@@ -653,24 +647,6 @@ export default function CreateServiceScreen({ navigation, route }) {
                   )
                 })}
               </ScrollView>
-
-              <Text style={styles.fieldLabel}>Headline</Text>
-              <TextInput
-                style={styles.input}
-                value={websiteCardOptions[selectedWebsiteCard]?.headline || ''}
-                onChangeText={value => updateSelectedWebsiteCard('headline', value.slice(0, 55))}
-                maxLength={55}
-                accessibilityLabel="Card headline"
-              />
-              <Text style={styles.fieldLabel}>Supporting line</Text>
-              <TextInput
-                style={[styles.input, styles.multiline]}
-                value={websiteCardOptions[selectedWebsiteCard]?.supporting_text || ''}
-                onChangeText={value => updateSelectedWebsiteCard('supporting_text', value.slice(0, 125))}
-                maxLength={125}
-                multiline
-                accessibilityLabel="Card supporting line"
-              />
 
               {websiteImageError ? (
                 <View style={[styles.warningBox, styles.websiteImageOption]}>
