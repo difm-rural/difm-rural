@@ -27,6 +27,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <AppShell adminName={data.adminName}>
+      <div className="dashboard-page">
       <header className="page-header">
         <div><p className="eyebrow">Marketplace pulse</p><h1>Good morning, {data.adminName.split(' ')[0]}</h1><p>Here is what is happening across Rural Connections.</p></div>
         <nav className="range-picker" aria-label="Dashboard date range">
@@ -69,6 +70,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div className="data-list">{data.recentJobs.map(job => <div className="data-row" key={job.id}><div><strong>{job.title}</strong><span>{job.category || 'Uncategorised'} · {job.location_name || 'Location not set'}</span></div><span className={`status-chip ${job.status}`}>{job.status.replaceAll('_', ' ')}</span></div>)}</div>
         </article>
       </section>
+      </div>
     </AppShell>
   )
 }
