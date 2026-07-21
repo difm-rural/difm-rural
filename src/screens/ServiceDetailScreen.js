@@ -232,7 +232,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
             contentContainerStyle={styles.photoStrip}
             style={styles.photoStripWrap}>
             {photos.map((url, i) => (
-              <Image key={`${url}-${i}`} source={{ uri: url }} style={styles.servicePhoto} />
+              <Image key={`${url}-${i}`} source={{ uri: url }} style={styles.servicePhoto} resizeMode="contain" />
             ))}
           </ScrollView>
         )}

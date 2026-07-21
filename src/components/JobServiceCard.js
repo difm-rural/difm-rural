@@ -138,7 +138,7 @@ export default function JobServiceCard({
       {/* ── Image area ──────────────────────────────────────────────────────── */}
       <View style={styles.imageBox}>
         {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={styles.photo} />
+          <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode={isService ? 'contain' : 'cover'} />
         ) : catImg ? (
           <Image source={catImg} style={styles.photo} resizeMode="cover" />
         ) : (
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
 
   // ─── Image area ─────────────────────────────────────────────────────────────
   imageBox: { width: CARD_WIDTH, height: 110, position: 'relative' },
-  photo:    { width: CARD_WIDTH, height: 110 },
+  photo:    { width: CARD_WIDTH, height: 110, backgroundColor: colors.background },
   placeholder: {
     width: CARD_WIDTH,
     height: 110,

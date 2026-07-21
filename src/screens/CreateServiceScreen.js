@@ -70,6 +70,7 @@ async function preparePhotoForDraft(asset) {
     base64: resized.base64 || asset.base64 || null,
     mimeType: 'image/jpeg',
     fileName: `service-draft-${Date.now()}.jpg`,
+    listingPhoto: asset,
   }
 }
 
@@ -143,6 +144,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   const isEditing = !!editingService?.id
   const [creationMode, setCreationMode] = useState(isEditing ? 'manual' : (route?.params?.startMode || 'choose'))
   const [sourcePhoto, setSourcePhoto] = useState(null)
+  const [useSourceAsPhoto, setUseSourceAsPhoto] = useState(false)
   const [draftSource, setDraftSource] = useState(isEditing ? 'manual' : null)
   const [draftMissingFields, setDraftMissingFields] = useState([])
   const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
@@ -237,7 +239,41 @@ export default function CreateServiceScreen({ navigation, route }) {
     setDraftConfidenceNotes(Array.isArray(draft?.confidence_notes) ? draft.confidence_notes : [])
     setDraftSource('photo')
     setCreationMode('manual')
-    setStep(6)
+    setStep(1)
+  }
+
+  function includeSourcePhotoIfSelected() {
+    if (!useSourceAsPhoto || !sourcePhoto) return
+    const listingPhoto = sourcePhoto.listingPhoto || sourcePhoto
+    setPhotos(prev => prev.length >= 4 || prev.some(photo => getPhotoUri(photo) === listingPhoto.uri)
+      ? prev
+      : [...prev, listingPhoto])
+  }
+
+  function finishPhotoDraft(draft) {
+    includeSourcePhotoIfSelected()
+    applyAiDraft(draft)
+  }
+
+  async function enrichDraftFromWebsite(draft, websiteUrl) {
+    setCreatingDraft(true)
+    setDraftError('')
+    const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
+      body: {
+        website_url: websiteUrl,
+        allow_website_scan: true,
+        current_draft: draft,
+      },
+    })
+    setCreatingDraft(false)
+
+    if (error) {
+      Alert.alert('Website scan unavailable', 'The photo draft is still ready. You can review and complete it manually.')
+      finishPhotoDraft(draft)
+      return
+    }
+
+    finishPhotoDraft(data?.draft || data)
   }
 
   async function chooseSourcePhoto(fromCamera) {
@@ -253,13 +289,14 @@ export default function CreateServiceScreen({ navigation, route }) {
       }
 
       const result = fromCamera
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: true })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: true })
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: false })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: false })
 
       if (!result.canceled) {
         const picked = normalizePickedAsset(result.assets[0])
         const prepared = await preparePhotoForDraft(picked)
         setSourcePhoto(prepared)
+        setUseSourceAsPhoto(false)
       }
     } catch (error) {
       Alert.alert('Photo unavailable', error?.message || 'Could not open the camera or photo library.')
@@ -286,13 +323,26 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     if (error) {
       setDraftError(error.message || 'The draft assistant is not available yet.')
-      setPhotos(prev => prev.length >= 4 ? prev : [...prev, sourcePhoto])
       setDraftMissingFields(['Add service title', 'Choose category', 'Add service area', 'Add pricing'])
       return
     }
 
-    setPhotos(prev => prev.length >= 4 ? prev : [...prev, sourcePhoto])
-    applyAiDraft(data?.draft || data)
+    const draft = data?.draft || data
+    const websiteUrl = draft?.website_url
+    if (!websiteUrl) {
+      finishPhotoDraft(draft)
+      return
+    }
+
+    Alert.alert(
+      'Website found',
+      `The photo includes ${websiteUrl}. Would you like Rural Connections to scan that public website for more service details?`,
+      [
+        { text: 'Not now', style: 'cancel', onPress: () => finishPhotoDraft(draft) },
+        { text: 'Scan website', onPress: () => enrichDraftFromWebsite(draft, websiteUrl) },
+      ],
+      { cancelable: false }
+    )
   }
 
   function renderStartChoice() {
@@ -367,8 +417,20 @@ export default function CreateServiceScreen({ navigation, route }) {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.startContent}>
           {sourcePhoto ? (
             <>
-              <Image source={{ uri: sourcePhoto.uri }} style={styles.sourcePreview} />
+              <Image source={{ uri: sourcePhoto.uri }} style={styles.sourcePreview} resizeMode="contain" />
               <Text style={styles.photoHint}>Make sure the text is clear and not cut off.</Text>
+              <TouchableOpacity
+                style={styles.sourcePhotoOption}
+                onPress={() => setUseSourceAsPhoto(value => !value)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: useSourceAsPhoto }}
+                accessibilityLabel="Also use the source image as a public service photo">
+                <Icon name={useSourceAsPhoto ? 'checkbox' : 'square-outline'} size={22} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sourcePhotoOptionTitle}>Use as a service photo</Text>
+                  <Text style={styles.sourcePhotoOptionBody}>Off by default. Flyers and business cards are usually better used only to create the draft.</Text>
+                </View>
+              </TouchableOpacity>
               {creatingDraft && (
                 <View style={styles.draftProgress}>
                   <ActivityIndicator color={colors.primary} />
@@ -389,13 +451,13 @@ export default function CreateServiceScreen({ navigation, route }) {
                 <Button
                   variant="secondary"
                   title="Retake"
-                  onPress={() => setSourcePhoto(null)}
+                  onPress={() => { setSourcePhoto(null); setUseSourceAsPhoto(false) }}
                   disabled={creatingDraft}
                   accessibilityLabel="Retake or choose another photo"
                 />
                 <Button
                   title={draftError ? 'Use manually' : 'Use photo'}
-                  onPress={draftError ? () => { setDraftSource('photo'); setCreationMode('manual'); setStep(1) } : createDraftFromPhoto}
+                  onPress={draftError ? () => { includeSourcePhotoIfSelected(); setDraftSource('photo'); setCreationMode('manual'); setStep(1) } : createDraftFromPhoto}
                   loading={creatingDraft}
                   style={{ flex: 1 }}
                   accessibilityLabel="Use photo"
@@ -645,6 +707,13 @@ export default function CreateServiceScreen({ navigation, route }) {
       <>
         <Text style={styles.stepHeading}>What service can you offer?</Text>
 
+        {draftSource === 'photo' && (
+          <View style={styles.sourceNote}>
+            <Text style={styles.sourceNoteTitle}>Draft created from your photo</Text>
+            <Text style={styles.sourceNoteText}>Start here and check each pre-filled step before publishing.</Text>
+          </View>
+        )}
+
         <Text style={styles.fieldLabel}>Service title</Text>
         <TextInput
           style={styles.input}
@@ -697,7 +766,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         <View style={styles.photoGrid}>
           {photos.map((photo, idx) => (
             <View key={`${getPhotoUri(photo)}-${idx}`} style={styles.photoThumb}>
-              <Image source={{ uri: getPhotoUri(photo) }} style={styles.photoImg} />
+              <Image source={{ uri: getPhotoUri(photo) }} style={styles.photoImg} resizeMode="contain" />
               <TouchableOpacity
                 style={styles.photoRemove}
                 onPress={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
@@ -1274,6 +1343,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   photoHint: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: 10, marginBottom: 14 },
+  sourcePhotoOption: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+  },
+  sourcePhotoOptionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
+  sourcePhotoOptionBody: { fontSize: 12, lineHeight: 18, color: colors.textSecondary },
   draftProgress: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -47,7 +47,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
 
   return (
     <View style={[styles.row, !service.is_active && styles.rowInactive]}>
-      {photoUrl && <Image source={{ uri: photoUrl }} style={styles.rowPhoto} />}
+      {photoUrl && <Image source={{ uri: photoUrl }} style={styles.rowPhoto} resizeMode="contain" />}
 
       <View style={styles.rowTop}>
         <View style={styles.rowTitleWrap}>

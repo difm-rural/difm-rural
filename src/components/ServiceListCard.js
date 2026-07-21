@@ -39,7 +39,7 @@ export default function ServiceListCard({ item, onPress }) {
       accessibilityLabel={`${item.title} by ${providerName}`}>
 
       {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={styles.thumb} />
+        <Image source={{ uri: photoUrl }} style={styles.thumb} resizeMode="contain" />
       ) : catImg ? (
         <Image source={catImg} style={styles.thumb} resizeMode="cover" />
       ) : (

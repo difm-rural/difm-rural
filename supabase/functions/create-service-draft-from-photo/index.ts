@@ -4,17 +4,22 @@ const corsHeaders = {
 }
 
 const categories = [
-  'Machinery',
-  'Labour',
-  'Water delivery',
-  'Animal care',
-  'Maintenance',
-  'Fencing',
-  'Other',
+  'Fencing & Gates',
+  'Animals & Farm Sitting',
+  'Water & Drainage',
+  'Spraying & Pest Control',
+  'Land & Vegetation',
+  'Cropping, Hay & Feed',
+  'Earthworks & Driveways',
+  'Machinery & Repairs',
+  'Buildings & Maintenance',
+  'Transport & Delivery',
+  'Property & House Sitting',
+  'General Rural Help',
 ]
 
 const systemPrompt = `
-You extract rural service listing details from photos for DIFM Rural.
+You extract rural service listing details from photos for Rural Connections.
 
 Return JSON only with this shape:
 {
@@ -29,6 +34,7 @@ Return JSON only with this shape:
   "availability": string | null,
   "equipment": string[],
   "tags": string[],
+  "website_url": string | null,
   "contact_details_found": string[],
   "missing_fields": string[],
   "confidence_notes": string[]
@@ -39,6 +45,7 @@ Rules:
 - If a detail is unclear or missing, use null and add it to missing_fields.
 - Do not put phone numbers, emails, social handles, or external contact instructions into public descriptions.
 - Put detected contact details only in contact_details_found.
+- Put a clearly visible public website address in website_url, normalized with https:// when possible.
 - Prefer one of these categories: ${categories.join(', ')}.
 - If pricing is unclear, use "unknown" and add pricing to missing_fields.
 - Keep descriptions concise and suitable for a rural marketplace service card.
@@ -51,6 +58,17 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+async function hasSignedInUser(req: Request) {
+  const authorization = req.headers.get('authorization')
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!authorization || !supabaseUrl || !anonKey) return false
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { Authorization: authorization, apikey: anonKey },
+  })
+  return response.ok
+}
+
 function safeParseJson(text: string) {
   try {
     return JSON.parse(text)
@@ -58,6 +76,18 @@ function safeParseJson(text: string) {
     const match = text.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('AI response did not contain JSON.')
     return JSON.parse(match[0])
+  }
+}
+
+function normalizeWebsiteUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const candidate = /^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`
+  try {
+    const url = new URL(candidate)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null
+    return url.toString()
+  } catch {
+    return null
   }
 }
 
@@ -80,6 +110,8 @@ function normalizeDraft(raw: Record<string, unknown>) {
     availability: typeof raw.availability === 'string' ? raw.availability : null,
     equipment: Array.isArray(raw.equipment) ? raw.equipment.filter(item => typeof item === 'string') : [],
     tags: Array.isArray(raw.tags) ? raw.tags.filter(item => typeof item === 'string') : [],
+    website_url: normalizeWebsiteUrl(raw.website_url),
+    website_scanned: raw.website_scanned === true,
     contact_details_found: Array.isArray(raw.contact_details_found)
       ? raw.contact_details_found.filter(item => typeof item === 'string')
       : [],
@@ -88,6 +120,97 @@ function normalizeDraft(raw: Record<string, unknown>) {
       ? raw.confidence_notes.filter(item => typeof item === 'string')
       : [],
   }
+}
+
+function isBlockedHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || !host.includes('.')) return true
+  if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return true
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!ipv4) return false
+  const parts = ipv4.slice(1).map(Number)
+  if (parts.some(part => part > 255)) return true
+  return parts[0] === 10 || parts[0] === 127 || parts[0] === 0 ||
+    (parts[0] === 169 && parts[1] === 254) ||
+    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+    (parts[0] === 192 && parts[1] === 168)
+}
+
+function publicWebsiteUrl(value: unknown) {
+  const normalized = normalizeWebsiteUrl(value)
+  if (!normalized) throw new Error('The detected website address is not valid.')
+  const url = new URL(normalized)
+  if (isBlockedHost(url.hostname) || (url.port && !['80', '443'].includes(url.port))) {
+    throw new Error('That website address cannot be scanned.')
+  }
+  return url
+}
+
+async function readLimitedText(response: Response, limit = 350_000) {
+  if (!response.body) return ''
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let size = 0
+  let text = ''
+  while (size < limit) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    text += decoder.decode(value.slice(0, Math.max(0, limit - (size - value.byteLength))), { stream: true })
+  }
+  reader.cancel().catch(() => {})
+  return text + decoder.decode()
+}
+
+async function readPublicWebsite(value: unknown) {
+  let url = publicWebsiteUrl(value)
+  for (let redirect = 0; redirect < 4; redirect++) {
+    const response = await fetch(url, {
+      redirect: 'manual',
+      headers: { 'User-Agent': 'RuralConnectionsServiceDraftBot/1.0', Accept: 'text/html,text/plain' },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location')
+      if (!location) throw new Error('The website redirect was incomplete.')
+      url = publicWebsiteUrl(new URL(location, url).toString())
+      continue
+    }
+    if (!response.ok) throw new Error(`The website returned ${response.status}.`)
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
+      throw new Error('The website did not return a readable page.')
+    }
+    const html = await readLimitedText(response)
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 45_000)
+    if (text.length < 80) throw new Error('The website did not contain enough readable service information.')
+    return { url: url.toString(), text }
+  }
+  throw new Error('The website redirected too many times.')
+}
+
+async function callOpenAi(openAiApiKey: string, content: Record<string, unknown>[]) {
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openAiApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini', input: [{ role: 'user', content }] }),
+  })
+  const result = await response.json()
+  if (!response.ok) throw new Error(result?.error?.message || 'OpenAI request failed.')
+  const outputText = extractOutputText(result)
+  if (!outputText) throw new Error('AI response did not include text output.')
+  return normalizeDraft(safeParseJson(outputText))
 }
 
 function extractOutputText(result: Record<string, unknown>) {
@@ -111,6 +234,7 @@ function extractOutputText(result: Record<string, unknown>) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+  if (!(await hasSignedInUser(req))) return jsonResponse({ error: 'Unauthorized' }, 401)
 
   const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
   if (!openAiApiKey) {
@@ -118,7 +242,29 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { image_base64, mime_type, image_size_bytes } = await req.json()
+    const { image_base64, mime_type, image_size_bytes, website_url, allow_website_scan, current_draft } = await req.json()
+
+    if (allow_website_scan === true) {
+      if (!website_url) return jsonResponse({ error: 'website_url is required.' }, 400)
+      const website = await readPublicWebsite(website_url)
+      const enrichmentPrompt = `${systemPrompt}
+
+You are now improving an existing photo-created draft using text from a public website that the user explicitly approved scanning.
+- Preserve useful facts already present in the draft unless the website clearly provides a correction or more detail.
+- Use only service information supported by the supplied draft or website text.
+- Never copy testimonials, unverifiable superlatives, phone numbers, email addresses, or instructions to contact the provider outside Rural Connections into descriptions.
+- Set website_url to the supplied public URL and website_scanned to true.
+
+Existing draft:
+${JSON.stringify(current_draft && typeof current_draft === 'object' ? current_draft : {})}
+
+Approved website URL: ${website.url}
+Readable website text:
+${website.text}`
+      const draft = await callOpenAi(openAiApiKey, [{ type: 'input_text', text: enrichmentPrompt }])
+      return jsonResponse({ draft: { ...draft, website_url: website.url, website_scanned: true } })
+    }
+
     if (!image_base64 || typeof image_base64 !== 'string') {
       return jsonResponse({ error: 'image_base64 is required.' }, 400)
     }
@@ -129,38 +275,10 @@ Deno.serve(async (req) => {
 
     const imageUrl = `data:${mime_type || 'image/jpeg'};base64,${image_base64}`
     console.log('create-service-draft-from-photo: calling OpenAI Responses API')
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini',
-        input: [
-          {
-            role: 'user',
-            content: [
-              { type: 'input_text', text: systemPrompt },
-              { type: 'input_image', image_url: imageUrl, detail: 'high' },
-            ],
-          },
-        ],
-      }),
-    })
-
-    const result = await response.json()
-    if (!response.ok) {
-      console.error('create-service-draft-from-photo: OpenAI error', result?.error?.message || response.status)
-      return jsonResponse({ error: result?.error?.message || 'OpenAI request failed.' }, response.status)
-    }
-
-    const outputText = extractOutputText(result)
-    if (!outputText) {
-      return jsonResponse({ error: 'AI response did not include text output.' }, 502)
-    }
-
-    const draft = normalizeDraft(safeParseJson(outputText))
+    const draft = await callOpenAi(openAiApiKey, [
+      { type: 'input_text', text: systemPrompt },
+      { type: 'input_image', image_url: imageUrl, detail: 'high' },
+    ])
     console.log('create-service-draft-from-photo: draft created')
     return jsonResponse({ draft })
   } catch (error) {
