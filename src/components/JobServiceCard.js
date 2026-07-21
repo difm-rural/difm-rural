@@ -138,12 +138,24 @@ export default function JobServiceCard({
       {/* ── Image area ──────────────────────────────────────────────────────── */}
       <View style={styles.imageBox}>
         {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode={isService ? 'contain' : 'cover'} />
+          <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode="cover" />
         ) : catImg ? (
           <Image source={catImg} style={styles.photo} resizeMode="cover" />
         ) : (
           <View style={[styles.placeholder, { backgroundColor: cat.bg }]}>
             <Icon name={cat.icon} size={40} color={cat.fg} />
+          </View>
+        )}
+
+        {isService && photoUrl && !!item.card_headline && (
+          <View style={[
+            styles.cardMessage,
+            item.card_style === 'bold' && styles.cardMessageBold,
+            item.card_style === 'clean' && styles.cardMessageClean,
+          ]}>
+            <Text style={[styles.cardMessageText, item.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={3}>
+              {item.card_headline}
+            </Text>
           </View>
         )}
 
@@ -266,6 +278,19 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   overlayBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
+  cardMessage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(15,45,33,0.78)',
+  },
+  cardMessageBold: { top: 0, justifyContent: 'center', backgroundColor: 'rgba(15,45,33,0.60)' },
+  cardMessageClean: { left: 6, right: 6, bottom: 6, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.90)' },
+  cardMessageText: { color: colors.white, fontSize: 11, lineHeight: 14, fontWeight: '800' },
+  cardMessageTextClean: { color: colors.primaryDark },
 
   // Bid bubble
   bidBubble: {

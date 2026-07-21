@@ -47,7 +47,27 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
 
   return (
     <View style={[styles.row, !service.is_active && styles.rowInactive]}>
-      {photoUrl && <Image source={{ uri: photoUrl }} style={styles.rowPhoto} resizeMode="contain" />}
+      {photoUrl && (
+        <View style={styles.rowPhotoWrap}>
+          <Image source={{ uri: photoUrl }} style={styles.rowPhoto} resizeMode="cover" />
+          {!!service.card_headline && (
+            <View style={[
+              styles.cardMessage,
+              service.card_style === 'bold' && styles.cardMessageBold,
+              service.card_style === 'clean' && styles.cardMessageClean,
+            ]}>
+              <Text style={[styles.cardHeadline, service.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={2}>
+                {service.card_headline}
+              </Text>
+              {!!service.card_supporting_text && (
+                <Text style={[styles.cardSupporting, service.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={2}>
+                  {service.card_supporting_text}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.rowTop}>
         <View style={styles.rowTitleWrap}>
@@ -76,8 +96,6 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
         {service.category}  ·  <Icon name="location-outline" size={11} color={colors.textMuted} /> {service.location_name || '—'}
       </Text>
       <Text style={styles.rowDate}>{listedAgo(service.created_at)}</Text>
-      <Text style={styles.rowRate}>{formatRate(service)}</Text>
-
       {service.bookingCount > 0 && (
         <View style={styles.bookingCountWrap}>
           <Text style={styles.bookingCountText}>{service.bookingCount} booking{service.bookingCount !== 1 ? 's' : ''}</Text>
@@ -325,13 +343,30 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   rowInactive: { opacity: 0.6 },
-  rowPhoto: {
+  rowPhotoWrap: {
     width: '100%',
     height: 138,
     borderRadius: 12,
     backgroundColor: colors.background,
     marginBottom: 12,
+    overflow: 'hidden',
+    position: 'relative',
   },
+  rowPhoto: { width: '100%', height: '100%' },
+  cardMessage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(15,45,33,0.78)',
+  },
+  cardMessageBold: { top: 0, justifyContent: 'center', backgroundColor: 'rgba(15,45,33,0.60)' },
+  cardMessageClean: { left: 10, right: 10, bottom: 10, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.90)' },
+  cardHeadline: { color: colors.white, fontSize: 18, lineHeight: 21, fontWeight: '800' },
+  cardSupporting: { color: colors.white, fontSize: 11, lineHeight: 15, marginTop: 4 },
+  cardMessageTextClean: { color: colors.primaryDark },
 
   rowTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 10 },
   rowTitleWrap: { flex: 1 },
@@ -358,7 +393,6 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, color: colors.primary, fontWeight: '700', marginBottom: 6 },
   statusTextPaused: { color: colors.textMuted },
   rowDate:  { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
-  rowRate:  { fontSize: 14, fontWeight: '600', color: colors.primary, marginBottom: 8 },
 
   bookingCountWrap: { backgroundColor: colors.infoLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: 10 },
   bookingCountText: { fontSize: 12, fontWeight: '700', color: colors.info },

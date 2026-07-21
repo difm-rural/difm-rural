@@ -34,6 +34,14 @@ Return JSON only with this shape:
   "availability": string | null,
   "equipment": string[],
   "tags": string[],
+  "card_options": [
+    {
+      "label": string,
+      "headline": string,
+      "supporting_text": string,
+      "style": "bold" | "bottom" | "clean"
+    }
+  ],
   "website_url": string | null,
   "contact_details_found": string[],
   "missing_fields": string[],
@@ -49,6 +57,8 @@ Rules:
 - Prefer one of these categories: ${categories.join(', ')}.
 - If pricing is unclear, use "unknown" and add pricing to missing_fields.
 - Keep descriptions concise and suitable for a rural marketplace service card.
+- When website copy is supplied, return exactly three distinct card_options grounded in that copy. Preserve a strong existing headline or tagline verbatim when useful. Do not invent claims.
+- Keep each card headline under 55 characters and each supporting line under 125 characters.
 `
 
 function jsonResponse(body: unknown, status = 200) {
@@ -98,6 +108,23 @@ function normalizeDraft(raw: Record<string, unknown>) {
       ? 'Other'
       : null
 
+  const cardOptions = Array.isArray(raw.card_options)
+    ? raw.card_options.flatMap((option, index) => {
+      if (!option || typeof option !== 'object') return []
+      const value = option as Record<string, unknown>
+      const headline = typeof value.headline === 'string' ? value.headline.trim().slice(0, 55) : ''
+      const supportingText = typeof value.supporting_text === 'string' ? value.supporting_text.trim().slice(0, 125) : ''
+      if (!headline) return []
+      const allowedStyles = ['bold', 'bottom', 'clean']
+      return [{
+        label: typeof value.label === 'string' ? value.label.trim().slice(0, 30) : `Option ${index + 1}`,
+        headline,
+        supporting_text: supportingText,
+        style: typeof value.style === 'string' && allowedStyles.includes(value.style) ? value.style : allowedStyles[index % 3],
+      }]
+    }).slice(0, 3)
+    : []
+
   return {
     title: typeof raw.title === 'string' ? raw.title : null,
     category,
@@ -110,6 +137,7 @@ function normalizeDraft(raw: Record<string, unknown>) {
     availability: typeof raw.availability === 'string' ? raw.availability : null,
     equipment: Array.isArray(raw.equipment) ? raw.equipment.filter(item => typeof item === 'string') : [],
     tags: Array.isArray(raw.tags) ? raw.tags.filter(item => typeof item === 'string') : [],
+    card_options: cardOptions,
     website_url: normalizeWebsiteUrl(raw.website_url),
     website_scanned: raw.website_scanned === true,
     contact_details_found: Array.isArray(raw.contact_details_found)
@@ -275,16 +303,39 @@ async function validWebsiteImage(value: string, pageUrl: URL) {
   return null
 }
 
-async function websiteImageFromHtml(html: string, pageUrl: URL) {
+function marketingCopyFromScript(script: string) {
+  const copy: string[] = []
+  for (const match of script.matchAll(/["']([A-Z][A-Z0-9 .,&'!?…-]{7,90})["']/g)) {
+    const value = match[1].replace(/\s+/g, ' ').trim()
+    if (value.split(/\s+/).length >= 2) copy.push(value)
+  }
+  for (const match of script.matchAll(/children\s*:\s*["']((?:\\.|[^"'\\]){8,300})["']/g)) {
+    const value = match[1]
+      .replace(/\\n/g, ' ')
+      .replace(/\\["']/g, quote => quote.slice(1))
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (value.split(/\s+/).length < 2 || /(?:className|https?:\/\/|\{\}|=>)/.test(value)) continue
+    copy.push(value)
+  }
+  return [...new Set(copy)].slice(0, 80)
+}
+
+async function websiteEnhancementsFromHtml(html: string, pageUrl: URL) {
   const directCandidates = websiteImageCandidates(html, pageUrl)
+  let imageUrl: string | null = null
   for (const candidate of [...new Set(directCandidates)]) {
     const valid = await validWebsiteImage(candidate, pageUrl).catch(() => null)
-    if (valid) return valid
+    if (valid) {
+      imageUrl = valid
+      break
+    }
   }
 
   // JavaScript-rendered sites often keep their hero image in the main module
   // rather than the initial HTML. Inspect same-site modules only, and favour
   // filenames that describe a listing-friendly image over logos and portraits.
+  const marketingCopy: string[] = []
   for (const tag of (html.match(/<script\s+[^>]*src=["'][^"']+["'][^>]*>/gi) || []).slice(0, 2)) {
     const src = tagAttribute(tag, 'src')
     if (!src) continue
@@ -302,6 +353,8 @@ async function websiteImageFromHtml(html: string, pageUrl: URL) {
       })
       if (!response.ok) continue
       const script = await readLimitedText(response, 500_000)
+      marketingCopy.push(...marketingCopyFromScript(script))
+      if (imageUrl) continue
       const assets = [...script.matchAll(/["']([^"']+\.(?:jpe?g|png|webp))["']/gi)]
         .map(match => match[1])
         .filter(path => !/(logo|icon|avatar|portrait)/i.test(path))
@@ -309,13 +362,16 @@ async function websiteImageFromHtml(html: string, pageUrl: URL) {
       for (const asset of [...new Set(assets)].slice(0, 10)) {
         const candidate = new URL(asset, scriptUrl).toString()
         const valid = await validWebsiteImage(candidate, pageUrl).catch(() => null)
-        if (valid) return valid
+        if (valid) {
+          imageUrl = valid
+          break
+        }
       }
     } catch {
       // A missing bundle image should not prevent the service draft itself.
     }
   }
-  return null
+  return { imageUrl, marketingText: [...new Set(marketingCopy)].join('\n').slice(0, 12_000) }
 }
 
 async function readPublicWebsite(value: unknown) {
@@ -340,7 +396,14 @@ async function readPublicWebsite(value: unknown) {
     const html = await readLimitedText(response)
     const text = readableWebsiteText(html)
     if (text.length < 80) throw new Error('The website did not contain enough readable service information.')
-    return { url: url.toString(), text, imageUrl: await websiteImageFromHtml(html, url) }
+    const enhancements = await websiteEnhancementsFromHtml(html, url)
+    return {
+      url: url.toString(),
+      text: [text, enhancements.marketingText && `Marketing copy rendered by the website:\n${enhancements.marketingText}`]
+        .filter(Boolean)
+        .join('\n'),
+      imageUrl: enhancements.imageUrl,
+    }
   }
   throw new Error('The website redirected too many times.')
 }
@@ -399,6 +462,8 @@ You are now improving an existing photo-created draft using text from a public w
 - Use only service information supported by the supplied draft or website text.
 - Never copy testimonials, unverifiable superlatives, phone numbers, email addresses, or instructions to contact the provider outside Rural Connections into descriptions.
 - Set website_url to the supplied public URL and website_scanned to true.
+- Create three genuinely useful card_options: one preserving the strongest website headline, one concise practical summary, and one warm problem/solution treatment.
+- Reuse the website's exact tagline when it is strong and supported by the supplied copy.
 
 Existing draft:
 ${JSON.stringify(current_draft && typeof current_draft === 'object' ? current_draft : {})}

@@ -138,6 +138,26 @@ function base64ToArrayBuffer(base64) {
   return new Uint8Array(bytes).buffer
 }
 
+function buildWebsiteCardOptions(draft) {
+  const supplied = Array.isArray(draft?.card_options) ? draft.card_options : []
+  const styles = ['bold', 'bottom', 'clean']
+  const labels = ['Bold headline', 'Practical', 'Warm & direct']
+  const fallbacks = [
+    { headline: draft?.short_description || draft?.title || 'Local rural service', supporting_text: draft?.full_description || '' },
+    { headline: draft?.title || 'Ready when you need a hand', supporting_text: draft?.short_description || draft?.full_description || '' },
+    { headline: `Need help with ${String(draft?.title || 'your property').toLowerCase()}?`, supporting_text: draft?.short_description || '' },
+  ]
+  return styles.map((style, index) => {
+    const option = supplied[index] || fallbacks[index]
+    return {
+      label: option?.label || labels[index],
+      headline: String(option?.headline || fallbacks[index].headline).slice(0, 55),
+      supporting_text: String(option?.supporting_text || fallbacks[index].supporting_text).slice(0, 125),
+      style,
+    }
+  })
+}
+
 async function edgeFunctionErrorMessage(error, fallback) {
   try {
     const body = await error?.context?.clone?.().json()
@@ -159,6 +179,8 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [websiteDraftPreview, setWebsiteDraftPreview] = useState(null)
   const [useWebsiteImage, setUseWebsiteImage] = useState(false)
   const [websiteImageError, setWebsiteImageError] = useState(false)
+  const [websiteCardOptions, setWebsiteCardOptions] = useState([])
+  const [selectedWebsiteCard, setSelectedWebsiteCard] = useState(0)
   const [draftSource, setDraftSource] = useState(isEditing ? 'manual' : null)
   const [draftMissingFields, setDraftMissingFields] = useState([])
   const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
@@ -170,6 +192,9 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [category, setCategory] = useState(editingService?.category || '')
   const [description, setDescription] = useState(editingService?.description || '')
   const [photos, setPhotos] = useState(Array.isArray(editingService?.photos) ? editingService.photos : [])
+  const [cardHeadline, setCardHeadline] = useState(editingService?.card_headline || '')
+  const [cardSupportingText, setCardSupportingText] = useState(editingService?.card_supporting_text || '')
+  const [cardStyle, setCardStyle] = useState(editingService?.card_style || null)
 
   const [pricingType, setPricingType] = useState(normalizePricingType(editingService?.pricing_type))
   const [rate, setRate] = useState(editingService?.rate != null ? String(editingService.rate) : '')
@@ -251,6 +276,9 @@ export default function CreateServiceScreen({ navigation, route }) {
     setIncludesEquipment(nextEquipment)
     setDraftMissingFields(Array.isArray(draft?.missing_fields) ? draft.missing_fields.map(formatMissingField).filter(Boolean) : [])
     setDraftConfidenceNotes(Array.isArray(draft?.confidence_notes) ? draft.confidence_notes : [])
+    setCardHeadline(draft?.card_headline || '')
+    setCardSupportingText(draft?.card_supporting_text || '')
+    setCardStyle(draft?.card_style || null)
     setDraftSource(source)
     setCreationMode('manual')
     setStep(1)
@@ -339,15 +367,14 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     const draft = data?.draft || data
-    if (draft?.website_image_url) {
-      setWebsiteDraftPreview(draft)
-      return
-    }
-    applyAiDraft(draft, 'website')
+    setWebsiteDraftPreview(draft)
+    setWebsiteCardOptions(buildWebsiteCardOptions(draft))
+    setSelectedWebsiteCard(0)
   }
 
   function continueWebsiteDraft() {
     if (!websiteDraftPreview) return
+    const selectedOption = websiteCardOptions[selectedWebsiteCard]
     if (useWebsiteImage && websiteDraftPreview.website_image_url) {
       setPhotos(prev => prev.length >= 4 || prev.some(photo => getPhotoUri(photo) === websiteDraftPreview.website_image_url)
         ? prev
@@ -358,8 +385,19 @@ export default function CreateServiceScreen({ navigation, route }) {
           fromWebsite: true,
         }])
     }
-    applyAiDraft(websiteDraftPreview, 'website')
+    applyAiDraft({
+      ...websiteDraftPreview,
+      card_headline: selectedOption?.headline || '',
+      card_supporting_text: selectedOption?.supporting_text || '',
+      card_style: selectedOption?.style || null,
+    }, 'website')
     setWebsiteDraftPreview(null)
+  }
+
+  function updateSelectedWebsiteCard(field, value) {
+    setWebsiteCardOptions(options => options.map((option, index) => (
+      index === selectedWebsiteCard ? { ...option, [field]: value } : option
+    )))
   }
 
   async function chooseSourcePhoto(fromCamera) {
@@ -565,25 +603,81 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
           )}
 
-          {!!websiteDraftPreview?.website_image_url && (
+          {!!websiteDraftPreview && (
             <View style={styles.websiteImageCard}>
-              <Text style={styles.websiteImageTitle}>Website image found</Text>
-              <Image
-                source={{ uri: websiteDraftPreview.website_image_url }}
-                style={styles.websiteImagePreview}
-                resizeMode="contain"
-                accessibilityLabel="Image found on the website"
-                onError={() => {
-                  setWebsiteImageError(true)
-                  setUseWebsiteImage(false)
-                }}
+              <Text style={styles.websiteImageTitle}>Choose your card message</Text>
+              <Text style={styles.websiteChoiceIntro}>We found three ways to present your service. Choose one, then adjust the wording if needed.</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.websiteOptionRow}>
+                {websiteCardOptions.map((option, index) => {
+                  const selected = selectedWebsiteCard === index
+                  const clean = option.style === 'clean'
+                  return (
+                    <TouchableOpacity
+                      key={`${option.style}-${index}`}
+                      style={[styles.creativeOption, selected && styles.creativeOptionSelected]}
+                      onPress={() => setSelectedWebsiteCard(index)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${option.label}: ${option.headline}`}>
+                      <View style={styles.creativeImageWrap}>
+                        {!!websiteDraftPreview.website_image_url && !websiteImageError ? (
+                          <Image
+                            source={{ uri: websiteDraftPreview.website_image_url }}
+                            style={styles.creativeImage}
+                            resizeMode="cover"
+                            onError={() => {
+                              setWebsiteImageError(true)
+                              setUseWebsiteImage(false)
+                            }}
+                          />
+                        ) : (
+                          <View style={[styles.creativeImage, styles.creativeFallback]} />
+                        )}
+                        <View style={[
+                          styles.creativeOverlay,
+                          option.style === 'bold' && styles.creativeOverlayBold,
+                          option.style === 'bottom' && styles.creativeOverlayBottom,
+                          clean && styles.creativeOverlayClean,
+                        ]}>
+                          <Text style={[styles.creativeHeadline, clean && styles.creativeTextClean]} numberOfLines={3}>{option.headline}</Text>
+                          {!!option.supporting_text && (
+                            <Text style={[styles.creativeSupporting, clean && styles.creativeTextClean]} numberOfLines={3}>{option.supporting_text}</Text>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.creativeOptionFooter}>
+                        <Text style={styles.creativeOptionLabel}>{option.label}</Text>
+                        <Icon name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={selected ? colors.primary : colors.textMuted} />
+                      </View>
+                    </TouchableOpacity>
+                  )
+                })}
+              </ScrollView>
+
+              <Text style={styles.fieldLabel}>Headline</Text>
+              <TextInput
+                style={styles.input}
+                value={websiteCardOptions[selectedWebsiteCard]?.headline || ''}
+                onChangeText={value => updateSelectedWebsiteCard('headline', value.slice(0, 55))}
+                maxLength={55}
+                accessibilityLabel="Card headline"
               />
+              <Text style={styles.fieldLabel}>Supporting line</Text>
+              <TextInput
+                style={[styles.input, styles.multiline]}
+                value={websiteCardOptions[selectedWebsiteCard]?.supporting_text || ''}
+                onChangeText={value => updateSelectedWebsiteCard('supporting_text', value.slice(0, 125))}
+                maxLength={125}
+                multiline
+                accessibilityLabel="Card supporting line"
+              />
+
               {websiteImageError ? (
                 <View style={[styles.warningBox, styles.websiteImageOption]}>
                   <Text style={styles.warningTitle}>Image unavailable</Text>
                   <Text style={styles.warningText}>The website image could not be loaded. You can continue without it and add a photo later.</Text>
                 </View>
-              ) : (
+              ) : !!websiteDraftPreview.website_image_url ? (
                 <TouchableOpacity
                   style={[styles.sourcePhotoOption, styles.websiteImageOption]}
                   onPress={() => setUseWebsiteImage(value => !value)}
@@ -595,7 +689,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                     <Text style={styles.sourcePhotoOptionBody}>Select this only if you own the image or have permission to publish it. We will copy it into Rural Connections rather than link to the website.</Text>
                   </View>
                 </TouchableOpacity>
-              )}
+              ) : null}
               <Button
                 title="Continue with draft"
                 onPress={continueWebsiteDraft}
@@ -819,6 +913,9 @@ export default function CreateServiceScreen({ navigation, route }) {
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
       minimum_units: 1,
       includes_equipment: includesEquipment,
+      card_headline: cardHeadline.trim() || null,
+      card_supporting_text: cardSupportingText.trim() || null,
+      card_style: cardStyle || null,
       payment_timing: paymentTiming,
       materials,
       availability: formatAvailabilityPayload(availableFrom),
@@ -999,7 +1096,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   function renderStep2() {
     return (
       <>
-        <Text style={styles.stepHeading}>Add a short description</Text>
+        <Text style={styles.stepHeading}>Describe and present your service</Text>
 
         <Text style={styles.fieldLabel}>Description <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
@@ -1014,6 +1111,51 @@ export default function CreateServiceScreen({ navigation, route }) {
           autoCapitalize="sentences"
           accessibilityLabel="Service description"
         />
+
+        <Text style={styles.fieldLabel}>Card headline <Text style={styles.optional}>(optional)</Text></Text>
+        <TextInput
+          style={styles.input}
+          placeholder="A short line that catches attention"
+          placeholderTextColor={colors.textMuted}
+          value={cardHeadline}
+          onChangeText={value => setCardHeadline(value.slice(0, 55))}
+          maxLength={55}
+          accessibilityLabel="Service card headline"
+        />
+
+        <Text style={styles.fieldLabel}>Supporting line <Text style={styles.optional}>(optional)</Text></Text>
+        <TextInput
+          style={[styles.input, styles.multiline]}
+          placeholder="Explain the benefit in one concise sentence"
+          placeholderTextColor={colors.textMuted}
+          value={cardSupportingText}
+          onChangeText={value => setCardSupportingText(value.slice(0, 125))}
+          maxLength={125}
+          multiline
+          accessibilityLabel="Service card supporting line"
+        />
+
+        {!!cardHeadline && (
+          <>
+            <Text style={styles.fieldLabel}>Card treatment</Text>
+            <View style={styles.segmentGrid}>
+              {[
+                { id: 'bold', label: 'Bold overlay' },
+                { id: 'bottom', label: 'Bottom band' },
+                { id: 'clean', label: 'Clean panel' },
+              ].map(option => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[styles.segmentBtn, cardStyle === option.id && styles.segmentBtnActive]}
+                  onPress={() => setCardStyle(option.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: cardStyle === option.id }}>
+                  <Text style={[styles.segmentText, cardStyle === option.id && styles.segmentTextActive]}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
 
         <Text style={styles.fieldLabel}>Photos <Text style={styles.optional}>(optional)</Text></Text>
         <View style={styles.photoGrid}>
@@ -1631,6 +1773,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   websiteImageOption: { marginBottom: 0 },
+  websiteChoiceIntro: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+  websiteOptionRow: { gap: 12, paddingVertical: 2 },
+  creativeOption: {
+    width: 252,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+  },
+  creativeOptionSelected: { borderColor: colors.primary },
+  creativeImageWrap: { width: '100%', height: 168, position: 'relative', backgroundColor: colors.primaryLight },
+  creativeImage: { ...StyleSheet.absoluteFillObject },
+  creativeFallback: { backgroundColor: colors.primaryDark },
+  creativeOverlay: { position: 'absolute', left: 0, right: 0, padding: 14 },
+  creativeOverlayBold: { top: 0, bottom: 0, justifyContent: 'center', backgroundColor: 'rgba(15,45,33,0.62)' },
+  creativeOverlayBottom: { bottom: 0, backgroundColor: 'rgba(15,45,33,0.78)' },
+  creativeOverlayClean: { left: 10, right: 10, bottom: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.90)' },
+  creativeHeadline: { color: colors.white, fontSize: 18, lineHeight: 22, fontWeight: '800' },
+  creativeSupporting: { color: colors.white, fontSize: 11, lineHeight: 15, marginTop: 6 },
+  creativeTextClean: { color: colors.primaryDark },
+  creativeOptionFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 10 },
+  creativeOptionLabel: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   draftProgress: {
     flexDirection: 'row',
     alignItems: 'center',
