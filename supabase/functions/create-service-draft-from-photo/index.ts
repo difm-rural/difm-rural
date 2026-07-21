@@ -251,7 +251,7 @@ async function validWebsiteImage(value: string, pageUrl: URL) {
       redirect: 'manual',
       headers: {
         'User-Agent': 'RuralConnectionsServiceDraftBot/1.0',
-        Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*',
+        Accept: 'image/webp,image/png,image/jpeg',
         Range: 'bytes=0-1023',
       },
       signal: AbortSignal.timeout(8_000),
@@ -267,7 +267,8 @@ async function validWebsiteImage(value: string, pageUrl: URL) {
     const contentType = (response.headers.get('content-type') || '').toLowerCase()
     const contentLength = Number(response.headers.get('content-length') || 0)
     response.body?.cancel().catch(() => {})
-    return response.ok && contentType.startsWith('image/') && (!contentLength || contentLength <= 5 * 1024 * 1024)
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    return response.ok && supportedTypes.includes(contentType.split(';')[0]) && (!contentLength || contentLength <= 5 * 1024 * 1024)
       ? imageUrl.toString()
       : null
   }
@@ -301,7 +302,7 @@ async function websiteImageFromHtml(html: string, pageUrl: URL) {
       })
       if (!response.ok) continue
       const script = await readLimitedText(response, 500_000)
-      const assets = [...script.matchAll(/["']([^"']+\.(?:jpe?g|png|webp|avif))["']/gi)]
+      const assets = [...script.matchAll(/["']([^"']+\.(?:jpe?g|png|webp))["']/gi)]
         .map(match => match[1])
         .filter(path => !/(logo|icon|avatar|portrait)/i.test(path))
         .sort((a, b) => Number(/(hero|banner|cover|service)/i.test(b)) - Number(/(hero|banner|cover|service)/i.test(a)))
