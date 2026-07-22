@@ -1328,9 +1328,11 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.headerActions}>
-          <View />
+      <View style={[styles.header, step === 2 && styles.compactDetailsHeader, { paddingTop: insets.top + 12 }]}>
+        <View style={[styles.headerActions, step === 2 && styles.compactHeaderActions]}>
+          {step === 2
+            ? <Text style={styles.compactHeaderBrand}>Rural Connections</Text>
+            : <View />}
           <TouchableOpacity
             style={styles.headerActionBtn}
             onPress={cancelCreation}
@@ -1340,9 +1342,13 @@ export default function CreateServiceScreen({ navigation, route }) {
             <Text style={styles.headerCancelText}>Cancel</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.kicker}>Rural Connections</Text>
-        <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit service' : 'Advertise a service'}</Text>
-        <Text style={styles.headerSub}>{STEP_LABELS[step - 1]}</Text>
+        {step !== 2 && (
+          <>
+            <Text style={styles.kicker}>Rural Connections</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit service' : 'Advertise a service'}</Text>
+            <Text style={styles.headerSub}>{STEP_LABELS[step - 1]}</Text>
+          </>
+        )}
         {renderProgress()}
       </View>
 
@@ -1412,8 +1418,11 @@ export default function CreateServiceScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 14, backgroundColor: colors.background },
+  compactDetailsHeader: { paddingBottom: 9 },
   headerBackBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   headerActions: { minHeight: 36, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  compactHeaderActions: { minHeight: 30, marginBottom: 8 },
+  compactHeaderBrand: { color: colors.accent, fontSize: 12, fontWeight: '800' },
   headerActionBtn: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 2 },
   headerCancelText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
