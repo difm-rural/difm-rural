@@ -17,7 +17,6 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
@@ -61,22 +60,6 @@ function normalizePickedAsset(asset) {
     base64: asset.base64 || null,
     mimeType: asset.mimeType || 'image/jpeg',
     fileName: asset.fileName || `service-photo-${Date.now()}.jpg`,
-  }
-}
-
-async function preparePhotoForDraft(asset) {
-  const resized = await manipulateAsync(
-    asset.uri,
-    [{ resize: { width: 1200 } }],
-    { compress: 0.72, format: SaveFormat.JPEG, base64: true }
-  )
-
-  return {
-    uri: resized.uri,
-    base64: resized.base64 || asset.base64 || null,
-    mimeType: 'image/jpeg',
-    fileName: `service-draft-${Date.now()}.jpg`,
-    listingPhoto: asset,
   }
 }
 
@@ -178,8 +161,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   const editingService = route?.params?.service || null
   const isEditing = !!editingService?.id
   const [creationMode, setCreationMode] = useState(isEditing ? 'manual' : (route?.params?.startMode || 'choose'))
-  const [sourcePhoto, setSourcePhoto] = useState(null)
-  const [useSourceAsPhoto, setUseSourceAsPhoto] = useState(false)
   const [websiteInput, setWebsiteInput] = useState('')
   const [websiteError, setWebsiteError] = useState('')
   const [websiteDraftPreview, setWebsiteDraftPreview] = useState(null)
@@ -191,7 +172,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [draftMissingFields, setDraftMissingFields] = useState([])
   const [draftConfidenceNotes, setDraftConfidenceNotes] = useState([])
   const [creatingDraft, setCreatingDraft] = useState(false)
-  const [draftError, setDraftError] = useState('')
   const [step, setStep] = useState(1)
 
   const [title, setTitle] = useState(editingService?.title || '')
@@ -260,7 +240,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     return ''
   }
 
-  function applyAiDraft(draft, source = 'photo') {
+  function applyAiDraft(draft, source = 'website') {
     const nextTitle = draft?.title || ''
     const nextCategory = normalizeCategory(draft?.category)
     const nextDescription = draft?.full_description || draft?.description || draft?.short_description || ''
@@ -290,7 +270,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   function cancelCreation() {
     const hasChanges = isEditing || !!(
-      title.trim() || category || description.trim() || photos.length || sourcePhoto ||
+      title.trim() || category || description.trim() || photos.length ||
       websiteInput.trim() || pricingType || locationName.trim() || draftSource
     )
     if (!hasChanges) {
@@ -307,41 +287,6 @@ export default function CreateServiceScreen({ navigation, route }) {
         { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
       ]
     )
-  }
-
-  function includeSourcePhotoIfSelected() {
-    if (!useSourceAsPhoto || !sourcePhoto) return
-    const listingPhoto = sourcePhoto.listingPhoto || sourcePhoto
-    setPhotos(prev => prev.length >= 4 || prev.some(photo => getPhotoUri(photo) === listingPhoto.uri)
-      ? prev
-      : [...prev, listingPhoto])
-  }
-
-  function finishPhotoDraft(draft) {
-    includeSourcePhotoIfSelected()
-    applyAiDraft(draft, 'photo')
-  }
-
-  async function enrichDraftFromWebsite(draft, websiteUrl) {
-    setCreatingDraft(true)
-    setDraftError('')
-    const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
-      body: {
-        website_url: websiteUrl,
-        allow_website_scan: true,
-        current_draft: draft,
-      },
-    })
-    setCreatingDraft(false)
-
-    if (error) {
-      const message = await edgeFunctionErrorMessage(error, 'The website could not be read.')
-      Alert.alert('Website scan unavailable', `${message}\n\nThe photo draft is still ready, so you can review and complete it manually.`)
-      finishPhotoDraft(draft)
-      return
-    }
-
-    finishPhotoDraft(data?.draft || data)
   }
 
   async function createDraftFromWebsite() {
@@ -399,75 +344,6 @@ export default function CreateServiceScreen({ navigation, route }) {
     setWebsiteDraftPreview(null)
   }
 
-  async function chooseSourcePhoto(fromCamera) {
-    setDraftError('')
-    try {
-      const permission = fromCamera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync()
-
-      if (permission.status !== 'granted') {
-        Alert.alert('Permission needed', `Please allow ${fromCamera ? 'camera' : 'photo'} access to create a draft from a photo.`)
-        return
-      }
-
-      const result = fromCamera
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: false })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.8, allowsEditing: false })
-
-      if (!result.canceled) {
-        const picked = normalizePickedAsset(result.assets[0])
-        const prepared = await preparePhotoForDraft(picked)
-        setSourcePhoto(prepared)
-        setUseSourceAsPhoto(false)
-      }
-    } catch (error) {
-      Alert.alert('Photo unavailable', error?.message || 'Could not open the camera or photo library.')
-    }
-  }
-
-  async function createDraftFromPhoto() {
-    if (!sourcePhoto?.base64) {
-      Alert.alert('Photo not ready', 'Please choose a photo with readable service details.')
-      return
-    }
-
-    setCreatingDraft(true)
-    setDraftError('')
-    const approxBytes = Math.round((sourcePhoto.base64.length * 3) / 4)
-    const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, {
-      body: {
-        image_base64: sourcePhoto.base64,
-        mime_type: sourcePhoto.mimeType || 'image/jpeg',
-        image_size_bytes: approxBytes,
-      },
-    })
-    setCreatingDraft(false)
-
-    if (error) {
-      setDraftError(await edgeFunctionErrorMessage(error, 'The draft assistant is not available yet.'))
-      setDraftMissingFields(['Add service title', 'Choose category', 'Add service area', 'Add pricing'])
-      return
-    }
-
-    const draft = data?.draft || data
-    const websiteUrl = draft?.website_url
-    if (!websiteUrl) {
-      finishPhotoDraft(draft)
-      return
-    }
-
-    Alert.alert(
-      'Website found',
-      `The photo includes ${websiteUrl}. Would you like Rural Connections to scan that public website for more service details?`,
-      [
-        { text: 'Not now', style: 'cancel', onPress: () => finishPhotoDraft(draft) },
-        { text: 'Scan website', onPress: () => enrichDraftFromWebsite(draft, websiteUrl) },
-      ],
-      { cancelable: false }
-    )
-  }
-
   function renderStartChoice() {
     return (
       <View style={styles.screen}>
@@ -499,22 +375,7 @@ export default function CreateServiceScreen({ navigation, route }) {
             </View>
             <View style={styles.startCopy}>
               <Text style={styles.startTitle}>Create manually</Text>
-              <Text style={styles.startBody}>Build your listing step by step.</Text>
-            </View>
-            <Text style={styles.startArrow}>{'>'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.startOption}
-            onPress={() => setCreationMode('photo')}
-            accessibilityRole="button"
-            accessibilityLabel="Create service from photo">
-            <View style={styles.startIconWrap}>
-              <Icon name="camera-outline" size={23} color={colors.primary} />
-            </View>
-            <View style={styles.startCopy}>
-              <Text style={styles.startTitle}>Create from photo</Text>
-              <Text style={styles.startBody}>Use a flyer, business card, sign, screenshot, or note.</Text>
+              <Text style={styles.startBody}>Add your details, photo and card message step by step.</Text>
             </View>
             <Text style={styles.startArrow}>{'>'}</Text>
           </TouchableOpacity>
@@ -697,108 +558,6 @@ export default function CreateServiceScreen({ navigation, route }) {
               disabled={!websiteInput.trim()}
               accessibilityLabel="Scan website and create service draft"
             />
-          )}
-        </ScrollView>
-      </View>
-    )
-  }
-
-  function renderPhotoDraft() {
-    return (
-      <View style={styles.screen}>
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.headerActionBtn}
-              onPress={() => sourcePhoto ? setSourcePhoto(null) : setCreationMode('choose')}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="Go back">
-              <Text style={styles.headerBackBtnText}>Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerActionBtn}
-              onPress={cancelCreation}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel creating service">
-              <Text style={styles.headerCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.kicker}>Photo-to-draft</Text>
-          <Text style={styles.headerTitle} accessibilityRole="header">Create from photo</Text>
-          <Text style={styles.headerSub}>Take or upload a clear photo that shows your service details.</Text>
-        </View>
-
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.startContent}>
-          {sourcePhoto ? (
-            <>
-              <Image source={{ uri: sourcePhoto.uri }} style={styles.sourcePreview} resizeMode="contain" />
-              <Text style={styles.photoHint}>Make sure the text is clear and not cut off.</Text>
-              <TouchableOpacity
-                style={styles.sourcePhotoOption}
-                onPress={() => setUseSourceAsPhoto(value => !value)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: useSourceAsPhoto }}
-                accessibilityLabel="Also use the source image as a public service photo">
-                <Icon name={useSourceAsPhoto ? 'checkbox' : 'square-outline'} size={22} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sourcePhotoOptionTitle}>Use as a service photo</Text>
-                  <Text style={styles.sourcePhotoOptionBody}>Off by default. Flyers and business cards are usually better used only to create the draft.</Text>
-                </View>
-              </TouchableOpacity>
-              {creatingDraft && (
-                <View style={styles.draftProgress}>
-                  <ActivityIndicator color={colors.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.draftProgressTitle}>Creating your draft...</Text>
-                    <Text style={styles.draftProgressBody}>Reading the photo and finding service details.</Text>
-                  </View>
-                </View>
-              )}
-              {!!draftError && (
-                <View style={styles.warningBox}>
-                  <Text style={styles.warningTitle}>Draft assistant unavailable</Text>
-                  <Text style={styles.warningText}>{draftError}</Text>
-                  <Text style={styles.warningText}>You can still use this photo and fill the service in manually.</Text>
-                </View>
-              )}
-              <View style={styles.footerRow}>
-                <Button
-                  variant="secondary"
-                  title="Retake"
-                  onPress={() => { setSourcePhoto(null); setUseSourceAsPhoto(false) }}
-                  disabled={creatingDraft}
-                  accessibilityLabel="Retake or choose another photo"
-                />
-                <Button
-                  title={draftError ? 'Use manually' : 'Use photo'}
-                  onPress={draftError ? () => { includeSourcePhotoIfSelected(); setDraftSource('photo'); setCreationMode('manual'); setStep(1) } : createDraftFromPhoto}
-                  loading={creatingDraft}
-                  style={{ flex: 1 }}
-                  accessibilityLabel="Use photo"
-                />
-              </View>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={styles.photoChoice}
-                onPress={() => chooseSourcePhoto(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Take photo">
-                <Text style={styles.photoChoiceTitle}>Take photo</Text>
-                <Text style={styles.photoChoiceBody}>Capture a flyer, business card, sign, or handwritten note.</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.photoChoice}
-                onPress={() => chooseSourcePhoto(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Upload photo">
-                <Text style={styles.photoChoiceTitle}>Upload photo</Text>
-                <Text style={styles.photoChoiceBody}>Use a saved screenshot, poster, or service image.</Text>
-              </TouchableOpacity>
-            </>
           )}
         </ScrollView>
       </View>
@@ -1222,6 +981,49 @@ export default function CreateServiceScreen({ navigation, route }) {
     )
   }
 
+  function renderFloatingCardPreview() {
+    const previewImage = photos.length > 0
+      ? { uri: getPhotoUri(photos[0]) }
+      : categoryImage(category)
+    const previewStyle = cardStyle || 'bottom'
+    const clean = previewStyle === 'clean'
+    const previewHeadline = cardHeadline.trim() || 'Your tagline will appear here'
+
+    return (
+      <View style={styles.floatingPreviewLayer} pointerEvents="none">
+        <Text style={styles.floatingPreviewLabel}>Live card preview</Text>
+        <View style={styles.floatingPreviewCard}>
+          {previewImage ? (
+            <Image source={previewImage} style={styles.floatingPreviewImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.floatingPreviewImage, styles.creativeFallback]} />
+          )}
+          <View style={[
+            styles.creativeOverlay,
+            previewStyle === 'bold' && styles.creativeOverlayBold,
+            previewStyle === 'bottom' && styles.creativeOverlayBottom,
+            clean && styles.creativeOverlayClean,
+          ]}>
+            <Text
+              style={[
+                styles.floatingPreviewHeadline,
+                clean && styles.creativeTextClean,
+                !cardHeadline.trim() && styles.floatingPreviewPlaceholder,
+              ]}
+              numberOfLines={2}>
+              {previewHeadline}
+            </Text>
+            {!!cardSupportingText.trim() && (
+              <Text style={[styles.floatingPreviewSupporting, clean && styles.creativeTextClean]} numberOfLines={2}>
+                {cardSupportingText}
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    )
+  }
+
   function renderStep3() {
     return (
       <>
@@ -1522,7 +1324,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   const RENDERERS = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5]
 
   if (creationMode === 'choose') return renderStartChoice()
-  if (creationMode === 'photo') return renderPhotoDraft()
   if (creationMode === 'website') return renderWebsiteDraft()
 
   return (
@@ -1551,9 +1352,14 @@ export default function CreateServiceScreen({ navigation, route }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         enabled={Platform.OS === 'android'}>
         <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: stepTranslateX }] }]}>
+          {step === 2 && renderFloatingCardPreview()}
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}
+            contentContainerStyle={[
+              styles.scrollContent,
+              step === 2 && styles.scrollContentWithFloatingPreview,
+              { paddingBottom: insets.bottom + 150 },
+            ]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             automaticallyAdjustKeyboardInsets={true}>
@@ -1618,6 +1424,44 @@ const styles = StyleSheet.create({
   progressPillActive: { backgroundColor: colors.primary },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 28 },
+  scrollContentWithFloatingPreview: { paddingTop: 164 },
+  floatingPreviewLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    elevation: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 9,
+    backgroundColor: colors.background,
+  },
+  floatingPreviewLabel: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  floatingPreviewCard: {
+    height: 132,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: colors.primaryLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  floatingPreviewImage: { ...StyleSheet.absoluteFillObject },
+  floatingPreviewHeadline: { color: colors.white, fontSize: 18, lineHeight: 21, fontWeight: '800' },
+  floatingPreviewSupporting: { color: colors.white, fontSize: 11, lineHeight: 15, marginTop: 4 },
+  floatingPreviewPlaceholder: { opacity: 0.72 },
   stepHeading: { fontSize: 24, lineHeight: 30, fontWeight: '700', color: colors.textPrimary, marginBottom: 16, letterSpacing: 0 },
   fieldLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, marginTop: 14 },
   fieldHelp: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: -2, marginBottom: 10 },
@@ -1819,24 +1663,6 @@ const styles = StyleSheet.create({
   startTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
   startBody: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
   startArrow: { fontSize: 22, color: colors.textMuted, fontWeight: '700' },
-  photoChoice: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 18,
-    minHeight: 96,
-    justifyContent: 'center',
-  },
-  photoChoiceTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
-  photoChoiceBody: { fontSize: 14, lineHeight: 21, color: colors.textSecondary },
-  sourcePreview: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-    borderRadius: 14,
-    backgroundColor: colors.border,
-  },
-  photoHint: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: 10, marginBottom: 14 },
   sourcePhotoOption: {
     flexDirection: 'row',
     alignItems: 'flex-start',
