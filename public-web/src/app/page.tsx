@@ -111,6 +111,11 @@ export default async function Home() {
 
   return (
     <main>
+      <div className="launch-banner" role="status">
+        <strong>Launching shortly</strong>
+        <span>Rural Connections is getting ready to connect rural New Zealand.</span>
+      </div>
+
       <header className="site-header">
         <a className="brand" href="#top" aria-label="Rural Connections home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
