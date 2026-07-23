@@ -129,6 +129,7 @@ export default async function Home() {
           <a href="#how-it-works">How it works</a>
           <a href="#services">Services</a>
           <a href="#why-rural-connections">Why us</a>
+          <a href="mailto:hello@ruralconnections.nz">Contact</a>
         </nav>
         <a className="header-cta" href="difmrural://">
           Open the app <ArrowRight size={16} aria-hidden="true" />
@@ -308,9 +309,14 @@ export default async function Home() {
           <span><strong>Rural Connections</strong><small>Local help. Rural know-how.</small></span>
         </a>
         <p>Connecting rural New Zealand, one useful job at a time.</p>
+        <div className="footer-contact">
+          <span>Questions, feedback or early interest?</span>
+          <a href="mailto:hello@ruralconnections.nz">hello@ruralconnections.nz</a>
+        </div>
         <div className="footer-links">
           <a href="#how-it-works">How it works</a>
           <a href="#services">Services</a>
+          <a href="/privacy">Privacy</a>
           <a href="difmrural://">Open the app</a>
         </div>
         <div className="footer-bottom">

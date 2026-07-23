@@ -5,6 +5,7 @@ import {
   BackHandler,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -694,7 +695,7 @@ export default function AccountTabScreen({ navigation }) {
         )}
         <MenuRow
           icon="document-text-outline" label="Terms & privacy" last
-          onPress={() => Alert.alert('Terms & privacy', 'Terms and privacy policy coming soon.')}
+          onPress={() => Linking.openURL('https://ruralconnections.nz/privacy')}
         />
       </View>
 
@@ -706,7 +707,7 @@ export default function AccountTabScreen({ navigation }) {
         />
         <MenuRow
           icon="mail-outline" label="Contact us" last
-          onPress={() => Alert.alert('Contact us', 'support@difmrural.co.nz')}
+          onPress={() => Linking.openURL('mailto:hello@ruralconnections.nz')}
         />
       </View>
     </View>
