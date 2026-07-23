@@ -132,7 +132,7 @@ export default async function Home() {
 
       <section className="hero" id="top">
         <div className="hero-copy">
-          <p className="eyebrow">A rural marketplace for Aotearoa</p>
+          <p className="eyebrow">A rural marketplace for New Zealand</p>
           <h1>Get rural work sorted.</h1>
           <p className="hero-lead">
             Find nearby people with the practical skills your property needs—or turn your rural
