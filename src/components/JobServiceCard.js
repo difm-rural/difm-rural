@@ -96,6 +96,7 @@ export default function JobServiceCard({
   status,
   isGuest = false,
   onGuestAction,
+  nextMove = null,
 }) {
   const isService = item._type === 'service' || item.itemType === 'service'
   const profile   = isService ? (item.profile || {}) : (item.profiles || {})
@@ -223,6 +224,32 @@ export default function JobServiceCard({
 
         {/* Row 5: rating */}
         <Text style={styles.rating}>{ratingText}</Text>
+
+        {nextMove && (
+          <View style={[
+            styles.nextMove,
+            nextMove.tone === 'attention' && styles.nextMoveAttention,
+            nextMove.tone === 'scheduled' && styles.nextMoveScheduled,
+            nextMove.tone === 'active' && styles.nextMoveActive,
+          ]}>
+            <View style={styles.nextMoveHeading}>
+              <Icon
+                name={nextMove.icon || 'time-outline'}
+                size={12}
+                color={nextMove.tone === 'attention' ? '#9a6700' : colors.primary}
+              />
+              <Text
+                style={[
+                  styles.nextMoveLabel,
+                  nextMove.tone === 'attention' && styles.nextMoveLabelAttention,
+                ]}
+                numberOfLines={1}>
+                {nextMove.label}
+              </Text>
+            </View>
+            <Text style={styles.nextMoveDetail} numberOfLines={2}>{nextMove.detail}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   )
@@ -310,6 +337,20 @@ const styles = StyleSheet.create({
 
   // ─── Body ───────────────────────────────────────────────────────────────────
   body: { padding: 8, paddingBottom: 10 },
+  nextMove: {
+    marginTop: 8,
+    borderRadius: 8,
+    backgroundColor: '#f2f5f3',
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+  },
+  nextMoveAttention: { backgroundColor: '#fff4d6' },
+  nextMoveScheduled: { backgroundColor: '#eaf2ff' },
+  nextMoveActive: { backgroundColor: '#e8f5ee' },
+  nextMoveHeading: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  nextMoveLabel: { flex: 1, fontSize: 9.5, lineHeight: 12, fontWeight: '800', color: colors.primary },
+  nextMoveLabelAttention: { color: '#8a5d00' },
+  nextMoveDetail: { marginTop: 2, fontSize: 8.5, lineHeight: 11, color: colors.textSecondary },
 
   // Row 1
   row1: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },

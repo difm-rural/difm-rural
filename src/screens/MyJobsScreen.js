@@ -17,6 +17,7 @@ import Icon from '../components/Icon'
 import EmptyState from '../components/EmptyState'
 import Loading from '../components/Loading'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
+import { jobNextMove } from '../lib/nextMove'
 
 export default function MyJobsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
@@ -58,10 +59,14 @@ export default function MyJobsScreen({ navigation, route }) {
 
     const openIds = rawJobs.filter(j => j.status === 'open').map(j => j.id)
     let bidCountMap = {}
+    let questionCountMap = {}
     if (openIds.length > 0) {
-      const { data: bidsData } = await supabase
-        .from('bids').select('job_id').in('job_id', openIds).eq('status', 'pending')
+      const [{ data: bidsData }, { data: questionsData }] = await Promise.all([
+        supabase.from('bids').select('job_id').in('job_id', openIds).eq('status', 'pending'),
+        supabase.from('job_questions').select('job_id').in('job_id', openIds).is('answer', null),
+      ])
       bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+      questionsData?.forEach(q => { questionCountMap[q.job_id] = (questionCountMap[q.job_id] || 0) + 1 })
     }
 
     const completedIds = rawJobs.filter(j => j.status === 'completed').map(j => j.id)
@@ -97,6 +102,7 @@ export default function MyJobsScreen({ navigation, route }) {
       ...job,
       profiles: profileData || null,
       bidCount: bidCountMap[job.id] || 0,
+      unansweredQuestionCount: questionCountMap[job.id] || 0,
       acceptedBidAmount: acceptedBidAmountMap[job.id],
       completedAmount: acceptedBidAmountMap[job.id],
       requesterRatingGiven: requesterRatingMap[job.id],
@@ -276,6 +282,10 @@ export default function MyJobsScreen({ navigation, route }) {
                   item={job}
                   showStatusBadge
                   status={job.status}
+                  nextMove={jobNextMove(job, 'requester', {
+                    bidCount: job.bidCount,
+                    unansweredQuestionCount: job.unansweredQuestionCount,
+                  })}
                   onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
                 />
               )}
@@ -329,7 +339,7 @@ export default function MyJobsScreen({ navigation, route }) {
 
         {/* Active bids (jobs I'm doing) */}
         <View style={styles.cardSection}>
-          <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>Jobs I'm doing</Text>
+          <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>My jobs and offers</Text>
           {activeBids.length === 0 ? (
             <EmptyState
               compact
@@ -347,6 +357,10 @@ export default function MyJobsScreen({ navigation, route }) {
                   item={bid.jobs}
                   showStatusBadge
                   status={bid.jobs?.status}
+                  nextMove={jobNextMove(bid.jobs, 'provider', {
+                    otherName: bid.jobs?.profiles?.full_name,
+                    hasPendingBid: bid.status === 'pending',
+                  })}
                   onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
                 />
               )}

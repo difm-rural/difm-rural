@@ -27,6 +27,7 @@ import { fetchConnectionsForRequester } from '../../lib/connections'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
+import { fetchActionableNextMoves } from '../../lib/nextMove'
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   const isPrimary = variant === 'primary'
@@ -56,6 +57,7 @@ export default function HomeTabScreen({ navigation }) {
   const [connections, setConnections]   = useState([])
   const [invitedJobs, setInvitedJobs]   = useState([])
   const [seasonalReminders, setSeasonalReminders] = useState([])
+  const [nextMoves, setNextMoves]         = useState([])
   const [loading, setLoading]           = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
 
@@ -76,18 +78,20 @@ export default function HomeTabScreen({ navigation }) {
     const isRequester = true              // everyone can request
     const isProvider  = canProvide(prof)  // providing is additive
 
-    const [notifs, counts, conns, invited, reminders] = await Promise.all([
+    const [notifs, counts, conns, invited, reminders, actionable] = await Promise.all([
       fetchNotifications(8),
       fetchSummary(user.id, isRequester, isProvider),
       fetchConnectionsForRequester(user.id),
       isProvider ? fetchInvitedJobsForProvider(user.id) : Promise.resolve([]),
       fetchSeasonalReminders(),
+      fetchActionableNextMoves(user.id, isProvider),
     ])
     setNotifications(notifs)
     setSummary(counts)
     setConnections(conns)
     setInvitedJobs(invited)
     setSeasonalReminders(reminders)
+    setNextMoves(actionable)
     reminders.forEach(reminder => recordSeasonalEvent(reminder.id, 'impression'))
     setLoading(false)
     setRefreshing(false)
@@ -152,7 +156,20 @@ export default function HomeTabScreen({ navigation }) {
   const isProvider  = canProvide(profile)
   const firstName   = profile?.full_name?.split(' ')[0] || 'there'
   const unread      = notifications.filter(n => !n.read)
-  const attention   = unread.slice(0, 5)
+  const nextMoveKeys = new Set(nextMoves.map(item => `${item.entityType}:${item.entityId}`))
+  const remainingNotifications = unread.filter(notification => {
+    const metadata = notification.metadata || {}
+    const key = metadata.booking_id
+      ? `booking:${metadata.booking_id}`
+      : metadata.job_id
+        ? `job:${metadata.job_id}`
+        : null
+    return !key || !nextMoveKeys.has(key)
+  })
+  const attention = [
+    ...nextMoves.map(item => ({ ...item, _kind: 'nextMove' })),
+    ...remainingNotifications.map(item => ({ ...item, _kind: 'notification' })),
+  ].slice(0, 5)
   const totalActive = (summary.activeJobs || 0) + (summary.reqBookings || 0)
     + (summary.pendingBids || 0) + (summary.jobsDoing || 0) + (summary.provBookings || 0)
 
@@ -163,6 +180,21 @@ export default function HomeTabScreen({ navigation }) {
     { label: 'Offers made', count: summary.pendingBids || 0, target: 'Jobs' },
     { label: 'In progress', count: (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0), target: 'Activity' },
   ]
+
+  function openAttentionItem(item) {
+    if (item._kind === 'notification') {
+      openNotificationTarget(navigation, userId, item)
+      return
+    }
+    if (item.entityType === 'job') {
+      navigation.navigate('ManageTask', { job: item.item, bidCount: item.item.bidCount || 0 })
+      return
+    }
+    navigation.navigate('ServiceBookingDetail', {
+      booking: item.item,
+      viewerRole: item.viewerRole,
+    })
+  }
 
   if (loading) {
     return (
@@ -254,11 +286,17 @@ export default function HomeTabScreen({ navigation }) {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Needs attention</Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Notifications')}
+              onPress={() => nextMoves.length > 0
+                ? navigation.getParent()?.navigate('Activity')
+                : navigation.navigate('Notifications')}
               accessibilityRole="button"
-              accessibilityLabel="All notifications">
+              accessibilityLabel={nextMoves.length > 0 ? 'View all activity' : 'All notifications'}>
               <Text style={styles.sectionLink}>
-                {unread.length > 0 ? `All notifications (${unread.length})` : 'All notifications'}
+                {nextMoves.length > 0
+                  ? `View activity (${nextMoves.length})`
+                  : unread.length > 0
+                    ? `All notifications (${unread.length})`
+                    : 'All notifications'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -268,19 +306,33 @@ export default function HomeTabScreen({ navigation }) {
               <Text style={styles.attentionClearText}>All caught up — nothing waiting on you.</Text>
             </View>
           ) : (
-            attention.map((n, i) => (
+            attention.map((item, i) => (
               <TouchableOpacity
-                key={n.id}
+                key={item.id}
                 style={[styles.notifRow, i < attention.length - 1 && styles.notifRowBorder]}
-                onPress={() => openNotificationTarget(navigation, userId, n)}
+                onPress={() => openAttentionItem(item)}
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel={n.body}>
-                <Icon name={NOTIFICATION_ICONS[n.type] || 'notifications-outline'} size={20} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.notifBody} numberOfLines={2}>{n.body}</Text>
-                  <Text style={styles.notifTime}>{notificationTimeAgo(n.created_at)}</Text>
-                </View>
+                accessibilityLabel={item._kind === 'nextMove' ? `${item.nextMove.label}. ${item.nextMove.detail}` : item.body}>
+                <Icon
+                  name={item._kind === 'nextMove'
+                    ? item.nextMove.icon
+                    : NOTIFICATION_ICONS[item.type] || 'notifications-outline'}
+                  size={20}
+                  color={item._kind === 'nextMove' ? '#9a6700' : colors.primary}
+                />
+                {item._kind === 'nextMove' ? (
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.nextMoveTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.nextMoveLabel}>{item.nextMove.label}</Text>
+                    <Text style={styles.notifBody} numberOfLines={2}>{item.nextMove.detail}</Text>
+                  </View>
+                ) : (
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
+                    <Text style={styles.notifTime}>{notificationTimeAgo(item.created_at)}</Text>
+                  </View>
+                )}
                 <View style={styles.notifDot} />
               </TouchableOpacity>
             ))
@@ -438,6 +490,8 @@ const styles = StyleSheet.create({
   },
   notifRowBorder: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
   notifIcon: { fontSize: 18, lineHeight: 22 },
+  nextMoveTitle: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  nextMoveLabel: { fontSize: 14, lineHeight: 19, fontWeight: '800', color: '#8a5d00', marginTop: 1 },
   notifBody: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
   notifTime: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   notifDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 6 },

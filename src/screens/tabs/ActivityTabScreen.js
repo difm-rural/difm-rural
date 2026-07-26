@@ -33,6 +33,7 @@ import Loading from '../../components/Loading'
 import { loadReview, saveReview } from '../../lib/reviews'
 import { canProvide } from '../../lib/roles'
 import { markNotificationsReadFor } from '../../lib/notifications'
+import { bookingNextMove, jobNextMove } from '../../lib/nextMove'
 
 function bookingNeedsQuote(booking) {
   return (booking?.service || booking?.services)?.pricing_type === 'quote_required'
@@ -70,6 +71,8 @@ function BookingWorkCard({
   const providerCanConfirmCancellation = viewerRole === 'provider' && booking.status === 'cancellation_requested'
   const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
   const canReview = booking.status === 'completed' && !!onReview
+  const otherName = viewerRole === 'provider' ? booking.requesterName : booking.providerName
+  const nextMove = bookingNextMove(booking, viewerRole, { otherName })
 
   return (
     <View style={styles.bookingWorkWrap}>
@@ -78,6 +81,7 @@ function BookingWorkCard({
         showStatusBadge
         status={booking.status}
         onPress={onPress}
+        nextMove={nextMove}
       />
 
       {providerPending && (
@@ -251,13 +255,40 @@ export default function ActivityTabScreen({ navigation }) {
     const rawJobs = jobsData || []
     if (rawJobs.length > 0) {
       const openIds = rawJobs.filter(j => j.status === 'open').map(j => j.id)
+      const awardedIds = rawJobs.filter(j => isJobAwarded(j.status)).map(j => j.id)
       let bidCountMap = {}
-      if (openIds.length > 0) {
-        const { data: bidsData } = await supabase
-          .from('bids').select('job_id').in('job_id', openIds).eq('status', 'pending')
-        bidsData?.forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+      let questionCountMap = {}
+      let acceptedProviderMap = {}
+
+      const [bidsResult, questionsResult, acceptedResult] = await Promise.all([
+        openIds.length
+          ? supabase.from('bids').select('job_id').in('job_id', openIds).eq('status', 'pending')
+          : Promise.resolve({ data: [] }),
+        openIds.length
+          ? supabase.from('job_questions').select('job_id').in('job_id', openIds).is('answer', null)
+          : Promise.resolve({ data: [] }),
+        awardedIds.length
+          ? supabase.from('bids').select('job_id, provider_id').in('job_id', awardedIds).eq('status', 'accepted')
+          : Promise.resolve({ data: [] }),
+      ])
+      ;(bidsResult.data || []).forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
+      ;(questionsResult.data || []).forEach(q => { questionCountMap[q.job_id] = (questionCountMap[q.job_id] || 0) + 1 })
+
+      const acceptedBids = acceptedResult.data || []
+      const providerIds = [...new Set(acceptedBids.map(b => b.provider_id).filter(Boolean))]
+      if (providerIds.length > 0) {
+        const { data: providers } = await supabase.from('profiles_public').select('id, full_name').in('id', providerIds)
+        const providerNames = {}
+        ;(providers || []).forEach(provider => { providerNames[provider.id] = provider.full_name })
+        acceptedBids.forEach(bid => { acceptedProviderMap[bid.job_id] = providerNames[bid.provider_id] || 'the provider' })
       }
-      setActiveJobs(rawJobs.map(j => ({ ...j, bidCount: bidCountMap[j.id] || 0 })))
+
+      setActiveJobs(rawJobs.map(j => ({
+        ...j,
+        bidCount: bidCountMap[j.id] || 0,
+        unansweredQuestionCount: questionCountMap[j.id] || 0,
+        providerName: acceptedProviderMap[j.id],
+      })))
     } else {
       setActiveJobs([])
     }
@@ -288,18 +319,34 @@ export default function ActivityTabScreen({ navigation }) {
   }
 
   async function fetchProviderData(uid) {
-    // Jobs with accepted bids
+    // Jobs with an offer pending or accepted. Pending offers remain visible so
+    // the provider can see that the requester has the next move.
     const { data: bidsData } = await supabase
       .from('bids')
       .select('*, jobs(*)')
       .eq('provider_id', uid)
-      .eq('status', 'accepted')
+      .in('status', ['pending', 'accepted'])
       .order('created_at', { ascending: false })
 
     const activeBids = (bidsData || []).filter(b =>
-      b.jobs && isJobAwarded(b.jobs.status)
+      b.jobs && (
+        (b.status === 'pending' && b.jobs.status === 'open')
+        || (b.status === 'accepted' && isJobAwarded(b.jobs.status))
+      )
     )
-    setActiveBidJobs(activeBids.map(b => ({ ...b.jobs, _bidAmount: b.amount, bidCount: 0 })))
+    const requesterIds = [...new Set(activeBids.map(b => b.jobs?.requester_id).filter(Boolean))]
+    let requesterNames = {}
+    if (requesterIds.length > 0) {
+      const { data: requesters } = await supabase.from('profiles_public').select('id, full_name').in('id', requesterIds)
+      ;(requesters || []).forEach(requester => { requesterNames[requester.id] = requester.full_name })
+    }
+    setActiveBidJobs(activeBids.map(b => ({
+      ...b.jobs,
+      _bidAmount: b.amount,
+      _bidStatus: b.status,
+      requesterName: requesterNames[b.jobs.requester_id],
+      bidCount: 0,
+    })))
 
     // Bookings as provider
     const { data: bookingsData } = await supabase
@@ -658,6 +705,11 @@ export default function ActivityTabScreen({ navigation }) {
                   item={job}
                   showStatusBadge
                   status={job.status}
+                  nextMove={jobNextMove(job, 'requester', {
+                    otherName: job.providerName,
+                    bidCount: job.bidCount,
+                    unansweredQuestionCount: job.unansweredQuestionCount,
+                  })}
                   onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
                 />
               )}
@@ -701,7 +753,7 @@ export default function ActivityTabScreen({ navigation }) {
         {/* Provider: Jobs doing */}
         {isProvider && activeBidJobs.length > 0 && (
           <View style={styles.cardSection}>
-            <Text style={styles.sectionLabel}>Jobs you're doing</Text>
+            <Text style={styles.sectionLabel}>Your jobs and offers</Text>
             <FlatList
               horizontal
               data={activeBidJobs}
@@ -711,6 +763,10 @@ export default function ActivityTabScreen({ navigation }) {
                   item={job}
                   showStatusBadge
                   status={job.status}
+                  nextMove={jobNextMove(job, 'provider', {
+                    otherName: job.requesterName,
+                    hasPendingBid: job._bidStatus === 'pending',
+                  })}
                   onPress={() => navigation.navigate('JobDetail', { job })}
                 />
               )}

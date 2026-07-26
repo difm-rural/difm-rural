@@ -20,6 +20,8 @@ import ReceivedReview from '../components/ReceivedReview'
 import ReputationCard from '../components/ReputationCard'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
+import NextMoveBanner from '../components/NextMoveBanner'
+import { bookingNextMove } from '../lib/nextMove'
 import { loadReview } from '../lib/reviews'
 import {
   updateBookingStatus,
@@ -149,6 +151,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const otherUser = viewerRole === 'provider' ? requester : provider
   const otherRoleLabel = viewerRole === 'provider' ? 'Requester' : 'Provider'
   const isQuoteRequired = service.pricing_type === 'quote_required'
+  const nextMove = bookingNextMove(booking, viewerRole, { otherName: otherUser?.full_name })
 
   function openMap() {
     if (!booking.latitude || !booking.longitude) return
@@ -344,6 +347,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets={true}>
+        <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 14 }} />
+
         <View style={styles.card}>
           <Text style={styles.cardLabel}>People</Text>
           <DetailRow label="Requester" value={requester?.full_name || booking.requesterName || 'Requester'} />

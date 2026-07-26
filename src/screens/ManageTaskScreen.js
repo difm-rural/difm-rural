@@ -24,6 +24,8 @@ import Button from '../components/Button'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 import { fetchInvitesForJob, inviteStatusLabel } from '../lib/invites'
+import { jobNextMove } from '../lib/nextMove'
+import NextMoveBanner from '../components/NextMoveBanner'
 
 function timeAgo(isoString) {
   if (!isoString) return 'Unknown'
@@ -238,6 +240,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         .from('job_questions')
         .select('id', { count: 'exact', head: true })
         .eq('job_id', job.id)
+        .is('answer', null)
       setQuestionCount(count || 0)
     } catch { /* table may not exist yet */ }
   }
@@ -305,6 +308,12 @@ export default function ManageTaskScreen({ navigation, route }) {
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
   const isAwarded = isJobAwarded(job.status)
+  const nextMove = jobNextMove(job, isAcceptedProvider ? 'provider' : 'requester', {
+    otherName: isAcceptedProvider ? requesterProfile?.full_name : acceptedBid?.providerName,
+    bidCount: Math.max(bidCount || 0, bids.length),
+    unansweredQuestionCount: questionCount,
+    hasPendingBid: !isTaskOwner && !isAcceptedProvider,
+  })
 
   function ensureTaskOwner() {
     if (isTaskOwner) return true
@@ -528,6 +537,8 @@ export default function ManageTaskScreen({ navigation, route }) {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
           showsVerticalScrollIndicator={false}>
 
+          <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
+
           {/* Job overview */}
           <View style={styles.card}>
             <View style={styles.acceptedHeaderRow}>
@@ -728,6 +739,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
         showsVerticalScrollIndicator={false}>
+
+        <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
 
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
