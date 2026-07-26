@@ -22,6 +22,8 @@ export const NOTIFICATION_ICONS = {
   booking_cancelled:               'alert-circle-outline',
   service_booking_withdrawn:       'alert-circle-outline',
   booking_ready:                   'notifications-outline',
+  opportunity_match:               'briefcase-outline',
+  opportunity_digest:              'briefcase-outline',
   booking_completed:               'checkmark-circle-outline',
   booking_cancellation_requested:  'alert-circle-outline',
 }

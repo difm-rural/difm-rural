@@ -312,7 +312,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         ? (alsoPublic
             ? `${who} has been invited, and your job is also on the public board.`
             : `${who} has been invited. Only they can see this job.`)
-        : 'Providers near you will be notified.'
+        : 'Your job is live. Providers with matching capabilities and travel areas can now find it.'
     Alert.alert(successTitle, successBody, [
       { text: 'OK', onPress: returnAfterPost },
     ])

@@ -34,6 +34,8 @@ const SUBJECTS: Record<string, string> = {
   booking_completed:               'Booking completed',
   booking_cancellation_requested:  'Cancellation requested',
   new_message:                     'You have an unread message',
+  opportunity_match:               'A strong job match is nearby',
+  opportunity_digest:              'Jobs matching your capabilities',
 }
 
 type OutboxRow = {
@@ -199,10 +201,15 @@ Deno.serve(async (req) => {
 
     const { data: prefs } = await supabase
       .from('user_preferences')
-      .select('email_transactional, email_messages, email_seasonal')
+      .select('email_transactional, email_messages, email_seasonal, opportunity_alert_mode, opportunity_email')
       .eq('user_id', candidate.user_id)
       .maybeSingle()
-    let allowed = candidate.email_type === 'new_message'
+    const isOpportunity = candidate.email_type === 'opportunity_match'
+      || candidate.email_type === 'opportunity_digest'
+    const expectedOpportunityMode = candidate.email_type === 'opportunity_match' ? 'instant' : 'daily'
+    let allowed = isOpportunity
+      ? prefs?.opportunity_email === true && prefs?.opportunity_alert_mode === expectedOpportunityMode
+      : candidate.email_type === 'new_message'
       ? prefs?.email_messages !== false
       : isSeasonal
         ? prefs?.email_seasonal === true

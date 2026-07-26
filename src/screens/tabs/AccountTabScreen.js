@@ -110,6 +110,28 @@ function Stat({ number, label }) {
   )
 }
 
+function SettingSwitchRow({ icon, label, sub, value, onChange, last }) {
+  return (
+    <View style={[styles.row, !last && styles.rowBorder]}>
+      <View style={styles.rowLeft}>
+        <Icon name={icon} size={18} color={colors.textSecondary} style={styles.rowIcon} />
+        <View style={styles.rowLabelWrap}>
+          <Text style={styles.rowLabel}>{label}</Text>
+          {!!sub && <Text style={styles.rowSub}>{sub}</Text>}
+        </View>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: colors.border, true: colors.primary }}
+        thumbColor={colors.white}
+        ios_backgroundColor={colors.border}
+        accessibilityLabel={label}
+      />
+    </View>
+  )
+}
+
 export default function AccountTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const { refreshProfile } = useUser()
@@ -141,6 +163,11 @@ export default function AccountTabScreen({ navigation }) {
   const [emailTransactional, setEmailTransactional] = useState(true)
   const [emailMessages,      setEmailMessages]      = useState(true)
   const [emailSeasonal,      setEmailSeasonal]      = useState(false)
+  const [opportunityMode,    setOpportunityMode]    = useState('off')
+  const [opportunityRadius,  setOpportunityRadius]  = useState(30)
+  const [opportunityAvailable, setOpportunityAvailable] = useState(true)
+  const [opportunityPush,    setOpportunityPush]    = useState(true)
+  const [opportunityEmail,   setOpportunityEmail]   = useState(false)
   const [locationModalVisible, setLocationModalVisible] = useState(false)
   const [editModal, setEditModal]           = useState({
     visible: false, field: '', label: '', value: '', keyboardType: 'default',
@@ -203,6 +230,11 @@ export default function AccountTabScreen({ navigation }) {
     setEmailTransactional(prefs?.email_transactional !== false)
     setEmailMessages(prefs?.email_messages !== false)
     setEmailSeasonal(!!prefs?.email_seasonal)
+    setOpportunityMode(prefs?.opportunity_alert_mode || 'off')
+    setOpportunityRadius(prefs?.opportunity_radius_km || 30)
+    setOpportunityAvailable(prefs?.opportunity_available !== false)
+    setOpportunityPush(prefs?.opportunity_push !== false)
+    setOpportunityEmail(!!prefs?.opportunity_email)
 
     setLoading(false)
   }
@@ -230,6 +262,35 @@ export default function AccountTabScreen({ navigation }) {
     const next = !emailSeasonal
     setEmailSeasonal(next)
     await updateUserPreferences({ email_seasonal: next })
+  }
+
+  async function saveOpportunityPreference(field, value) {
+    await updateUserPreferences({ [field]: value })
+  }
+
+  function handleOpportunityMode(mode) {
+    setOpportunityMode(mode)
+    saveOpportunityPreference('opportunity_alert_mode', mode)
+  }
+
+  function handleOpportunityRadius(radius) {
+    setOpportunityRadius(radius)
+    saveOpportunityPreference('opportunity_radius_km', radius)
+  }
+
+  function handleOpportunityAvailable(value) {
+    setOpportunityAvailable(value)
+    saveOpportunityPreference('opportunity_available', value)
+  }
+
+  function handleOpportunityPush(value) {
+    setOpportunityPush(value)
+    saveOpportunityPreference('opportunity_push', value)
+  }
+
+  function handleOpportunityEmail(value) {
+    setOpportunityEmail(value)
+    saveOpportunityPreference('opportunity_email', value)
   }
 
   // ─── Biometric toggle ──────────────────────────────────────────────────────
@@ -677,6 +738,109 @@ export default function AccountTabScreen({ navigation }) {
           onPress={handleDailyDigestToggle}
         />
       </View>
+
+      {isProvider && (
+        <>
+          <Text style={styles.sectionLabel}>Job opportunities</Text>
+          <View style={[styles.card, styles.opportunityCard]}>
+            <Text style={styles.opportunityTitle}>Personalised opportunity alerts</Text>
+            <Text style={styles.opportunityIntro}>
+              Only hear about public jobs that match your capabilities and travel area.
+            </Text>
+
+            <View style={styles.modeOptions}>
+              {[
+                { id: 'instant', label: 'Strong matches', sub: 'As they are posted' },
+                { id: 'daily', label: 'Daily summary', sub: 'One morning update' },
+                { id: 'off', label: 'No alerts', sub: 'Browse jobs yourself' },
+              ].map(option => {
+                const selected = opportunityMode === option.id
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[styles.modeOption, selected && styles.modeOptionSelected]}
+                    onPress={() => handleOpportunityMode(option.id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}>
+                    <View style={[styles.radio, selected && styles.radioSelected]}>
+                      {selected && <View style={styles.radioDot} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modeLabel, selected && styles.modeLabelSelected]}>{option.label}</Text>
+                      <Text style={styles.modeSub}>{option.sub}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+
+            {opportunityMode !== 'off' && (
+              <>
+                <View style={styles.opportunityDivider} />
+                <Text style={styles.opportunityFieldLabel}>Travel area</Text>
+                <View style={styles.radiusOptions}>
+                  {[15, 30, 50, 100].map(radius => (
+                    <TouchableOpacity
+                      key={radius}
+                      style={[styles.radiusChip, opportunityRadius === radius && styles.radiusChipSelected]}
+                      onPress={() => handleOpportunityRadius(radius)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: opportunityRadius === radius }}>
+                      <Text style={[
+                        styles.radiusChipText,
+                        opportunityRadius === radius && styles.radiusChipTextSelected,
+                      ]}>
+                        {radius} km
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {!profile.latitude && (
+                  <TouchableOpacity style={styles.locationWarning} onPress={openLocationModal}>
+                    <Icon name="location-outline" size={17} color="#9a6700" />
+                    <Text style={styles.locationWarningText}>
+                      Add your profile location before alerts can be matched.
+                    </Text>
+                    <Icon name="chevron-forward" size={15} color="#9a6700" />
+                  </TouchableOpacity>
+                )}
+                {skills.length === 0 && (
+                  <TouchableOpacity style={styles.locationWarning} onPress={() => setSection('profile')}>
+                    <Icon name="construct-outline" size={17} color="#9a6700" />
+                    <Text style={styles.locationWarningText}>
+                      Select your capabilities before alerts can be matched.
+                    </Text>
+                    <Icon name="chevron-forward" size={15} color="#9a6700" />
+                  </TouchableOpacity>
+                )}
+
+                <View style={styles.opportunitySwitches}>
+                  <SettingSwitchRow
+                    icon="checkmark-circle-outline"
+                    label="Available for work"
+                    sub="Pause this when you are fully booked"
+                    value={opportunityAvailable}
+                    onChange={handleOpportunityAvailable}
+                  />
+                  <SettingSwitchRow
+                    icon="phone-portrait-outline"
+                    label="Push notifications"
+                    value={opportunityPush}
+                    onChange={handleOpportunityPush}
+                  />
+                  <SettingSwitchRow
+                    icon="mail-outline"
+                    label="Email alerts"
+                    value={opportunityEmail}
+                    onChange={handleOpportunityEmail}
+                    last
+                  />
+                </View>
+              </>
+            )}
+          </View>
+        </>
+      )}
     </View>
   )
 
@@ -960,6 +1124,68 @@ const styles = StyleSheet.create({
   rowValue:       { fontSize: 13, color: colors.textMuted, textAlign: 'right', flexShrink: 1 },
   rowChevron:     { fontSize: 20, color: colors.textMuted, lineHeight: 24 },
   rowChevronDanger: { color: '#e57373' },
+
+  opportunityCard: { padding: 14 },
+  opportunityTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  opportunityIntro: { fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginTop: 4, marginBottom: 12 },
+  modeOptions: { gap: 8 },
+  modeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  modeOptionSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioSelected: { borderColor: colors.primary },
+  radioDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
+  modeLabel: { fontSize: 13.5, fontWeight: '600', color: colors.textPrimary },
+  modeLabelSelected: { color: colors.primary },
+  modeSub: { fontSize: 11.5, color: colors.textMuted, marginTop: 1 },
+  opportunityDivider: { height: 1, backgroundColor: '#ecefec', marginVertical: 16 },
+  opportunityFieldLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 },
+  radiusOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  radiusChip: {
+    flex: 1,
+    minWidth: 62,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+  },
+  radiusChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  radiusChipText: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
+  radiusChipTextSelected: { color: colors.white },
+  locationWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 9,
+    backgroundColor: '#fff8df',
+  },
+  locationWarningText: { flex: 1, fontSize: 12, lineHeight: 17, color: '#765300' },
+  opportunitySwitches: {
+    borderWidth: 1,
+    borderColor: '#ececec',
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 14,
+  },
 
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {

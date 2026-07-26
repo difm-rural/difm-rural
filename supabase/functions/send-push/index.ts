@@ -28,6 +28,8 @@ const TITLES: Record<string, string> = {
   booking_ready:                  'Ready to confirm',
   booking_completed:              'Booking completed',
   booking_cancellation_requested: 'Cancellation requested',
+  opportunity_match:              'Job opportunity nearby',
+  opportunity_digest:             'Jobs matching your capabilities',
 }
 
 Deno.serve(async (req) => {
@@ -48,6 +50,19 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
+
+  if (record.type === 'opportunity_match' || record.type === 'opportunity_digest') {
+    const { data: prefs } = await supabase
+      .from('user_preferences')
+      .select('opportunity_alert_mode, opportunity_push')
+      .eq('user_id', record.user_id)
+      .maybeSingle()
+
+    const expectedMode = record.type === 'opportunity_match' ? 'instant' : 'daily'
+    if (prefs?.opportunity_alert_mode !== expectedMode || prefs?.opportunity_push !== true) {
+      return new Response('ok', { status: 200 })
+    }
+  }
 
   const { data: tokens } = await supabase
     .from('device_push_tokens')
