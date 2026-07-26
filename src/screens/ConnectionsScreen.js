@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
@@ -20,11 +20,12 @@ import {
 
 const CANVAS_SIZE = Math.min(Dimensions.get('window').width - 32, 420)
 
-export default function ConnectionsScreen({ navigation }) {
+export default function ConnectionsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
+  const inviteJob = route.params?.inviteJob || null
   const [connections, setConnections] = useState([])
   const [me, setMe] = useState(null)
-  const [view, setView] = useState('network') // 'network' | 'list'
+  const [view, setView] = useState(inviteJob ? 'list' : 'network') // 'network' | 'list'
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -48,7 +49,44 @@ export default function ConnectionsScreen({ navigation }) {
     load()
   }
 
+  async function inviteConnection(conn) {
+    const name = conn.provider?.full_name || 'this provider'
+    Alert.alert(
+      'Invite previous provider?',
+      `Invite ${name} to view and offer on “${inviteJob.title}”?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send invite',
+          onPress: async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            const { error } = await supabase.from('job_invites').insert({
+              job_id: inviteJob.id,
+              requester_id: user?.id,
+              provider_id: conn.provider_id,
+            })
+            if (error?.code === '23505') {
+              Alert.alert('Already invited', `${name} has already been invited to this job.`)
+              return
+            }
+            if (error) {
+              Alert.alert('Invite not sent', error.message || 'Please try again.')
+              return
+            }
+            Alert.alert('Invitation sent', `${name} will be notified about this job.`, [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ])
+          },
+        },
+      ],
+    )
+  }
+
   function openConnection(conn) {
+    if (inviteJob) {
+      inviteConnection(conn)
+      return
+    }
     navigation.navigate('ConnectionDetail', { connection: conn })
   }
 
@@ -120,8 +158,13 @@ export default function ConnectionsScreen({ navigation }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Connections</Text>
-        <Text style={styles.headerTitle} accessibilityRole="header">People you've worked with</Text>
+        <Text style={styles.kicker}>{inviteJob ? 'Invite to job' : 'Connections'}</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">
+          {inviteJob ? 'Choose a previous provider' : "People you've worked with"}
+        </Text>
+        {inviteJob ? (
+          <Text style={styles.headerSubtitle} numberOfLines={2}>{inviteJob.title}</Text>
+        ) : null}
 
         {!loading && connections.length > 0 && (
           <View style={styles.toggle}>
@@ -174,6 +217,7 @@ const styles = StyleSheet.create({
   backBtnText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   kicker: { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 4 },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
+  headerSubtitle: { fontSize: 14, lineHeight: 20, color: colors.textSecondary, marginTop: 5 },
 
   toggle: { flexDirection: 'row', backgroundColor: colors.background, borderRadius: 10, padding: 3, marginTop: 12, alignSelf: 'flex-start' },
   toggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },

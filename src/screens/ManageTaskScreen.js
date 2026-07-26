@@ -26,6 +26,8 @@ import { fetchProviderStats } from '../lib/providerStats'
 import { fetchInvitesForJob, inviteStatusLabel } from '../lib/invites'
 import { jobNextMove } from '../lib/nextMove'
 import NextMoveBanner from '../components/NextMoveBanner'
+import ListingPerformanceCard from '../components/ListingPerformanceCard'
+import { fetchJobListingPerformance } from '../lib/listingPerformance'
 
 function timeAgo(isoString) {
   if (!isoString) return 'Unknown'
@@ -89,6 +91,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [authChecked, setAuthChecked] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [questionCount, setQuestionCount] = useState(0)
+  const [listingPerformance, setListingPerformance] = useState(null)
 
   useEffect(() => {
     async function loadCurrentUserAndJob() {
@@ -115,6 +118,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       if (active && latestJob) setJob(latestJob)
       const inv = await fetchInvitesForJob(initialJob.id)
       if (active) setInvites(inv)
+      const performance = await fetchJobListingPerformance(initialJob.id)
+      if (active) setListingPerformance(performance)
     })()
     return () => { active = false }
   }, [initialJob.id]))
@@ -736,6 +741,18 @@ export default function ManageTaskScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}>
 
         <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
+
+        {job.status === 'open' && bids.length === 0 ? (
+          <ListingPerformanceCard
+            job={job}
+            performance={listingPerformance}
+            onEdit={handleEdit}
+            onConnections={() => navigation.getParent()?.navigate('Home', {
+              screen: 'Connections',
+              params: { inviteJob: { id: job.id, title: job.title } },
+            })}
+          />
+        ) : null}
 
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>

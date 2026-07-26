@@ -21,6 +21,7 @@ import { staticMapUrl, staticMapPolygonUrl } from '../lib/maps'
 import { coarseSuburb, stripPlusCode } from '../lib/location'
 import { canProvide } from '../lib/roles'
 import { useUser } from '../context/UserContext'
+import { recordJobProviderView } from '../lib/listingPerformance'
 
 const MATERIALS_LABELS = {
   none:      'No materials needed',
@@ -135,6 +136,7 @@ export default function JobDetailScreen({ route, navigation }) {
     setJob(currentJob)
 
     trackEvent('job_viewed', { job_id: currentJob.id, category: currentJob.category })
+    recordJobProviderView(currentJob.id)
 
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(profileData)
