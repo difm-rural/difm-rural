@@ -4,6 +4,7 @@ import { colors } from '../theme/tokens'
 import { categoryImage } from '../lib/categoryImages'
 import { categoryVisual } from './JobServiceCard'
 import Icon from './Icon'
+import { availabilityDisplay } from '../lib/providerAvailability'
 
 function servicePrice(item) {
   const { pricing_type, rate, unit_label } = item
@@ -29,6 +30,11 @@ export default function ServiceListCard({ item, onPress }) {
   const ratingText   = ratingCount > 0 ? `★ ${Number(item.ratingAverage || 0).toFixed(1)} (${ratingCount})` : '★ New'
   const providerName = profile.full_name || 'Provider'
   const paused    = item.is_active === false
+  const availability = availabilityDisplay(
+    profile.availability_status,
+    profile.availability_until,
+    profile.availability_updated_at,
+  )
 
   return (
     <TouchableOpacity
@@ -56,6 +62,26 @@ export default function ServiceListCard({ item, onPress }) {
         <View style={styles.bottomRow}>
           <Text style={styles.rating}>{ratingText}</Text>
           <Text style={styles.price}>{price}</Text>
+          {!availability.stale && (
+            <View style={[
+              styles.availabilityPill,
+              availability.tone === 'limited' && styles.availabilityPillLimited,
+              !availability.active && styles.availabilityPillMuted,
+            ]}>
+              <View style={[
+                styles.availabilityDot,
+                availability.tone === 'limited' && { backgroundColor: colors.warning },
+                !availability.active && { backgroundColor: colors.textMuted },
+              ]} />
+              <Text style={[
+                styles.availabilityText,
+                availability.tone === 'limited' && { color: colors.warning },
+                !availability.active && { color: colors.textMuted },
+              ]} numberOfLines={1}>
+                {availability.label}
+              </Text>
+            </View>
+          )}
           {paused && (
             <View style={styles.pausedPill}>
               <Text style={styles.pausedPillText}>Paused</Text>
@@ -95,6 +121,11 @@ const styles = StyleSheet.create({
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   rating:    { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
   price:     { fontSize: 13, fontWeight: '700', color: colors.primary },
+  availabilityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
+  availabilityPillLimited: { backgroundColor: colors.warningLight },
+  availabilityPillMuted: { backgroundColor: colors.background },
+  availabilityDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.primary },
+  availabilityText: { fontSize: 10, fontWeight: '700', color: colors.primary },
 
   pausedPill:     { backgroundColor: colors.background, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   pausedPillText: { fontSize: 11, fontWeight: '700', color: colors.textMuted },

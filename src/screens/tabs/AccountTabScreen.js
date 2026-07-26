@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../../lib/uploadAvatar'
@@ -27,6 +28,7 @@ import Loading from '../../components/Loading'
 import Button from '../../components/Button'
 import { canProvide } from '../../lib/roles'
 import { loadUserPreferences, updateUserPreferences } from '../../lib/preferences'
+import { availabilityDisplay, PROVIDER_AVAILABILITY_OPTIONS } from '../../lib/providerAvailability'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import CapabilityPicker from '../../components/CapabilityPicker'
 import {
@@ -43,6 +45,13 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
+
+function localDay(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 const SECTION_TITLES = {
   hub:     'Account',
@@ -132,7 +141,7 @@ function SettingSwitchRow({ icon, label, sub, value, onChange, last }) {
   )
 }
 
-export default function AccountTabScreen({ navigation }) {
+export default function AccountTabScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const { refreshProfile } = useUser()
 
@@ -165,15 +174,29 @@ export default function AccountTabScreen({ navigation }) {
   const [emailSeasonal,      setEmailSeasonal]      = useState(false)
   const [opportunityMode,    setOpportunityMode]    = useState('off')
   const [opportunityRadius,  setOpportunityRadius]  = useState(30)
-  const [opportunityAvailable, setOpportunityAvailable] = useState(true)
   const [opportunityPush,    setOpportunityPush]    = useState(true)
   const [opportunityEmail,   setOpportunityEmail]   = useState(false)
+  const [availabilityStatus, setAvailabilityStatus] = useState('unknown')
+  const [availabilityUntil, setAvailabilityUntil]   = useState(null)
+  const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState(null)
+  const [availabilityDateVisible, setAvailabilityDateVisible] = useState(false)
+  const [availabilityDate, setAvailabilityDate] = useState(() => {
+    const date = new Date()
+    date.setDate(date.getDate() + 7)
+    return date
+  })
   const [locationModalVisible, setLocationModalVisible] = useState(false)
   const [editModal, setEditModal]           = useState({
     visible: false, field: '', label: '', value: '', keyboardType: 'default',
   })
 
   useFocusEffect(useCallback(() => { loadProfile() }, []))
+
+  useEffect(() => {
+    if (!route?.params?.openAvailability) return
+    setSection('account')
+    navigation.setParams({ openAvailability: undefined })
+  }, [route?.params?.openAvailability])
 
   // Hardware back returns to the hub before leaving the tab.
   useEffect(() => {
@@ -197,7 +220,7 @@ export default function AccountTabScreen({ navigation }) {
 
     const [{ data: profileData }, { data: reviewsData }, { count: jobCount }, { count: serviceCount }] = await Promise.all([
       supabase.from('profiles')
-        .select('full_name, phone, region, avatar_url, primary_role, role, display_name, bio, skills, qualifications, address, latitude, longitude')
+        .select('full_name, phone, region, avatar_url, primary_role, role, display_name, bio, skills, qualifications, address, latitude, longitude, availability_status, availability_until, availability_updated_at')
         .eq('id', user.id)
         .single(),
       supabase.from('reviews').select('rating').eq('reviewee_id', user.id),
@@ -210,6 +233,9 @@ export default function AccountTabScreen({ navigation }) {
       setAvatarUrl(profileData.avatar_url || null)
       setSkills(profileData.skills || [])
       setQualifications(profileData.qualifications || [])
+      setAvailabilityStatus(profileData.availability_status || 'unknown')
+      setAvailabilityUntil(profileData.availability_until || null)
+      setAvailabilityUpdatedAt(profileData.availability_updated_at || null)
     }
     setJobsAndServices((jobCount || 0) + (serviceCount || 0))
 
@@ -232,7 +258,6 @@ export default function AccountTabScreen({ navigation }) {
     setEmailSeasonal(!!prefs?.email_seasonal)
     setOpportunityMode(prefs?.opportunity_alert_mode || 'off')
     setOpportunityRadius(prefs?.opportunity_radius_km || 30)
-    setOpportunityAvailable(prefs?.opportunity_available !== false)
     setOpportunityPush(prefs?.opportunity_push !== false)
     setOpportunityEmail(!!prefs?.opportunity_email)
 
@@ -278,9 +303,46 @@ export default function AccountTabScreen({ navigation }) {
     saveOpportunityPreference('opportunity_radius_km', radius)
   }
 
-  function handleOpportunityAvailable(value) {
-    setOpportunityAvailable(value)
-    saveOpportunityPreference('opportunity_available', value)
+  async function saveAvailability(status, until = null) {
+    if (!userId) return
+    const updatedAt = new Date().toISOString()
+    const previous = { status: availabilityStatus, until: availabilityUntil, updatedAt: availabilityUpdatedAt }
+    setAvailabilityStatus(status)
+    setAvailabilityUntil(until)
+    setAvailabilityUpdatedAt(updatedAt)
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        availability_status: status,
+        availability_until: until,
+        availability_updated_at: updatedAt,
+      })
+      .eq('id', userId)
+    if (error) {
+      setAvailabilityStatus(previous.status)
+      setAvailabilityUntil(previous.until)
+      setAvailabilityUpdatedAt(previous.updatedAt)
+      Alert.alert('Could not update availability', error.message)
+      return
+    }
+    refreshProfile()
+  }
+
+  function chooseAvailability(status) {
+    if (status === 'unavailable_until') {
+      const date = new Date()
+      date.setDate(date.getDate() + 7)
+      setAvailabilityDate(date)
+      setAvailabilityDateVisible(true)
+      return
+    }
+    saveAvailability(status)
+  }
+
+  function confirmUnavailableUntil() {
+    const day = localDay(availabilityDate)
+    setAvailabilityDateVisible(false)
+    saveAvailability('unavailable_until', day)
   }
 
   function handleOpportunityPush(value) {
@@ -493,6 +555,11 @@ export default function AccountTabScreen({ navigation }) {
     ? `${Number(ratingSummary.average || 0).toFixed(1)} / 5 · ${ratingSummary.count} review${ratingSummary.count === 1 ? '' : 's'}`
     : 'No reviews yet'
   const isProvider = canProvide(profile)
+  const availability = availabilityDisplay(
+    availabilityStatus,
+    availabilityUntil,
+    availabilityUpdatedAt,
+  )
   const locationDisplay = getDisplayLocation(profile.address) || profile.address || '—'
 
   const onboardYears = Math.floor(monthsOnboard / 12)
@@ -745,6 +812,55 @@ export default function AccountTabScreen({ navigation }) {
 
       {isProvider && (
         <>
+          <Text style={styles.sectionLabel}>Availability</Text>
+          <View style={[styles.card, styles.availabilityCard]}>
+            <View style={styles.availabilityHeading}>
+              <View style={[
+                styles.availabilityCurrentIcon,
+                availability.tone === 'positive' && styles.availabilityCurrentIconPositive,
+                availability.tone === 'limited' && styles.availabilityCurrentIconLimited,
+              ]}>
+                <Icon
+                  name={availability.active ? 'checkmark-circle-outline' : 'time-outline'}
+                  size={20}
+                  color={availability.tone === 'positive' ? colors.primary : availability.tone === 'limited' ? colors.warning : colors.textMuted}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.availabilityTitle}>Your work availability</Text>
+                <Text style={styles.availabilityCurrent}>{availability.label}</Text>
+              </View>
+            </View>
+            <Text style={styles.availabilityIntro}>
+              This is shown to requesters and used to avoid sending you unsuitable leads.
+            </Text>
+            <View style={styles.availabilityOptions}>
+              {PROVIDER_AVAILABILITY_OPTIONS.map(option => {
+                const selected = availabilityStatus === option.value && !availability.stale
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.availabilityOption, selected && styles.availabilityOptionSelected]}
+                    onPress={() => chooseAvailability(option.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}>
+                    <Icon name={option.icon} size={19} color={selected ? colors.primary : colors.textSecondary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.availabilityOptionLabel, selected && styles.availabilityOptionLabelSelected]}>
+                        {option.label}
+                      </Text>
+                      <Text style={styles.availabilityOptionSub}>{option.description}</Text>
+                    </View>
+                    {selected && <Icon name="checkmark-circle" size={20} color={colors.primary} />}
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+            <Text style={styles.availabilityFreshness}>
+              Short-term availability expires automatically. We’ll ask you to confirm it each week.
+            </Text>
+          </View>
+
           <Text style={styles.sectionLabel}>Job opportunities</Text>
           <View style={[styles.card, styles.opportunityCard]}>
             <Text style={styles.opportunityTitle}>Personalised opportunity alerts</Text>
@@ -818,14 +934,16 @@ export default function AccountTabScreen({ navigation }) {
                   </TouchableOpacity>
                 )}
 
+                {!availability.active && (
+                  <View style={styles.locationWarning}>
+                    <Icon name="time-outline" size={17} color="#9a6700" />
+                    <Text style={styles.locationWarningText}>
+                      Update your availability above before matching can begin.
+                    </Text>
+                  </View>
+                )}
+
                 <View style={styles.opportunitySwitches}>
-                  <SettingSwitchRow
-                    icon="checkmark-circle-outline"
-                    label="Available for work"
-                    sub="Pause this when you are fully booked"
-                    value={opportunityAvailable}
-                    onChange={handleOpportunityAvailable}
-                  />
                   <SettingSwitchRow
                     icon="phone-portrait-outline"
                     label="Push notifications"
@@ -911,6 +1029,37 @@ export default function AccountTabScreen({ navigation }) {
       </ScrollView>
 
       {/* ── Location modal ──────────────────────────────────────────────────── */}
+      <Modal
+        visible={availabilityDateVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvailabilityDateVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Unavailable until</Text>
+            <Text style={styles.availabilityDateHint}>
+              You won’t be matched with new work before this date.
+            </Text>
+            <DateTimePicker
+              value={availabilityDate}
+              mode="date"
+              minimumDate={new Date(Date.now() + 86400000)}
+              onChange={(event, selected) => {
+                if (selected) setAvailabilityDate(selected)
+              }}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setAvailabilityDateVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={confirmUnavailableUntil}>
+                <Text style={styles.modalSaveText}>Set availability</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={locationModalVisible}
         transparent
@@ -1128,6 +1277,23 @@ const styles = StyleSheet.create({
   rowValue:       { fontSize: 13, color: colors.textMuted, textAlign: 'right', flexShrink: 1 },
   rowChevron:     { fontSize: 20, color: colors.textMuted, lineHeight: 24 },
   rowChevronDanger: { color: '#e57373' },
+
+  availabilityCard: { padding: 14 },
+  availabilityHeading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  availabilityCurrentIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  availabilityCurrentIconPositive: { backgroundColor: colors.primaryLight },
+  availabilityCurrentIconLimited: { backgroundColor: colors.warningLight },
+  availabilityTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  availabilityCurrent: { fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
+  availabilityIntro: { fontSize: 12.5, lineHeight: 18, color: colors.textSecondary, marginTop: 12, marginBottom: 10 },
+  availabilityOptions: { gap: 7 },
+  availabilityOption: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10 },
+  availabilityOptionSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  availabilityOptionLabel: { fontSize: 13.5, fontWeight: '600', color: colors.textPrimary },
+  availabilityOptionLabelSelected: { color: colors.primary },
+  availabilityOptionSub: { fontSize: 11.5, lineHeight: 16, color: colors.textMuted, marginTop: 1 },
+  availabilityFreshness: { fontSize: 11.5, lineHeight: 16, color: colors.textMuted, marginTop: 10 },
+  availabilityDateHint: { fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginBottom: 12 },
 
   opportunityCard: { padding: 14 },
   opportunityTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },

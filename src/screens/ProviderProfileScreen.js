@@ -12,6 +12,7 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Loading from '../components/Loading'
 import EmptyState from '../components/EmptyState'
+import { availabilityDisplay } from '../lib/providerAvailability'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const ALL_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -120,7 +121,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
       // Step 1: profile + bids + services + reviews in parallel
       const [profileResult, bidsResult, servicesResult, reviewsResult] = await Promise.all([
         // Safe public columns only — never fetch another user's phone/address/GPS.
-        supabase.from('profiles_public').select('id, full_name, avatar_url, display_name, bio, skills, qualifications, region, primary_role, role, created_at').eq('id', providerId).single(),
+        supabase.from('profiles_public').select('id, full_name, avatar_url, display_name, bio, skills, qualifications, region, primary_role, role, created_at, availability_status, availability_until, availability_updated_at').eq('id', providerId).single(),
         supabase.from('bids').select('job_id, status, created_at').eq('provider_id', providerId),
         supabase.from('services')
           .select('*')
@@ -230,6 +231,11 @@ export default function ProviderProfileScreen({ route, navigation }) {
 
   const name  = displayName(profile?.full_name)
   const since = memberSince(profile?.created_at)
+  const availability = availabilityDisplay(
+    profile?.availability_status,
+    profile?.availability_until,
+    profile?.availability_updated_at,
+  )
 
   return (
     <View style={styles.screen}>
@@ -265,6 +271,27 @@ export default function ProviderProfileScreen({ route, navigation }) {
             </View>
 
             {since ? <Text style={styles.memberSince}>Member since {since}</Text> : null}
+
+            {!availability.stale && (
+              <View style={[
+                styles.availabilityBadge,
+                availability.tone === 'limited' && styles.availabilityBadgeLimited,
+                !availability.active && styles.availabilityBadgeMuted,
+              ]}>
+                <Icon
+                  name={availability.active ? 'checkmark-circle-outline' : 'time-outline'}
+                  size={13}
+                  color={availability.tone === 'limited' ? colors.warning : availability.active ? colors.primary : colors.textMuted}
+                />
+                <Text style={[
+                  styles.availabilityBadgeText,
+                  availability.tone === 'limited' && { color: colors.warning },
+                  !availability.active && { color: colors.textMuted },
+                ]}>
+                  {availability.label}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.badgeRow}>
               {(profile?.primary_role === 'provider' || profile?.primary_role === 'both' ||
@@ -539,6 +566,10 @@ const styles = StyleSheet.create({
   verifiedText:  { fontSize: 12, fontWeight: '700', color: colors.primary },
 
   memberSince:  { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
+  availabilityBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: colors.primaryLight, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, marginBottom: 7 },
+  availabilityBadgeLimited: { backgroundColor: colors.warningLight },
+  availabilityBadgeMuted: { backgroundColor: colors.background },
+  availabilityBadgeText: { fontSize: 11.5, fontWeight: '700', color: colors.primary },
   ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   starRow:      { flexDirection: 'row', gap: 1 },
   ratingScore:  { fontSize: 14, fontWeight: '700', color: colors.textPrimary },

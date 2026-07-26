@@ -26,6 +26,7 @@ export const NOTIFICATION_ICONS = {
   opportunity_digest:              'briefcase-outline',
   saved_interest_match:            'bookmark-outline',
   saved_interest_digest:           'bookmark-outline',
+  availability_check:              'calendar-outline',
   booking_completed:               'checkmark-circle-outline',
   booking_cancellation_requested:  'alert-circle-outline',
 }
@@ -107,6 +108,16 @@ export async function openNotificationTarget(navigation, userId, notification) {
   }
 
   try {
+    if (notification.type === 'availability_check' || meta.availability_prompt) {
+      const tabs = navigation.getParent?.()
+      tabs?.navigate('Account', {
+        screen: 'AccountMain',
+        params: { openAvailability: Date.now() },
+      })
+      markRead()
+      return true
+    }
+
     // Chat-message notifications open the conversation directly.
     if (notification.type === 'new_message' && meta.sender_id) {
       const { data: sender } = await supabase

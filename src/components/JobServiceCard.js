@@ -3,6 +3,7 @@ import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import { colors } from '../theme/tokens'
 import { statusLabel, statusTone } from '../lib/lifecycle'
 import { stripPlusCode } from '../lib/location'
+import { availabilityDisplay } from '../lib/providerAvailability'
 import { categoryImage } from '../lib/categoryImages'
 import Icon from './Icon'
 
@@ -100,6 +101,9 @@ export default function JobServiceCard({
 }) {
   const isService = item._type === 'service' || item.itemType === 'service'
   const profile   = isService ? (item.profile || {}) : (item.profiles || {})
+  const availability = isService
+    ? availabilityDisplay(profile.availability_status, profile.availability_until, profile.availability_updated_at)
+    : null
   const photoUrl  = Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0] : null
   const category  = item.category || 'Other'
   const cat       = categoryVisual(category)
@@ -207,8 +211,18 @@ export default function JobServiceCard({
 
         {/* Row 2: service badge pill */}
         {isService && (
-          <View style={styles.servicePill}>
-            <Text style={styles.servicePillText}>SERVICE</Text>
+          <View style={styles.serviceMetaRow}>
+            <View style={styles.servicePill}>
+              <Text style={styles.servicePillText}>SERVICE</Text>
+            </View>
+            {availability && !availability.stale && (
+              <View style={[styles.availabilityPill, availability.tone === 'limited' && styles.availabilityPillLimited]}>
+                <View style={[styles.availabilityDot, availability.tone === 'limited' && { backgroundColor: colors.warning }]} />
+                <Text style={[styles.availabilityPillText, availability.tone === 'limited' && { color: colors.warning }]} numberOfLines={1}>
+                  {availability.label}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -375,9 +389,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     paddingHorizontal: 5,
     paddingVertical: 2,
-    marginBottom: 4,
   },
   servicePillText: { fontSize: 8, fontWeight: '700', color: '#5b21b6', letterSpacing: 0.5 },
+  serviceMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, overflow: 'hidden', marginBottom: 4 },
+  availabilityPill: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1, backgroundColor: colors.primaryLight, borderRadius: 999, paddingHorizontal: 5, paddingVertical: 2 },
+  availabilityPillLimited: { backgroundColor: colors.warningLight },
+  availabilityDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary },
+  availabilityPillText: { flexShrink: 1, fontSize: 7.5, fontWeight: '700', color: colors.primary },
 
   // Row 3: title
   title: {

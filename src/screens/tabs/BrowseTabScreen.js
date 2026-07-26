@@ -20,6 +20,7 @@ import EmptyState from '../../components/EmptyState'
 import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
 import { CATEGORY_FILTERS } from '../../lib/categories'
+import { availabilityDisplay } from '../../lib/providerAvailability'
 
 const FILTERS = CATEGORY_FILTERS
 
@@ -135,7 +136,7 @@ export default function BrowseTabScreen({ navigation }) {
     const providerIds = [...new Set(raw.map(s => s.provider_id).filter(Boolean))]
     const [{ data: profilesData }, { data: reviewsData }] = providerIds.length > 0
       ? await Promise.all([
-        supabase.from('profiles_public').select('id, full_name, avatar_url').in('id', providerIds),
+        supabase.from('profiles_public').select('id, full_name, avatar_url, availability_status, availability_until, availability_updated_at').in('id', providerIds),
         supabase.from('reviews').select('reviewee_id, rating').in('reviewee_id', providerIds),
       ])
       : [{ data: [] }, { data: [] }]
@@ -151,10 +152,17 @@ export default function BrowseTabScreen({ navigation }) {
 
     setServices(raw.map(s => {
       const summary = ratingMap[s.provider_id] || { total: 0, count: 0 }
+      const provider = profileMap[s.provider_id] || null
+      const availability = availabilityDisplay(
+        provider?.availability_status,
+        provider?.availability_until,
+        provider?.availability_updated_at,
+      )
       return {
         ...s,
         _type: 'service',
-        profile: profileMap[s.provider_id] || null,
+        profile: provider,
+        _availabilityRank: availability.tone === 'positive' ? 0 : availability.tone === 'limited' ? 1 : availability.stale ? 3 : 2,
         ratingAverage: summary.count > 0 ? summary.total / summary.count : 0,
         ratingCount:   summary.count,
       }
@@ -177,7 +185,10 @@ export default function BrowseTabScreen({ navigation }) {
     let items = [...services]
     if (filter !== 'All') items = items.filter(i => i.category === filter)
     if (search.trim())    items = items.filter(i => itemMatchesSearch(i, search))
-    items = items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    items = items.sort((a, b) =>
+      (a._availabilityRank ?? 3) - (b._availabilityRank ?? 3)
+      || new Date(b.created_at) - new Date(a.created_at)
+    )
 
     if (userLat != null && userLng != null) {
       items = items.map(i => {

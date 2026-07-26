@@ -69,6 +69,25 @@ export default function NotificationsScreen({ navigation, route }) {
     requestBadgeRefresh()
   }
 
+  async function quickSetAvailability(item, status) {
+    if (!userId) return
+    const now = new Date().toISOString()
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        availability_status: status,
+        availability_until: null,
+        availability_updated_at: now,
+      })
+      .eq('id', userId)
+    if (error) return
+    await supabase.from('notifications').update({ read: true }).eq('id', item.id)
+    setItems(prev => prev.map(n => n.id === item.id
+      ? { ...n, read: true, _wasUnread: false, _availabilityAnswered: status }
+      : n))
+    requestBadgeRefresh()
+  }
+
   const hasUnread = items.some(n => !n.read)
 
   function renderItem({ item }) {
@@ -87,6 +106,30 @@ export default function NotificationsScreen({ navigation, route }) {
         <Icon name={NOTIFICATION_ICONS[item.type] || 'notifications-outline'} size={20} color={colors.primary} />
         <View style={styles.rowContent}>
           <Text style={styles.rowBody}>{item.body}</Text>
+          {item.type === 'availability_check' && !item._availabilityAnswered && (
+            <View style={styles.quickActions}>
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={() => quickSetAvailability(item, 'available_this_week')}>
+                <Text style={styles.quickActionText}>Available this week</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={() => quickSetAvailability(item, 'limited')}>
+                <Text style={styles.quickActionText}>Limited</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickActionSecondary}
+                onPress={() => openNotificationTarget(navigation, userId, item)}>
+                <Text style={styles.quickActionSecondaryText}>Other</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {item._availabilityAnswered && (
+            <Text style={styles.answeredText}>
+              Updated: {item._availabilityAnswered === 'limited' ? 'Limited availability' : 'Available this week'}
+            </Text>
+          )}
           <Text style={styles.rowTime}>{notificationTimeAgo(item.created_at)}</Text>
         </View>
         {item._wasUnread && <View style={styles.unreadDot} />}
@@ -176,6 +219,12 @@ const styles = StyleSheet.create({
   rowContent: { flex: 1 },
   rowBody:    { fontSize: 15, color: colors.textPrimary, lineHeight: 21 },
   rowTime:    { fontSize: 12, color: colors.textMuted, marginTop: 4 },
+  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  quickAction: { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  quickActionText: { color: colors.white, fontSize: 11.5, fontWeight: '700' },
+  quickActionSecondary: { borderWidth: 1, borderColor: colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  quickActionSecondaryText: { color: colors.primary, fontSize: 11.5, fontWeight: '700' },
+  answeredText: { color: colors.primary, fontSize: 12, fontWeight: '600', marginTop: 8 },
   unreadDot: {
     width: 8,
     height: 8,
