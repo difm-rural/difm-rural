@@ -25,7 +25,7 @@ export async function getDashboardData(days: number) {
   const [
     jobsResult, servicesResult, bookingsResult, snapshotsResult,
     completionsResult, usersResult, newUsersResult, bidsResult,
-    campaignsResult, deliveriesResult,
+    campaignsResult, deliveriesResult, engagementResult,
   ] = await Promise.all([
     supabase.from('jobs').select('id, title, status, category, location_name, created_at').order('created_at', { ascending: false }),
     supabase.from('services').select('id, title, is_active, category, created_at'),
@@ -37,6 +37,7 @@ export async function getDashboardData(days: number) {
     supabase.from('bids').select('id', { count: 'exact', head: true }).gte('created_at', cutoff),
     supabase.from('seasonal_campaigns').select('id, is_active, starts_on, ends_on'),
     supabase.from('seasonal_campaign_deliveries').select('campaign_id, first_impression_at, dismissed_at, actioned_at, email_sent_at').gte('created_at', cutoff),
+    supabase.rpc('admin_engagement_overview', { p_days: days }),
   ])
 
   const jobs = (jobsResult.data || []) as Job[]
@@ -108,5 +109,10 @@ export async function getDashboardData(days: number) {
       dismissed: deliveries.filter(delivery => delivery.dismissed_at).length,
       emails: deliveries.filter(delivery => delivery.email_sent_at).length,
     },
+    engagement: engagementResult.data as {
+      listing?: { noViews48h?: number; viewedNoOffers48h?: number; zeroMatches?: number }
+      coordination?: { unscheduledWork?: number; overdue?: number }
+      delivery?: { failedEmails?: number; pendingEmails?: number }
+    } | null,
   }
 }

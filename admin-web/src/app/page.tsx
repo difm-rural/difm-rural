@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, ArrowUpRight, BriefcaseBusiness, Clock3, Handshake, Megaphone, UsersRound, Wrench } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ArrowUpRight, BriefcaseBusiness, Clock3, Handshake, Megaphone, UsersRound, Wrench } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { CategoryBars, JobsTimeline, StatusBars } from '@/components/dashboard-charts'
 import { getDashboardData } from '@/lib/dashboard'
@@ -43,6 +43,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <KpiCard label="New users" value={data.kpis.newUsers} detail={`${data.kpis.users} total accounts`} icon={UsersRound} href={`/details/new-users?range=${days}`} />
         <KpiCard label="Average lifecycle" value={formatLifecycle(data.kpis.averageLifecycleHours)} detail="Posting to confirmed completion" icon={Clock3} href={`/details/lifecycle?range=${days}`} />
       </section>
+
+      <Link href="/operations" className="operations-pulse">
+        <div><AlertTriangle size={18} /><span><strong>Operations pulse</strong> Real signals that may need attention</span></div>
+        <dl>
+          <div><dt>Stalled</dt><dd>{(data.engagement?.listing?.noViews48h || 0) + (data.engagement?.listing?.viewedNoOffers48h || 0)}</dd></div>
+          <div><dt>No matches</dt><dd>{data.engagement?.listing?.zeroMatches || 0}</dd></div>
+          <div><dt>Unscheduled</dt><dd>{data.engagement?.coordination?.unscheduledWork || 0}</dd></div>
+          <div><dt>Delivery issues</dt><dd>{(data.engagement?.delivery?.failedEmails || 0) + (data.engagement?.delivery?.pendingEmails || 0)}</dd></div>
+        </dl>
+        <ArrowRight size={17} />
+      </Link>
 
       <section className="dashboard-grid primary-grid">
         <article className="panel wide-panel">

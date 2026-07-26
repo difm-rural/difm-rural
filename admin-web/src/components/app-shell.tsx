@@ -2,10 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, BellRing, ChevronRight, LayoutDashboard, LogOut, Megaphone, ShieldCheck } from 'lucide-react'
+import { Activity, ChevronRight, GitBranch, LayoutDashboard, LogOut, Megaphone, ShieldCheck, UsersRound } from 'lucide-react'
 
 const navigation = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/operations', label: 'Operations', icon: Activity },
+  { href: '/funnel', label: 'Funnel', icon: GitBranch },
+  { href: '/providers', label: 'Provider supply', icon: UsersRound },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
 ]
 
@@ -29,9 +32,6 @@ export function AppShell({ children, adminName }: { children: React.ReactNode; a
               </Link>
             )
           })}
-          <p className="nav-label monitor-label">Monitor</p>
-          <div className="nav-item muted-item"><BarChart3 size={18} /><span>Lifecycle history</span><em>Collecting</em></div>
-          <div className="nav-item muted-item"><BellRing size={18} /><span>Delivery health</span><em>Next</em></div>
         </nav>
         <div className="sidebar-security"><ShieldCheck size={17} /><span>Protected by Supabase admin policies</span></div>
         <div className="sidebar-user">
