@@ -26,6 +26,8 @@ const INITIAL_STATE = {
   dateTo:             null,
   hideExactLocation:  false,
   locationArea:       '',
+  repeatedFromJobId:  null,
+  recurrenceFrequency: 'one_time',
 }
 
 export function PostJobProvider({ children }) {

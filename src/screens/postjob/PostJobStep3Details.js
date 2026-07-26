@@ -92,7 +92,7 @@ export default function PostJobStep3Details({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <PostJobHeader currentStep={3} onBack={handleBack} />
+      <PostJobHeader currentStep={3} title={route.params?.mode === 'repeat' ? 'Repeat a job' : undefined} onBack={handleBack} />
 
       <KeyboardAvoidingView
         style={styles.flex1}

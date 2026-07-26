@@ -99,6 +99,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   const { jobData, resetJobData } = usePostJob()
 
   const isEditMode   = route.params?.mode === 'edit'
+  const isRepeatMode = route.params?.mode === 'repeat'
   const editJob      = route.params?.job || null
   const editBidCount = route.params?.bidCount || 0
 
@@ -116,6 +117,8 @@ export default function PostJobStep5Review({ navigation, route }) {
     inviteProviderName,
     dateFrom, dateTo,
     hideExactLocation, locationArea,
+    repeatedFromJobId,
+    recurrenceFrequency,
   } = jobData
 
   const isInvite = !!inviteProviderId && !isEditMode
@@ -246,6 +249,8 @@ export default function PostJobStep5Review({ navigation, route }) {
       access_conditions: accessConditions.length > 0 ? accessConditions : null,
       hide_exact_location: !!hideExactLocation,
       location_area:       locationArea || null,
+      repeated_from_job_id: repeatedFromJobId || null,
+      recurrence_frequency: recurrenceFrequency || 'one_time',
     }
 
     if (!user) {
@@ -299,13 +304,14 @@ export default function PostJobStep5Review({ navigation, route }) {
       inviteFailed = !!inviteError
     }
 
-    trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress, invited: isInvite })
+    trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress, invited: isInvite, repeated: isRepeatMode })
+    if (isRepeatMode) trackEvent('job_repeated', { source_job_id: repeatedFromJobId, category: resolvedCategory })
     trackCategoryInterest(resolvedCategory)
     setUploadStatus('')
     resetJobData()
 
     const who = inviteProviderName || 'your provider'
-    const successTitle = isInvite ? 'Offer sent!' : 'Job posted!'
+    const successTitle = isInvite ? 'Offer sent!' : isRepeatMode ? 'Job posted again!' : 'Job posted!'
     const successBody = inviteFailed
       ? `Your job is posted, but we couldn't notify ${who}. You can offer it from their profile.`
       : isInvite
@@ -318,13 +324,13 @@ export default function PostJobStep5Review({ navigation, route }) {
     ])
   }
 
-  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : (isInvite ? 'Send offer' : 'Post job'))
+  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : (isInvite ? 'Send offer' : isRepeatMode ? 'Post repeated job' : 'Post job'))
 
   return (
     <View style={styles.screen}>
       <PostJobHeader
         currentStep={5}
-        title={isEditMode ? 'Edit job' : 'Post a job'}
+        title={isEditMode ? 'Edit job' : route.params?.mode === 'repeat' ? 'Repeat a job' : 'Post a job'}
         onBack={handleBack}
       />
 
@@ -332,6 +338,15 @@ export default function PostJobStep5Review({ navigation, route }) {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}>
+
+        {isRepeatMode && (
+          <View style={styles.repeatNotice}>
+            <Icon name="refresh-outline" size={18} color={colors.primary} />
+            <Text style={styles.repeatNoticeText}>
+              Based on your previous job. Check the details below before posting it again.
+            </Text>
+          </View>
+        )}
 
         {isInvite && (
           <View style={styles.inviteBanner}>
@@ -471,6 +486,18 @@ const styles = StyleSheet.create({
   screen:        { flex: 1, backgroundColor: '#f5f5f5' },
   scroll:        { flex: 1 },
   scrollContent: { padding: 16 },
+  repeatNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: '#c3e6d4',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  repeatNoticeText: { flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
 
   mapThumb: {
     width: '100%',

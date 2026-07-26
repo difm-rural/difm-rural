@@ -90,7 +90,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <PostJobHeader currentStep={4} onBack={handleBack} />
+      <PostJobHeader currentStep={4} title={route.params?.mode === 'repeat' ? 'Repeat a job' : undefined} onBack={handleBack} />
 
       <KeyboardAvoidingView
         style={styles.flex1}

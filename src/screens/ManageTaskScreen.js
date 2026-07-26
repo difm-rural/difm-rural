@@ -442,17 +442,12 @@ export default function ManageTaskScreen({ navigation, route }) {
     )
   }
 
-  function handleRepost() {
+  function handleRepeat() {
     if (!ensureTaskOwner()) return
     navigation.navigate('PostJob', {
-      prefill: {
-        title: job.title,
-        category: job.category,
-        locationName: job.location_name,
-        description: job.description,
-        priceType: job.price_type,
-        price: job.price ? String(job.price) : '',
-      },
+      mode: 'repeat',
+      repeatJob: job,
+      origin: 'Activity',
     })
   }
 
@@ -657,7 +652,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const showEdit       = job.status === 'open'
   const showCancel     = isJobActive(job.status)
   const showDelete     = (job.status === 'open' && bidCount === 0) || job.status === 'cancelled'
-  const showRepost     = job.status === 'completed' || job.status === 'cancelled'
+  const showRepeat     = job.status === 'completed' || job.status === 'cancelled'
   const showCompletedActions = job.status === 'completed'
 
   const actionItems = [
@@ -705,13 +700,13 @@ export default function ManageTaskScreen({ navigation, route }) {
       subtitle: 'Send to someone who might help',
       onPress: handleShare,
     },
-    showRepost && {
-      key: 'repost',
+    showRepeat && {
+      key: 'repeat',
       emoji: 'refresh-outline',
       iconBg: colors.primaryLight,
-      label: 'Repost job',
-      subtitle: 'Create a new listing based on this job',
-      onPress: handleRepost,
+      label: 'Repeat this job',
+      subtitle: 'Review a copy, update the date or details, then post it',
+      onPress: handleRepeat,
     },
     showCancel && {
       key: 'cancel',

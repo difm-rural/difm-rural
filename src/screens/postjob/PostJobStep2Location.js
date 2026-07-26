@@ -214,7 +214,7 @@ export default function PostJobStep2Location({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <PostJobHeader currentStep={2} onBack={handleBack} />
+      <PostJobHeader currentStep={2} title={route.params?.mode === 'repeat' ? 'Repeat a job' : undefined} onBack={handleBack} />
 
       <View style={styles.searchBarWrap}>
         <AddressAutocomplete

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
+import { repeatJobToJobData } from '../../lib/repeatJob'
 import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
@@ -35,6 +36,8 @@ export default function PostJobStep1JobType({ navigation, route }) {
   const isEditMode = route.params?.mode === 'edit'
   const editJob    = route.params?.job || null
   const prefill    = route.params?.prefill || null
+  const repeatJob  = route.params?.repeatJob || null
+  const isRepeatMode = route.params?.mode === 'repeat' && !!repeatJob
 
   const [title,          setTitle]          = useState(editJob?.title           || jobData.title || prefill?.title || '')
   const [scheduleType,   setScheduleType]   = useState(editJob?.schedule_type   || jobData.scheduleType)
@@ -80,7 +83,18 @@ export default function PostJobStep1JobType({ navigation, route }) {
         priceType:    editJob.price_type      || 'fixed',
         price:        editJob.price ? String(editJob.price) : '',
         _editJobId:   editJob.id,
+        repeatedFromJobId: editJob.repeated_from_job_id || null,
+        recurrenceFrequency: editJob.recurrence_frequency || 'one_time',
       })
+    } else if (isRepeatMode) {
+      resetJobData()
+      const mapped = repeatJobToJobData(repeatJob)
+      updateJobData(mapped)
+      setTitle(mapped.title)
+      setScheduleType(mapped.scheduleType)
+      setScheduledDate(null)
+      setDateFrom(null)
+      setDateTo(null)
     } else if (!isEditMode) {
       // New job — start clean. Clear both context AND local field state, since a
       // still-mounted Step 1 would otherwise re-sync stale values into context.
@@ -130,6 +144,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
   function canProceed() {
     if (title.trim().length < 3 || !scheduleType) return false
+    if (scheduleType === 'specific') return !!scheduledDate
     if (scheduleType === 'range') return !!(dateFrom && dateTo)
     return true
   }
@@ -150,7 +165,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <PostJobHeader currentStep={1} onBack={handleBack} />
+      <PostJobHeader currentStep={1} title={isRepeatMode ? 'Repeat a job' : undefined} onBack={handleBack} />
 
       <KeyboardAvoidingView
         style={styles.flex1}
