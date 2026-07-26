@@ -48,6 +48,7 @@ import ProviderProfileScreen   from '../screens/ProviderProfileScreen'
 import ReviewsListScreen       from '../screens/ReviewsListScreen'
 import ConnectionsScreen       from '../screens/ConnectionsScreen'
 import ConnectionDetailScreen  from '../screens/ConnectionDetailScreen'
+import SavedInterestsScreen    from '../screens/SavedInterestsScreen'
 import InvitedJobsScreen       from '../screens/InvitedJobsScreen'
 import OnboardingScreen        from '../screens/OnboardingScreen'
 
@@ -114,6 +115,7 @@ function JobsStackNav() {
       <JobsNav.Screen name="PostJobStep4Budget"   component={PostJobStep4Budget}   />
       <JobsNav.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
       <JobsNav.Screen name="JobDetail"            component={JobDetailScreen}      />
+      <JobsNav.Screen name="SavedInterests"        component={SavedInterestsScreen} />
       <JobsNav.Screen name="ManageTask"           component={ManageTaskScreen}     />
       <JobsNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <JobsNav.Screen name="Chat"                 component={ChatScreen}           />
@@ -195,6 +197,7 @@ function AccountStackNav() {
       <AccountNav.Screen name="ReviewsList"     component={ReviewsListScreen}     />
       <AccountNav.Screen name="Connections"       component={ConnectionsScreen}        />
       <AccountNav.Screen name="ConnectionDetail"  component={ConnectionDetailScreen}   />
+      <AccountNav.Screen name="SavedInterests"     component={SavedInterestsScreen}     />
     </AccountNav.Navigator>
   )
 }

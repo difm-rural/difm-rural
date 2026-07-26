@@ -1,11 +1,13 @@
 import React, { useCallback, useRef, useState } from 'react'
 import {
+  Alert,
   FlatList,
   Keyboard,
   Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,8 +20,9 @@ import { colors } from '../../theme/tokens'
 import { useUser } from '../../context/UserContext'
 import { JOB_CATEGORIES } from '../../lib/categories'
 import { canProvide } from '../../lib/roles'
-import { getCurrentLocation, haversineDistance } from '../../lib/location'
+import { coarseSuburb, getCurrentLocation, haversineDistance, reverseGeocode } from '../../lib/location'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../../lib/watchlist'
+import { saveJobSearch, SAVED_INTEREST_FREQUENCIES } from '../../lib/savedInterests'
 import JobCard from '../../components/JobCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import SkeletonCard from '../../components/SkeletonCard'
@@ -104,6 +107,13 @@ export default function JobsTabScreen({ navigation }) {
   const [search, setSearch]           = useState('')
   const [sort, setSort]               = useState('nearest')
   const [radius, setRadius]           = useState('any')
+  const [saveOpen, setSaveOpen]       = useState(false)
+  const [saveName, setSaveName]       = useState('')
+  const [saveLocation, setSaveLocation] = useState('')
+  const [saveFrequency, setSaveFrequency] = useState('instant')
+  const [savePush, setSavePush]       = useState(true)
+  const [saveEmail, setSaveEmail]     = useState(false)
+  const [saving, setSaving]           = useState(false)
   const userIdRef = useRef(null)
 
   useFocusEffect(useCallback(() => { load() }, []))
@@ -217,6 +227,54 @@ export default function JobsTabScreen({ navigation }) {
   }
 
   const hasActiveFilter = filter !== 'All' || !!search.trim() || radius !== 'any'
+
+  async function openSaveSearch() {
+    if (!userId) {
+      Alert.alert('Sign in required', 'Sign in to save searches and receive matching job alerts.')
+      return
+    }
+    if (radius !== 'any' && !coords) {
+      Alert.alert('Location unavailable', 'Allow location access before saving a distance-based search.')
+      return
+    }
+    let place = saveLocation
+    if (radius !== 'any' && coords && !place) {
+      const address = await reverseGeocode(coords.latitude, coords.longitude)
+      place = coarseSuburb(address) || 'your location'
+      setSaveLocation(place)
+    }
+    const subject = search.trim() || (filter !== 'All' ? filter : 'Open jobs')
+    const scope = radius !== 'any' ? ` within ${radius} km of ${place || 'your location'}` : ''
+    setSaveName(`${subject}${scope}`)
+    setSaveOpen(true)
+  }
+
+  async function confirmSaveSearch() {
+    if (!saveName.trim()) return
+    setSaving(true)
+    try {
+      await saveJobSearch(userId, {
+        name: saveName,
+        query: search,
+        category: filter === 'All' ? null : filter,
+        locationName: radius === 'any' ? null : saveLocation,
+        latitude: radius === 'any' ? null : coords?.latitude,
+        longitude: radius === 'any' ? null : coords?.longitude,
+        radiusKm: radius === 'any' ? null : radius,
+        frequency: saveFrequency,
+        pushEnabled: savePush,
+        emailEnabled: saveEmail,
+      })
+      setSaveOpen(false)
+      Alert.alert('Search saved', saveFrequency === 'off'
+        ? 'You can find and manage it in Account → Saved interests.'
+        : `We’ll send ${saveFrequency === 'instant' ? 'an alert' : 'a daily summary'} when new jobs match.`)
+    } catch (error) {
+      Alert.alert('Could not save this search', error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   // Filter, annotate with distance, apply radius, then sort.
   const visibleJobs = (() => {
@@ -381,6 +439,18 @@ export default function JobsTabScreen({ navigation }) {
           </View>
         )}
       </View>
+      {hasActiveFilter && (
+        <View style={styles.saveSearchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.saveSearchTitle}>{visibleJobs.length} matching {visibleJobs.length === 1 ? 'job' : 'jobs'}</Text>
+            <Text style={styles.saveSearchSub}>Save these filters and choose when to hear about new matches.</Text>
+          </View>
+          <TouchableOpacity style={styles.saveSearchButton} onPress={openSaveSearch} accessibilityRole="button">
+            <Icon name="bookmark-outline" size={17} color={colors.primary} />
+            <Text style={styles.saveSearchButtonText}>Save search</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   )
 
@@ -436,6 +506,58 @@ export default function JobsTabScreen({ navigation }) {
 
   return (
     <View style={styles.screen}>
+      <Modal visible={saveOpen} transparent animationType="slide" onRequestClose={() => setSaveOpen(false)}>
+        <View style={styles.saveBackdrop}>
+          <View style={[styles.saveSheet, { paddingBottom: Math.max(insets.bottom, 18) }]}>
+            <View style={styles.saveSheetHeader}>
+              <View>
+                <Text style={styles.saveKicker}>Job alerts</Text>
+                <Text style={styles.saveTitle}>Save this search</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSaveOpen(false)} accessibilityLabel="Close">
+                <Icon name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.saveLabel}>Name</Text>
+            <TextInput
+              style={styles.saveInput}
+              value={saveName}
+              onChangeText={setSaveName}
+              placeholder="e.g. Fence repairs near Warkworth"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={styles.saveLabel}>How often?</Text>
+            {SAVED_INTEREST_FREQUENCIES.map(option => (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.frequencyOption, saveFrequency === option.value && styles.frequencyOptionActive]}
+                onPress={() => setSaveFrequency(option.value)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.frequencyOptionTitle}>{option.label}</Text>
+                  <Text style={styles.frequencyOptionDescription}>{option.description}</Text>
+                </View>
+                <Icon name={saveFrequency === option.value ? 'radio-button-on' : 'radio-button-off'} size={21} color={colors.primary} />
+              </TouchableOpacity>
+            ))}
+            {saveFrequency !== 'off' && (
+              <View style={styles.channelOptions}>
+                <View style={styles.channelOption}>
+                  <View><Text style={styles.channelTitle}>Push notification</Text><Text style={styles.channelDescription}>Best for timely matches</Text></View>
+                  <Switch value={savePush} onValueChange={setSavePush} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.white} />
+                </View>
+                <View style={styles.channelOption}>
+                  <View><Text style={styles.channelTitle}>Email</Text><Text style={styles.channelDescription}>Send to your account email</Text></View>
+                  <Switch value={saveEmail} onValueChange={setSaveEmail} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.white} />
+                </View>
+              </View>
+            )}
+            <Button title="Save search" icon="bookmark-outline" onPress={confirmSaveSearch} loading={saving} disabled={!saveName.trim()} style={{ marginTop: 16 }} />
+            <TouchableOpacity style={styles.manageLink} onPress={() => { setSaveOpen(false); navigation.navigate('SavedInterests') }}>
+              <Text style={styles.manageLinkText}>Manage saved interests</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
@@ -616,6 +738,29 @@ const styles = StyleSheet.create({
   chipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText:       { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   chipTextActive: { color: colors.white },
+
+  saveSearchRow: { marginHorizontal: 16, marginBottom: 14, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  saveSearchTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
+  saveSearchSub: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  saveSearchButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9 },
+  saveSearchButtonText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  saveBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' },
+  saveSheet: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '90%' },
+  saveSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  saveKicker: { color: colors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
+  saveTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: '700', marginTop: 2 },
+  saveLabel: { color: colors.textPrimary, fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
+  saveInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 11, color: colors.textPrimary, fontSize: 14, marginBottom: 8 },
+  frequencyOption: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 11, marginBottom: 7 },
+  frequencyOptionActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  frequencyOptionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '700' },
+  frequencyOptionDescription: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  channelOptions: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6, paddingTop: 5 },
+  channelOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  channelTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
+  channelDescription: { color: colors.textSecondary, fontSize: 11, marginTop: 1 },
+  manageLink: { alignItems: 'center', paddingVertical: 12 },
+  manageLinkText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
 
   boardCardWrap: { paddingHorizontal: 16 },
 })

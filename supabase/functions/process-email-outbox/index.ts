@@ -36,6 +36,8 @@ const SUBJECTS: Record<string, string> = {
   new_message:                     'You have an unread message',
   opportunity_match:               'A strong job match is nearby',
   opportunity_digest:              'Jobs matching your capabilities',
+  saved_interest_match:            'A new job matches your saved search',
+  saved_interest_digest:           'New jobs match your saved search',
 }
 
 type OutboxRow = {
@@ -206,14 +208,34 @@ Deno.serve(async (req) => {
       .maybeSingle()
     const isOpportunity = candidate.email_type === 'opportunity_match'
       || candidate.email_type === 'opportunity_digest'
+    const isSavedInterest = candidate.email_type === 'saved_interest_match'
+      || candidate.email_type === 'saved_interest_digest'
     const expectedOpportunityMode = candidate.email_type === 'opportunity_match' ? 'instant' : 'daily'
-    let allowed = isOpportunity
+    let allowed = isSavedInterest
+      ? true
+      : isOpportunity
       ? prefs?.opportunity_email === true && prefs?.opportunity_alert_mode === expectedOpportunityMode
       : candidate.email_type === 'new_message'
       ? prefs?.email_messages !== false
       : isSeasonal
         ? prefs?.email_seasonal === true
         : prefs?.email_transactional !== false
+
+    if (isSavedInterest && notification) {
+      const interestId = notification.metadata?.saved_interest_id
+      const expectedFrequency = candidate.email_type === 'saved_interest_match' ? 'instant' : 'daily'
+      const { data: interest } = interestId
+        ? await supabase
+            .from('saved_interests')
+            .select('active, frequency, email_enabled')
+            .eq('id', interestId)
+            .eq('user_id', candidate.user_id)
+            .maybeSingle()
+        : { data: null }
+      allowed = interest?.active === true
+        && interest.frequency === expectedFrequency
+        && interest.email_enabled === true
+    }
 
     if (isSeasonal && allowed && campaign) {
       const [{ data: settings }, { data: profile }] = await Promise.all([

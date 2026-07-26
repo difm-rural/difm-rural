@@ -558,6 +558,10 @@ export default function AccountTabScreen({ navigation }) {
 
       <View style={styles.hubButtons}>
         <HubButton
+          icon="bookmark-outline" label="Saved interests" sub="Searches, follows and alert frequency"
+          onPress={() => navigation.navigate('SavedInterests')}
+        />
+        <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}
         />

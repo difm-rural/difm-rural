@@ -30,6 +30,8 @@ const TITLES: Record<string, string> = {
   booking_cancellation_requested: 'Cancellation requested',
   opportunity_match:              'Job opportunity nearby',
   opportunity_digest:             'Jobs matching your capabilities',
+  saved_interest_match:           'New saved-search match',
+  saved_interest_digest:          'Your saved-search update',
 }
 
 Deno.serve(async (req) => {
@@ -60,6 +62,21 @@ Deno.serve(async (req) => {
 
     const expectedMode = record.type === 'opportunity_match' ? 'instant' : 'daily'
     if (prefs?.opportunity_alert_mode !== expectedMode || prefs?.opportunity_push !== true) {
+      return new Response('ok', { status: 200 })
+    }
+  }
+
+  if (record.type === 'saved_interest_match' || record.type === 'saved_interest_digest') {
+    const interestId = record.metadata?.saved_interest_id
+    if (!interestId) return new Response('ok', { status: 200 })
+    const { data: interest } = await supabase
+      .from('saved_interests')
+      .select('active, frequency, push_enabled')
+      .eq('id', interestId)
+      .eq('user_id', record.user_id)
+      .maybeSingle()
+    const expectedFrequency = record.type === 'saved_interest_match' ? 'instant' : 'daily'
+    if (!interest?.active || interest.frequency !== expectedFrequency || interest.push_enabled !== true) {
       return new Response('ok', { status: 200 })
     }
   }
