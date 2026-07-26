@@ -31,6 +31,14 @@ import {
   dismissProviderBooking as dismissBookingApi,
   saveBookingReview,
 } from '../lib/bookingActions'
+import WorkScheduleCard from '../components/WorkScheduleCard'
+import ArrivalWindowModal from '../components/ArrivalWindowModal'
+import {
+  addWorkToPhoneCalendar,
+  fetchWorkSchedule,
+  saveArrivalWindow,
+  sendRunningLate,
+} from '../lib/workSchedule'
 
 function formatMoney(amount, service) {
   if (amount != null) return `$${amount} NZD`
@@ -63,6 +71,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const [myReview, setMyReview] = useState(null)
   const [receivedReview, setReceivedReview] = useState(null)
   const [savingReview, setSavingReview] = useState(false)
+  const [workSchedule, setWorkSchedule] = useState(null)
+  const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
+  const [savingArrival, setSavingArrival] = useState(false)
 
   useEffect(() => {
     fetchBooking()
@@ -130,6 +141,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     if (data) setBooking(data)
     if (data?.quote_amount != null) setQuoteAmount(String(data.quote_amount))
     if (data?.quote_notes) setQuoteNotes(data.quote_notes)
+    const schedule = await fetchWorkSchedule({ bookingId: initialBooking.id })
+    setWorkSchedule(schedule)
   }
 
   if (!booking) {
@@ -183,6 +196,36 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       otherUserId: viewerRole === 'provider' ? booking.requester_id : booking.provider_id,
       otherUserName: otherUser?.full_name || (viewerRole === 'provider' ? 'Requester' : 'Provider'),
     })
+  }
+
+  async function handleSaveArrivalWindow(start, end, expectedComplete) {
+    setSavingArrival(true)
+    const { data, error } = await saveArrivalWindow({ bookingId: booking.id, start, end, expectedComplete })
+    setSavingArrival(false)
+    if (error) {
+      Alert.alert('Could not save arrival window', error.message || 'Please try again.')
+      return
+    }
+    setWorkSchedule(data)
+    setArrivalModalVisible(false)
+    Alert.alert('Arrival window confirmed', 'The requester has been notified.')
+  }
+
+  function handleRunningLate() {
+    Alert.alert('How late are you running?', 'The other party will be notified immediately.', [
+      { text: '15 minutes', onPress: () => submitLateNotice(15) },
+      { text: '30 minutes', onPress: () => submitLateNotice(30) },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
+  async function submitLateNotice(minutes) {
+    const { error } = await sendRunningLate({ bookingId: booking.id, minutes })
+    if (error) {
+      Alert.alert('Notice not sent', error.message || 'Please try again.')
+      return
+    }
+    Alert.alert('Update sent', `The other party has been told you are about ${minutes} minutes late.`)
   }
 
   async function updateStatus(nextStatus, allowedStatuses, message) {
@@ -349,6 +392,21 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         automaticallyAdjustKeyboardInsets={true}>
         <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 14 }} />
 
+        {['confirmed', 'in_progress'].includes(booking.status) ? (
+          <WorkScheduleCard
+            schedule={workSchedule}
+            canSetWindow={viewerRole === 'provider'}
+            onSetWindow={() => setArrivalModalVisible(true)}
+            onAddCalendar={() => addWorkToPhoneCalendar({
+              title: service.title || 'Service booking',
+              schedule: workSchedule,
+              location: booking.location_name,
+              otherPartyName: otherUser?.full_name,
+            })}
+            onRunningLate={handleRunningLate}
+          />
+        ) : null}
+
         <View style={styles.card}>
           <Text style={styles.cardLabel}>People</Text>
           <DetailRow label="Requester" value={requester?.full_name || booking.requesterName || 'Requester'} />
@@ -488,6 +546,14 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         saving={savingReview}
         onClose={() => setReviewVisible(false)}
         onSubmit={submitReview}
+      />
+      <ArrivalWindowModal
+        visible={arrivalModalVisible}
+        schedule={workSchedule}
+        suggestedDate={booking.scheduled_date}
+        saving={savingArrival}
+        onClose={() => setArrivalModalVisible(false)}
+        onSave={handleSaveArrivalWindow}
       />
     </KeyboardAvoidingView>
   )

@@ -81,6 +81,12 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Rural Connections uses your calendar to add confirmed work and reminders."
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "extra": {

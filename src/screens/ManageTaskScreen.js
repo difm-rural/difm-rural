@@ -28,6 +28,14 @@ import { jobNextMove } from '../lib/nextMove'
 import NextMoveBanner from '../components/NextMoveBanner'
 import ListingPerformanceCard from '../components/ListingPerformanceCard'
 import { fetchJobListingPerformance } from '../lib/listingPerformance'
+import WorkScheduleCard from '../components/WorkScheduleCard'
+import ArrivalWindowModal from '../components/ArrivalWindowModal'
+import {
+  addWorkToPhoneCalendar,
+  fetchWorkSchedule,
+  saveArrivalWindow,
+  sendRunningLate,
+} from '../lib/workSchedule'
 
 function timeAgo(isoString) {
   if (!isoString) return 'Unknown'
@@ -92,6 +100,9 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [questionCount, setQuestionCount] = useState(0)
   const [listingPerformance, setListingPerformance] = useState(null)
+  const [workSchedule, setWorkSchedule] = useState(null)
+  const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
+  const [savingArrival, setSavingArrival] = useState(false)
 
   useEffect(() => {
     async function loadCurrentUserAndJob() {
@@ -120,6 +131,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       if (active) setInvites(inv)
       const performance = await fetchJobListingPerformance(initialJob.id)
       if (active) setListingPerformance(performance)
+      const schedule = await fetchWorkSchedule({ jobId: initialJob.id })
+      if (active) setWorkSchedule(schedule)
     })()
     return () => { active = false }
   }, [initialJob.id]))
@@ -419,6 +432,36 @@ export default function ManageTaskScreen({ navigation, route }) {
     })
   }
 
+  async function handleSaveArrivalWindow(start, end, expectedComplete) {
+    setSavingArrival(true)
+    const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
+    setSavingArrival(false)
+    if (error) {
+      Alert.alert('Could not save arrival window', error.message || 'Please try again.')
+      return
+    }
+    setWorkSchedule(data)
+    setArrivalModalVisible(false)
+    Alert.alert('Arrival window confirmed', 'The requester has been notified.')
+  }
+
+  function handleRunningLate() {
+    Alert.alert('How late are you running?', 'The other party will be notified immediately.', [
+      { text: '15 minutes', onPress: () => submitLateNotice(15) },
+      { text: '30 minutes', onPress: () => submitLateNotice(30) },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
+  async function submitLateNotice(minutes) {
+    const { error } = await sendRunningLate({ jobId: job.id, minutes })
+    if (error) {
+      Alert.alert('Notice not sent', error.message || 'Please try again.')
+      return
+    }
+    Alert.alert('Update sent', `The other party has been told you are about ${minutes} minutes late.`)
+  }
+
   function handleConfirmComplete() {
     if (!ensureTaskOwner()) return
     Alert.alert(
@@ -539,6 +582,21 @@ export default function ManageTaskScreen({ navigation, route }) {
 
           <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
 
+          {['accepted', 'in_progress'].includes(job.status) ? (
+            <WorkScheduleCard
+              schedule={workSchedule}
+              canSetWindow={isAcceptedProvider}
+              onSetWindow={() => setArrivalModalVisible(true)}
+              onAddCalendar={() => addWorkToPhoneCalendar({
+                title: job.title,
+                schedule: workSchedule,
+                location: job.location_name,
+                otherPartyName,
+              })}
+              onRunningLate={handleRunningLate}
+            />
+          ) : null}
+
           {/* Job overview */}
           <View style={styles.card}>
             <View style={styles.acceptedHeaderRow}>
@@ -644,6 +702,14 @@ export default function ManageTaskScreen({ navigation, route }) {
           </View>
 
         </ScrollView>
+        <ArrivalWindowModal
+          visible={arrivalModalVisible}
+          schedule={workSchedule}
+          suggestedDate={job.scheduled_date || job.date_from}
+          saving={savingArrival}
+          onClose={() => setArrivalModalVisible(false)}
+          onSave={handleSaveArrivalWindow}
+        />
         {cancelModalJSX}
       </View>
     )

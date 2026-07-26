@@ -22,6 +22,14 @@ import { coarseSuburb, stripPlusCode } from '../lib/location'
 import { canProvide } from '../lib/roles'
 import { useUser } from '../context/UserContext'
 import { recordJobProviderView } from '../lib/listingPerformance'
+import WorkScheduleCard from '../components/WorkScheduleCard'
+import ArrivalWindowModal from '../components/ArrivalWindowModal'
+import {
+  addWorkToPhoneCalendar,
+  fetchWorkSchedule,
+  saveArrivalWindow,
+  sendRunningLate,
+} from '../lib/workSchedule'
 
 const MATERIALS_LABELS = {
   none:      'No materials needed',
@@ -90,6 +98,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const [providerReview, setProviderReview] = useState(null)
   const [providerReviewVisible, setProviderReviewVisible] = useState(false)
   const [savingProviderReview, setSavingProviderReview] = useState(false)
+  const [workSchedule, setWorkSchedule] = useState(null)
+  const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
+  const [savingArrival, setSavingArrival] = useState(false)
 
   // Bid form state (Features 3 & 4)
   const [editingBid,        setEditingBid]        = useState(false)
@@ -140,6 +151,8 @@ export default function JobDetailScreen({ route, navigation }) {
 
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(profileData)
+    const schedule = await fetchWorkSchedule({ jobId: currentJob.id })
+    setWorkSchedule(schedule)
 
     const { data: bidsData } = await supabase
       .from('bids')
@@ -581,6 +594,36 @@ export default function JobDetailScreen({ route, navigation }) {
       )
     }
 
+    async function handleSaveArrivalWindow(start, end, expectedComplete) {
+      setSavingArrival(true)
+      const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
+      setSavingArrival(false)
+      if (error) {
+        Alert.alert('Could not save arrival window', error.message || 'Please try again.')
+        return
+      }
+      setWorkSchedule(data)
+      setArrivalModalVisible(false)
+      Alert.alert('Arrival window confirmed', `${requesterFirstName} has been notified.`)
+    }
+
+    function handleRunningLate() {
+      Alert.alert('How late are you running?', `${requesterFirstName} will be notified immediately.`, [
+        { text: '15 minutes', onPress: () => submitLateNotice(15) },
+        { text: '30 minutes', onPress: () => submitLateNotice(30) },
+        { text: 'Cancel', style: 'cancel' },
+      ])
+    }
+
+    async function submitLateNotice(minutes) {
+      const { error } = await sendRunningLate({ jobId: job.id, minutes })
+      if (error) {
+        Alert.alert('Notice not sent', error.message || 'Please try again.')
+        return
+      }
+      Alert.alert('Update sent', `${requesterFirstName} has been told you are about ${minutes} minutes late.`)
+    }
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {headerJSX}
@@ -631,6 +674,21 @@ export default function JobDetailScreen({ route, navigation }) {
               </View>
               <Icon name="chevron-forward" size={24} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
+          ) : null}
+
+          {(!isCompleted && !isCancelled && !isAwaitingCompletion) ? (
+            <WorkScheduleCard
+              schedule={workSchedule}
+              canSetWindow
+              onSetWindow={() => setArrivalModalVisible(true)}
+              onAddCalendar={() => addWorkToPhoneCalendar({
+                title: job.title,
+                schedule: workSchedule,
+                location: jobLocation(job),
+                otherPartyName: requesterProfile?.full_name,
+              })}
+              onRunningLate={handleRunningLate}
+            />
           ) : null}
 
           {isCompleted && <ReceivedReview review={receivedReview} fromLabel="requester" />}
@@ -729,6 +787,14 @@ export default function JobDetailScreen({ route, navigation }) {
           saving={savingReview}
           onClose={() => setReviewVisible(false)}
           onSubmit={handleSubmitRequesterReview}
+        />
+        <ArrivalWindowModal
+          visible={arrivalModalVisible}
+          schedule={workSchedule}
+          suggestedDate={job.scheduled_date || job.date_from}
+          saving={savingArrival}
+          onClose={() => setArrivalModalVisible(false)}
+          onSave={handleSaveArrivalWindow}
         />
         </KeyboardAvoidingView>
       </View>

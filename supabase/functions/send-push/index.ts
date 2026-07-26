@@ -33,6 +33,9 @@ const TITLES: Record<string, string> = {
   saved_interest_match:           'New saved-search match',
   saved_interest_digest:          'Your saved-search update',
   availability_check:             'Are you available this week?',
+  arrival_window_confirmed:       'Arrival window confirmed',
+  running_late:                   'Running late',
+  work_completion_due:            'Is the work complete?',
 }
 
 Deno.serve(async (req) => {
