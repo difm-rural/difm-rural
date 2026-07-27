@@ -1,6 +1,18 @@
 import { Alert, Platform } from 'react-native'
-import * as Calendar from 'expo-calendar'
 import { supabase } from './supabase'
+
+let calendarModule
+
+function getCalendarModule() {
+  if (calendarModule) return calendarModule
+  try {
+    calendarModule = require('expo-calendar')
+    return calendarModule
+  } catch (error) {
+    console.log('Calendar native module is not available in this app build:', error)
+    return null
+  }
+}
 
 export async function fetchWorkSchedule({ jobId, bookingId }) {
   let query = supabase.from('work_schedules').select('*')
@@ -45,7 +57,7 @@ export function formatArrivalWindow(schedule) {
   return `${date}, ${time(start)}–${time(end)}`
 }
 
-function reminderOffsets(start) {
+function reminderOffsets(start, Calendar) {
   const eveningBefore = new Date(start)
   eveningBefore.setDate(eveningBefore.getDate() - 1)
   eveningBefore.setHours(18, 0, 0, 0)
@@ -63,6 +75,14 @@ export async function addWorkToPhoneCalendar({
   otherPartyName,
 }) {
   if (!schedule) return false
+  const Calendar = getCalendarModule()
+  if (!Calendar) {
+    Alert.alert(
+      'App update needed',
+      'Calendar support has been added to Rural Connections. Install the latest app build to add confirmed work to your phone calendar.',
+    )
+    return false
+  }
   try {
     const permission = await Calendar.requestCalendarPermissionsAsync()
     if (permission.status !== 'granted') {
@@ -81,7 +101,7 @@ export async function addWorkToPhoneCalendar({
       endDate: end,
       location: location || undefined,
       notes: `Confirmed through Rural Connections${otherPartyName ? ` with ${otherPartyName}` : ''}.`,
-      alarms: reminderOffsets(start),
+      alarms: reminderOffsets(start, Calendar),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }, Platform.OS === 'android' ? { startNewActivityTask: false } : undefined)
     return true

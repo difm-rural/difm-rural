@@ -230,7 +230,7 @@ export default function JobsTabScreen({ navigation }) {
 
   async function openSaveSearch() {
     if (!userId) {
-      Alert.alert('Sign in required', 'Sign in to save searches and receive matching job alerts.')
+      Alert.alert('Sign in required', 'Sign in to create job alerts for matching work.')
       return
     }
     if (radius !== 'any' && !coords) {
@@ -266,11 +266,11 @@ export default function JobsTabScreen({ navigation }) {
         emailEnabled: saveEmail,
       })
       setSaveOpen(false)
-      Alert.alert('Search saved', saveFrequency === 'off'
+      Alert.alert('Job alert created', saveFrequency === 'off'
         ? 'You can find and manage it in Account → Saved interests.'
         : `We’ll send ${saveFrequency === 'instant' ? 'an alert' : 'a daily summary'} when new jobs match.`)
     } catch (error) {
-      Alert.alert('Could not save this search', error.message)
+      Alert.alert('Could not create this job alert', error.message)
     } finally {
       setSaving(false)
     }
@@ -443,11 +443,15 @@ export default function JobsTabScreen({ navigation }) {
         <View style={styles.saveSearchRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.saveSearchTitle}>{visibleJobs.length} matching {visibleJobs.length === 1 ? 'job' : 'jobs'}</Text>
-            <Text style={styles.saveSearchSub}>Save these filters and choose when to hear about new matches.</Text>
+            <Text style={styles.saveSearchSub}>Get notified when similar jobs are posted.</Text>
           </View>
-          <TouchableOpacity style={styles.saveSearchButton} onPress={openSaveSearch} accessibilityRole="button">
-            <Icon name="bookmark-outline" size={17} color={colors.primary} />
-            <Text style={styles.saveSearchButtonText}>Save search</Text>
+          <TouchableOpacity
+            style={styles.saveSearchButton}
+            onPress={openSaveSearch}
+            accessibilityRole="button"
+            accessibilityLabel="Create job alert">
+            <Icon name="notifications-outline" size={17} color={colors.primary} />
+            <Text style={styles.saveSearchButtonText}>Create job alert</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -512,7 +516,7 @@ export default function JobsTabScreen({ navigation }) {
             <View style={styles.saveSheetHeader}>
               <View>
                 <Text style={styles.saveKicker}>Job alerts</Text>
-                <Text style={styles.saveTitle}>Save this search</Text>
+                <Text style={styles.saveTitle}>Create job alert</Text>
               </View>
               <TouchableOpacity onPress={() => setSaveOpen(false)} accessibilityLabel="Close">
                 <Icon name="close" size={24} color={colors.textSecondary} />
@@ -551,7 +555,7 @@ export default function JobsTabScreen({ navigation }) {
                 </View>
               </View>
             )}
-            <Button title="Save search" icon="bookmark-outline" onPress={confirmSaveSearch} loading={saving} disabled={!saveName.trim()} style={{ marginTop: 16 }} />
+            <Button title="Create job alert" icon="notifications-outline" onPress={confirmSaveSearch} loading={saving} disabled={!saveName.trim()} style={{ marginTop: 16 }} />
             <TouchableOpacity style={styles.manageLink} onPress={() => { setSaveOpen(false); navigation.navigate('SavedInterests') }}>
               <Text style={styles.manageLinkText}>Manage saved interests</Text>
             </TouchableOpacity>
