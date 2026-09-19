@@ -29,6 +29,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const PRICING_TYPES = [
   { id: 'fixed', label: 'Fixed price' },
   { id: 'hourly', label: 'Hourly rate' },
+  { id: 'day_rate', label: 'Day rate' },
   { id: 'per_unit', label: 'Per load/unit' },
   { id: 'quote_required', label: 'Estimate / quote' },
 ]
@@ -185,6 +186,11 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [pricingType, setPricingType] = useState(normalizePricingType(editingService?.pricing_type))
   const [rate, setRate] = useState(editingService?.rate != null ? String(editingService.rate) : '')
   const [unitLabel, setUnitLabel] = useState(editingService?.unit_label || '')
+  const [minimumUnits, setMinimumUnits] = useState(
+    editingService?.minimum_units != null && Number(editingService.minimum_units) !== 1
+      ? String(editingService.minimum_units)
+      : ''
+  )
   const [paymentTiming, setPaymentTiming] = useState(editingService?.payment_timing || 'on_completion')
   const [materials, setMaterials] = useState(editingService?.materials || 'included')
   const [locationName, setLocationName] = useState(editingService?.location_name || '')
@@ -235,7 +241,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     if (v === 'hourly') return 'hourly'
     if (v === 'fixed') return 'fixed'
     if (v === 'quote_required' || v === 'unknown') return 'quote_required'
-    if (v === 'day_rate' || v === 'per_day') return 'fixed'   // day rate folded into fixed for preview
+    if (v === 'day_rate' || v === 'per_day') return 'day_rate'
     if (v === 'per_unit' || v === 'per_load' || v === 'per_job') return 'per_unit'
     return ''
   }
@@ -646,6 +652,8 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     setSubmitting(true)
     const publishRate = pricingType === 'quote_required' ? 0 : parseFloat(rate)
+    const parsedMin = parseFloat(minimumUnits)
+    const publishMinUnits = Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin : 1
     const payload = {
       provider_id: user.id,
       title: title.trim(),
@@ -656,7 +664,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       pricing_type: pricingType,
       rate: publishRate,
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
-      minimum_units: 1,
+      minimum_units: publishMinUnits,
       card_headline: cardHeadline.trim() || null,
       card_supporting_text: cardSupportingText.trim() || null,
       card_style: cardStyle || null,
@@ -1077,6 +1085,24 @@ export default function CreateServiceScreen({ navigation, route }) {
               </View>
             )}
           </View>
+        )}
+
+        {pricingType !== 'quote_required' && pricingType !== 'fixed' && (
+          <>
+            <Text style={styles.fieldLabel}>
+              Minimum {pricingType === 'hourly' ? 'hours' : pricingType === 'day_rate' ? 'days' : (unitLabel.trim() || 'units')}
+              {' '}<Text style={styles.optional}>(optional)</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 4"
+              placeholderTextColor={colors.textMuted}
+              value={minimumUnits}
+              onChangeText={setMinimumUnits}
+              keyboardType="numeric"
+              accessibilityLabel="Minimum quantity"
+            />
+          </>
         )}
 
         <Text style={styles.fieldLabel}>When is payment due?</Text>
