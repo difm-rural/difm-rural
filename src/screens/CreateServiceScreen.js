@@ -43,6 +43,24 @@ const MATERIALS_OPTIONS = [
   { id: 'requester_supplies', label: 'Requester supplies' },
 ]
 const materialsLabel = (id) => MATERIALS_OPTIONS.find(o => o.id === id)?.label || '—'
+const ADDON_BASES = [
+  { id: 'flat', label: 'Flat' },
+  { id: 'per_km', label: 'Per km' },
+  { id: 'per_unit', label: 'Per unit' },
+]
+// Display token for a display-only add-on: flat -> "+$120 float",
+// per_km -> "+$3/km", per_unit -> "+$2.50/bale". Works on the create-screen
+// state shape (string amount); label appended when present, unit defaults to "unit".
+function addOnDisplay(a) {
+  const amt = String(a.amount ?? '').trim()
+  const label = String(a.label || '').trim()
+  const price = a.basis === 'per_km'
+    ? `+$${amt}/km`
+    : a.basis === 'per_unit'
+    ? `+$${amt}/${(a.unit_label || 'unit').trim() || 'unit'}`
+    : `+$${amt}`
+  return label ? `${price} ${label}` : price
+}
 const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Review']
 const CARD_TREATMENTS = [
   { id: 'bold', label: 'Bold overlay' },
@@ -191,6 +209,21 @@ export default function CreateServiceScreen({ navigation, route }) {
       ? String(editingService.minimum_units)
       : ''
   )
+  const [minCharge, setMinCharge] = useState(
+    editingService?.min_charge != null ? String(editingService.min_charge) : ''
+  )
+  const [pricingAddOns, setPricingAddOns] = useState(
+    Array.isArray(editingService?.pricing_add_ons)
+      ? editingService.pricing_add_ons.map(a => ({
+          label: a.label || '',
+          amount: a.amount != null ? String(a.amount) : '',
+          basis: a.basis || 'flat',
+          unit_label: a.unit_label || '',
+          optional: !!a.optional,
+        }))
+      : []
+  )
+  const [pricingTerms, setPricingTerms] = useState(editingService?.pricing_terms || '')
   const [paymentTiming, setPaymentTiming] = useState(editingService?.payment_timing || 'on_completion')
   const [materials, setMaterials] = useState(editingService?.materials || 'included')
   const [locationName, setLocationName] = useState(editingService?.location_name || '')
@@ -244,6 +277,16 @@ export default function CreateServiceScreen({ navigation, route }) {
     if (v === 'day_rate' || v === 'per_day') return 'day_rate'
     if (v === 'per_unit' || v === 'per_load' || v === 'per_job') return 'per_unit'
     return ''
+  }
+
+  function addAddOn() {
+    setPricingAddOns(prev => [...prev, { label: '', amount: '', basis: 'flat', unit_label: '', optional: false }])
+  }
+  function updateAddOn(index, field, value) {
+    setPricingAddOns(prev => prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)))
+  }
+  function removeAddOn(index) {
+    setPricingAddOns(prev => prev.filter((_, i) => i !== index))
   }
 
   function applyAiDraft(draft, source = 'website') {
@@ -652,8 +695,26 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     setSubmitting(true)
     const publishRate = pricingType === 'quote_required' ? 0 : parseFloat(rate)
+    const supportsMinimum = pricingType !== 'quote_required' && pricingType !== 'fixed'
     const parsedMin = parseFloat(minimumUnits)
-    const publishMinUnits = Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin : 1
+    const publishMinUnits = supportsMinimum && Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin : 1
+    const parsedMinCharge = parseFloat(minCharge)
+    const publishMinCharge = supportsMinimum && Number.isFinite(parsedMinCharge) && parsedMinCharge >= 0
+      ? parsedMinCharge
+      : null
+    // Drop rows missing a label OR an amount; keep add-ons display-only.
+    const cleanAddOns = pricingAddOns
+      .filter(a => a.label.trim() && String(a.amount).trim())
+      .map(a => {
+        const amt = parseFloat(a.amount)
+        return {
+          label: a.label.trim(),
+          amount: Number.isFinite(amt) ? amt : 0,
+          basis: a.basis || 'flat',
+          optional: !!a.optional,
+          ...(a.basis === 'per_unit' ? { unit_label: a.unit_label.trim() || null } : {}),
+        }
+      })
     const payload = {
       provider_id: user.id,
       title: title.trim(),
@@ -665,6 +726,9 @@ export default function CreateServiceScreen({ navigation, route }) {
       rate: publishRate,
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
       minimum_units: publishMinUnits,
+      min_charge: publishMinCharge,
+      pricing_add_ons: cleanAddOns,
+      pricing_terms: pricingTerms.trim() || null,
       card_headline: cardHeadline.trim() || null,
       card_supporting_text: cardSupportingText.trim() || null,
       card_style: cardStyle || null,
@@ -1102,6 +1166,16 @@ export default function CreateServiceScreen({ navigation, route }) {
               keyboardType="numeric"
               accessibilityLabel="Minimum quantity"
             />
+            <Text style={styles.fieldLabel}>Minimum charge <Text style={styles.optional}>(optional)</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 150"
+              placeholderTextColor={colors.textMuted}
+              value={minCharge}
+              onChangeText={setMinCharge}
+              keyboardType="numeric"
+              accessibilityLabel="Minimum charge in NZD"
+            />
           </>
         )}
 
@@ -1132,6 +1206,86 @@ export default function CreateServiceScreen({ navigation, route }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        <Text style={styles.fieldLabel}>Extra charges <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={styles.fieldHelp}>Delivery, float, call-out, bond, chemical. Shown on your listing so requesters know what to expect — not added to any total.</Text>
+        {pricingAddOns.map((addOn, idx) => (
+          <View key={idx} style={styles.addOnCard}>
+            <View style={styles.addOnTopRow}>
+              <TextInput
+                style={[styles.input, styles.addOnLabel]}
+                placeholder="e.g. Delivery"
+                placeholderTextColor={colors.textMuted}
+                value={addOn.label}
+                onChangeText={v => updateAddOn(idx, 'label', v)}
+                accessibilityLabel={`Extra charge ${idx + 1} label`}
+              />
+              <TextInput
+                style={[styles.input, styles.addOnAmount]}
+                placeholder="$0"
+                placeholderTextColor={colors.textMuted}
+                value={addOn.amount}
+                onChangeText={v => updateAddOn(idx, 'amount', v)}
+                keyboardType="numeric"
+                accessibilityLabel={`Extra charge ${idx + 1} amount`}
+              />
+              <TouchableOpacity
+                onPress={() => removeAddOn(idx)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove extra charge ${idx + 1}`}>
+                <Icon name="close" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.segmentGrid}>
+              {ADDON_BASES.map(b => (
+                <TouchableOpacity
+                  key={b.id}
+                  style={[styles.segmentBtn, addOn.basis === b.id && styles.segmentBtnActive]}
+                  onPress={() => updateAddOn(idx, 'basis', b.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: addOn.basis === b.id }}>
+                  <Text style={[styles.segmentText, addOn.basis === b.id && styles.segmentTextActive]}>{b.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {addOn.basis === 'per_unit' && (
+              <TextInput
+                style={styles.input}
+                placeholder="Unit (e.g. bale, load, m)"
+                placeholderTextColor={colors.textMuted}
+                value={addOn.unit_label}
+                onChangeText={v => updateAddOn(idx, 'unit_label', v)}
+                autoCapitalize="none"
+                accessibilityLabel={`Extra charge ${idx + 1} unit`}
+              />
+            )}
+            <TouchableOpacity
+              style={styles.addOnOptionalRow}
+              onPress={() => updateAddOn(idx, 'optional', !addOn.optional)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: addOn.optional }}>
+              <Icon name={addOn.optional ? 'checkbox' : 'square-outline'} size={20} color={colors.primary} />
+              <Text style={styles.addOnOptionalText}>Optional for the requester (they can decline it)</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+        <TouchableOpacity onPress={addAddOn} style={styles.addAddOnBtn} accessibilityRole="button" accessibilityLabel="Add an extra charge">
+          <Text style={styles.addAddOnText}>+ Add extra charge</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.fieldLabel}>Terms &amp; conditions <Text style={styles.optional}>(optional)</Text></Text>
+        <TextInput
+          style={[styles.input, styles.termsInput]}
+          placeholder="Fuel policy? Pickup or delivered? Deposit? Lease term? Weather-dependent?"
+          placeholderTextColor={colors.textMuted}
+          value={pricingTerms}
+          onChangeText={setPricingTerms}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+          accessibilityLabel="Pricing terms and conditions"
+        />
 
       </>
     )
@@ -1208,6 +1362,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function renderStep5() {
+    const reviewAddOns = pricingAddOns.filter(a => a.label.trim() && String(a.amount).trim())
     const missingItems = [
       !title.trim() && 'Add service title',
       !category && 'Choose category',
@@ -1306,6 +1461,21 @@ export default function CreateServiceScreen({ navigation, route }) {
             <View style={styles.finalCardPriceBadge}>
               <Text style={styles.finalCardPriceText}>{formatRate()}</Text>
             </View>
+            {!!minCharge.trim() && pricingType !== 'quote_required' && pricingType !== 'fixed' && (
+              <Text style={styles.finalCardMinCharge}>Minimum charge ${minCharge.trim()}</Text>
+            )}
+            {reviewAddOns.length > 0 && (
+              <View style={styles.finalCardAddOns}>
+                {reviewAddOns.map((a, i) => (
+                  <Text key={i} style={styles.finalCardAddOn}>
+                    {addOnDisplay(a)}{a.optional ? ' (optional)' : ''}
+                  </Text>
+                ))}
+              </View>
+            )}
+            {!!pricingTerms.trim() && (
+              <Text style={styles.finalCardTerms}>{pricingTerms.trim()}</Text>
+            )}
             <Text style={styles.finalCardStatus}>{serviceActive ? 'Advertising live' : 'Advertising paused'}</Text>
             <Text style={styles.finalCardMeta}>{category}{locationName ? `  ·  ${locationName}` : ''}</Text>
             {!!description && <Text style={styles.finalCardDescription}>{description}</Text>}
@@ -1640,6 +1810,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  addOnCard:        { borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 10, padding: 12, marginBottom: 10 },
+  addOnTopRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addOnLabel:       { flex: 1, marginBottom: 8 },
+  addOnAmount:      { width: 90, marginBottom: 8 },
+  addOnOptionalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  addOnOptionalText:{ flex: 1, fontSize: 13, color: colors.textSecondary },
+  addAddOnBtn:      { paddingVertical: 6, marginBottom: 12 },
+  addAddOnText:     { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  termsInput:       { minHeight: 90 },
+  finalCardMinCharge: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  finalCardAddOns:    { marginTop: 6 },
+  finalCardAddOn:     { fontSize: 13, color: colors.textSecondary },
+  finalCardTerms:     { fontSize: 13, color: colors.textMuted, marginTop: 6, fontStyle: 'italic' },
   managementCard: {
     backgroundColor: colors.white,
     borderRadius: 12,

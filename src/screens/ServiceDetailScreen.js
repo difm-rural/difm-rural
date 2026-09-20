@@ -36,6 +36,14 @@ function formatPricingType(type) {
   }
 }
 
+// Display-only add-on price token; unit defaults to "unit" so per_unit never
+// renders a dangling "/". flat -> "+$120", per_km -> "+$3/km", per_unit -> "+$2.50/bale".
+function formatAddOnValue(a) {
+  if (a.basis === 'per_km')   return `+$${a.amount}/km`
+  if (a.basis === 'per_unit') return `+$${a.amount}/${a.unit_label || 'unit'}`
+  return `+$${a.amount}`
+}
+
 const MATERIALS_LABELS = {
   included:           'Included',
   estimate:           'Charged as estimate',
@@ -321,6 +329,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
               value={`${service.minimum_units}`}
             />
           )}
+          {service.min_charge != null && (
+            <DetailRow label="Minimum charge" value={`$${service.min_charge}`} />
+          )}
           {service.materials ? (
             <DetailRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
           ) : null}
@@ -334,6 +345,27 @@ export default function ServiceDetailScreen({ route, navigation }) {
             last
           />
         </View>
+
+        {/* Extra charges (display-only) */}
+        {Array.isArray(service.pricing_add_ons) && service.pricing_add_ons.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Extra charges</Text>
+            {service.pricing_add_ons.map((a, i) => (
+              <DetailRow
+                key={i}
+                label={`${a.label || 'Extra'}${a.optional ? ' (optional)' : ''}`}
+                value={formatAddOnValue(a)}
+                last={i === service.pricing_add_ons.length - 1}
+              />
+            ))}
+          </View>
+        )}
+        {service.pricing_terms ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Terms &amp; conditions</Text>
+            <Text style={styles.descText}>{service.pricing_terms}</Text>
+          </View>
+        ) : null}
 
         {/* Description */}
         {service.description ? (
