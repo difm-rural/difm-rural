@@ -47,14 +47,37 @@ function formatPrice(item) {
     return 'Open'
   }
   const { pricing_type, rate, unit_label } = item
+  let baseLabel
   switch (pricing_type) {
-    case 'quote_required': return 'Quote required'
-    case 'hourly':   return `$${rate}/hr`
-    case 'day_rate': return `$${rate}/day`
-    case 'per_unit': return `$${rate}/${unit_label || 'unit'}`
-    case 'fixed':    return `$${rate}`
-    default:         return rate ? `$${rate}` : 'POA'
+    case 'quote_required': baseLabel = 'Quote required'; break
+    case 'hourly':   baseLabel = `$${rate}/hr`; break
+    case 'day_rate': baseLabel = `$${rate}/day`; break
+    case 'per_unit': baseLabel = `$${rate}/${unit_label || 'unit'}`; break
+    case 'fixed':    baseLabel = `$${rate}`; break
+    default:         baseLabel = rate ? `$${rate}` : 'POA'
   }
+  return applyVariantHeadline(item, baseLabel)
+}
+
+// Tier 3 headline: base rate + additional variants. Same pricing_type across all ->
+// "from $<min>/<unit>"; mixed types (or a quote base) -> base label + " · more options".
+// Empty/null variants -> unchanged.
+export function applyVariantHeadline(item, baseLabel) {
+  const variants = Array.isArray(item.pricing_variants) ? item.pricing_variants : []
+  if (variants.length === 0) return baseLabel
+  if (item.pricing_type === 'quote_required') return `${baseLabel} · more options`
+  const types = new Set([item.pricing_type, ...variants.map(v => v.pricing_type)])
+  if (types.size === 1) {
+    const entries = [{ rate: item.rate, unit_label: item.unit_label }, ...variants]
+    let min = entries[0]
+    for (const e of entries) { if (Number(e.rate) < Number(min.rate)) min = e }
+    const unit = item.pricing_type === 'hourly' ? '/hr'
+      : item.pricing_type === 'day_rate' ? '/day'
+      : item.pricing_type === 'per_unit' ? `/${min.unit_label || 'unit'}`
+      : ''
+    return `from $${min.rate}${unit}`
+  }
+  return `${baseLabel} · more options`
 }
 
 function getInitials(name) {

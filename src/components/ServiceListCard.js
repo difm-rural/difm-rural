@@ -2,20 +2,22 @@ import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import { categoryImage } from '../lib/categoryImages'
-import { categoryVisual } from './JobServiceCard'
+import { categoryVisual, applyVariantHeadline } from './JobServiceCard'
 import Icon from './Icon'
 import { availabilityDisplay } from '../lib/providerAvailability'
 
 function servicePrice(item) {
   const { pricing_type, rate, unit_label } = item
+  let baseLabel
   switch (pricing_type) {
-    case 'quote_required': return 'Quote required'
-    case 'hourly':   return `$${rate}/hr`
-    case 'day_rate': return `$${rate}/day`
-    case 'per_unit': return `$${rate}/${unit_label || 'unit'}`
-    case 'fixed':    return `$${rate}`
-    default:         return rate ? `$${rate}` : 'POA'
+    case 'quote_required': baseLabel = 'Quote required'; break
+    case 'hourly':   baseLabel = `$${rate}/hr`; break
+    case 'day_rate': baseLabel = `$${rate}/day`; break
+    case 'per_unit': baseLabel = `$${rate}/${unit_label || 'unit'}`; break
+    case 'fixed':    baseLabel = `$${rate}`; break
+    default:         baseLabel = rate ? `$${rate}` : 'POA'
   }
+  return applyVariantHeadline(item, baseLabel)
 }
 
 // Full-width horizontal service card for the Services list (category thumbnail +

@@ -44,6 +44,18 @@ function formatAddOnValue(a) {
   return `+$${a.amount}`
 }
 
+// A single additional rate option (base rate is shown separately).
+function formatVariantValue(v) {
+  const token = v.pricing_type === 'hourly' ? `$${v.rate}/hr`
+    : v.pricing_type === 'day_rate' ? `$${v.rate}/day`
+    : v.pricing_type === 'per_unit' ? `$${v.rate}/${v.unit_label || 'unit'}`
+    : `$${v.rate}`
+  const bits = []
+  if (v.min_units != null)  bits.push(`min ${v.min_units}`)
+  if (v.min_charge != null) bits.push(`min $${v.min_charge}`)
+  return bits.length ? `${token} (${bits.join(', ')})` : token
+}
+
 const MATERIALS_LABELS = {
   included:           'Included',
   estimate:           'Charged as estimate',
@@ -332,6 +344,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
           {service.min_charge != null && (
             <DetailRow label="Minimum charge" value={`$${service.min_charge}`} />
           )}
+          {Array.isArray(service.pricing_variants) && service.pricing_variants.map((v, i) => (
+            <DetailRow key={`variant-${i}`} label={v.label || 'Option'} value={formatVariantValue(v)} />
+          ))}
           {service.materials ? (
             <DetailRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
           ) : null}

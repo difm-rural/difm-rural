@@ -61,6 +61,26 @@ function addOnDisplay(a) {
     : `+$${amt}`
   return label ? `${price} ${label}` : price
 }
+const VARIANT_PRICING_TYPES = PRICING_TYPES.filter(pt => pt.id !== 'quote_required')
+// Rate token for a variant (create-screen state shape, string rate). Unit
+// defaults to "unit" so per_unit never renders a dangling "/".
+function variantRateToken(v) {
+  const amt = String(v.rate ?? '').trim()
+  if (v.pricing_type === 'hourly')   return `$${amt}/hr`
+  if (v.pricing_type === 'day_rate') return `$${amt}/day`
+  if (v.pricing_type === 'per_unit') return `$${amt}/${(v.unit_label || 'unit').trim() || 'unit'}`
+  return `$${amt}`
+}
+function variantDisplay(v) {
+  const label = String(v.label || '').trim()
+  const min = String(v.min_units ?? '').trim()
+  return `${label ? label + ': ' : ''}${variantRateToken(v)}${min ? ` (min ${min})` : ''}`
+}
+// A variant is publishable only with a label and a finite positive rate.
+function isValidVariant(v) {
+  const r = parseFloat(v.rate)
+  return !!v.label.trim() && Number.isFinite(r) && r > 0
+}
 const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Review']
 const CARD_TREATMENTS = [
   { id: 'bold', label: 'Bold overlay' },
@@ -224,6 +244,18 @@ export default function CreateServiceScreen({ navigation, route }) {
       : []
   )
   const [pricingTerms, setPricingTerms] = useState(editingService?.pricing_terms || '')
+  const [pricingVariants, setPricingVariants] = useState(
+    Array.isArray(editingService?.pricing_variants)
+      ? editingService.pricing_variants.map(v => ({
+          label: v.label || '',
+          pricing_type: v.pricing_type || 'fixed',
+          rate: v.rate != null ? String(v.rate) : '',
+          unit_label: v.unit_label || '',
+          min_units: v.min_units != null ? String(v.min_units) : '',
+          min_charge: v.min_charge != null ? String(v.min_charge) : '',
+        }))
+      : []
+  )
   const [paymentTiming, setPaymentTiming] = useState(editingService?.payment_timing || 'on_completion')
   const [materials, setMaterials] = useState(editingService?.materials || 'included')
   const [locationName, setLocationName] = useState(editingService?.location_name || '')
@@ -287,6 +319,16 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
   function removeAddOn(index) {
     setPricingAddOns(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function addVariant() {
+    setPricingVariants(prev => [...prev, { label: '', pricing_type: 'fixed', rate: '', unit_label: '', min_units: '', min_charge: '' }])
+  }
+  function updateVariant(index, field, value) {
+    setPricingVariants(prev => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)))
+  }
+  function removeVariant(index) {
+    setPricingVariants(prev => prev.filter((_, i) => i !== index))
   }
 
   function applyAiDraft(draft, source = 'website') {
@@ -715,6 +757,21 @@ export default function CreateServiceScreen({ navigation, route }) {
           ...(a.basis === 'per_unit' ? { unit_label: a.unit_label.trim() || null } : {}),
         }
       })
+    // Only publish variants with a label and a finite positive rate; never store rate: 0.
+    const cleanVariants = pricingVariants
+      .filter(isValidVariant)
+      .map(v => {
+        const mu = parseFloat(v.min_units)
+        const mc = parseFloat(v.min_charge)
+        return {
+          label: v.label.trim(),
+          pricing_type: v.pricing_type || 'fixed',
+          rate: parseFloat(v.rate),
+          ...(v.pricing_type === 'per_unit' ? { unit_label: v.unit_label.trim() || null } : {}),
+          ...(Number.isFinite(mu) && mu > 0 ? { min_units: mu } : {}),
+          ...(Number.isFinite(mc) && mc >= 0 ? { min_charge: mc } : {}),
+        }
+      })
     const payload = {
       provider_id: user.id,
       title: title.trim(),
@@ -729,6 +786,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       min_charge: publishMinCharge,
       pricing_add_ons: cleanAddOns,
       pricing_terms: pricingTerms.trim() || null,
+      pricing_variants: cleanVariants,
       card_headline: cardHeadline.trim() || null,
       card_supporting_text: cardSupportingText.trim() || null,
       card_style: cardStyle || null,
@@ -1179,6 +1237,51 @@ export default function CreateServiceScreen({ navigation, route }) {
           </>
         )}
 
+        <Text style={styles.fieldLabel}>More rate options <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={styles.fieldHelp}>Add alternative rates under this listing — e.g. round vs square baleage. Your base rate above stays the main price.</Text>
+        {pricingVariants.map((v, idx) => (
+          <View key={idx} style={styles.addOnCard}>
+            <View style={styles.addOnTopRow}>
+              <TextInput
+                style={[styles.input, styles.addOnLabel]}
+                placeholder="Label (e.g. Round baleage)"
+                placeholderTextColor={colors.textMuted}
+                value={v.label}
+                onChangeText={t => updateVariant(idx, 'label', t)}
+                accessibilityLabel={`Rate option ${idx + 1} label`}
+              />
+              <TouchableOpacity onPress={() => removeVariant(idx)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={`Remove rate option ${idx + 1}`}>
+                <Icon name="close" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.segmentGrid}>
+              {VARIANT_PRICING_TYPES.map(pt => (
+                <TouchableOpacity
+                  key={pt.id}
+                  style={[styles.segmentBtn, v.pricing_type === pt.id && styles.segmentBtnActive]}
+                  onPress={() => updateVariant(idx, 'pricing_type', pt.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: v.pricing_type === pt.id }}>
+                  <Text style={[styles.segmentText, v.pricing_type === pt.id && styles.segmentTextActive]}>{pt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.addOnTopRow}>
+              <TextInput style={[styles.input, styles.addOnLabel]} placeholder="Rate" placeholderTextColor={colors.textMuted} value={v.rate} onChangeText={t => updateVariant(idx, 'rate', t)} keyboardType="numeric" accessibilityLabel={`Rate option ${idx + 1} rate`} />
+              {v.pricing_type === 'per_unit' && (
+                <TextInput style={[styles.input, styles.addOnLabel]} placeholder="Unit (e.g. bale)" placeholderTextColor={colors.textMuted} value={v.unit_label} onChangeText={t => updateVariant(idx, 'unit_label', t)} autoCapitalize="none" accessibilityLabel={`Rate option ${idx + 1} unit`} />
+              )}
+            </View>
+            <View style={styles.addOnTopRow}>
+              <TextInput style={[styles.input, styles.addOnLabel]} placeholder="Min quantity (optional)" placeholderTextColor={colors.textMuted} value={v.min_units} onChangeText={t => updateVariant(idx, 'min_units', t)} keyboardType="numeric" accessibilityLabel={`Rate option ${idx + 1} minimum quantity`} />
+              <TextInput style={[styles.input, styles.addOnLabel]} placeholder="Min charge (optional)" placeholderTextColor={colors.textMuted} value={v.min_charge} onChangeText={t => updateVariant(idx, 'min_charge', t)} keyboardType="numeric" accessibilityLabel={`Rate option ${idx + 1} minimum charge`} />
+            </View>
+          </View>
+        ))}
+        <TouchableOpacity onPress={addVariant} style={styles.addAddOnBtn} accessibilityRole="button" accessibilityLabel="Add another rate option">
+          <Text style={styles.addAddOnText}>+ Add another rate option</Text>
+        </TouchableOpacity>
+
         <Text style={styles.fieldLabel}>When is payment due?</Text>
         <View style={styles.segmentGrid}>
           {PAYMENT_OPTIONS.map(o => (
@@ -1363,6 +1466,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   function renderStep5() {
     const reviewAddOns = pricingAddOns.filter(a => a.label.trim() && String(a.amount).trim())
+    const reviewVariants = pricingVariants.filter(isValidVariant)
     const missingItems = [
       !title.trim() && 'Add service title',
       !category && 'Choose category',
@@ -1461,6 +1565,13 @@ export default function CreateServiceScreen({ navigation, route }) {
             <View style={styles.finalCardPriceBadge}>
               <Text style={styles.finalCardPriceText}>{formatRate()}</Text>
             </View>
+            {reviewVariants.length > 0 && (
+              <View style={styles.finalCardAddOns}>
+                {reviewVariants.map((v, i) => (
+                  <Text key={i} style={styles.finalCardAddOn}>{variantDisplay(v)}</Text>
+                ))}
+              </View>
+            )}
             {!!minCharge.trim() && pricingType !== 'quote_required' && pricingType !== 'fixed' && (
               <Text style={styles.finalCardMinCharge}>Minimum charge ${minCharge.trim()}</Text>
             )}
