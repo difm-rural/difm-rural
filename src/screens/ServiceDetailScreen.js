@@ -88,14 +88,34 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const [providerStats, setProviderStats] = useState(null)
   const [recentReviews, setRecentReviews] = useState([])
   const [quantity, setQuantity] = useState(initialService.minimum_units || 1)
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(null) // null = base rate
   const [isBooked, setIsBooked] = useState(false)
   const [activeBooking, setActiveBooking] = useState(null)
   const [currentUserId, setCurrentUserId] = useState(null)
 
-  const rate = asNumber(service.rate)
-  const isEstimatable = ['hourly', 'per_unit', 'day_rate'].includes(service.pricing_type)
-  const isQuoteRequired = service.pricing_type === 'quote_required'
-  const total = isQuoteRequired ? null : isEstimatable ? formatCurrency(quantity * rate) : formatCurrency(rate)
+  const rate = asNumber(service.rate) // base rate — shown in the Service details card (unchanged)
+  const variants = Array.isArray(service.pricing_variants) ? service.pricing_variants : []
+  const selectedOption = selectedVariantIndex != null ? variants[selectedVariantIndex] : null
+  // Effective option drives the estimator + what flows to the booking. Falls back
+  // to the base service fields; note variant uses min_units, base uses minimum_units.
+  const effectivePricingType = selectedOption ? selectedOption.pricing_type : service.pricing_type
+  const effectiveRate = asNumber(selectedOption ? selectedOption.rate : service.rate)
+  const effectiveMin = (selectedOption ? selectedOption.min_units : service.minimum_units) || 1
+  const effectiveUnitLabel = effectivePricingType === 'hourly' ? 'hour'
+    : effectivePricingType === 'day_rate' ? 'day'
+    : (selectedOption ? (selectedOption.unit_label || 'unit') : (service.unit_label || 'unit'))
+  const isEstimatable = ['hourly', 'per_unit', 'day_rate'].includes(effectivePricingType)
+  const isQuoteRequired = effectivePricingType === 'quote_required'
+  const total = isQuoteRequired ? null : isEstimatable ? formatCurrency(quantity * effectiveRate) : formatCurrency(effectiveRate)
+  const baseRateToken = service.pricing_type === 'quote_required'
+    ? 'Quote required'
+    : formatVariantValue({ pricing_type: service.pricing_type, rate: service.rate, unit_label: service.unit_label, min_units: service.minimum_units > 1 ? service.minimum_units : null, min_charge: service.min_charge })
+
+  function selectOption(index) {
+    setSelectedVariantIndex(index)
+    const opt = index != null ? variants[index] : null
+    setQuantity((opt ? opt.min_units : service.minimum_units) || 1) // reset qty to option min
+  }
 
   useEffect(() => {
     fetchService()
@@ -401,6 +421,34 @@ export default function ServiceDetailScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* Rate option selector */}
+        {variants.length > 0 && !isOwnService && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Choose a rate option</Text>
+            {[null, ...variants.map((_, i) => i)].map(idx => {
+              const opt = idx != null ? variants[idx] : null
+              const selected = selectedVariantIndex === idx
+              const label = opt ? (opt.label || 'Option') : 'Base rate'
+              const value = opt ? formatVariantValue(opt) : baseRateToken
+              return (
+                <TouchableOpacity
+                  key={idx == null ? 'base' : `v-${idx}`}
+                  style={styles.optionRow}
+                  onPress={() => selectOption(idx)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${label}: ${value}`}>
+                  <Icon name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={selected ? colors.primary : colors.textMuted} />
+                  <View style={styles.optionText}>
+                    <Text style={styles.optionLabel}>{label}</Text>
+                    <Text style={styles.optionValue}>{value}</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        )}
+
         {/* Cost estimator */}
         {isEstimatable && (
           <View style={styles.card}>
@@ -408,14 +456,14 @@ export default function ServiceDetailScreen({ route, navigation }) {
             <View style={styles.estimatorRow}>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQuantity(q => Math.max(service.minimum_units || 1, q - 1))}
+                onPress={() => setQuantity(q => Math.max(effectiveMin, q - 1))}
                 accessibilityRole="button"
                 accessibilityLabel="Decrease quantity">
                 <Icon name="remove" size={22} color={colors.primary} />
               </TouchableOpacity>
               <View style={styles.qtyDisplay}>
                 <Text style={styles.qtyNum}>{quantity}</Text>
-                <Text style={styles.qtyUnit}>{unitLabel}{quantity !== 1 ? 's' : ''}</Text>
+                <Text style={styles.qtyUnit}>{effectiveUnitLabel}{quantity !== 1 ? 's' : ''}</Text>
               </View>
               <TouchableOpacity
                 style={styles.qtyBtn}
@@ -442,7 +490,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
             ? goToManageServices
             : isBooked
             ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
-            : () => navigation.navigate('BookingConfirm', { service, quantity })}
+            : () => navigation.navigate('BookingConfirm', { service, quantity, ...(selectedOption ? { selectedOption } : {}) })}
           accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}
         />
         {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
@@ -606,6 +654,11 @@ const styles = StyleSheet.create({
   },
   estimateLabel: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   estimateTotal: { fontSize: 20, fontWeight: 'bold', color: colors.primary },
+
+  optionRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  optionText:  { flex: 1 },
+  optionLabel: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  optionValue: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
 
   previewNote: {
     backgroundColor: colors.infoLight,

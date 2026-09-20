@@ -83,15 +83,17 @@ function AuthSheet({ onDismiss, onLogin, onRegister }) {
 
 export default function BookingConfirmScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
-  const { service, quantity: initialQty } = route.params || {}
+  const { service, quantity: initialQty, selectedOption } = route.params || {}
   const qty = initialQty || 1
-  const rate = asNumber(service?.rate)
-  const isQuoteRequired = service?.pricing_type === 'quote_required'
+  const option = selectedOption || null
+  const effectivePricingType = option ? option.pricing_type : service?.pricing_type
+  const rate = asNumber(option ? option.rate : service?.rate)
+  const isQuoteRequired = effectivePricingType === 'quote_required'
   const total = (qty * rate).toFixed(2)
 
-  const unitLabel = service?.pricing_type === 'hourly' ? 'hour'
-    : service?.pricing_type === 'day_rate' ? 'day'
-    : (service?.unit_label || 'unit')
+  const unitLabel = effectivePricingType === 'hourly' ? 'hour'
+    : effectivePricingType === 'day_rate' ? 'day'
+    : (option ? (option.unit_label || 'unit') : (service?.unit_label || 'unit'))
 
   const [scheduleType,   setScheduleType]   = useState('asap')
   const [date,           setDate]           = useState(null)
@@ -148,7 +150,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
     }
     navigation.navigate('LocationPicker', {
       returnTo: 'BookingConfirm',
-      returnParams: { service, quantity: qty },
+      returnParams: { service, quantity: qty, selectedOption: option },
       title: 'Pin service location',
       subtitle: 'Tap the map or drag the pin to the exact spot for this service',
       initialLatitude: latitude,
