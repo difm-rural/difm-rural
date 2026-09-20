@@ -94,6 +94,16 @@ export const CATEGORY_FILTERS = [
   ...CATEGORIES.map(c => ({ id: c, label: c })),
 ]
 
+// Kind-dependent browse categories for Listings (L2). `service` reuses the full
+// labour taxonomy; resource kinds get their own short sets. Storage lives under lease.
+export const LISTING_CATEGORIES = {
+  service:  CATEGORIES,
+  grazing:  ['Grazing', 'Agistment', 'Winter grazing', 'Dairy support'],
+  hire:     ['Machinery', 'Trailers', 'Yards & handling', 'Implements'],
+  lease:    ['Paddock/land', 'Shed/building', 'Storage'],
+  for_sale: ['Hay & baleage', 'Feed & supplement', 'Livestock sundries', 'General'],
+}
+
 // True when a job title reads like house-sitting (used to surface the
 // house-sitting-only options: date range, hide exact address).
 export function isHouseSitting(title) {
