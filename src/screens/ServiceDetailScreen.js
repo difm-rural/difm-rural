@@ -80,6 +80,8 @@ function formatCurrency(value) {
   return asNumber(value).toFixed(2)
 }
 
+const KIND_ENQUIRY = ['for_sale', 'grazing', 'lease'] // bypass bookings — enquiry only
+
 export default function ServiceDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { service: initialService } = route.params
@@ -153,6 +155,11 @@ export default function ServiceDetailScreen({ route, navigation }) {
     const { data: { user } } = await supabase.auth.getUser()
     setCurrentUserId(user?.id || null)
     if (!user) return
+    if (KIND_ENQUIRY.includes(service.kind)) { // enquiry kinds have no bookings
+      setActiveBooking(null)
+      setIsBooked(false)
+      return
+    }
     if (user.id === service.provider_id) {
       setActiveBooking(null)
       setIsBooked(false)
@@ -224,6 +231,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
     : 'Flexible'
   const photos = Array.isArray(service.photos) ? service.photos : []
   const isOwnService = !!currentUserId && currentUserId === service.provider_id
+  const isEnquiryKind = KIND_ENQUIRY.includes(service.kind)
 
   function goToManageServices() {
     const routeNames = navigation.getState()?.routeNames || []
@@ -422,7 +430,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         )}
 
         {/* Rate option selector */}
-        {variants.length > 0 && !isOwnService && (
+        {variants.length > 0 && !isOwnService && !isEnquiryKind && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Choose a rate option</Text>
             {[null, ...variants.map((_, i) => i)].map(idx => {
@@ -450,7 +458,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         )}
 
         {/* Cost estimator */}
-        {isEstimatable && (
+        {isEstimatable && !isEnquiryKind && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Estimate your cost</Text>
             <View style={styles.estimatorRow}>
@@ -483,24 +491,40 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
       {/* Book button */}
       <View style={[styles.bookFooter, { paddingBottom: insets.bottom + 12 }]}>
-        <Button
-          variant={!isOwnService && isBooked ? 'secondary' : 'primary'}
-          title={isOwnService ? 'Manage your services' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : `Book now · $${total} NZD`}
-          onPress={isOwnService
-            ? goToManageServices
-            : isBooked
-            ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
-            : () => navigation.navigate('BookingConfirm', { service, quantity, ...(selectedOption ? { selectedOption } : {}) })}
-          accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}
-        />
-        {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
+        {isEnquiryKind && !isOwnService ? (
           <Button
-            variant="destructive"
-            title={activeBooking?.status === 'pending' ? 'Withdraw request' : 'Request cancellation'}
-            onPress={handleCancelBooking}
-            style={{ marginTop: 10 }}
-            accessibilityLabel={activeBooking?.status === 'pending' ? 'Withdraw service request' : 'Request cancellation'}
+            variant="primary"
+            title="Enquire"
+            onPress={() => navigation.navigate('Chat', {
+              serviceId:     service.id,
+              otherUserId:   service.provider_id,
+              jobTitle:      service.title,
+              otherUserName: profile?.full_name || 'Provider',
+            })}
+            accessibilityLabel="Enquire about this listing"
           />
+        ) : (
+          <>
+            <Button
+              variant={!isOwnService && isBooked ? 'secondary' : 'primary'}
+              title={isOwnService ? 'Manage your services' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : `Book now · $${total} NZD`}
+              onPress={isOwnService
+                ? goToManageServices
+                : isBooked
+                ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
+                : () => navigation.navigate('BookingConfirm', { service, quantity, ...(selectedOption ? { selectedOption } : {}) })}
+              accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}
+            />
+            {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
+              <Button
+                variant="destructive"
+                title={activeBooking?.status === 'pending' ? 'Withdraw request' : 'Request cancellation'}
+                onPress={handleCancelBooking}
+                style={{ marginTop: 10 }}
+                accessibilityLabel={activeBooking?.status === 'pending' ? 'Withdraw service request' : 'Request cancellation'}
+              />
+            )}
+          </>
         )}
       </View>
     </View>

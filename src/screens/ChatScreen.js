@@ -31,11 +31,12 @@ function parseSpecialMessage(content) {
 
 export default function ChatScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
-  const { jobId, bookingId, jobTitle, otherUserId, otherUserName } = route.params
+  const { jobId, bookingId, serviceId, jobTitle, otherUserId, otherUserName } = route.params
   const isServiceBookingChat = !!bookingId
-  const chatId = bookingId || jobId
+  const isListingChat = !bookingId && !!serviceId
+  const chatId = bookingId || serviceId || jobId
   const messageTable = isServiceBookingChat ? 'service_booking_messages' : 'messages'
-  const idColumn = isServiceBookingChat ? 'booking_id' : 'job_id'
+  const idColumn = isServiceBookingChat ? 'booking_id' : isListingChat ? 'service_id' : 'job_id'
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
@@ -46,6 +47,7 @@ export default function ChatScreen({ route, navigation }) {
   const markChatNotificationsRead = () => markNotificationsReadFor({
     bookingId,
     jobId,
+    serviceId,
     type: 'new_message',
   })
 
@@ -63,7 +65,7 @@ export default function ChatScreen({ route, navigation }) {
           .eq('id', bookingId)
           .single()
         setJobStatus(bookingData?.status || null)
-      } else {
+      } else if (!isListingChat) {
         // jobs_public masks location_name for anyone who isn't the owner or the
         // accepted provider — the requester still gets it for the share-address bar.
         const { data: jobData } = await supabase
@@ -74,13 +76,21 @@ export default function ChatScreen({ route, navigation }) {
         setJobStatus(jobData?.status || null)
         setJobInfo(jobData || null)
       }
+      // A listing (enquiry) chat has no job/booking lifecycle — nothing to fetch.
 
       // Stored newest-first to match the inverted FlatList (no per-render copy).
-      const { data } = await supabase
+      // A listing thread is one owner ↔ many enquirers, so service_id alone isn't
+      // the thread identity — constrain to the (me, otherUserId) participant pair.
+      let query = supabase
         .from(messageTable)
         .select('*')
         .eq(idColumn, chatId)
-        .order('created_at', { ascending: false })
+      if (isListingChat) {
+        query = query.or(
+          `and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`
+        )
+      }
+      const { data } = await query.order('created_at', { ascending: false })
 
       setMessages(data || [])
       await markChatNotificationsRead()
@@ -91,9 +101,16 @@ export default function ChatScreen({ route, navigation }) {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: messageTable, filter: `${idColumn}=eq.${chatId}` },
           payload => {
+            const m = payload.new
+            // postgres_changes can only filter on service_id, so drop any message
+            // outside the (me, otherUserId) pair for a one-to-many listing thread.
+            if (isListingChat && !(
+              (m.sender_id === user.id && m.receiver_id === otherUserId) ||
+              (m.sender_id === otherUserId && m.receiver_id === user.id)
+            )) return
             setMessages(prev => {
-              if (prev.some(m => m.id === payload.new.id)) return prev
-              return [payload.new, ...prev]
+              if (prev.some(x => x.id === m.id)) return prev
+              return [m, ...prev]
             })
             markChatNotificationsRead()
           }
@@ -104,7 +121,7 @@ export default function ChatScreen({ route, navigation }) {
             { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `id=eq.${bookingId}` },
             payload => { setJobStatus(payload.new?.status || null) }
           )
-      } else {
+      } else if (!isListingChat) {
         channel.on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'jobs', filter: `id=eq.${jobId}` },
@@ -126,16 +143,18 @@ export default function ChatScreen({ route, navigation }) {
     const content = text.trim()
     if (!content) return
 
-    const { data: latestRecord } = await supabase
-      .from(isServiceBookingChat ? 'bookings' : 'jobs')
-      .select('status')
-      .eq('id', chatId)
-      .single()
+    if (!isListingChat) {
+      const { data: latestRecord } = await supabase
+        .from(isServiceBookingChat ? 'bookings' : 'jobs')
+        .select('status')
+        .eq('id', chatId)
+        .single()
 
-    if (latestRecord?.status === 'completed') {
-      setJobStatus('completed')
-      Alert.alert('Chat closed', 'This work has been marked complete, so chat is now read-only.')
-      return
+      if (latestRecord?.status === 'completed') {
+        setJobStatus('completed')
+        Alert.alert('Chat closed', 'This work has been marked complete, so chat is now read-only.')
+        return
+      }
     }
 
     setText('')

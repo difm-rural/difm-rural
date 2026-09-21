@@ -49,7 +49,7 @@ export async function fetchNotifications(limit = 50) {
 // Marks the current user's unread notifications for a given job or booking as
 // read — call when the user resolves the underlying item (e.g. confirms a
 // booking) so stale "please confirm" prompts leave the Needs-attention feed.
-export async function markNotificationsReadFor({ bookingId, jobId, type } = {}) {
+export async function markNotificationsReadFor({ bookingId, jobId, serviceId, type } = {}) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
@@ -60,6 +60,7 @@ export async function markNotificationsReadFor({ bookingId, jobId, type } = {}) 
       .eq('read', false)
     if (bookingId) q = q.eq('metadata->>booking_id', bookingId)
     else if (jobId) q = q.eq('metadata->>job_id', jobId)
+    else if (serviceId) q = q.eq('metadata->>service_id', serviceId)
     else return
     if (type) q = q.eq('type', type)
     await q
@@ -144,6 +145,18 @@ export async function openNotificationTarget(navigation, userId, notification) {
         navigation.navigate('Chat', {
           jobId:         meta.job_id,
           jobTitle:      job?.title || 'Job',
+          otherUserId:   meta.sender_id,
+          otherUserName,
+        })
+        markRead()
+        return true
+      }
+      if (meta.service_id) {
+        const { data: svc } = await supabase
+          .from('services').select('title').eq('id', meta.service_id).maybeSingle()
+        navigation.navigate('Chat', {
+          serviceId:     meta.service_id,
+          jobTitle:      svc?.title || 'Listing',
           otherUserId:   meta.sender_id,
           otherUserName,
         })
