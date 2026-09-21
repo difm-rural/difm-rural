@@ -107,15 +107,7 @@ const KIND_PRICING_DEFAULTS = {
   lease:    { pricingType: 'per_unit', unitLabel: 'week' },
   for_sale: { pricingType: 'per_unit', unitLabel: 'bale' },
 }
-function step1Heading(kind, direction) {
-  if (direction === 'wanted') {
-    return {
-      grazing:  'What grazing are you looking for?',
-      hire:     'What gear are you looking to hire?',
-      lease:    'What space are you looking for?',
-      for_sale: 'What are you looking to buy?',
-    }[kind] || 'What are you looking for?'
-  }
+function step1Heading(kind) {
   return {
     service:  'What service can you offer?',
     grazing:  'What grazing do you have?',
@@ -237,7 +229,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   const isEditing = !!editingService?.id
   const [creationMode, setCreationMode] = useState(isEditing ? 'manual' : (route?.params?.startMode || 'kind'))
   const [kind, setKind] = useState(editingService?.kind || 'service')
-  const [direction, setDirection] = useState(editingService?.direction || 'offering')
   const [websiteInput, setWebsiteInput] = useState('')
   const [websiteError, setWebsiteError] = useState('')
   const [websiteDraftPreview, setWebsiteDraftPreview] = useState(null)
@@ -319,9 +310,9 @@ export default function CreateServiceScreen({ navigation, route }) {
   function canProceed() {
     if (step === 1) return !!(title.trim() && category)
     if (step === 2) return true
-    if (step === 3) return direction === 'wanted' ? true : !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
+    if (step === 3) return !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
     if (step === 4) return !!locationName.trim()
-    if (step === 5) return !!(title.trim() && category && locationName.trim() && (direction === 'wanted' || (pricingType && (pricingType === 'quote_required' || rate.trim()))))
+    if (step === 5) return !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
     return true
   }
 
@@ -475,7 +466,6 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   function selectKind(k) {
     setKind(k)
-    if (!KIND_IS_RESOURCE[k]) setDirection('offering') // service is always offering
     if (!isEditing) {
       const d = KIND_PRICING_DEFAULTS[k] || { pricingType: '', unitLabel: '' }
       setPricingType(d.pricingType)   // per-kind default (NEW listings only)
@@ -511,24 +501,6 @@ export default function CreateServiceScreen({ navigation, route }) {
               <Icon name={kind === k.id ? 'radio-button-on' : 'radio-button-off'} size={20} color={kind === k.id ? colors.primary : colors.textMuted} />
             </TouchableOpacity>
           ))}
-
-          {KIND_IS_RESOURCE[kind] && (
-            <>
-              <Text style={styles.fieldLabel}>Are you offering or looking?</Text>
-              <View style={styles.segmentGrid}>
-                {[{ id: 'offering', label: "I'm offering" }, { id: 'wanted', label: "I'm looking for" }].map(o => (
-                  <TouchableOpacity
-                    key={o.id}
-                    style={[styles.segmentBtn, direction === o.id && styles.segmentBtnActive]}
-                    onPress={() => setDirection(o.id)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: direction === o.id }}>
-                    <Text style={[styles.segmentText, direction === o.id && styles.segmentTextActive]}>{o.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
 
           <Button
             title="Continue"
@@ -842,7 +814,6 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     setSubmitting(true)
-    const isWanted = direction === 'wanted'
     const publishRate = pricingType === 'quote_required' ? 0 : parseFloat(rate)
     const supportsMinimum = pricingType !== 'quote_required' && pricingType !== 'fixed'
     const parsedMin = parseFloat(minimumUnits)
@@ -887,15 +858,15 @@ export default function CreateServiceScreen({ navigation, route }) {
       location_name: locationName.trim(),
       travel_range_km: travelRange ? parseFloat(travelRange) : null,
       kind,
-      direction,
-      pricing_type: isWanted ? 'quote_required' : pricingType,
-      rate: isWanted ? null : publishRate,
-      unit_label: isWanted ? null : (pricingType === 'per_unit' ? unitLabel.trim() || null : null),
-      minimum_units: isWanted ? 1 : publishMinUnits,
-      min_charge: isWanted ? null : publishMinCharge,
-      pricing_add_ons: isWanted ? [] : cleanAddOns,
+      direction: 'offering',
+      pricing_type: pricingType,
+      rate: publishRate,
+      unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
+      minimum_units: publishMinUnits,
+      min_charge: publishMinCharge,
+      pricing_add_ons: cleanAddOns,
       pricing_terms: pricingTerms.trim() || null,
-      pricing_variants: isWanted ? [] : cleanVariants,
+      pricing_variants: cleanVariants,
       card_headline: cardHeadline.trim() || null,
       card_supporting_text: cardSupportingText.trim() || null,
       card_style: cardStyle || null,
@@ -1038,7 +1009,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   function renderStep1() {
     return (
       <>
-        <Text style={styles.stepHeading}>{step1Heading(kind, direction)}</Text>
+        <Text style={styles.stepHeading}>{step1Heading(kind)}</Text>
 
         {!!draftSource && (
           <View style={styles.sourceNote}>
@@ -1264,17 +1235,6 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function renderStep3() {
-    if (direction === 'wanted') {
-      return (
-        <>
-          <Text style={styles.stepHeading}>Pricing</Text>
-          <View style={styles.helpBox}>
-            <Text style={styles.helpBoxTitle}>No price needed</Text>
-            <Text style={styles.helpBoxText}>You're looking for this, so there's no rate to set. Interested people contact you and you discuss price on enquiry.</Text>
-          </View>
-        </>
-      )
-    }
     return (
       <>
         <Text style={styles.stepHeading}>How is it priced?</Text>
@@ -1590,8 +1550,8 @@ export default function CreateServiceScreen({ navigation, route }) {
     const missingItems = [
       !title.trim() && 'Add service title',
       !category && 'Choose category',
-      direction !== 'wanted' && !pricingType && 'Choose pricing type',
-      direction !== 'wanted' && pricingType !== 'quote_required' && !rate.trim() && 'Add rate',
+      !pricingType && 'Choose pricing type',
+      pricingType !== 'quote_required' && !rate.trim() && 'Add rate',
       !locationName.trim() && 'Add service area',
       ...draftMissingFields,
     ].filter(Boolean)
@@ -1683,7 +1643,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           <View style={styles.finalCardBody}>
             <Text style={styles.finalCardTitle}>{title || 'Your service title'}</Text>
             <View style={styles.finalCardPriceBadge}>
-              <Text style={styles.finalCardPriceText}>{direction === 'wanted' ? 'Discussed on enquiry' : formatRate()}</Text>
+              <Text style={styles.finalCardPriceText}>{formatRate()}</Text>
             </View>
             {reviewVariants.length > 0 && (
               <View style={styles.finalCardAddOns}>
