@@ -254,8 +254,8 @@ export default function HomeTabScreen({ navigation }) {
               onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'JobsBoard' })}
             />
             <PrimaryAction
-              title="Advertise a service"
-              subtitle="Offer your skills, gear, or delivery run"
+              title="Create a listing"
+              subtitle="Advertise a service, grazing, gear, space or goods"
               variant="secondary"
               onPress={() => navigation.getParent()?.navigate('Account', { screen: 'CreateService' })}
             />

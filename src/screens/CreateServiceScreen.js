@@ -107,6 +107,13 @@ const KIND_PRICING_DEFAULTS = {
   lease:    { pricingType: 'per_unit', unitLabel: 'week' },
   for_sale: { pricingType: 'per_unit', unitLabel: 'bale' },
 }
+const KIND_COPY = {
+  service:  { header: 'Advertise a service',        titlePlaceholder: 'e.g. Tractor topping with operator' },
+  grazing:  { header: 'Advertise grazing',          titlePlaceholder: 'e.g. 8ha winter grazing, good fences & water' },
+  hire:     { header: 'Advertise gear for hire',    titlePlaceholder: 'e.g. Tandem trailer, 3.5T' },
+  lease:    { header: 'Advertise space to lease',   titlePlaceholder: 'e.g. Dry shed, 100m², secure' },
+  for_sale: { header: 'Advertise an item for sale', titlePlaceholder: 'e.g. Meadow hay, small squares' },
+}
 function step1Heading(kind) {
   return {
     service:  'What service can you offer?',
@@ -809,7 +816,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   async function handlePublish() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      Alert.alert('Sign in required', 'Please sign in to list a service.')
+      Alert.alert('Sign in required', 'Please sign in to publish a listing.')
       return
     }
 
@@ -1018,10 +1025,10 @@ export default function CreateServiceScreen({ navigation, route }) {
           </View>
         )}
 
-        <Text style={styles.fieldLabel}>Service title</Text>
+        <Text style={styles.fieldLabel}>Listing title</Text>
         <TextInput
           style={[styles.input, styles.titleInput]}
-          placeholder="e.g. Tractor topping with operator"
+          placeholder={KIND_COPY[kind]?.titlePlaceholder || 'e.g. Tractor topping with operator'}
           placeholderTextColor={colors.textMuted}
           value={title}
           onChangeText={setTitle}
@@ -1029,7 +1036,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           numberOfLines={2}
           textAlignVertical="top"
           autoCapitalize="sentences"
-          accessibilityLabel="Service title"
+          accessibilityLabel="Listing title"
         />
 
         <Text style={styles.fieldLabel}>Category</Text>
@@ -1058,7 +1065,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     return (
       <>
-        <Text style={styles.stepHeading}>Describe your Service</Text>
+        <Text style={styles.stepHeading}>Describe your listing</Text>
 
         <Text style={styles.fieldLabel}>Description <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
@@ -1074,7 +1081,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           accessibilityLabel="Service description"
         />
 
-        <Text style={styles.fieldLabel}>Service photo <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={styles.fieldLabel}>Listing photo <Text style={styles.optional}>(optional)</Text></Text>
         <Text style={styles.fieldHelp}>Add a photo to make your card more recognisable. You can take one now or choose one from your phone.</Text>
         <View style={styles.photoGrid}>
           {photos.map((photo, idx) => (
@@ -1146,7 +1153,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         {!!cardHeadline && (
           <>
             <Text style={styles.fieldLabel}>Choose how your message appears</Text>
-            <Text style={styles.fieldHelp}>Select the card treatment that best suits your service.</Text>
+            <Text style={styles.fieldHelp}>Select the card treatment that best suits your listing.</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.websiteOptionRow}>
               {CARD_TREATMENTS.map(option => {
                 const selected = selectedTreatment === option.id
@@ -1563,11 +1570,11 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     return (
       <>
-        <Text style={styles.stepHeading}>Review your service</Text>
+        <Text style={styles.stepHeading}>Review your listing</Text>
         {!!draftSource && (
           <View style={styles.sourceNote}>
             <Text style={styles.sourceNoteTitle}>Draft created from your {draftSource === 'website' ? 'website' : 'photo'}</Text>
-            <Text style={styles.sourceNoteText}>This is how your service card will appear. Use Back to change anything before publishing.</Text>
+            <Text style={styles.sourceNoteText}>This is how your listing card will appear. Use Back to change anything before publishing.</Text>
           </View>
         )}
         {uniqueMissingItems.length > 0 && (
@@ -1733,7 +1740,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         {step !== 2 && (
           <>
             <Text style={styles.kicker}>Rural Connections</Text>
-            <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit service' : 'Advertise a service'}</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit listing' : (KIND_COPY[kind]?.header || 'Advertise a listing')}</Text>
             <Text style={styles.headerSub}>{STEP_LABELS[step - 1]}</Text>
           </>
         )}
