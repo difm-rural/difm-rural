@@ -146,7 +146,7 @@ export default function HomeTabScreen({ navigation }) {
     if (campaign.primary_action === 'post_job') {
       navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })
     } else if (campaign.primary_action === 'browse_services') {
-      navigation.getParent()?.navigate('Browse')
+      navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })
     } else if (campaign.primary_action === 'manage_profile') {
       navigation.getParent()?.navigate('Account', { screen: 'Profile' })
     }
@@ -241,7 +241,7 @@ export default function HomeTabScreen({ navigation }) {
             title="Browse services"
             subtitle="Book advertised rural services"
             variant="secondary"
-            onPress={() => navigation.getParent()?.navigate('Browse')}
+            onPress={() => navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })}
           />
         </View>
 
@@ -251,7 +251,7 @@ export default function HomeTabScreen({ navigation }) {
             <PrimaryAction
               title="Find jobs"
               subtitle="Browse open rural work nearby"
-              onPress={() => navigation.getParent()?.navigate('Jobs')}
+              onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'JobsBoard' })}
             />
             <PrimaryAction
               title="Advertise a service"
