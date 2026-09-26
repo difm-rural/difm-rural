@@ -109,7 +109,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           title="Edit"
           onPress={() => onEdit(service)}
           style={{ flex: 1 }}
-          accessibilityLabel="Edit service"
+          accessibilityLabel="Edit listing"
         />
         <Button
           variant="destructive"
@@ -117,7 +117,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           title="Delete"
           onPress={() => onDelete(service)}
           style={{ flex: 1 }}
-          accessibilityLabel="Delete service"
+          accessibilityLabel="Delete listing"
         />
       </View>
     </View>
@@ -272,10 +272,10 @@ export default function MyServicesScreen({ navigation, route }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Services</Text>
+        <Text style={styles.kicker}>Listings</Text>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle} accessibilityRole="header">My services</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header">My listings</Text>
             <Text style={styles.headerSub}>{services.length} listed</Text>
           </View>
           <Button
@@ -283,19 +283,19 @@ export default function MyServicesScreen({ navigation, route }) {
             icon="add"
             title="Add"
             onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
-            accessibilityLabel="Add new service"
+            accessibilityLabel="Add new listing"
           />
         </View>
       </View>
 
       {loading ? (
-        <Loading label="Loading your services…" />
+        <Loading label="Loading your listings…" />
       ) : services.length === 0 ? (
         <EmptyState
           icon="construct-outline"
-          title="No services listed yet"
-          body="Create your first service to start receiving bookings from locals."
-          actionLabel="Create your first service"
+          title="No listings yet"
+          body="Create your first listing to start reaching locals nearby."
+          actionLabel="Create your first listing"
           actionIcon="arrow-forward"
           onAction={() => navigation.navigate('CreateService', { newListing: Date.now() })}
         />

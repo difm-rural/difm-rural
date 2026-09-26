@@ -24,8 +24,8 @@ import CapabilityPicker from '../components/CapabilityPicker'
 // Everyone can request (post jobs, book services). "I also provide" adds the
 // provider tools on top — it never removes the ability to request.
 const ROLE_OPTIONS = [
-  { key: 'requester', emoji: 'home-outline',      label: 'I will mostly post jobs and book local services', sub: 'Find trusted rural people nearby' },
-  { key: 'both',      emoji: 'construct-outline',  label: 'I will mostly advertise services and take on jobs', sub: 'Advertise services and take on jobs too' },
+  { key: 'requester', emoji: 'home-outline',      label: 'I will mostly post jobs and find local listings', sub: 'Find trusted rural people nearby' },
+  { key: 'both',      emoji: 'construct-outline',  label: 'I will mostly advertise listings and take on jobs', sub: 'Advertise listings and take on jobs too' },
 ]
 
 // Step meta indexed by step number (0–4)
@@ -625,7 +625,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             style={styles.actionCard}
             onPress={markComplete}
             accessibilityRole="button"
-            accessibilityLabel="Browse services">
+            accessibilityLabel="Browse listings">
             <Icon name="search-outline" size={22} color={colors.primary} />
             <Text style={styles.actionCardTitle}>Browse services</Text>
             <Text style={styles.actionCardSub}>Find local providers</Text>

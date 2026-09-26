@@ -206,7 +206,7 @@ function AccountStackNav() {
 const TAB_DEFS = [
   { name: 'Home',     label: 'Home'     },
   { name: 'Jobs',     label: 'Jobs'     },
-  { name: 'Browse',   label: 'Services' },
+  { name: 'Browse',   label: 'Listings' },
   { name: 'Activity', label: 'Activity' },
   { name: 'Account',  label: 'Account'  },
 ]

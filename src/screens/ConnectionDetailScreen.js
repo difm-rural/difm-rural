@@ -108,7 +108,7 @@ export default function ConnectionDetailScreen({ navigation, route }) {
         {/* Re-book */}
         <Text style={styles.sectionLabel}>Book them again</Text>
         {loadingServices ? (
-          <View style={styles.card}><Text style={styles.muted}>Loading their services…</Text></View>
+          <View style={styles.card}><Text style={styles.muted}>Loading their listings…</Text></View>
         ) : services.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.muted}>

@@ -253,7 +253,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
           accessibilityLabel="Go back">
           <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Service</Text>
+        <Text style={styles.kicker}>Listing</Text>
         <Text style={styles.headerTitle} numberOfLines={2} accessibilityRole="header">{service.title}</Text>
         {profile?.full_name ? (
           <Text style={styles.headerSub}>by {profile.full_name}</Text>
@@ -349,7 +349,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
         {/* Service details */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Service details</Text>
+          <Text style={styles.cardLabel}>Listing details</Text>
           <DetailRow label="Pricing type" value={formatPricingType(service.pricing_type)} />
           <DetailRow
               label="Rate"
@@ -413,7 +413,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {/* Description */}
         {service.description ? (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>About this service</Text>
+            <Text style={styles.cardLabel}>About this listing</Text>
             <Text style={styles.descText}>{service.description}</Text>
           </View>
         ) : null}
@@ -507,13 +507,13 @@ export default function ServiceDetailScreen({ route, navigation }) {
           <>
             <Button
               variant={!isOwnService && isBooked ? 'secondary' : 'primary'}
-              title={isOwnService ? 'Manage your services' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : `Book now · $${total} NZD`}
+              title={isOwnService ? 'Manage your listings' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : `Book now · $${total} NZD`}
               onPress={isOwnService
                 ? goToManageServices
                 : isBooked
                 ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
                 : () => navigation.navigate('BookingConfirm', { service, quantity, ...(selectedOption ? { selectedOption } : {}) })}
-              accessibilityLabel={isOwnService ? 'Manage your services' : isBooked ? 'View your booking' : 'Book this service'}
+              accessibilityLabel={isOwnService ? 'Manage your listings' : isBooked ? 'View your booking' : 'Book this service'}
             />
             {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
               <Button

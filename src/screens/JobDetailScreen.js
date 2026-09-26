@@ -346,7 +346,7 @@ export default function JobDetailScreen({ route, navigation }) {
   function handleEnableProviding() {
     Alert.alert(
       'Enable providing?',
-      'This lets you make offers on jobs and advertise your own services. You can still request help as usual.',
+      'This lets you make offers on jobs and advertise your own listings. You can still request help as usual.',
       [
         { text: 'Not now', style: 'cancel' },
         {

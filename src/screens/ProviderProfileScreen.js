@@ -370,7 +370,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
         {/* ── Active services ───────────────────────────────────── */}
         {services.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Available services</Text>
+            <Text style={styles.cardTitle}>Available listings</Text>
             {visibleServices.map((svc, idx) => (
               <TouchableOpacity
                 key={svc.id}

@@ -820,7 +820,7 @@ export default function ActivityTabScreen({ navigation }) {
               tone="positive"
               icon="time-outline"
               title="No history yet"
-              body="Completed jobs and services will show up here once they're done."
+              body="Completed jobs and bookings will show up here once they're done."
             />
           ) : (
             <>

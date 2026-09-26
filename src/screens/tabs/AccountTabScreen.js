@@ -602,7 +602,7 @@ export default function AccountTabScreen({ navigation, route }) {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryRight}>
-          <Stat number={jobsAndServices} label="Jobs and Services" />
+          <Stat number={jobsAndServices} label="Jobs and Listings" />
           <Stat number={ratingSummary.count} label="Reviews" />
           <Stat number={onboardValue} label={onboardLabel} />
         </View>
@@ -749,7 +749,7 @@ export default function AccountTabScreen({ navigation, route }) {
           <Text style={styles.sectionLabel}>Provider tools</Text>
           <View style={styles.card}>
             <MenuRow
-              icon="construct-outline" label="My services"
+              icon="construct-outline" label="My listings"
               onPress={() => navigation.navigate('MyServices')}
             />
             <MenuRow

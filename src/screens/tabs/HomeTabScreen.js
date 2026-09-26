@@ -238,8 +238,8 @@ export default function HomeTabScreen({ navigation }) {
             onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })}
           />
           <PrimaryAction
-            title="Browse services"
-            subtitle="Book advertised rural services"
+            title="Browse listings"
+            subtitle="Find rural listings near you"
             variant="secondary"
             onPress={() => navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })}
           />

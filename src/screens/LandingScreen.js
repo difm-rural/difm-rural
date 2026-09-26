@@ -155,7 +155,7 @@ export default function LandingScreen({ navigation }) {
           value={search}
           onChangeText={setSearch}
           returnKeyType="search"
-          accessibilityLabel="Search jobs and services"
+          accessibilityLabel="Search jobs and listings"
         />
       </View>
 
@@ -182,7 +182,7 @@ export default function LandingScreen({ navigation }) {
             />
           )}
           <HorizontalSection
-            title="Available services"
+            title="Available listings"
             items={filteredServices}
             onPressItem={item => navigation.navigate('ServiceDetail', { service: item })}
             onGuestAction={handleGuestAction}

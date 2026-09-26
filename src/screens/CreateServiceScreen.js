@@ -81,7 +81,7 @@ function isValidVariant(v) {
   const r = parseFloat(v.rate)
   return !!v.label.trim() && Number.isFinite(r) && r > 0
 }
-const STEP_LABELS = ['Service', 'Details', 'Price', 'Location', 'Review']
+const STEP_LABELS = ['Listing', 'Details', 'Price', 'Location', 'Review']
 const CARD_TREATMENTS = [
   { id: 'bold', label: 'Bold overlay' },
   { id: 'bottom', label: 'Bottom band' },
@@ -175,7 +175,7 @@ function formatMissingField(field) {
   if (value.includes('service area') || value === 'location') return 'Add service area'
   if (value.includes('pricing') || value.includes('rate')) return 'Confirm pricing'
   if (value.includes('availability')) return 'Add availability'
-  if (value.includes('title')) return 'Add service title'
+  if (value.includes('title')) return 'Add listing title'
   if (value.includes('category')) return 'Choose category'
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
@@ -453,10 +453,10 @@ export default function CreateServiceScreen({ navigation, route }) {
       return
     }
     Alert.alert(
-      isEditing ? 'Discard your changes?' : 'Discard this service?',
+      isEditing ? 'Discard your changes?' : 'Discard this listing?',
       isEditing
         ? 'Any changes made on this screen will be lost.'
-        : 'The service has not been published. Any details, photos, or generated draft will be lost.',
+        : 'The listing has not been published. Any details, photos, or generated draft will be lost.',
       [
         { text: 'Keep editing', style: 'cancel' },
         { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
@@ -579,7 +579,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               onPress={cancelCreation}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
-              accessibilityLabel="Cancel creating service">
+              accessibilityLabel="Cancel creating listing">
               <Text style={styles.headerCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -646,7 +646,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               onPress={cancelCreation}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
-              accessibilityLabel="Cancel creating service">
+              accessibilityLabel="Cancel creating listing">
               <Text style={styles.headerCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -991,7 +991,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     setSubmitting(false)
-    Alert.alert(isEditing ? 'Service updated!' : 'Service published!', isEditing ? 'Your service has been updated.' : 'Your service is now live.', [
+    Alert.alert(isEditing ? 'Listing updated!' : 'Listing published!', isEditing ? 'Your listing has been updated.' : 'Your listing is now live.', [
       { text: 'OK', onPress: leavePublishScreen },
     ])
   }
@@ -1012,15 +1012,15 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     if (bookingsData?.length > 0) {
       Alert.alert(
-        'Cannot delete this service',
-        'This service has booking history. Pause advertising instead so it stops showing to requesters while existing jobs and records remain available.'
+        'Cannot delete this listing',
+        'This listing has booking history. Pause advertising instead so it stops showing to requesters while existing jobs and records remain available.'
       )
       return
     }
 
     Alert.alert(
-      'Delete service',
-      `Delete "${title || 'this service'}"? This cannot be undone.`,
+      'Delete listing',
+      `Delete "${title || 'this listing'}"? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -1029,7 +1029,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           onPress: async () => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
-              Alert.alert('Sign in required', 'Please sign in again to delete this service.')
+              Alert.alert('Sign in required', 'Please sign in again to delete this listing.')
               return
             }
 
@@ -1040,11 +1040,11 @@ export default function CreateServiceScreen({ navigation, route }) {
               .eq('provider_id', user.id)
 
             if (error) {
-              Alert.alert('Could not delete service', error.message)
+              Alert.alert('Could not delete listing', error.message)
               return
             }
 
-            Alert.alert('Service deleted', 'This service has been removed.', [
+            Alert.alert('Listing deleted', 'This listing has been removed.', [
               { text: 'OK', onPress: () => navigation.goBack() },
             ])
           },
@@ -1128,7 +1128,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           numberOfLines={8}
           textAlignVertical="top"
           autoCapitalize="sentences"
-          accessibilityLabel="Service description"
+          accessibilityLabel="Listing description"
         />
 
         <Text style={styles.fieldLabel}>Listing photo <Text style={styles.optional}>(optional)</Text></Text>
@@ -1605,7 +1605,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     const reviewAddOns = pricingAddOns.filter(a => a.label.trim() && String(a.amount).trim())
     const reviewVariants = pricingVariants.filter(isValidVariant)
     const missingItems = [
-      !title.trim() && 'Add service title',
+      !title.trim() && 'Add listing title',
       !category && 'Choose category',
       !pricingType && 'Choose pricing type',
       pricingType !== 'quote_required' && !rate.trim() && 'Add rate',
@@ -1747,9 +1747,9 @@ export default function CreateServiceScreen({ navigation, route }) {
             />
             <Button
               variant="destructive"
-              title="Delete service"
+              title="Delete listing"
               onPress={handleDeleteService}
-              accessibilityLabel="Delete service"
+              accessibilityLabel="Delete listing"
             />
           </View>
         )}
@@ -1850,7 +1850,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                 loading={submitting}
                 disabled={!canProceed()}
                 style={{ flex: 1 }}
-                accessibilityLabel="Publish service"
+                accessibilityLabel="Publish listing"
               />
             )}
           </View>

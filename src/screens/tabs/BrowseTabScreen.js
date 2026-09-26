@@ -224,8 +224,8 @@ export default function BrowseTabScreen({ navigation }) {
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
-        <Text style={styles.title}>Services</Text>
-        <Text style={styles.subtitle}>Book rural service providers</Text>
+        <Text style={styles.title}>Listings</Text>
+        <Text style={styles.subtitle}>Find rural listings near you</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search fencing, water, machinery..."
@@ -235,7 +235,7 @@ export default function BrowseTabScreen({ navigation }) {
           onSubmitEditing={Keyboard.dismiss}
           returnKeyType="done"
           blurOnSubmit
-          accessibilityLabel="Search services"
+          accessibilityLabel="Search listings"
         />
       </View>
 
@@ -244,8 +244,8 @@ export default function BrowseTabScreen({ navigation }) {
           style={styles.manageBanner}
           onPress={() => navigation.navigate('MyServices')}
           accessibilityRole="button"
-          accessibilityLabel="Manage your advertised services">
-          <Text style={styles.manageBannerTitle}>Manage your services</Text>
+          accessibilityLabel="Manage your advertised listings">
+          <Text style={styles.manageBannerTitle}>Manage your listings</Text>
           <Text style={styles.manageBannerText}>Edit, pause advertising, or delete a listing</Text>
         </TouchableOpacity>
       )}
@@ -275,16 +275,16 @@ export default function BrowseTabScreen({ navigation }) {
         isProvider ? (
           <EmptyState
             icon="construct-outline"
-            title="No services listed yet"
-            body="Be the first — list a service so locals nearby can book you."
-            actionLabel="List a service"
+            title="No listings yet"
+            body="Be the first — add a listing so locals nearby can find you."
+            actionLabel="Add a listing"
             actionIcon="arrow-forward"
             onAction={() => navigation.navigate('MyServices')}
           />
         ) : (
           <EmptyState
             icon="pricetags-outline"
-            title="No services available yet"
+            title="No listings available yet"
             body="Check back soon, or post a job to get quotes from providers."
             actionLabel="Post a job"
             actionIcon="arrow-forward"
@@ -302,13 +302,13 @@ export default function BrowseTabScreen({ navigation }) {
           {isProvider ? (
             <>
               <ServiceSection
-                title="Your services"
+                title="Your listings"
                 items={yourServices}
                 onPressItem={handlePress}
               />
 
               <ServiceSection
-                title="Other services"
+                title="Other listings"
                 items={otherServices}
                 onPressItem={handlePress}
               />
@@ -322,14 +322,14 @@ export default function BrowseTabScreen({ navigation }) {
               />
 
               <ServiceSection
-                title="All services"
+                title="All listings"
                 items={allServices}
                 onPressItem={handlePress}
               />
 
               {allServices.length === 0 && nearYou.length > 0 && (
                 <View style={styles.noMore}>
-                  <Text style={styles.noMoreText}>All available services shown above</Text>
+                  <Text style={styles.noMoreText}>All available listings shown above</Text>
                 </View>
               )}
             </>
