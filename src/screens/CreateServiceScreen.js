@@ -280,6 +280,16 @@ export default function CreateServiceScreen({ navigation, route }) {
       : []
   )
   const [pricingTerms, setPricingTerms] = useState(editingService?.pricing_terms || '')
+  // Advanced pricing levers collapse behind a toggle. Auto-expand when editing a
+  // listing that already has any of them set, so existing values are never hidden.
+  const [advancedOpen, setAdvancedOpen] = useState(
+    isEditing && (
+      (Array.isArray(editingService?.pricing_variants) && editingService.pricing_variants.length > 0) ||
+      (Array.isArray(editingService?.pricing_add_ons) && editingService.pricing_add_ons.length > 0) ||
+      !!editingService?.pricing_terms ||
+      editingService?.min_charge != null
+    )
+  )
   const [pricingVariants, setPricingVariants] = useState(
     Array.isArray(editingService?.pricing_variants)
       ? editingService.pricing_variants.map(v => ({
@@ -323,6 +333,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setPricingAddOns([])
     setPricingVariants([])
     setPricingTerms('')
+    setAdvancedOpen(false)
     setPaymentTiming('on_completion')
     setMaterials('included')
     setLocationName('')
@@ -1361,18 +1372,63 @@ export default function CreateServiceScreen({ navigation, route }) {
               keyboardType="numeric"
               accessibilityLabel="Minimum quantity"
             />
-            <Text style={styles.fieldLabel}>Minimum charge <Text style={styles.optional}>(optional)</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 150"
-              placeholderTextColor={colors.textMuted}
-              value={minCharge}
-              onChangeText={setMinCharge}
-              keyboardType="numeric"
-              accessibilityLabel="Minimum charge in NZD"
-            />
           </>
         )}
+
+        <Text style={styles.fieldLabel}>When is payment due?</Text>
+        <View style={styles.segmentGrid}>
+          {PAYMENT_OPTIONS.map(o => (
+            <TouchableOpacity
+              key={o.id}
+              style={[styles.segmentBtn, paymentTiming === o.id && styles.segmentBtnActive]}
+              onPress={() => setPaymentTiming(o.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: paymentTiming === o.id }}>
+              <Text style={[styles.segmentText, paymentTiming === o.id && styles.segmentTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.fieldLabel}>Are materials included?</Text>
+        <View style={styles.segmentGrid}>
+          {MATERIALS_OPTIONS.map(o => (
+            <TouchableOpacity
+              key={o.id}
+              style={[styles.segmentBtn, materials === o.id && styles.segmentBtnActive]}
+              onPress={() => setMaterials(o.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: materials === o.id }}>
+              <Text style={[styles.segmentText, materials === o.id && styles.segmentTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={styles.advancedToggle}
+          onPress={() => setAdvancedOpen(v => !v)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: advancedOpen }}
+          accessibilityLabel="Add more pricing options">
+          <Text style={styles.advancedToggleText}>Add more pricing options</Text>
+          <Text style={styles.advancedToggleChevron}>{advancedOpen ? '▾' : '▸'}</Text>
+        </TouchableOpacity>
+
+        {advancedOpen && (
+          <>
+            {pricingType !== 'quote_required' && pricingType !== 'fixed' && (
+              <>
+                <Text style={styles.fieldLabel}>Minimum charge <Text style={styles.optional}>(optional)</Text></Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 150"
+                  placeholderTextColor={colors.textMuted}
+                  value={minCharge}
+                  onChangeText={setMinCharge}
+                  keyboardType="numeric"
+                  accessibilityLabel="Minimum charge in NZD"
+                />
+              </>
+            )}
 
         <Text style={styles.fieldLabel}>More rate options <Text style={styles.optional}>(optional)</Text></Text>
         <Text style={styles.fieldHelp}>Add alternative rates under this listing — e.g. round vs square baleage. Your base rate above stays the main price.</Text>
@@ -1418,34 +1474,6 @@ export default function CreateServiceScreen({ navigation, route }) {
         <TouchableOpacity onPress={addVariant} style={styles.addAddOnBtn} accessibilityRole="button" accessibilityLabel="Add another rate option">
           <Text style={styles.addAddOnText}>+ Add another rate option</Text>
         </TouchableOpacity>
-
-        <Text style={styles.fieldLabel}>When is payment due?</Text>
-        <View style={styles.segmentGrid}>
-          {PAYMENT_OPTIONS.map(o => (
-            <TouchableOpacity
-              key={o.id}
-              style={[styles.segmentBtn, paymentTiming === o.id && styles.segmentBtnActive]}
-              onPress={() => setPaymentTiming(o.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: paymentTiming === o.id }}>
-              <Text style={[styles.segmentText, paymentTiming === o.id && styles.segmentTextActive]}>{o.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.fieldLabel}>Are materials included?</Text>
-        <View style={styles.segmentGrid}>
-          {MATERIALS_OPTIONS.map(o => (
-            <TouchableOpacity
-              key={o.id}
-              style={[styles.segmentBtn, materials === o.id && styles.segmentBtnActive]}
-              onPress={() => setMaterials(o.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: materials === o.id }}>
-              <Text style={[styles.segmentText, materials === o.id && styles.segmentTextActive]}>{o.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         <Text style={styles.fieldLabel}>Extra charges <Text style={styles.optional}>(optional)</Text></Text>
         <Text style={styles.fieldHelp}>Delivery, float, call-out, bond, chemical. Shown on your listing so requesters know what to expect — not added to any total.</Text>
@@ -1526,6 +1554,8 @@ export default function CreateServiceScreen({ navigation, route }) {
           textAlignVertical="top"
           accessibilityLabel="Pricing terms and conditions"
         />
+          </>
+        )}
 
       </>
     )
@@ -2067,6 +2097,9 @@ const styles = StyleSheet.create({
   addOnOptionalText:{ flex: 1, fontSize: 13, color: colors.textSecondary },
   addAddOnBtn:      { paddingVertical: 6, marginBottom: 12 },
   addAddOnText:     { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  advancedToggle:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  advancedToggleText:    { fontSize: 15, fontWeight: '600', color: colors.primary },
+  advancedToggleChevron: { fontSize: 14, color: colors.primary },
   termsInput:       { minHeight: 90 },
   finalCardMinCharge: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
   finalCardAddOns:    { marginTop: 6 },
