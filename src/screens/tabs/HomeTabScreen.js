@@ -257,7 +257,7 @@ export default function HomeTabScreen({ navigation }) {
               title="Create a listing"
               subtitle="Advertise a service, grazing, gear, space or goods"
               variant="secondary"
-              onPress={() => navigation.getParent()?.navigate('Account', { screen: 'CreateService' })}
+              onPress={() => navigation.getParent()?.navigate('Account', { screen: 'CreateService', params: { newListing: Date.now() } })}
             />
           </View>
         )}

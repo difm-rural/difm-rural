@@ -282,7 +282,7 @@ export default function MyServicesScreen({ navigation, route }) {
             size="sm"
             icon="add"
             title="Add"
-            onPress={() => navigation.navigate('CreateService')}
+            onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
             accessibilityLabel="Add new service"
           />
         </View>
@@ -297,7 +297,7 @@ export default function MyServicesScreen({ navigation, route }) {
           body="Create your first service to start receiving bookings from locals."
           actionLabel="Create your first service"
           actionIcon="arrow-forward"
-          onAction={() => navigation.navigate('CreateService')}
+          onAction={() => navigation.navigate('CreateService', { newListing: Date.now() })}
         />
       ) : (
         <FlatList

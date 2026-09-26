@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Animated,
@@ -302,6 +302,54 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   const [submitting, setSubmitting] = useState(false)
   const stepTranslateX = useRef(new Animated.Value(0)).current
+
+  // Re-initialise a NEW listing to a fresh draft. Never touches the editing path.
+  function resetDraft() {
+    setCreationMode('kind')
+    setKind('service')
+    setStep(1)
+    setTitle('')
+    setCategory('')
+    setDescription('')
+    setPhotos([])
+    setCardHeadline('')
+    setCardSupportingText('')
+    setCardStyle(null)
+    setPricingType('')
+    setRate('')
+    setUnitLabel('')
+    setMinimumUnits('')
+    setMinCharge('')
+    setPricingAddOns([])
+    setPricingVariants([])
+    setPricingTerms('')
+    setPaymentTiming('on_completion')
+    setMaterials('included')
+    setLocationName('')
+    setTravelRange('')
+    setAvailableFrom(null)
+    setShowDatePicker(false)
+    setServiceActive(true)
+    setWebsiteInput('')
+    setWebsiteError('')
+    setWebsiteDraftPreview(null)
+    setUseWebsiteImage(false)
+    setWebsiteImageError(false)
+    setWebsiteCardOptions([])
+    setSelectedWebsiteCard(0)
+    setDraftSource(null)
+    setDraftMissingFields([])
+    setDraftConfidenceNotes([])
+    setCreatingDraft(false)
+  }
+
+  // Each NEW-listing entry passes a fresh `newListing` token, so re-entering a
+  // persisted screen instance restarts at the kind screen. Does NOT fire on a
+  // tab-return (no token change), so a draft survives tab-switching.
+  useEffect(() => {
+    if (!isEditing) resetDraft()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.newListing])
 
   function animateStep(newStep, direction) {
     const outTo = direction === 'forward' ? -SCREEN_WIDTH : SCREEN_WIDTH
@@ -922,6 +970,8 @@ export default function CreateServiceScreen({ navigation, route }) {
         navigation.goBack()
         return
       }
+
+      resetDraft() // next new listing starts clean even if this instance persists
 
       const routeNames = navigation.getState()?.routeNames || []
       if (routeNames.includes('MyServices') && typeof navigation.replace === 'function') {
