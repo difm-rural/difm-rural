@@ -107,6 +107,18 @@ const KIND_PRICING_DEFAULTS = {
   lease:    { pricingType: 'per_unit', unitLabel: 'week' },
   for_sale: { pricingType: 'per_unit', unitLabel: 'bale' },
 }
+// Kind-aware DEFAULT pricing view. Maps to existing pricing_type values; only
+// which types/unit/minimum show (and payment/materials) differ. service = today.
+const KIND_PRICING = {
+  service:  { types: ['fixed', 'hourly', 'day_rate', 'per_unit', 'quote_required'], unit: 'free', showPayment: true,  showMaterials: true },
+  hire:     { types: ['day_rate', 'per_unit', 'quote_required'], unitOptions: ['day', 'week'], showPayment: true, showMaterials: false },
+  lease:    { types: ['per_unit', 'fixed', 'quote_required'], typeLabels: { per_unit: 'Per period', fixed: 'Fixed total' }, unitOptions: ['week', 'month'], minLabel: 'Minimum term', showPayment: false, showMaterials: false },
+  grazing:  { types: ['per_unit', 'quote_required'], unitOptions: ['head/week', 'head/month', 'ha'], capacity: true, showPayment: false, showMaterials: false },
+  for_sale: { types: ['per_unit', 'fixed', 'quote_required'], typeLabels: { per_unit: 'Per unit', fixed: 'Fixed lot' }, unitOptions: ['each', 'bale', 'tonne', 'kg'], unitAllowOther: true, minLabel: 'Minimum quantity', showPayment: false, showMaterials: false },
+}
+function pricingTypeLabel(cfg, id) {
+  return (cfg.typeLabels && cfg.typeLabels[id]) || PRICING_TYPES.find(p => p.id === id)?.label || id
+}
 const KIND_COPY = {
   service:  { header: 'Advertise a service',        titlePlaceholder: 'e.g. Tractor topping with operator' },
   grazing:  { header: 'Advertise grazing',          titlePlaceholder: 'e.g. 8ha winter grazing, good fences & water' },
@@ -268,6 +280,9 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [minCharge, setMinCharge] = useState(
     editingService?.min_charge != null ? String(editingService.min_charge) : ''
   )
+  const [maxUnits, setMaxUnits] = useState(
+    editingService?.max_units != null ? String(editingService.max_units) : ''
+  )
   const [pricingAddOns, setPricingAddOns] = useState(
     Array.isArray(editingService?.pricing_add_ons)
       ? editingService.pricing_add_ons.map(a => ({
@@ -330,6 +345,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setUnitLabel('')
     setMinimumUnits('')
     setMinCharge('')
+    setMaxUnits('')
     setPricingAddOns([])
     setPricingVariants([])
     setPricingTerms('')
@@ -888,6 +904,12 @@ export default function CreateServiceScreen({ navigation, route }) {
     const publishMinCharge = supportsMinimum && Number.isFinite(parsedMinCharge) && parsedMinCharge >= 0
       ? parsedMinCharge
       : null
+    // Grazing per-head capacity → max_units; grazing has no minimum in the UI → 1.
+    const isGrazingHeadCapacity = kind === 'grazing' && (unitLabel === 'head/week' || unitLabel === 'head/month')
+    const parsedMaxUnits = parseFloat(maxUnits)
+    const publishMaxUnits = isGrazingHeadCapacity && Number.isFinite(parsedMaxUnits) && parsedMaxUnits > 0
+      ? parsedMaxUnits
+      : null
     // Drop rows missing a label OR an amount; keep add-ons display-only.
     const cleanAddOns = pricingAddOns
       .filter(a => a.label.trim() && String(a.amount).trim())
@@ -928,8 +950,9 @@ export default function CreateServiceScreen({ navigation, route }) {
       pricing_type: pricingType,
       rate: publishRate,
       unit_label: pricingType === 'per_unit' ? unitLabel.trim() || null : null,
-      minimum_units: publishMinUnits,
+      minimum_units: kind === 'grazing' ? 1 : publishMinUnits,
       min_charge: publishMinCharge,
+      max_units: publishMaxUnits,
       pricing_add_ons: cleanAddOns,
       pricing_terms: pricingTerms.trim() || null,
       pricing_variants: cleanVariants,
@@ -1303,20 +1326,24 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function renderStep3() {
+    const cfg = KIND_PRICING[kind] || KIND_PRICING.service
+    const isGrazingHeadCapacity = cfg.capacity && (unitLabel === 'head/week' || unitLabel === 'head/month')
+    const isGrazingHa = cfg.capacity && unitLabel === 'ha'
+    const isOtherUnit = cfg.unitAllowOther && Array.isArray(cfg.unitOptions) && !cfg.unitOptions.includes(unitLabel)
     return (
       <>
         <Text style={styles.stepHeading}>How is it priced?</Text>
 
         <Text style={styles.fieldLabel}>Pricing</Text>
         <View style={styles.segmentGrid}>
-          {PRICING_TYPES.map(pt => (
+          {cfg.types.map(id => (
             <TouchableOpacity
-              key={pt.id}
-              style={[styles.segmentBtn, pricingType === pt.id && styles.segmentBtnActive]}
-              onPress={() => setPricingType(pt.id)}
+              key={id}
+              style={[styles.segmentBtn, pricingType === id && styles.segmentBtnActive]}
+              onPress={() => setPricingType(id)}
               accessibilityRole="button"
-              accessibilityState={{ selected: pricingType === pt.id }}>
-              <Text style={[styles.segmentText, pricingType === pt.id && styles.segmentTextActive]}>{pt.label}</Text>
+              accessibilityState={{ selected: pricingType === id }}>
+              <Text style={[styles.segmentText, pricingType === id && styles.segmentTextActive]}>{pricingTypeLabel(cfg, id)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1327,40 +1354,96 @@ export default function CreateServiceScreen({ navigation, route }) {
             <Text style={styles.helpBoxText}>Use this when price depends on distance, job size, materials, or conditions.</Text>
           </View>
         ) : (
-          <View style={styles.inlineRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Rate</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="120"
-                placeholderTextColor={colors.textMuted}
-                value={rate}
-                onChangeText={setRate}
-                keyboardType="numeric"
-                accessibilityLabel="Rate in NZD"
-              />
-            </View>
-            {pricingType === 'per_unit' && (
+          <>
+            <View style={styles.inlineRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Unit</Text>
+                <Text style={styles.fieldLabel}>Rate</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="trough"
+                  placeholder="120"
                   placeholderTextColor={colors.textMuted}
-                  value={unitLabel}
-                  onChangeText={setUnitLabel}
-                  autoCapitalize="none"
-                  accessibilityLabel="Unit label"
+                  value={rate}
+                  onChangeText={setRate}
+                  keyboardType="numeric"
+                  accessibilityLabel="Rate in NZD"
                 />
               </View>
+              {pricingType === 'per_unit' && cfg.unit === 'free' && (
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>Unit</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="trough"
+                    placeholderTextColor={colors.textMuted}
+                    value={unitLabel}
+                    onChangeText={setUnitLabel}
+                    autoCapitalize="none"
+                    accessibilityLabel="Unit label"
+                  />
+                </View>
+              )}
+            </View>
+            {pricingType === 'per_unit' && Array.isArray(cfg.unitOptions) && (
+              <>
+                <Text style={styles.fieldLabel}>Unit</Text>
+                <View style={styles.segmentGrid}>
+                  {cfg.unitOptions.map(u => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[styles.segmentBtn, unitLabel === u && styles.segmentBtnActive]}
+                      onPress={() => setUnitLabel(u)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: unitLabel === u }}>
+                      <Text style={[styles.segmentText, unitLabel === u && styles.segmentTextActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {cfg.unitAllowOther && (
+                    <TouchableOpacity
+                      key="__other"
+                      style={[styles.segmentBtn, isOtherUnit && styles.segmentBtnActive]}
+                      onPress={() => setUnitLabel('')}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isOtherUnit }}>
+                      <Text style={[styles.segmentText, isOtherUnit && styles.segmentTextActive]}>Other</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {cfg.unitAllowOther && isOtherUnit && (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Unit (e.g. crate)"
+                    placeholderTextColor={colors.textMuted}
+                    value={unitLabel}
+                    onChangeText={setUnitLabel}
+                    autoCapitalize="none"
+                    accessibilityLabel="Custom unit label"
+                  />
+                )}
+              </>
             )}
-          </View>
+          </>
         )}
 
-        {pricingType !== 'quote_required' && pricingType !== 'fixed' && (
+        {isGrazingHeadCapacity ? (
+          <>
+            <Text style={styles.fieldLabel}>Capacity <Text style={styles.optional}>(optional)</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 200"
+              placeholderTextColor={colors.textMuted}
+              value={maxUnits}
+              onChangeText={setMaxUnits}
+              keyboardType="numeric"
+              accessibilityLabel="Grazing capacity in head"
+            />
+            <Text style={styles.fieldHelp}>Grazing for up to {maxUnits.trim() || 'N'} head</Text>
+          </>
+        ) : isGrazingHa ? (
+          <Text style={styles.fieldHelp}>For the full term — usually 12+ months</Text>
+        ) : (pricingType !== 'quote_required' && pricingType !== 'fixed') ? (
           <>
             <Text style={styles.fieldLabel}>
-              Minimum {pricingType === 'hourly' ? 'hours' : pricingType === 'day_rate' ? 'days' : (unitLabel.trim() || 'units')}
+              {cfg.minLabel || `Minimum ${pricingType === 'hourly' ? 'hours' : pricingType === 'day_rate' ? 'days' : (unitLabel.trim() || 'units')}`}
               {' '}<Text style={styles.optional}>(optional)</Text>
             </Text>
             <TextInput
@@ -1373,35 +1456,43 @@ export default function CreateServiceScreen({ navigation, route }) {
               accessibilityLabel="Minimum quantity"
             />
           </>
+        ) : null}
+
+        {cfg.showPayment && (
+          <>
+            <Text style={styles.fieldLabel}>When is payment due?</Text>
+            <View style={styles.segmentGrid}>
+              {PAYMENT_OPTIONS.map(o => (
+                <TouchableOpacity
+                  key={o.id}
+                  style={[styles.segmentBtn, paymentTiming === o.id && styles.segmentBtnActive]}
+                  onPress={() => setPaymentTiming(o.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: paymentTiming === o.id }}>
+                  <Text style={[styles.segmentText, paymentTiming === o.id && styles.segmentTextActive]}>{o.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
         )}
 
-        <Text style={styles.fieldLabel}>When is payment due?</Text>
-        <View style={styles.segmentGrid}>
-          {PAYMENT_OPTIONS.map(o => (
-            <TouchableOpacity
-              key={o.id}
-              style={[styles.segmentBtn, paymentTiming === o.id && styles.segmentBtnActive]}
-              onPress={() => setPaymentTiming(o.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: paymentTiming === o.id }}>
-              <Text style={[styles.segmentText, paymentTiming === o.id && styles.segmentTextActive]}>{o.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.fieldLabel}>Are materials included?</Text>
-        <View style={styles.segmentGrid}>
-          {MATERIALS_OPTIONS.map(o => (
-            <TouchableOpacity
-              key={o.id}
-              style={[styles.segmentBtn, materials === o.id && styles.segmentBtnActive]}
-              onPress={() => setMaterials(o.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: materials === o.id }}>
-              <Text style={[styles.segmentText, materials === o.id && styles.segmentTextActive]}>{o.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {cfg.showMaterials && (
+          <>
+            <Text style={styles.fieldLabel}>Are materials included?</Text>
+            <View style={styles.segmentGrid}>
+              {MATERIALS_OPTIONS.map(o => (
+                <TouchableOpacity
+                  key={o.id}
+                  style={[styles.segmentBtn, materials === o.id && styles.segmentBtnActive]}
+                  onPress={() => setMaterials(o.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: materials === o.id }}>
+                  <Text style={[styles.segmentText, materials === o.id && styles.segmentTextActive]}>{o.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
 
         <TouchableOpacity
           style={styles.advancedToggle}

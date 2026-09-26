@@ -363,6 +363,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
               ? `$${rate}/${service.unit_label || 'unit'}`
               : `$${rate} fixed`}
           />
+          {service.max_units != null && (
+            <DetailRow label="Capacity" value={`Grazing for up to ${service.max_units} head`} />
+          )}
           {service.minimum_units > 1 && (
             <DetailRow
               label={`Minimum ${unitLabel}s`}
