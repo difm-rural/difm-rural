@@ -82,6 +82,11 @@ function formatCurrency(value) {
 
 const KIND_ENQUIRY = ['for_sale', 'grazing', 'lease'] // bypass bookings — enquiry only
 
+// Recurring cadence inferred from a unit label (grazing/lease), else null.
+function cadenceFromUnit(u) {
+  return /week/i.test(u || '') ? 'weekly' : /month/i.test(u || '') ? 'monthly' : null
+}
+
 export default function ServiceDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { service: initialService } = route.params
@@ -232,6 +237,13 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const photos = Array.isArray(service.photos) ? service.photos : []
   const isOwnService = !!currentUserId && currentUserId === service.provider_id
   const isEnquiryKind = KIND_ENQUIRY.includes(service.kind)
+  // Payment row is kind-aware: bookable kinds keep upfront/on-completion; grazing
+  // & lease show their recurring cadence (or nothing); for_sale shows nothing.
+  const paymentValue = !isEnquiryKind
+    ? (service.payment_timing === 'upfront' ? 'Upfront' : 'On completion')
+    : (service.kind === 'grazing' || service.kind === 'lease')
+    ? ({ weekly: 'Paid weekly', monthly: 'Paid monthly' }[cadenceFromUnit(service.unit_label)] || null)
+    : null
 
   function goToManageServices() {
     const routeNames = navigation.getState()?.routeNames || []
@@ -384,12 +396,10 @@ export default function ServiceDetailScreen({ route, navigation }) {
           {service.travel_range_km ? (
             <DetailRow label="Travel range" value={`${service.travel_range_km} km`} />
           ) : null}
-          <DetailRow label="Availability" value={availabilityText} />
-          <DetailRow
-            label="Payment"
-            value={service.payment_timing === 'upfront' ? 'Upfront' : 'On completion'}
-            last
-          />
+          <DetailRow label="Availability" value={availabilityText} last={!paymentValue} />
+          {paymentValue && (
+            <DetailRow label="Payment" value={paymentValue} last />
+          )}
         </View>
 
         {/* Extra charges (display-only) */}
