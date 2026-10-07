@@ -74,7 +74,7 @@ function jsonResponse(body: unknown, status = 200) {
 async function signedInUser(req: Request) {
   const authorization = req.headers.get('authorization')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const anonKey = Deno.env.get('SB_PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')
   if (!authorization || !supabaseUrl || !anonKey) return null
   const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: { Authorization: authorization, apikey: anonKey },
@@ -485,7 +485,7 @@ async function copyWebsiteImageToService(serviceId: unknown, imageValue: unknown
     throw new Error('A valid service is required before copying the image.')
   }
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const serviceRoleKey = Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !serviceRoleKey) throw new Error('Service image storage is not configured.')
 
   const ownershipResponse = await fetch(
