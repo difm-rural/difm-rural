@@ -6,6 +6,7 @@ import { LoaderCircle } from 'lucide-react'
 import {
   LISTING_KINDS, KIND_PRICING, KIND_PRICING_DEFAULTS,
   PAYMENT_OPTIONS, MATERIALS_OPTIONS,
+  ADDON_BASES, addOnDisplay, VARIANT_PRICING_TYPES, variantDisplay, isValidVariant,
   pricingTypeLabel, normalizePricingType, formatRate,
   type ListingKind,
 } from '@shared/listingPricing'
@@ -22,6 +23,10 @@ const KIND_LABEL: Record<string, string> = {
   service: 'Service', grazing: 'Grazing', hire: 'Hire', lease: 'Lease', for_sale: 'For sale',
 }
 
+// Stored (jsonb) shapes for the advanced levers — all fields optional on read.
+type StoredAddOn = { label?: string; amount?: number | string; basis?: string; unit_label?: string; optional?: boolean }
+type StoredVariant = { label?: string; pricing_type?: string; rate?: number | string; unit_label?: string; min_units?: number | string; min_charge?: number | string }
+
 export type EditListing = {
   id: string
   kind: string | null
@@ -37,7 +42,16 @@ export type EditListing = {
   max_units: number | null
   payment_timing: string | null
   materials: string | null
+  pricing_add_ons: StoredAddOn[] | null
+  pricing_variants: StoredVariant[] | null
+  pricing_terms: string | null
+  min_charge: number | null
 }
+
+// Editable row state for the repeaters (all-string inputs; compatible with the
+// @shared AddOnDraft / VariantDraft shapes consumed by addOnDisplay/isValidVariant).
+type AddOnRow = { label: string; amount: string; basis: string; unit_label: string; optional: boolean }
+type VariantRow = { label: string; pricing_type: string; rate: string; unit_label: string; min_units: string; min_charge: string }
 
 export function ListingForm({
   mode,
@@ -78,6 +92,38 @@ export function ListingForm({
   const [paymentTiming, setPaymentTiming] = useState(listing?.payment_timing ?? 'on_completion')
   const [materials, setMaterials] = useState(listing?.materials ?? 'included')
 
+  // Advanced levers (B2b) — populated from the row on EDIT, mirroring RN.
+  const [minCharge, setMinCharge] = useState(listing?.min_charge != null ? String(listing.min_charge) : '')
+  const [pricingTerms, setPricingTerms] = useState(listing?.pricing_terms ?? '')
+  const [pricingAddOns, setPricingAddOns] = useState<AddOnRow[]>(
+    (listing?.pricing_add_ons ?? []).map(a => ({
+      label: a.label ?? '',
+      amount: a.amount != null ? String(a.amount) : '',
+      basis: a.basis ?? 'flat',
+      unit_label: a.unit_label ?? '',
+      optional: !!a.optional,
+    })),
+  )
+  const [pricingVariants, setPricingVariants] = useState<VariantRow[]>(
+    (listing?.pricing_variants ?? []).map(v => ({
+      label: v.label ?? '',
+      pricing_type: v.pricing_type ?? 'fixed',
+      rate: v.rate != null ? String(v.rate) : '',
+      unit_label: v.unit_label ?? '',
+      min_units: v.min_units != null ? String(v.min_units) : '',
+      min_charge: v.min_charge != null ? String(v.min_charge) : '',
+    })),
+  )
+  // Auto-expand on edit when any advanced lever is already set, so existing values show.
+  const [advancedOpen, setAdvancedOpen] = useState(
+    mode === 'edit' && (
+      (listing?.pricing_variants?.length ?? 0) > 0 ||
+      (listing?.pricing_add_ons?.length ?? 0) > 0 ||
+      !!listing?.pricing_terms ||
+      listing?.min_charge != null
+    ),
+  )
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -98,7 +144,28 @@ export function ListingForm({
     setMaxUnits('')
     setPaymentTiming('on_completion')
     setMaterials('included')
+    setMinCharge('')
+    setPricingTerms('')
+    setPricingAddOns([])
+    setPricingVariants([])
+    setAdvancedOpen(false)
   }
+
+  // Add-on row handlers
+  const addAddOn = () =>
+    setPricingAddOns(rows => [...rows, { label: '', amount: '', basis: 'flat', unit_label: '', optional: false }])
+  const updateAddOn = (i: number, patch: Partial<AddOnRow>) =>
+    setPricingAddOns(rows => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const removeAddOn = (i: number) =>
+    setPricingAddOns(rows => rows.filter((_, idx) => idx !== i))
+
+  // Variant row handlers
+  const addVariant = () =>
+    setPricingVariants(rows => [...rows, { label: '', pricing_type: 'fixed', rate: '', unit_label: '', min_units: '', min_charge: '' }])
+  const updateVariant = (i: number, patch: Partial<VariantRow>) =>
+    setPricingVariants(rows => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const removeVariant = (i: number) =>
+    setPricingVariants(rows => rows.filter((_, idx) => idx !== i))
 
   // Grazing head-vs-ha branch — identical rule to RN renderStep3.
   const isGrazingHeadCapacity = !!cfg?.capacity && (unitLabel === 'head/week' || unitLabel === 'head/month')
@@ -126,6 +193,40 @@ export function ListingForm({
     const parsedMax = parseFloat(maxUnits)
     const publishMaxUnits = isGrazingHeadCapacity && Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : null
 
+    // --- Advanced levers (B2b), matching RN handlePublish sanitise rules exactly ---
+    const parsedMinCharge = parseFloat(minCharge)
+    const publishMinCharge = supportsMinimum && Number.isFinite(parsedMinCharge) && parsedMinCharge >= 0
+      ? parsedMinCharge
+      : null
+    // Drop rows missing a label OR amount; keep add-ons display-only.
+    const cleanAddOns = pricingAddOns
+      .filter(a => a.label.trim() && String(a.amount).trim())
+      .map(a => {
+        const amt = parseFloat(a.amount)
+        return {
+          label: a.label.trim(),
+          amount: Number.isFinite(amt) ? amt : 0,
+          basis: a.basis || 'flat',
+          optional: !!a.optional,
+          ...(a.basis === 'per_unit' ? { unit_label: a.unit_label.trim() || null } : {}),
+        }
+      })
+    // Only publish variants with a label and a finite positive rate; never store rate: 0.
+    const cleanVariants = pricingVariants
+      .filter(isValidVariant)
+      .map(v => {
+        const mu = parseFloat(v.min_units)
+        const mc = parseFloat(v.min_charge)
+        return {
+          label: v.label.trim(),
+          pricing_type: v.pricing_type || 'fixed',
+          rate: parseFloat(v.rate),
+          ...(v.pricing_type === 'per_unit' ? { unit_label: v.unit_label.trim() || null } : {}),
+          ...(Number.isFinite(mu) && mu > 0 ? { min_units: mu } : {}),
+          ...(Number.isFinite(mc) && mc >= 0 ? { min_charge: mc } : {}),
+        }
+      })
+
     const base = {
       // B1 fields
       title: title.trim(),
@@ -139,6 +240,11 @@ export function ListingForm({
       unit_label: pricingType === 'per_unit' ? (unitLabel.trim() || null) : null,
       minimum_units: kind === 'grazing' ? 1 : publishMinUnits,
       max_units: publishMaxUnits,
+      // B2b advanced levers — now owned by the form (written on both create and edit).
+      pricing_add_ons: cleanAddOns,
+      pricing_variants: cleanVariants,
+      pricing_terms: pricingTerms.trim() || null,
+      min_charge: publishMinCharge,
     }
 
     if (mode === 'edit' && listing) {
@@ -433,11 +539,167 @@ export function ListingForm({
             </div>
           )}
 
-          {/* B2b advanced levers slot in here */}
-          <section className="lform-pricing-placeholder">
-            <h2>More pricing options</h2>
-            <p className="muted">Add-ons, rate variants, terms and a minimum charge are added in the next step (B2b).</p>
-          </section>
+          {/* Advanced levers (B2b) */}
+          <div className="lform-advanced">
+            <button
+              type="button"
+              className="lform-advanced-toggle"
+              onClick={() => setAdvancedOpen(v => !v)}
+              aria-expanded={advancedOpen}
+            >
+              <span>More pricing options</span>
+              <span className="lform-advanced-chevron">{advancedOpen ? '▾' : '▸'}</span>
+            </button>
+
+            {advancedOpen && (
+              <div className="lform-advanced-body">
+                {/* Minimum charge */}
+                <div className="lform-field">
+                  <label htmlFor="lf-mincharge">Minimum charge <span className="optional">(optional)</span></label>
+                  <input
+                    id="lf-mincharge"
+                    inputMode="numeric"
+                    value={minCharge}
+                    onChange={e => setMinCharge(e.target.value)}
+                    placeholder="e.g. 80"
+                  />
+                  <p className="lform-help">A floor regardless of quantity. Not stored on quote or fixed-price listings.</p>
+                </div>
+
+                {/* Extra charges (add-ons) */}
+                <div className="lform-field">
+                  <label>Extra charges</label>
+                  {pricingAddOns.length === 0 && (
+                    <p className="lform-help">Optional add-ons shown on the listing (e.g. float fee, travel).</p>
+                  )}
+                  {pricingAddOns.map((a, i) => (
+                    <div className="lform-repeat" key={i}>
+                      <div className="lform-repeat-grid">
+                        <input
+                          placeholder="Label (e.g. Float fee)"
+                          value={a.label}
+                          onChange={e => updateAddOn(i, { label: e.target.value })}
+                        />
+                        <input
+                          inputMode="numeric"
+                          placeholder="Amount"
+                          value={a.amount}
+                          onChange={e => updateAddOn(i, { amount: e.target.value })}
+                        />
+                      </div>
+                      <div className="lseg">
+                        {ADDON_BASES.map(b => (
+                          <button
+                            type="button"
+                            key={b.id}
+                            className={a.basis === b.id ? 'lseg-btn active' : 'lseg-btn'}
+                            onClick={() => updateAddOn(i, { basis: b.id })}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
+                      {a.basis === 'per_unit' && (
+                        <input
+                          placeholder="Unit (e.g. bale)"
+                          value={a.unit_label}
+                          onChange={e => updateAddOn(i, { unit_label: e.target.value })}
+                        />
+                      )}
+                      <label className="lform-check">
+                        <input
+                          type="checkbox"
+                          checked={a.optional}
+                          onChange={e => updateAddOn(i, { optional: e.target.checked })}
+                        />
+                        Optional for the requester
+                      </label>
+                      <div className="lform-repeat-foot">
+                        <span className="lform-repeat-preview">{addOnDisplay(a)}</span>
+                        <button type="button" className="lform-repeat-remove" onClick={() => removeAddOn(i)}>Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" className="lform-add" onClick={addAddOn}>+ Add a charge</button>
+                </div>
+
+                {/* More rate options (variants) */}
+                <div className="lform-field">
+                  <label>More rate options</label>
+                  {pricingVariants.length === 0 && (
+                    <p className="lform-help">Alternative rates buyers can pick (e.g. half-day, weekend). Blank or zero-rate rows are dropped.</p>
+                  )}
+                  {pricingVariants.map((v, i) => (
+                    <div className="lform-repeat" key={i}>
+                      <input
+                        placeholder="Label (e.g. Half day)"
+                        value={v.label}
+                        onChange={e => updateVariant(i, { label: e.target.value })}
+                      />
+                      <div className="lseg">
+                        {VARIANT_PRICING_TYPES.map(pt => (
+                          <button
+                            type="button"
+                            key={pt.id}
+                            className={v.pricing_type === pt.id ? 'lseg-btn active' : 'lseg-btn'}
+                            onClick={() => updateVariant(i, { pricing_type: pt.id })}
+                          >
+                            {pt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="lform-repeat-grid">
+                        <input
+                          inputMode="numeric"
+                          placeholder="Rate"
+                          value={v.rate}
+                          onChange={e => updateVariant(i, { rate: e.target.value })}
+                        />
+                        {v.pricing_type === 'per_unit' && (
+                          <input
+                            placeholder="Unit (e.g. bale)"
+                            value={v.unit_label}
+                            onChange={e => updateVariant(i, { unit_label: e.target.value })}
+                          />
+                        )}
+                      </div>
+                      <div className="lform-repeat-grid">
+                        <input
+                          inputMode="numeric"
+                          placeholder="Min units (optional)"
+                          value={v.min_units}
+                          onChange={e => updateVariant(i, { min_units: e.target.value })}
+                        />
+                        <input
+                          inputMode="numeric"
+                          placeholder="Min charge (optional)"
+                          value={v.min_charge}
+                          onChange={e => updateVariant(i, { min_charge: e.target.value })}
+                        />
+                      </div>
+                      <div className="lform-repeat-foot">
+                        <span className="lform-repeat-preview">{variantDisplay(v)}</span>
+                        <button type="button" className="lform-repeat-remove" onClick={() => removeVariant(i)}>Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" className="lform-add" onClick={addVariant}>+ Add a rate option</button>
+                </div>
+
+                {/* Terms */}
+                <div className="lform-field">
+                  <label htmlFor="lf-terms">Terms</label>
+                  <textarea
+                    id="lf-terms"
+                    value={pricingTerms}
+                    onChange={e => setPricingTerms(e.target.value)}
+                    rows={3}
+                    placeholder="Anything else about pricing — deposits, cancellation, what's not included."
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       ) : (
         <section className="lform-pricing-placeholder">

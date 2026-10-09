@@ -14,7 +14,7 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   // RLS plus the explicit provider_id filter: a provider can only load their own row.
   const { data: listing } = await supabase
     .from('services')
-    .select('id, kind, title, category, description, location_name, travel_range_km, pricing_type, rate, unit_label, minimum_units, max_units, payment_timing, materials')
+    .select('id, kind, title, category, description, location_name, travel_range_km, pricing_type, rate, unit_label, minimum_units, max_units, payment_timing, materials, pricing_add_ons, pricing_variants, pricing_terms, min_charge')
     .eq('id', id)
     .eq('provider_id', user.id)
     .maybeSingle()

@@ -227,3 +227,22 @@ a.row:hover { background: var(--sage); }
 .lform-preview-label { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .lform-preview-val { font-size: 16px; font-weight: 800; color: var(--forest-deep); }
 @media (max-width: 620px) { .lform-row { grid-template-columns: 1fr; } }
+
+/* Advanced pricing levers (B2b) */
+.lform-advanced { border-top: 1px solid var(--line); padding-top: 16px; }
+.lform-advanced-toggle { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--forest-deep); font-size: 14px; font-weight: 750; cursor: pointer; }
+.lform-advanced-chevron { color: var(--forest); font-size: 12px; }
+.lform-advanced-body { display: grid; gap: 20px; margin-top: 16px; }
+.lform-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.lform-check input { width: 16px; height: 16px; accent-color: var(--forest); }
+.lform-repeat { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); }
+.lform-repeat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lform-repeat input, .lform-repeat textarea { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; font-family: inherit; }
+.lform-repeat input:focus { outline: 2px solid var(--forest); outline-offset: 0; }
+.lform-repeat-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lform-repeat-preview { font-size: 13px; font-weight: 750; color: var(--forest-deep); }
+.lform-repeat-remove { padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.lform-repeat-remove:hover { background: #fbe7e7; color: #c81920; border-color: #f0c9c9; }
+.lform-add { justify-self: start; padding: 8px 14px; border: 1px dashed var(--line); border-radius: 8px; background: white; font-size: 13px; font-weight: 700; color: var(--forest-deep); cursor: pointer; }
+.lform-add:hover { background: var(--sage); border-style: solid; }
+@media (max-width: 620px) { .lform-repeat-grid { grid-template-columns: 1fr; } }
