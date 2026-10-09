@@ -17,6 +17,7 @@ import { cancelBookingByRequester } from '../lib/bookingActions'
 import ReviewList from '../components/ReviewList'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
+import { KIND_ENQUIRY } from '../../shared/listingPricing'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -79,8 +80,6 @@ function asNumber(value, fallback = 0) {
 function formatCurrency(value) {
   return asNumber(value).toFixed(2)
 }
-
-const KIND_ENQUIRY = ['for_sale', 'grazing', 'lease'] // bypass bookings — enquiry only
 
 // Recurring cadence inferred from a unit label (grazing/lease), else null.
 function cadenceFromUnit(u) {
