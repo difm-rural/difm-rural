@@ -127,6 +127,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
           .select('*')
           .eq('provider_id', providerId)
           .eq('is_active', true)
+          .is('closed_at', null)
           .order('created_at', { ascending: false }),
         supabase.from('reviews')
           .select('*')

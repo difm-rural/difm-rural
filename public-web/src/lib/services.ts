@@ -31,6 +31,7 @@ export async function getFeaturedServices(): Promise<PublicService[]> {
       "id,title,description,category,pricing_type,rate,unit_label,location_name,photos,card_headline,card_supporting_text,card_style"
     )
     .eq("is_active", true)
+    .is("closed_at", null)
     .order("created_at", { ascending: false })
     .limit(6);
 

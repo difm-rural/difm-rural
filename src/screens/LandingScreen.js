@@ -92,6 +92,7 @@ export default function LandingScreen({ navigation }) {
       .from('services')
       .select('*')
       .eq('is_active', true)
+      .is('closed_at', null)
       .order('created_at', { ascending: false })
 
     const raw = servicesData || []

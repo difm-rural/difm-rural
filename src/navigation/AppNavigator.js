@@ -665,7 +665,7 @@ export default function AppNavigator() {
         supabase.from('jobs').select('id', { count: 'exact', head: true })
           .eq('status', 'open').gte('created_at', yesterday).neq('requester_id', userId),
         supabase.from('services').select('id', { count: 'exact', head: true })
-          .eq('is_active', true).gte('created_at', yesterday).neq('provider_id', userId),
+          .eq('is_active', true).is('closed_at', null).gte('created_at', yesterday).neq('provider_id', userId),
       ])
       setJobsBadge(newJobs || 0)
       setServicesBadge(newServices || 0)

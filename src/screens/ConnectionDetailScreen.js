@@ -26,6 +26,7 @@ export default function ConnectionDetailScreen({ navigation, route }) {
         .select('*')
         .eq('provider_id', providerId)
         .eq('is_active', true)
+        .is('closed_at', null)
         .order('created_at', { ascending: false })
       if (active) {
         setServices(data || [])
