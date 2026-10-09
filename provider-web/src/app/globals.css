@@ -155,3 +155,30 @@ a.row:hover { background: var(--sage); }
   .enq-panes { grid-template-columns: 1fr; }
   .enq-thread { min-height: 420px; }
 }
+
+/* Listings table */
+.listings .dash-head { margin-bottom: 22px; }
+.listing-table-wrap { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; }
+.listing-table { width: 100%; border-collapse: collapse; }
+.listing-table thead th { text-align: left; padding: 12px 16px; background: var(--sage); color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.listing-row td { padding: 14px 16px; border-top: 1px solid var(--line); vertical-align: middle; font-size: 13px; }
+.listing-row.closed { opacity: .66; }
+.listing-row td strong { display: block; color: var(--ink); }
+.row-err { display: block; margin-top: 4px; color: #c81920; font-size: 11px; }
+.kind-tag { padding: 3px 9px; border-radius: 999px; background: var(--sage); color: var(--forest-deep); font-size: 11px; font-weight: 700; }
+.badge { padding: 3px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+.badge.live { background: #dcefe2; color: #1c6b43; }
+.badge.paused { background: #f0ece0; color: #8a7320; }
+.badge.closed { background: #e7e2dd; color: #6a5f55; }
+.actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.actions button { min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 12px; font-weight: 700; color: var(--forest-deep); cursor: pointer; }
+.actions button:hover:not(:disabled) { background: var(--sage); }
+.actions button:disabled { opacity: .5; cursor: default; }
+.actions .icon-btn { display: inline-grid; place-items: center; width: 32px; padding: 0; color: var(--muted); }
+.actions .icon-btn.danger:hover { background: #fbe7e7; color: #c81920; border-color: #f0c9c9; }
+@media (max-width: 760px) {
+  .listing-table thead { display: none; }
+  .listing-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+  .listing-row td { border: 0; padding: 2px 0; }
+  .listing-row td.actions { grid-column: 1 / -1; justify-content: flex-start; margin-top: 6px; }
+}
