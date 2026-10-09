@@ -1,0 +1,18 @@
+# dependencies
+/node_modules
+
+# next
+/.next
+/out
+
+# environment
+.env*
+!.env.example
+
+# deployment
+.vercel
+
+# misc
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
