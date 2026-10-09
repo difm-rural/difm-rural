@@ -1,3 +1,9 @@
+// TODO(web): Web apps importing /shared need a bundler mechanism decided —
+// (a) widen turbopack.root + @shared/* alias is confirmed working but makes
+// `next dev` watch the whole repo; (b) npm workspaces package is untested with a
+// real install (junction probe was inconclusive). Resolve with a real workspaces
+// install + a `next dev` watch-scope check BEFORE the first web app imports /shared.
+//
 // Shared, UI-free listing pricing/kind model — the single source of truth for
 // both the React Native app and the web apps (admin-web, public-web, future
 // provider web). Pure data + string/number helpers only: NO React, React
