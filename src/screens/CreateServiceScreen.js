@@ -29,6 +29,7 @@ import {
   variantDisplay, isValidVariant, LISTING_KINDS, KIND_IS_RESOURCE,
   KIND_PRICING_DEFAULTS, KIND_PRICING, pricingTypeLabel,
   KIND_COPY, step1Heading, normalizePricingType,
+  formatRate as formatRateShared,
 } from '../../shared/listingPricing'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -303,15 +304,10 @@ export default function CreateServiceScreen({ navigation, route }) {
     return true
   }
 
-  // NOTE: impure (reads component state) so it stays here. When the web create/edit
-  // form is built, refactor to a pure shared formatRate(pricingType, rate, unitLabel)
-  // in /shared/listingPricing.js so web doesn't fork rate-display logic.
+  // Thin wrapper over the shared pure formatRate — passes this component's state
+  // so web and RN share one rate-display rule (see /shared/listingPricing.ts).
   function formatRate() {
-    if (pricingType === 'quote_required') return 'Quote required'
-    if (pricingType === 'hourly') return `$${rate}/hr`
-    if (pricingType === 'day_rate') return `$${rate}/day`
-    if (pricingType === 'per_unit') return `$${rate}/${unitLabel || 'unit'}`
-    return `$${rate} fixed`
+    return formatRateShared(pricingType, rate, unitLabel)
   }
 
   function normalizeCategory(value) {

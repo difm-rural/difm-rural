@@ -1,25 +1,24 @@
-// Single unified taxonomy shared by BOTH marketplaces (jobs + services), with a
-// second, more detailed layer of provider capabilities under each category.
-// If you change this, also update:
+// Category taxonomy for BOTH marketplaces (jobs + services). The PURE taxonomy
+// data now lives in /shared/categories.ts (the single source of truth shared with
+// the web apps) and is re-exported below so every existing RN importer keeps
+// working unchanged. The RN-coupled layers (provider capabilities, house-sitting
+// detection) stay here. Category artwork lives in ./categoryImages.
+//
+// If you change the CATEGORIES list, update /shared/categories.ts — and also:
 //   - src/components/JobServiceCard.js  (CATEGORY_VISUALS icon map)
 //   - supabase/functions/categorize-job (CATEGORIES — then redeploy)
 //   - add a data migration remapping existing jobs.category / services.category
 
-// Level 1 — browse categories (kept short so browse isn't overwhelming).
-export const CATEGORIES = [
-  'Fencing & Gates',
-  'Animals & Farm Sitting',
-  'Water & Drainage',
-  'Spraying & Pest Control',
-  'Land & Vegetation',
-  'Cropping, Hay & Feed',
-  'Earthworks & Driveways',
-  'Machinery & Repairs',
-  'Buildings & Maintenance',
-  'Transport & Delivery',
-  'Property & House Sitting',
-  'General Rural Help',
-]
+// Pure taxonomy — single source of truth in /shared, re-exported for RN importers.
+export {
+  CATEGORIES,
+  JOB_CATEGORIES,
+  SERVICE_CATEGORIES,
+  CATEGORY_FILTERS,
+  LISTING_CATEGORIES,
+} from '../../shared/categories'
+
+import { CATEGORIES } from '../../shared/categories'
 
 // Level 2 — provider capabilities (a detailed skill layer under each category).
 // Providers select these; they're stored in profiles.skills (text[]).
@@ -81,28 +80,6 @@ export const CATEGORY_CAPABILITIES = {
 
 // Flat list of every capability (for matching / search).
 export const ALL_CAPABILITIES = CATEGORIES.flatMap(c => CATEGORY_CAPABILITIES[c] || [])
-
-// Jobs and services share one taxonomy — keep the old names as aliases so
-// existing imports keep working.
-export const JOB_CATEGORIES = CATEGORIES
-export const SERVICE_CATEGORIES = CATEGORIES
-
-// Filter-bar shape used by the browse / guest feed screens: [{ id, label }]
-// with a leading "All".
-export const CATEGORY_FILTERS = [
-  { id: 'All', label: 'All' },
-  ...CATEGORIES.map(c => ({ id: c, label: c })),
-]
-
-// Kind-dependent browse categories for Listings (L2). `service` reuses the full
-// labour taxonomy; resource kinds get their own short sets. Storage lives under lease.
-export const LISTING_CATEGORIES = {
-  service:  CATEGORIES,
-  grazing:  ['Grazing', 'Agistment', 'Winter grazing', 'Dairy support'],
-  hire:     ['Machinery', 'Trailers', 'Yards & handling', 'Implements'],
-  lease:    ['Paddock/land', 'Shed/building', 'Storage'],
-  for_sale: ['Hay & baleage', 'Feed & supplement', 'Livestock sundries', 'General'],
-}
 
 // True when a job title reads like house-sitting (used to surface the
 // house-sitting-only options: date range, hide exact address).

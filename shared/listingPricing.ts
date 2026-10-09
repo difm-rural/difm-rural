@@ -27,6 +27,22 @@ export const PRICING_TYPES: Option[] = [
   { id: 'quote_required', label: 'Estimate / quote' },
 ]
 
+// Headline rate display for a single listing price. Pure counterpart of the old
+// component-state formatRate in CreateServiceScreen, so web and RN share one
+// rate-display rule. rate is whatever the form holds (string or number); it is
+// interpolated verbatim, matching prior behaviour exactly.
+export function formatRate(
+  pricingType: string,
+  rate: string | number | null | undefined,
+  unitLabel?: string | null,
+): string {
+  if (pricingType === 'quote_required') return 'Quote required'
+  if (pricingType === 'hourly') return `$${rate}/hr`
+  if (pricingType === 'day_rate') return `$${rate}/day`
+  if (pricingType === 'per_unit') return `$${rate}/${unitLabel || 'unit'}`
+  return `$${rate} fixed`
+}
+
 export const PAYMENT_OPTIONS: Option[] = [
   { id: 'upfront', label: 'Pay upfront' },
   { id: 'on_completion', label: 'On completion' },
