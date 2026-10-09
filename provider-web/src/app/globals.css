@@ -82,3 +82,36 @@ code { background: var(--sage); padding: 1px 6px; border-radius: 5px; font-size:
   .sidebar { flex-direction: row; align-items: center; gap: 14px; overflow-x: auto; }
   .sidebar-user { margin: 0 0 0 auto; padding-top: 0; border: 0; }
 }
+
+/* Dashboard */
+.dash-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 26px; }
+.dash-sub { margin: 0; }
+.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.card { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); padding: 20px; min-width: 0; }
+.card.span-2 { grid-column: span 2; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.card-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 750; color: var(--forest-deep); }
+.card-head h2 svg { color: var(--forest); }
+.card-link { display: inline-flex; align-items: center; gap: 5px; color: var(--forest); font-size: 12px; font-weight: 800; }
+.empty { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; }
+.list > li { border-top: 1px solid var(--line); }
+.list > li:first-child { border-top: 0; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; }
+a.row { transition: background .15s ease; border-radius: 8px; padding-inline: 8px; margin-inline: -8px; }
+a.row:hover { background: var(--sage); }
+.row-main { min-width: 0; display: grid; gap: 2px; }
+.row-main strong { font-size: 13px; color: var(--ink); }
+.row-sub { font-size: 11px; color: var(--forest); font-weight: 650; }
+.row-snippet { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-meta { flex: none; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.bids-foot { margin: 12px 0 0; font-size: 12px; }
+.bids-foot .dim { color: #9aa49d; }
+.summary .stat-row { display: flex; gap: 32px; }
+.stat { display: grid; gap: 2px; }
+.stat-num { font-size: 32px; font-weight: 700; color: var(--forest-deep); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--muted); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
+@media (max-width: 760px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .card.span-2 { grid-column: span 1; }
+}
