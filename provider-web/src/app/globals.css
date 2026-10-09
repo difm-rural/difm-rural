@@ -182,3 +182,32 @@ a.row:hover { background: var(--sage); }
   .listing-row td { border: 0; padding: 2px 0; }
   .listing-row td.actions { grid-column: 1 / -1; justify-content: flex-start; margin-top: 6px; }
 }
+.dash-head-aside { display: flex; align-items: center; gap: 16px; }
+
+/* Listing create/edit form (B1 scaffold) */
+.lform { max-width: 620px; display: grid; gap: 22px; margin-top: 8px; }
+.lform-field { display: grid; gap: 7px; }
+.lform-field > label { font-size: 12px; font-weight: 800; color: var(--ink); }
+.lform-field .req { color: #c81920; }
+.lform-field input, .lform-field select, .lform-field textarea {
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font-family: inherit;
+}
+.lform-field textarea { resize: vertical; min-height: 92px; line-height: 1.5; }
+.lform-field input:focus, .lform-field select:focus, .lform-field textarea:focus { outline: 2px solid var(--forest); outline-offset: 0; }
+.lform-field select:disabled { background: var(--canvas); color: var(--muted); }
+.lform-kinds { display: flex; flex-wrap: wrap; gap: 8px; }
+.lform-kind { padding: 9px 14px; border: 1px solid var(--line); border-radius: 999px; background: white; font-size: 13px; font-weight: 700; color: var(--forest-deep); cursor: pointer; }
+.lform-kind:hover { background: var(--sage); }
+.lform-kind.active { background: var(--forest); color: white; border-color: var(--forest); }
+.lform-fixed { display: flex; align-items: center; gap: 12px; margin: 0; }
+.lform-fixed-note { font-size: 12px; }
+.lform-pricing-placeholder { border: 1px dashed var(--line); border-radius: 12px; background: var(--sage); padding: 18px 20px; }
+.lform-pricing-placeholder h2 { margin: 0 0 4px; font-size: 15px; font-weight: 750; color: var(--forest-deep); }
+.lform-pricing-placeholder p { margin: 0; font-size: 13px; }
+.lform-actions { display: flex; align-items: center; gap: 10px; }
+.lform-save { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 9px; background: var(--forest); color: white; font-size: 14px; font-weight: 800; cursor: pointer; }
+.lform-save:disabled { opacity: .5; cursor: default; }
+.lform-save.as-link { min-height: 38px; padding: 0 14px; font-size: 13px; }
+.lform-cancel { min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 9px; background: white; font-size: 14px; font-weight: 700; color: var(--forest-deep); cursor: pointer; }
+.lform-cancel:hover:not(:disabled) { background: var(--sage); }
+.lform-cancel:disabled { opacity: .5; cursor: default; }

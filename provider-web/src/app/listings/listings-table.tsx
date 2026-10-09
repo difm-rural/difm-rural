@@ -103,7 +103,11 @@ function ListingRow({ s }: { s: Listing }) {
 
 export function ListingsTable({ listings }: { listings: Listing[] }) {
   if (listings.length === 0) {
-    return <p className="empty">No listings yet. Create one in the Rural Connections app.</p>
+    return (
+      <p className="empty">
+        No listings yet. <Link href="/listings/new" className="text-link">Create one</Link> or use the Rural Connections app.
+      </p>
+    )
   }
   return (
     <div className="listing-table-wrap">

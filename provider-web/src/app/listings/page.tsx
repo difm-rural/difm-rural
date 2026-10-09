@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { ListingsTable, type Listing } from './listings-table'
@@ -26,7 +28,10 @@ export default async function ListingsPage() {
             <p className="eyebrow">Provider console</p>
             <h1>Listings</h1>
           </div>
-          <p className="muted dash-sub">{rows.length} listing{rows.length === 1 ? '' : 's'}</p>
+          <div className="dash-head-aside">
+            <p className="muted dash-sub">{rows.length} listing{rows.length === 1 ? '' : 's'}</p>
+            <Link href="/listings/new" className="lform-save as-link"><Plus size={15} /> New listing</Link>
+          </div>
         </header>
         <ListingsTable listings={rows} />
       </section>
