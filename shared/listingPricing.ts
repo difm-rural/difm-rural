@@ -1,8 +1,9 @@
-// TODO(web): Web apps importing /shared need a bundler mechanism decided —
-// (a) widen turbopack.root + @shared/* alias is confirmed working but makes
-// `next dev` watch the whole repo; (b) npm workspaces package is untested with a
-// real install (junction probe was inconclusive). Resolve with a real workspaces
-// install + a `next dev` watch-scope check BEFORE the first web app imports /shared.
+// Web bundler mechanism: (a) LOCKED — widen turbopack.root to repo root + @shared/*
+// tsconfig alias; /shared authored in .ts so types flow to both web apps
+// (public-web allowJs:false satisfied, no .d.ts needed). (b) workspace package was
+// tested with a real npm install and REJECTED: turbopack canonicalizes the symlink
+// to /shared and requires it inside turbopack.root, so (b) also needs a widened
+// root — identical repo-wide dev-watch as (a), with extra plumbing. No narrow-watch win.
 //
 // Shared, UI-free listing pricing/kind model — the single source of truth for
 // both the React Native app and the web apps (admin-web, public-web, future
