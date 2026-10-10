@@ -46,7 +46,18 @@ export type EditListing = {
   pricing_variants: StoredVariant[] | null
   pricing_terms: string | null
   min_charge: number | null
+  card_headline: string | null
+  card_supporting_text: string | null
+  card_style: string | null
+  availability: string[] | null
 }
+
+// Listing-card appearance options — labels match the RN create flow.
+const CARD_STYLES: { id: string; label: string }[] = [
+  { id: 'bold', label: 'Bold overlay' },
+  { id: 'bottom', label: 'Bottom band' },
+  { id: 'clean', label: 'Clean panel' },
+]
 
 // Editable row state for the repeaters (all-string inputs; compatible with the
 // @shared AddOnDraft / VariantDraft shapes consumed by addOnDisplay/isValidVariant).
@@ -124,6 +135,18 @@ export function ListingForm({
     ),
   )
 
+  // Card creative (B3) — optional listing-card polish.
+  const [cardHeadline, setCardHeadline] = useState(listing?.card_headline ?? '')
+  const [cardSupportingText, setCardSupportingText] = useState(listing?.card_supporting_text ?? '')
+  const [cardStyle, setCardStyle] = useState<string | null>(listing?.card_style ?? null)
+
+  // Availability (B3) — null = available now; else a single YYYY-MM-DD array.
+  const initialAvailFrom = Array.isArray(listing?.availability) && listing!.availability![0]
+    ? String(listing!.availability![0]).split('T')[0]
+    : ''
+  const [availMode, setAvailMode] = useState<'now' | 'from'>(initialAvailFrom ? 'from' : 'now')
+  const [availableFrom, setAvailableFrom] = useState(initialAvailFrom)
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -149,6 +172,11 @@ export function ListingForm({
     setPricingAddOns([])
     setPricingVariants([])
     setAdvancedOpen(false)
+    setCardHeadline('')
+    setCardSupportingText('')
+    setCardStyle(null)
+    setAvailMode('now')
+    setAvailableFrom('')
   }
 
   // Add-on row handlers
@@ -245,6 +273,11 @@ export function ListingForm({
       pricing_variants: cleanVariants,
       pricing_terms: pricingTerms.trim() || null,
       min_charge: publishMinCharge,
+      // B3 card creative + availability.
+      card_headline: cardHeadline.trim() || null,
+      card_supporting_text: cardSupportingText.trim() || null,
+      card_style: cardStyle || null, // only 'bold' | 'bottom' | 'clean' | null (check constraint)
+      availability: availMode === 'from' && availableFrom ? [availableFrom] : null,
     }
 
     if (mode === 'edit' && listing) {
@@ -707,6 +740,88 @@ export function ListingForm({
           <p className="muted">Pick a listing type to set pricing.</p>
         </section>
       )}
+
+      {/* Listing card (B3) — optional polish */}
+      <section className="lform-pricing">
+        <h2>Listing card <span className="optional">(optional)</span></h2>
+        <p className="muted">How your listing appears on the browse cards. Optional — leave blank for a plain card.</p>
+
+        <div className="lform-field">
+          <label htmlFor="lf-headline">Tagline / card headline</label>
+          <input
+            id="lf-headline"
+            value={cardHeadline}
+            onChange={e => setCardHeadline(e.target.value.slice(0, 55))}
+            maxLength={55}
+            placeholder="e.g. Too much garden, not enough time?"
+          />
+        </div>
+
+        <div className="lform-field">
+          <label htmlFor="lf-supporting">Supporting line</label>
+          <input
+            id="lf-supporting"
+            value={cardSupportingText}
+            onChange={e => setCardSupportingText(e.target.value.slice(0, 125))}
+            maxLength={125}
+            placeholder="Tell customers how you can help in one concise sentence"
+          />
+        </div>
+
+        <div className="lform-field">
+          <label>Card appearance</label>
+          <div className="lseg">
+            <button
+              type="button"
+              className={cardStyle === null ? 'lseg-btn active' : 'lseg-btn'}
+              onClick={() => setCardStyle(null)}
+            >
+              None
+            </button>
+            {CARD_STYLES.map(s => (
+              <button
+                type="button"
+                key={s.id}
+                className={cardStyle === s.id ? 'lseg-btn active' : 'lseg-btn'}
+                onClick={() => setCardStyle(s.id)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Availability (B3) — optional */}
+      <section className="lform-pricing">
+        <h2>Availability <span className="optional">(optional)</span></h2>
+        <div className="lform-field">
+          <div className="lseg">
+            <button
+              type="button"
+              className={availMode === 'now' ? 'lseg-btn active' : 'lseg-btn'}
+              onClick={() => { setAvailMode('now'); setAvailableFrom('') }}
+            >
+              Available now
+            </button>
+            <button
+              type="button"
+              className={availMode === 'from' ? 'lseg-btn active' : 'lseg-btn'}
+              onClick={() => setAvailMode('from')}
+            >
+              From a date
+            </button>
+          </div>
+          {availMode === 'from' && (
+            <input
+              type="date"
+              value={availableFrom}
+              onChange={e => setAvailableFrom(e.target.value)}
+              style={{ marginTop: 10, maxWidth: 220 }}
+            />
+          )}
+        </div>
+      </section>
 
       {error && <p className="form-error">{error}</p>}
 
