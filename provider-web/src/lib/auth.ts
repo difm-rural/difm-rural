@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-// Gate the provider app. A provider is a normal Supabase user whose profile
-// primary_role is 'provider' or 'both' (legacy accounts fall back to `role`).
-// Non-providers are sent to /providers-only, not an admin-style /not-authorised.
+// Gate the provider console. The requester/provider split is retired for now, so any
+// signed-in user may use it — the only gate is authentication. (The /providers-only
+// route is left in place but is now unreachable from here.) The profile is still
+// fetched and returned for the shell's display name.
 export async function requireProvider() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,9 +15,6 @@ export async function requireProvider() {
     .select('id, full_name, primary_role, role')
     .eq('id', user.id)
     .maybeSingle()
-
-  const role = profile?.primary_role ?? profile?.role
-  if (role !== 'provider' && role !== 'both') redirect('/providers-only')
 
   return { supabase, user, profile }
 }

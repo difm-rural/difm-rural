@@ -622,30 +622,29 @@ export default function AppNavigator() {
 
   async function fetchBadgeCounts(userId, prof) {
     try {
-      const role = prof?.primary_role || prof?.role || 'requester'
+      // Everyone can both request and provide now, so run both branches
+      // unconditionally — each contributes 0 when the user has nothing on that side.
       let activityCount = 0
 
-      if (role === 'requester' || role === 'both') {
-        const { data: jobs } = await supabase
-          .from('jobs').select('id').eq('requester_id', userId).eq('status', 'open')
-        if (jobs?.length > 0) {
-          const { count: c } = await supabase
-            .from('bids')
-            .select('id', { count: 'exact', head: true })
-            .in('job_id', jobs.map(j => j.id))
-            .eq('status', 'pending')
-          activityCount += (c || 0)
-        }
-      }
-
-      if (role === 'provider' || role === 'both') {
+      // Requester side: pending bids on my open jobs.
+      const { data: jobs } = await supabase
+        .from('jobs').select('id').eq('requester_id', userId).eq('status', 'open')
+      if (jobs?.length > 0) {
         const { count: c } = await supabase
-          .from('bookings')
+          .from('bids')
           .select('id', { count: 'exact', head: true })
-          .eq('provider_id', userId)
+          .in('job_id', jobs.map(j => j.id))
           .eq('status', 'pending')
         activityCount += (c || 0)
       }
+
+      // Provider side: pending bookings on my services.
+      const { count: bookingCount } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('provider_id', userId)
+        .eq('status', 'pending')
+      activityCount += (bookingCount || 0)
 
       // Unread notifications (Q&A replies, etc.)
       try {

@@ -435,29 +435,6 @@ export default function AccountTabScreen({ navigation, route }) {
     }
   }
 
-  // ─── Role ──────────────────────────────────────────────────────────────────
-
-  async function updateRole(newRole) {
-    if (!userId) return
-    // The legacy `role` column only allows requester/provider — map 'both'.
-    const legacyRole = newRole === 'both' ? 'provider' : newRole
-    const { error } = await supabase
-      .from('profiles')
-      .update({ primary_role: newRole, role: legacyRole })
-      .eq('id', userId)
-    if (error) {
-      Alert.alert('Could not update', error.message)
-      return
-    }
-    setProfile(p => ({ ...p, primary_role: newRole, role: legacyRole }))
-    Alert.alert('Updated', 'Your role has been updated.')
-  }
-
-  // Main-screen "I also provide" switch: on → both, off → requester.
-  function handleProvideToggle(value) {
-    updateRole(value ? 'both' : 'requester')
-  }
-
   // ─── Skills & qualifications ──────────────────────────────────────────────
 
   async function toggleSkill(skill) {
@@ -606,21 +583,6 @@ export default function AccountTabScreen({ navigation, route }) {
           <Stat number={ratingSummary.count} label="Reviews" />
           <Stat number={onboardValue} label={onboardLabel} />
         </View>
-      </View>
-
-      <View style={styles.provideCard}>
-        <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={styles.provideTitle}>I also provide</Text>
-          <Text style={styles.provideSub}>Make offers on jobs and list your own services.</Text>
-        </View>
-        <Switch
-          value={isProvider}
-          onValueChange={handleProvideToggle}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={colors.white}
-          ios_backgroundColor={colors.border}
-          accessibilityLabel="I also provide"
-        />
       </View>
 
       <View style={styles.hubButtons}>

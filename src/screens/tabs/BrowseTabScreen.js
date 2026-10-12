@@ -21,6 +21,7 @@ import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
 import { CATEGORY_FILTERS } from '../../lib/categories'
 import { availabilityDisplay } from '../../lib/providerAvailability'
+import { canProvide } from '../../lib/roles'
 
 const FILTERS = CATEGORY_FILTERS
 
@@ -69,7 +70,7 @@ function ServiceSection({ title, items, onPressItem }) {
 export default function BrowseTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const { profile } = useUser()
-  const isProvider = profile?.primary_role === 'provider' || profile?.primary_role === 'both'
+  const isProvider = canProvide(profile)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [services,    setServices]    = useState([])
   const [userRegion,  setUserRegion]  = useState('')
