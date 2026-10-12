@@ -917,6 +917,7 @@ export function ListingForm({
                       photoUrl={photoPreviews[0]}
                       category={category}
                       headline={cardHeadline}
+                      supporting={cardSupportingText}
                       cardStyle={opt.id}
                     />
                     <span className="lform-cardopt-label">{opt.label}</span>

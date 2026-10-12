@@ -15,20 +15,24 @@ function styleMod(cardStyle: CardStyle): '' | 'bold' | 'clean' {
 }
 
 // The photo + card-message overlay — the part that changes by card_style. The overlay
-// shows ONLY when there's a photo AND a headline (matches RN), headline only, 3-line clamp.
+// shows ONLY when there's a photo AND a headline (matches RN), with the optional
+// supporting line beneath (as RN's editor preview + detail hero show it), each 3-line clamp.
 export function CardImage({
   photoUrl,
   category,
   headline,
+  supporting,
   cardStyle,
 }: {
   photoUrl?: string | null
   category?: string | null
   headline?: string | null
+  supporting?: string | null
   cardStyle?: CardStyle
 }) {
   const mod = styleMod(cardStyle)
   const head = (headline ?? '').trim()
+  const sub = (supporting ?? '').trim()
   return (
     <div className="lcard-img">
       {photoUrl ? (
@@ -43,6 +47,9 @@ export function CardImage({
       {photoUrl && head && (
         <div className={`lcard-msg${mod ? ' ' + mod : ''}`}>
           <span className={`lcard-msg-text${mod === 'clean' ? ' clean' : ''}`}>{head}</span>
+          {sub && (
+            <span className={`lcard-msg-sub${mod === 'clean' ? ' clean' : ''}`}>{sub}</span>
+          )}
         </div>
       )}
     </div>
@@ -54,6 +61,7 @@ export type ListingCardData = {
   photoUrl?: string | null
   category?: string | null
   cardHeadline?: string | null
+  cardSupporting?: string | null
   cardStyle?: CardStyle
   priceLabel?: string | null
   kindLabel?: string | null
@@ -69,6 +77,7 @@ export function ListingCard({ data, footer }: { data: ListingCardData; footer?: 
         photoUrl={data.photoUrl}
         category={data.category}
         headline={data.cardHeadline}
+        supporting={data.cardSupporting}
         cardStyle={data.cardStyle}
       />
       <div className="lcard-body">

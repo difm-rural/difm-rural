@@ -94,6 +94,7 @@ export function ManageCard({ s }: { s: Listing }) {
         photoUrl: s.photos?.[0] ?? null,
         category: s.category,
         cardHeadline: s.card_headline,
+        cardSupporting: s.card_supporting_text,
         cardStyle: s.card_style as CardStyle,
         priceLabel: priceSummary(s),
         kindLabel: KIND_LABEL[s.kind ?? ''] ?? (s.kind ?? undefined),
