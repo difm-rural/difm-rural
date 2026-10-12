@@ -256,3 +256,27 @@ a.row:hover { background: var(--sage); }
 .lform-photo-remove:hover { background: #c81920; }
 .lform-photo-add { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px dashed var(--line); border-radius: 9px; background: white; font-size: 13px; font-weight: 700; color: var(--forest-deep); cursor: pointer; }
 .lform-photo-add:hover { background: var(--sage); border-style: solid; }
+
+/* ListingCard (C2) — CSS reproduction of RN JobServiceCard; literal rgba for fidelity */
+.lcard { width: 240px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); }
+.lcard-img { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--canvas); overflow: hidden; }
+.lcard-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lcard-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--sage); color: var(--forest); font-size: 11px; font-weight: 700; }
+/* Card message overlay. Base = RN 'bottom' treatment; .bold/.clean override, literal rgba. */
+.lcard-msg { position: absolute; left: 0; right: 0; bottom: 0; padding: 7px 8px; background: rgba(15,45,33,0.78); }
+.lcard-msg.bold { top: 0; display: flex; align-items: center; background: rgba(15,45,33,0.60); }
+.lcard-msg.clean { left: 6px; right: 6px; bottom: 6px; border-radius: 7px; background: rgba(255,255,255,0.90); }
+.lcard-msg-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: #fff; font-size: 13px; line-height: 1.25; font-weight: 800; }
+.lcard-msg-text.clean { color: var(--forest-deep); }
+.lcard-body { padding: 11px 13px; display: grid; gap: 7px; }
+.lcard-title { font-size: 14px; font-weight: 750; color: var(--ink); line-height: 1.3; }
+.lcard-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lcard-price { font-size: 13px; font-weight: 800; color: var(--forest-deep); }
+
+/* Card-style visual chooser (replaces the text picker) */
+.lform-cardchooser { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 480px; }
+.lform-cardopt { display: grid; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: white; cursor: pointer; text-align: center; }
+.lform-cardopt:hover { background: var(--sage); }
+.lform-cardopt.active { border-color: var(--forest); box-shadow: 0 0 0 2px var(--forest); }
+.lform-cardopt .lcard-img { aspect-ratio: 4 / 3; border-radius: 7px; }
+.lform-cardopt-label { font-size: 12px; font-weight: 700; color: var(--forest-deep); }

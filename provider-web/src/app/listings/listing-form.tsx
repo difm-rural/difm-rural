@@ -12,6 +12,7 @@ import {
 } from '@shared/listingPricing'
 import { LISTING_CATEGORIES } from '@shared/categories'
 import { createClient } from '@/lib/supabase/client'
+import { CardImage } from './listing-card'
 
 // B1 owns the non-pricing fields; B2a adds the DEFAULT pricing view (driven entirely
 // by KIND_PRICING[kind] from @shared — no rules derived here). The advanced levers
@@ -63,10 +64,11 @@ function fileExt(file: File): string {
   return byType[file.type] || file.name.split('.').pop()?.toLowerCase() || 'jpg'
 }
 
-// Listing-card appearance options — labels match the RN create flow.
-const CARD_STYLES: { id: string; label: string }[] = [
-  { id: 'bold', label: 'Bold overlay' },
+// Listing-card appearance options — labels match the RN create flow. Bottom first:
+// it's the default (RN renders null/'bottom' identically), so there's no "None".
+const CARD_STYLE_OPTIONS: { id: 'bottom' | 'bold' | 'clean'; label: string }[] = [
   { id: 'bottom', label: 'Bottom band' },
+  { id: 'bold', label: 'Bold overlay' },
   { id: 'clean', label: 'Clean panel' },
 ]
 
@@ -149,7 +151,9 @@ export function ListingForm({
   // Card creative (B3) — optional listing-card polish.
   const [cardHeadline, setCardHeadline] = useState(listing?.card_headline ?? '')
   const [cardSupportingText, setCardSupportingText] = useState(listing?.card_supporting_text ?? '')
-  const [cardStyle, setCardStyle] = useState<string | null>(listing?.card_style ?? null)
+  // Default 'bottom' (not null): RN renders null and 'bottom' identically, so legacy
+  // null rows show as bottom and new/edited rows store 'bottom' — display-identical.
+  const [cardStyle, setCardStyle] = useState<string>(listing?.card_style ?? 'bottom')
 
   // Availability (B3) — null = available now; else a single YYYY-MM-DD array.
   const initialAvailFrom = Array.isArray(listing?.availability) && listing!.availability![0]
@@ -213,7 +217,7 @@ export function ListingForm({
     setAdvancedOpen(false)
     setCardHeadline('')
     setCardSupportingText('')
-    setCardStyle(null)
+    setCardStyle('bottom')
     setAvailMode('now')
     setAvailableFrom('')
     setPhotos([])
@@ -898,25 +902,34 @@ export function ListingForm({
 
         <div className="lform-field">
           <label>Card appearance</label>
-          <div className="lseg">
-            <button
-              type="button"
-              className={cardStyle === null ? 'lseg-btn active' : 'lseg-btn'}
-              onClick={() => setCardStyle(null)}
-            >
-              None
-            </button>
-            {CARD_STYLES.map(s => (
-              <button
-                type="button"
-                key={s.id}
-                className={cardStyle === s.id ? 'lseg-btn active' : 'lseg-btn'}
-                onClick={() => setCardStyle(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+          {photoPreviews.length > 0 ? (
+            <>
+              <div className="lform-cardchooser">
+                {CARD_STYLE_OPTIONS.map(opt => (
+                  <button
+                    type="button"
+                    key={opt.id}
+                    className={`lform-cardopt${cardStyle === opt.id ? ' active' : ''}`}
+                    onClick={() => setCardStyle(opt.id)}
+                    aria-pressed={cardStyle === opt.id}
+                  >
+                    <CardImage
+                      photoUrl={photoPreviews[0]}
+                      category={category}
+                      headline={cardHeadline}
+                      cardStyle={opt.id}
+                    />
+                    <span className="lform-cardopt-label">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              {!cardHeadline.trim() && (
+                <p className="lform-help">Type a card headline above to see the message styles.</p>
+              )}
+            </>
+          ) : (
+            <p className="lform-help">Add a photo and a card headline to preview your listing card.</p>
+          )}
         </div>
       </section>
 
