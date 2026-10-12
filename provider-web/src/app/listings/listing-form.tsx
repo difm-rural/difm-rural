@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, ImagePlus, X } from 'lucide-react'
 import {
   LISTING_KINDS, KIND_PRICING, KIND_PRICING_DEFAULTS,
   PAYMENT_OPTIONS, MATERIALS_OPTIONS,
@@ -50,6 +50,17 @@ export type EditListing = {
   card_supporting_text: string | null
   card_style: string | null
   availability: string[] | null
+  photos: string[] | null
+}
+
+const MAX_PHOTOS = 4
+
+// Extension for a picked File, mirroring RN's mime→ext map (uploadPhotos).
+function fileExt(file: File): string {
+  const byType: Record<string, string> = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+  }
+  return byType[file.type] || file.name.split('.').pop()?.toLowerCase() || 'jpg'
 }
 
 // Listing-card appearance options — labels match the RN create flow.
@@ -147,8 +158,36 @@ export function ListingForm({
   const [availMode, setAvailMode] = useState<'now' | 'from'>(initialAvailFrom ? 'from' : 'now')
   const [availableFrom, setAvailableFrom] = useState(initialAvailFrom)
 
+  // Photos (C1) — array mixing existing URL strings (edit) with newly-picked File objects.
+  const [photos, setPhotos] = useState<(string | File)[]>(
+    Array.isArray(listing?.photos) ? [...listing!.photos!] : [],
+  )
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Once a NEW listing's row exists (created below), hold its id so a re-save (e.g. after
+  // a partial photo-upload failure keeps us on the form) UPDATEs it rather than inserting
+  // a duplicate. On edit it starts as the existing id.
+  const [savedId, setSavedId] = useState<string | null>(mode === 'edit' ? (listing?.id ?? null) : null)
+
+  // Thumbnail srcs: existing URLs as-is, Files as blob: object URLs (revoked on change/unmount).
+  const photoPreviews = useMemo(
+    () => photos.map(p => (typeof p === 'string' ? p : URL.createObjectURL(p))),
+    [photos],
+  )
+  useEffect(() => () => {
+    photoPreviews.forEach(u => { if (u.startsWith('blob:')) URL.revokeObjectURL(u) })
+  }, [photoPreviews])
+
+  function addPhotoFiles(files: FileList | null) {
+    if (!files) return
+    setPhotos(ps => {
+      const room = MAX_PHOTOS - ps.length
+      if (room <= 0) return ps
+      return [...ps, ...Array.from(files).slice(0, room)]
+    })
+  }
+  const removePhoto = (i: number) => setPhotos(ps => ps.filter((_, idx) => idx !== i))
 
   const cfg = kind ? KIND_PRICING[kind] : null
   const categoryOptions = kind ? LISTING_CATEGORIES[kind] : []
@@ -177,6 +216,7 @@ export function ListingForm({
     setCardStyle(null)
     setAvailMode('now')
     setAvailableFrom('')
+    setPhotos([])
   }
 
   // Add-on row handlers
@@ -280,10 +320,13 @@ export function ListingForm({
       availability: availMode === 'from' && availableFrom ? [availableFrom] : null,
     }
 
-    if (mode === 'edit' && listing) {
+    // 1. Write the row first (mirrors RN: the id is needed for the photo storage path).
+    let serviceId: string
+    if (savedId) {
+      // Existing row (edit, or a NEW row already created on a prior save attempt).
       // Partial update: payment/materials only when their control is shown, so a hidden
       // field keeps its existing value. B2b fields, closed_at, close_reason, kind and
-      // direction are never included.
+      // direction are never included. Photos are handled separately below.
       const fields: Record<string, unknown> = { ...base }
       if (cfg.showPayment) fields.payment_timing = paymentTiming
       if (cfg.showMaterials) fields.materials = materials
@@ -291,15 +334,16 @@ export function ListingForm({
       const { error: e } = await supabase
         .from('services')
         .update(fields)
-        .eq('id', listing.id)
+        .eq('id', savedId)
         .eq('provider_id', userId)
-      setBusy(false)
-      if (e) { setError('Couldn’t save — retry.'); return }
+      if (e) { setBusy(false); setError('Couldn’t save — retry.'); return }
+      serviceId = savedId
     } else {
       // Create mirrors an RN create: payment_timing/materials always written (control
       // value when shown, RN default otherwise). B2b advanced columns are omitted so
-      // they take their DB defaults ([] / [] / null / null).
-      const { error: e } = await supabase.from('services').insert({
+      // they take their DB defaults ([] / [] / null / null). .select('id') returns the
+      // new id for the photo path.
+      const { data, error: e } = await supabase.from('services').insert({
         provider_id: userId,
         kind,
         direction: 'offering',
@@ -307,9 +351,52 @@ export function ListingForm({
         ...base,
         payment_timing: cfg.showPayment ? paymentTiming : 'on_completion',
         materials: cfg.showMaterials ? materials : 'included',
-      })
-      setBusy(false)
-      if (e) { setError('Couldn’t create — retry.'); return }
+      }).select('id').single()
+      if (e || !data) { setBusy(false); setError('Couldn’t create — retry.'); return }
+      serviceId = data.id as string
+      setSavedId(serviceId) // so a re-save (e.g. after partial photo failure) updates, not re-inserts
+    }
+
+    // 2. Photos (mirror RN uploadPhotos): iterate in order — existing URL strings pass
+    // through unchanged; new Files upload to `${serviceId}/${Date.now()}_${i}.${ext}`.
+    // Failed uploads are skipped (surfaced below), never block the save.
+    const finalUrls: string[] = []
+    let failed = 0
+    for (let i = 0; i < photos.length; i++) {
+      const p = photos[i]
+      if (typeof p === 'string') { finalUrls.push(p); continue }
+      const path = `${serviceId}/${Date.now()}_${i}.${fileExt(p)}`
+      const { error: upErr } = await supabase.storage
+        .from('service-photos')
+        .upload(path, p, { contentType: p.type || 'image/jpeg', upsert: false })
+      if (upErr) { failed += 1; continue }
+      const { data: { publicUrl } } = supabase.storage.from('service-photos').getPublicUrl(path)
+      finalUrls.push(publicUrl)
+    }
+
+    // 3. Write services.photos. For an existing row (edit, or a NEW row already created on
+    // a prior save) always write — preserves untouched, applies adds/removals, clears to []
+    // when emptied. For a first-time create only when non-empty (the row keeps its default
+    // otherwise), matching RN's "update photos only if urls.length > 0". savedId is still the
+    // pre-insert value in this call, so a brand-new create takes the length check.
+    if (savedId || finalUrls.length > 0) {
+      const { error: pErr } = await supabase
+        .from('services')
+        .update({ photos: finalUrls })
+        .eq('id', serviceId)
+        .eq('provider_id', userId)
+      if (pErr) { setBusy(false); setError('Saved, but couldn’t update photos — retry.'); return }
+    }
+
+    setBusy(false)
+
+    // Partial photo failure: the listing + successful photos are saved. Reflect the saved
+    // set in state (so a retry re-uploads only what's re-added, not the already-saved ones)
+    // and keep the provider on the form with a notice instead of silently dropping them.
+    if (failed > 0) {
+      setPhotos(finalUrls)
+      setError(`Listing saved, but ${failed} photo${failed === 1 ? '' : 's'} couldn’t upload. Add again to retry.`)
+      return
     }
 
     router.push('/listings')
@@ -740,6 +827,47 @@ export function ListingForm({
           <p className="muted">Pick a listing type to set pricing.</p>
         </section>
       )}
+
+      {/* Photos (C1) — optional, up to 4 */}
+      <section className="lform-pricing">
+        <h2>Photos <span className="optional">(optional, up to {MAX_PHOTOS})</span></h2>
+        <p className="muted">The first photo is the card image. Drag-free: add up to {MAX_PHOTOS}.</p>
+
+        {photos.length > 0 && (
+          <div className="lform-photos">
+            {photos.map((p, i) => (
+              <div className="lform-photo" key={i}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoPreviews[i]} alt={`Listing photo ${i + 1}`} />
+                {i === 0 && <span className="lform-photo-badge">Card image</span>}
+                <button
+                  type="button"
+                  className="lform-photo-remove"
+                  onClick={() => removePhoto(i)}
+                  aria-label={`Remove photo ${i + 1}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {photos.length < MAX_PHOTOS ? (
+          <label className="lform-photo-add">
+            <ImagePlus size={16} /> Add photo{photos.length > 0 ? 's' : ''}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={e => { addPhotoFiles(e.target.files); e.target.value = '' }}
+              hidden
+            />
+          </label>
+        ) : (
+          <p className="lform-help">Maximum {MAX_PHOTOS} photos. Remove one to add another.</p>
+        )}
+      </section>
 
       {/* Listing card (B3) — optional polish */}
       <section className="lform-pricing">
