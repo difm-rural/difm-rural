@@ -21,20 +21,13 @@ import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import CapabilityPicker from '../components/CapabilityPicker'
 
-// Everyone can request (post jobs, book services). "I also provide" adds the
-// provider tools on top — it never removes the ability to request.
-const ROLE_OPTIONS = [
-  { key: 'requester', emoji: 'home-outline',      label: 'I will mostly post jobs and find local listings', sub: 'Find trusted rural people nearby' },
-  { key: 'both',      emoji: 'construct-outline',  label: 'I will mostly advertise listings and take on jobs', sub: 'Advertise listings and take on jobs too' },
-]
-
-// Step meta indexed by step number (0–4)
+// Step meta indexed by step number (0–3). The requester/provider choice is retired:
+// everyone goes through the same flow and is recorded as 'both' on completion.
 const STEP_META = [
-  { title: 'RURAL CONNECTIONS',   subtitle: null },                              // 0 role selection
-  { title: 'RURAL CONNECTIONS',   subtitle: null },                              // 1 welcome
-  { title: 'Your profile', subtitle: 'How others will see you' },         // 2 details
-  { title: 'Your skills',  subtitle: 'What can you help with?' },         // 3 skills
-  { title: 'All set!',     subtitle: 'Your profile is ready' },           // 4 summary
+  { title: 'RURAL CONNECTIONS', subtitle: null },                       // 0 welcome
+  { title: 'Your profile', subtitle: 'How others will see you' },       // 1 profile
+  { title: 'Your skills',  subtitle: 'What can you help with?' },       // 2 skills
+  { title: 'All set!',     subtitle: 'Your profile is ready' },         // 3 summary
 ]
 
 function getInitials(name) {
@@ -76,15 +69,10 @@ function ProgressBar({ pct }) {
 export default function OnboardingScreen({ profile: initialProfile, onComplete }) {
   const insets = useSafeAreaInsets()
 
-  // step 0 = role selection, 1 = welcome, 2 = profile, 3 = skills, 4 = summary
+  // step 0 = welcome, 1 = profile, 2 = skills, 3 = summary
   const [step, setStep]         = useState(0)
   const [saving, setSaving]     = useState(false)
   const [uploading, setUploading] = useState(false)
-
-  // Role (new: selected in step 0)
-  const [primaryRole, setPrimaryRole] = useState(
-    initialProfile?.primary_role || initialProfile?.role || null
-  )
 
   // Profile fields
   const [fullName,    setFullName]    = useState(initialProfile?.full_name    || '')
@@ -103,9 +91,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   const [showQualInput,  setShowQualInput]  = useState(false)
 
   // Derived
-  const roleLabel   = primaryRole === 'provider' ? 'Provider' : primaryRole === 'both' ? 'Both' : 'Requester'
-  const isRequester = primaryRole === 'requester'
-  const initials    = getInitials(displayName || fullName)
+  const initials = getInitials(displayName || fullName)
 
   // ─── Fresh data load ──────────────────────────────────────────────────────────
 
@@ -122,7 +108,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       .eq('id', user.id)
       .single()
     if (profile) {
-      setPrimaryRole(profile.primary_role || profile.role || null)
       setFullName(profile.full_name || '')
       setDisplayName(profile.display_name || profile.full_name?.trim().split(/\s+/)[0] || '')
       setPhone(profile.phone || '')
@@ -141,38 +126,16 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   async function markComplete() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) { onComplete(); return }
+    // Record everyone as 'both' (requester + provider) — set here so it applies even
+    // when the user skips. The legacy `role` column maps 'both' → provider.
     await supabase
       .from('profiles')
-      .update({ onboarding_completed: true })
+      .update({ onboarding_completed: true, primary_role: 'both', role: 'provider' })
       .eq('id', user.id)
     onComplete()
   }
 
-  async function savePrimaryRole() {
-    setSaving(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user?.id) {
-        Alert.alert('Error', 'Not logged in. Please restart the app.')
-        return
-      }
-      // Legacy `role` column only allows requester/provider — map "both" to
-      // provider there; primary_role is the real source of truth.
-      const legacyRole = primaryRole === 'both' ? 'provider' : primaryRole
-      const { error } = await supabase
-        .from('profiles')
-        .update({ primary_role: primaryRole, role: legacyRole })
-        .eq('id', user.id)
-      if (error) {
-        Alert.alert('Error saving', error.message)
-        return
-      }
-      setStep(1)
-    } finally {
-      setSaving(false)
-    }
-  }
-
+  // Saves the profile step (step 1) and advances to the skills step.
   async function saveStep2AndAdvance() {
     setSaving(true)
     try {
@@ -197,12 +160,13 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         Alert.alert('Error saving', error.message)
         return
       }
-      setStep(isRequester ? 4 : 3)
+      setStep(2)
     } finally {
       setSaving(false)
     }
   }
 
+  // Saves the skills step (step 2) and advances to the summary step.
   async function saveStep3AndAdvance() {
     setSaving(true)
     try {
@@ -222,7 +186,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         Alert.alert('Error saving', error.message)
         return
       }
-      setStep(4)
+      setStep(3)
     } finally {
       setSaving(false)
     }
@@ -278,22 +242,14 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   // ─── Navigation ───────────────────────────────────────────────────────────────
 
   function handleNext() {
-    if (step === 0) {
-      if (!primaryRole) {
-        Alert.alert('Select a role', 'Please choose how you will use the app.')
-        return
-      }
-      savePrimaryRole()
-      return
-    }
-    if (step === 1) { setStep(2); return }
-    if (step === 2) { saveStep2AndAdvance(); return }
-    if (step === 3) { saveStep3AndAdvance(); return }
-    if (step === 4) { markComplete(); return }
+    if (step === 0) { setStep(1); return }          // welcome → profile
+    if (step === 1) { saveStep2AndAdvance(); return } // profile → skills
+    if (step === 2) { saveStep3AndAdvance(); return } // skills → summary
+    if (step === 3) { markComplete(); return }        // summary → done
   }
 
   async function handleSkip() {
-    // Role selection (step 0) cannot be skipped
+    // Welcome (step 0) cannot be skipped
     if (step === 0) return
     await markComplete()
   }
@@ -306,58 +262,12 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
         keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
-        {ROLE_OPTIONS.map(r => (
-          <TouchableOpacity
-            key={r.key}
-            style={[styles.roleTile, primaryRole === r.key && styles.roleTileSelected]}
-            onPress={() => setPrimaryRole(r.key)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityState={{ selected: primaryRole === r.key }}
-            accessibilityLabel={`${r.label} — ${r.sub}`}>
-            <Icon name={r.emoji} size={28} color={colors.primary} />
-            <View style={styles.roleTileBody}>
-              <Text style={[styles.roleTileLabel, primaryRole === r.key && styles.roleTileLabelSelected]}>
-                {r.label}
-              </Text>
-              <Text style={[styles.roleTileSub, primaryRole === r.key && styles.roleTileSubSelected]}>
-                {r.sub}
-              </Text>
-            </View>
-            {primaryRole === r.key && (
-              <Icon name="checkmark-circle" size={18} color={colors.primary} />
-            )}
-          </TouchableOpacity>
-        ))}
-        <Text style={styles.roleNote}>
-          Your primary role can be changed at any time in Account settings.
-        </Text>
-      </ScrollView>
-    )
-  }
-
-  function renderStep1() {
-    return (
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
-
-        <View style={styles.infoCard}>
-          <Icon name="person-outline" size={22} color={colors.primary} />
-          <View style={styles.infoCardBody}>
-            <Text style={styles.infoCardLabel}>You're set up as</Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>{roleLabel}</Text>
-            </View>
-          </View>
-        </View>
 
         <View style={styles.infoCard}>
           <Icon name="flash-outline" size={22} color={colors.primary} />
           <View style={styles.infoCardBody}>
             <Text style={styles.infoCardLabel}>
-              Quick setup — {isRequester ? '2' : '3'} steps
+              Quick setup — 3 steps
             </Text>
             <Text style={styles.infoCardSub}>
               Takes less than 2 minutes. You can skip anything and update it later in Account settings.
@@ -378,7 +288,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
     )
   }
 
-  function renderStep2() {
+  function renderStep1() {
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -481,7 +391,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
     )
   }
 
-  function renderStep3() {
+  function renderStep2() {
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -559,7 +469,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
     )
   }
 
-  function renderStep4() {
+  function renderStep3() {
     const shownSkills = skills.slice(0, 4)
     const extraSkills = skills.length > 4 ? skills.length - 4 : 0
     const nameToShow  = displayName || fullName || 'Welcome!'
@@ -584,11 +494,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           <Text style={styles.summaryName}>{nameToShow}</Text>
           <View style={styles.summaryMeta}>
             {!!locationStr && <Text style={styles.summaryMetaText}><Icon name="location-outline" size={12} color={colors.textMuted} /> {locationStr}</Text>}
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>{roleLabel}</Text>
-            </View>
           </View>
-          {!isRequester && skills.length > 0 && (
+          {skills.length > 0 && (
             <View style={styles.summaryChips}>
               {shownSkills.map(s => (
                 <View key={s} style={styles.summaryChip}>
@@ -637,15 +544,12 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
-  const meta       = STEP_META[step] || STEP_META[0]
-  const isLastStep = step === 4
-  // Steps for requester: 0,1,2,4 (skip 3) → 4 total. Provider: 0–4 → 5 total.
-  const totalSteps  = isRequester ? 4 : 5
-  const currentDot  = Math.min(step + 1, totalSteps)
-  const progressPct = isRequester
-    ? ({ 0: 25, 1: 50, 2: 75, 4: 100 }[step] ?? 100)
-    : ({ 0: 20, 1: 40, 2: 60, 3: 80, 4: 100 }[step] ?? 100)
-  const btnLabel = isLastStep ? 'Go to dashboard' : saving ? 'Saving…' : 'Next'
+  const meta        = STEP_META[step] || STEP_META[0]
+  const isLastStep  = step === 3
+  const totalSteps  = 4
+  const currentDot  = step + 1
+  const progressPct = ({ 0: 25, 1: 50, 2: 75, 3: 100 }[step] ?? 100)
+  const btnLabel    = isLastStep ? 'Go to dashboard' : saving ? 'Saving…' : 'Next'
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -653,7 +557,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       {/* Green header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          {step <= 1 ? (
+          {step === 0 ? (
             <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
           ) : (
             <Text style={styles.stepKicker}>{meta.title}</Text>
@@ -664,11 +568,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         {step === 0 ? (
           <>
             <Text style={styles.headerTitle}>Welcome to Rural Connections</Text>
-            <Text style={styles.headerSub}>How will you mainly use the app?</Text>
-          </>
-        ) : step === 1 ? (
-          <>
-            <Text style={styles.headerTitle}>Welcome!</Text>
             <Text style={styles.headerSub}>Let's get your account set up</Text>
           </>
         ) : (
@@ -686,7 +585,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
       </View>
 
       {/* Footer */}
@@ -698,7 +596,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           style={{ marginBottom: 10 }}
           accessibilityLabel={btnLabel}
         />
-        {/* Skip is not available for step 0 (role required) or last step */}
+        {/* Skip is not available for step 0 (welcome) or last step */}
         {!isLastStep && step > 0 && (
           <TouchableOpacity
             style={styles.skipBtn}
@@ -764,34 +662,7 @@ const styles = StyleSheet.create({
   // ─── Step content ─────────────────────────────────────────────────────────────
   stepContent: { padding: 20 },
 
-  // ─── Role selection tiles (Step 0) ────────────────────────────────────────────
-  roleTile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 18,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  roleTileSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  roleTileEmoji: { fontSize: 32 },
-  roleTileBody:  { flex: 1 },
-  roleTileLabel: {
-    fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 4,
-  },
-  roleTileLabelSelected: { color: colors.primary },
-  roleTileSub: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-  roleTileSubSelected: { color: colors.primaryDark },
-  roleNote: { fontSize: 13, color: colors.textMuted, lineHeight: 19, textAlign: 'center', marginTop: 16, paddingHorizontal: 8 },
-  roleTileCheck: { fontSize: 22, color: colors.primary, fontWeight: '700' },
-
-  // ─── Info cards (Step 1) ──────────────────────────────────────────────────────
+  // ─── Info cards (Step 0 welcome) ──────────────────────────────────────────────
   infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -807,17 +678,8 @@ const styles = StyleSheet.create({
   infoCardBody:  { flex: 1 },
   infoCardLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 5 },
   infoCardSub:   { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-  roleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginTop: 4,
-  },
-  roleBadgeText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
-  // ─── Step 2 ───────────────────────────────────────────────────────────────────
+  // ─── Step 1 (profile) ─────────────────────────────────────────────────────────
   avatarRow:    { alignItems: 'center', marginBottom: 22 },
   avatarWrap:   { position: 'relative' },
   avatarCircle: {
@@ -861,7 +723,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
-  // ─── Step 3 ───────────────────────────────────────────────────────────────────
+  // ─── Step 2 (skills) ──────────────────────────────────────────────────────────
   introText: {
     fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 16,
   },
@@ -914,7 +776,7 @@ const styles = StyleSheet.create({
   qualAddIcon: { fontSize: 16, color: colors.primary, fontWeight: '700' },
   qualAddText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
 
-  // ─── Step 4 ───────────────────────────────────────────────────────────────────
+  // ─── Step 3 (summary) ─────────────────────────────────────────────────────────
   summaryCard: {
     backgroundColor: colors.white,
     borderRadius: 12, padding: 20, marginBottom: 14,
