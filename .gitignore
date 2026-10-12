@@ -49,3 +49,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Supabase CLI state/cache (project ref, pooler host, tool versions) — transient
+supabase/.temp/
