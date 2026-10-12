@@ -29,6 +29,7 @@ import {
   sendBookingQuote,
   acceptBookingQuote,
   dismissProviderBooking as dismissBookingApi,
+  declineBooking as declineBookingApi,
   saveBookingReview,
 } from '../lib/bookingActions'
 import WorkScheduleCard from '../components/WorkScheduleCard'
@@ -358,10 +359,30 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     navigation.goBack()
   }
 
+  function declineBooking() {
+    Alert.alert('Decline booking', 'Decline this request? The requester will be notified.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await declineBookingApi(booking.id)
+          if (error) {
+            Alert.alert('Could not decline booking', error.message)
+            if (error.code === 'stale') fetchBooking()
+            return
+          }
+          navigation.goBack()
+        },
+      },
+    ])
+  }
+
   const canRecoverMissingQuote = booking.status === 'confirmed' && booking.quote_amount == null && !booking.quote_sent_at
   const providerCanQuote = viewerRole === 'provider' && isQuoteRequired && (['pending', 'quote_sent'].includes(booking.status) || canRecoverMissingQuote)
   const requesterCanAcceptQuote = viewerRole === 'requester' && booking.status === 'quote_sent'
   const providerCanConfirm = viewerRole === 'provider' && !isQuoteRequired && booking.status === 'pending'
+  const providerCanDecline = viewerRole === 'provider' && ['pending', 'quote_sent'].includes(booking.status)
   const providerCanReady = viewerRole === 'provider' && isBookingUnderway(booking.status)
   const providerCanConfirmCancel = viewerRole === 'provider' && booking.status === 'cancellation_requested'
   const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
@@ -512,6 +533,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
             loading={savingQuote}
             style={styles.footerBtn}
           />
+        )}
+        {providerCanDecline && (
+          <Button variant="destructive" title="Decline" onPress={declineBooking} style={styles.footerBtn} />
         )}
         {requesterCanAcceptQuote && (
           <Button title="Accept quote" onPress={acceptQuote} style={styles.footerBtn} />
