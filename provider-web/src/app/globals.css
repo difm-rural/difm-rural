@@ -258,7 +258,7 @@ a.row:hover { background: var(--sage); }
 .lform-photo-add:hover { background: var(--sage); border-style: solid; }
 
 /* ListingCard (C2) — CSS reproduction of RN JobServiceCard; literal rgba for fidelity */
-.lcard { width: 240px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); }
+.lcard { width: 100%; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); }
 .lcard-img { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--canvas); overflow: hidden; }
 .lcard-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .lcard-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--sage); color: var(--forest); font-size: 11px; font-weight: 700; }
@@ -280,3 +280,16 @@ a.row:hover { background: var(--sage); }
 .lform-cardopt.active { border-color: var(--forest); box-shadow: 0 0 0 2px var(--forest); }
 .lform-cardopt .lcard-img { aspect-ratio: 4 / 3; border-radius: 7px; }
 .lform-cardopt-label { font-size: 12px; font-weight: 700; color: var(--forest-deep); }
+
+/* Listings manage grid (C3) */
+.manage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.lcard-body { flex: 1; }
+.manage-actions { border-top: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 7px; }
+.manage-actions.closed { opacity: .82; }
+.manage-actions-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.manage-actions-row button { min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 12px; font-weight: 700; color: var(--forest-deep); cursor: pointer; }
+.manage-actions-row button:hover:not(:disabled) { background: var(--sage); }
+.manage-actions-row button:disabled { opacity: .5; cursor: default; }
+.manage-actions-row .icon-btn { display: inline-grid; place-items: center; width: 32px; padding: 0; color: var(--muted); }
+.manage-actions-row .icon-btn.danger:hover { background: #fbe7e7; color: #c81920; border-color: #f0c9c9; }
+.manage-actions-row .icon-btn:last-child { margin-left: auto; }

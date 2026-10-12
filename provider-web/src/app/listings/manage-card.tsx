@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { LoaderCircle, Pencil, Trash2 } from 'lucide-react'
 import { KIND_ENQUIRY } from '@shared/listingPricing'
 import { createClient } from '@/lib/supabase/client'
+import { ListingCard, type CardStyle } from './listing-card'
 
 export type Listing = {
   id: string
@@ -17,6 +18,12 @@ export type Listing = {
   is_active: boolean | null
   closed_at: string | null
   close_reason: string | null
+  photos: string[] | null
+  card_headline: string | null
+  card_supporting_text: string | null
+  card_style: string | null
+  category: string | null
+  location_name: string | null
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -37,7 +44,7 @@ function priceSummary(s: Listing): string {
   return `$${s.rate}`
 }
 
-function ListingRow({ s }: { s: Listing }) {
+export function ManageCard({ s }: { s: Listing }) {
   const [supabase] = useState(() => createClient())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -74,51 +81,37 @@ function ListingRow({ s }: { s: Listing }) {
     router.refresh()
   }
 
-  return (
-    <tr className={closed ? 'listing-row closed' : 'listing-row'}>
-      <td>
-        <strong>{s.title ?? 'Untitled listing'}</strong>
-        {error && <span className="row-err">{error}</span>}
-      </td>
-      <td><span className="kind-tag">{KIND_LABEL[s.kind ?? ''] ?? (s.kind ?? '—')}</span></td>
-      <td>{priceSummary(s)}</td>
-      <td>
-        {closed
-          ? <span className="badge closed">{(s.close_reason ?? 'closed').toUpperCase()}</span>
-          : s.is_active
-            ? <span className="badge live">Advertising live</span>
-            : <span className="badge paused">Advertising paused</span>}
-      </td>
-      <td className="actions">
-        {busy && <LoaderCircle className="spin" size={15} />}
-        <button onClick={pauseResume} disabled={busy}>{s.is_active ? 'Pause' : 'Resume'}</button>
-        {canClose && <button onClick={markClosed} disabled={busy}>{CLOSE[s.kind as string].label}</button>}
-        {closed && <button onClick={reopen} disabled={busy}>Reopen</button>}
-        <Link href={`/listings/${s.id}/edit`} className="icon-btn" aria-label="Edit"><Pencil size={15} /></Link>
-        <button onClick={onDelete} disabled={busy} className="icon-btn danger" aria-label="Delete"><Trash2 size={15} /></button>
-      </td>
-    </tr>
-  )
-}
+  const badge: { label: string; tone: 'live' | 'paused' | 'closed' } = closed
+    ? { label: (s.close_reason ?? 'closed').toUpperCase(), tone: 'closed' }
+    : s.is_active
+      ? { label: 'Advertising live', tone: 'live' }
+      : { label: 'Advertising paused', tone: 'paused' }
 
-export function ListingsTable({ listings }: { listings: Listing[] }) {
-  if (listings.length === 0) {
-    return (
-      <p className="empty">
-        No listings yet. <Link href="/listings/new" className="text-link">Create one</Link> or use the Rural Connections app.
-      </p>
-    )
-  }
   return (
-    <div className="listing-table-wrap">
-      <table className="listing-table">
-        <thead>
-          <tr><th>Listing</th><th>Kind</th><th>Price</th><th>Status</th><th aria-label="Actions" /></tr>
-        </thead>
-        <tbody>
-          {listings.map(s => <ListingRow key={s.id} s={s} />)}
-        </tbody>
-      </table>
-    </div>
+    <ListingCard
+      data={{
+        title: s.title,
+        photoUrl: s.photos?.[0] ?? null,
+        category: s.category,
+        cardHeadline: s.card_headline,
+        cardStyle: s.card_style as CardStyle,
+        priceLabel: priceSummary(s),
+        kindLabel: KIND_LABEL[s.kind ?? ''] ?? (s.kind ?? undefined),
+        badge,
+      }}
+      footer={
+        <div className={closed ? 'manage-actions closed' : 'manage-actions'}>
+          {error && <span className="row-err">{error}</span>}
+          <div className="manage-actions-row">
+            {busy && <LoaderCircle className="spin" size={15} />}
+            <button onClick={pauseResume} disabled={busy}>{s.is_active ? 'Pause' : 'Resume'}</button>
+            {canClose && <button onClick={markClosed} disabled={busy}>{CLOSE[s.kind as string].label}</button>}
+            {closed && <button onClick={reopen} disabled={busy}>Reopen</button>}
+            <Link href={`/listings/${s.id}/edit`} className="icon-btn" aria-label="Edit"><Pencil size={15} /></Link>
+            <button onClick={onDelete} disabled={busy} className="icon-btn danger" aria-label="Delete"><Trash2 size={15} /></button>
+          </div>
+        </div>
+      }
+    />
   )
 }

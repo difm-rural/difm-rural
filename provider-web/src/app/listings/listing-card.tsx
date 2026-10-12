@@ -3,6 +3,7 @@
 // fidelity; the surrounding chrome uses provider-web's own tokens. Pure/presentational
 // (no hooks), so both the client form (C2 chooser) and the server listings page (C3)
 // can render it.
+import type { ReactNode } from 'react'
 import { ImageIcon } from 'lucide-react'
 
 export type CardStyle = 'bold' | 'bottom' | 'clean' | null | undefined
@@ -59,7 +60,9 @@ export type ListingCardData = {
   badge?: { label: string; tone: 'live' | 'paused' | 'closed' } | null
 }
 
-export function ListingCard({ data }: { data: ListingCardData }) {
+// `footer` lets a composing client card (e.g. the provider ManageCard) attach action
+// controls inside the same card; omitted, the card is the plain browse visual.
+export function ListingCard({ data, footer }: { data: ListingCardData; footer?: ReactNode }) {
   return (
     <div className="lcard">
       <CardImage
@@ -78,6 +81,7 @@ export function ListingCard({ data }: { data: ListingCardData }) {
           <span className={`badge ${data.badge.tone}`}>{data.badge.label}</span>
         )}
       </div>
+      {footer}
     </div>
   )
 }
