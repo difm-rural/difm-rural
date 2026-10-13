@@ -1812,7 +1812,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-        enabled={Platform.OS === 'android'}>
+        enabled={Platform.OS === 'ios'}>
         <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: stepTranslateX }] }]}>
           {step === 2 && renderFloatingCardPreview()}
           <ScrollView
