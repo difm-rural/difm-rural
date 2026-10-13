@@ -311,18 +311,18 @@ export default function JobsTabScreen({ navigation }) {
   // Any personal section above the board? If so, draw a divider before it so the
   // switch from "your stuff" to the open board reads clearly.
   const hasPersonalSection =
-    (isRequester && !isProvider) ||
+    isRequester ||
     (isRequester && myOpenJobs.length > 0) ||
     myBidJobs.length > 0
 
   const listHeader = (
     <View>
-      {/* Post a job — compact intro + full-width button. Hidden for providers
-          (they come here to find work; they can still post from Home). */}
-      {isRequester && !isProvider && (
+      {/* Post a job — compact intro + full-width button. Shown for everyone,
+          since anyone can request (post jobs) now. */}
+      {isRequester && (
         <View style={styles.postBlock}>
           <Text style={styles.postIntro}>
-            Need a hand? Post a job and get offers from providers nearby.
+            Need something done? Post a job and nearby locals will quote you.
           </Text>
           <Button
             title="Post a job"
