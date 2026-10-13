@@ -32,8 +32,10 @@ const STEP_META = [
 
 // Which top-level categories a capability list implies (any capability under a
 // category selects it). Used to seed the category chips from stored skills.
-const deriveCategories = (sk = []) =>
-  CATEGORIES.filter(c => (CATEGORY_CAPABILITIES[c] || []).some(cap => sk.includes(cap)))
+const deriveCategories = (sk) => {
+  const list = Array.isArray(sk) ? sk : [] // skills column can be null, not just undefined
+  return CATEGORIES.filter(c => (CATEGORY_CAPABILITIES[c] || []).some(cap => list.includes(cap)))
+}
 
 function getInitials(name) {
   if (!name) return '?'
