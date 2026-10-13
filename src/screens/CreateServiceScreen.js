@@ -1788,11 +1788,11 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, step === 2 && styles.compactDetailsHeader, { paddingTop: insets.top + 12 }]}>
-        <View style={[styles.headerActions, step === 2 && styles.compactHeaderActions]}>
-          {step === 2
-            ? <Text style={styles.compactHeaderBrand}>Rural Connections</Text>
-            : <View />}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.headerActions}>
+          <Text style={styles.compactTitle} numberOfLines={1} accessibilityRole="header">
+            {isEditing ? 'Edit listing' : (KIND_COPY[kind]?.header || 'Advertise a listing')}
+          </Text>
           <TouchableOpacity
             style={styles.headerActionBtn}
             onPress={cancelCreation}
@@ -1802,14 +1802,10 @@ export default function CreateServiceScreen({ navigation, route }) {
             <Text style={styles.headerCancelText}>Cancel</Text>
           </TouchableOpacity>
         </View>
-        {step !== 2 && (
-          <>
-            <Text style={styles.kicker}>Rural Connections</Text>
-            <Text style={styles.headerTitle} accessibilityRole="header">{isEditing ? 'Edit listing' : (KIND_COPY[kind]?.header || 'Advertise a listing')}</Text>
-            <Text style={styles.headerSub}>{STEP_LABELS[step - 1]}</Text>
-          </>
-        )}
-        {renderProgress()}
+        <View style={styles.progressRow}>
+          {renderProgress()}
+          <Text style={styles.stepCaption}>{STEP_LABELS[step - 1]}</Text>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -1877,7 +1873,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: 20, paddingBottom: 14, backgroundColor: colors.background },
+  header: { paddingHorizontal: 20, paddingBottom: 10, backgroundColor: colors.background },
   compactDetailsHeader: { paddingBottom: 9 },
   headerBackBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   headerActions: { minHeight: 36, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
@@ -1885,10 +1881,13 @@ const styles = StyleSheet.create({
   compactHeaderBrand: { color: colors.accent, fontSize: 12, fontWeight: '800' },
   headerActionBtn: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 2 },
   headerCancelText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
+  compactTitle: { flex: 1, marginRight: 12, fontSize: 18, lineHeight: 22, fontWeight: '700', color: colors.textPrimary },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, letterSpacing: 0 },
   headerSub: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 14 },
-  progressWrap: { flexDirection: 'row', gap: 8 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8 },
+  stepCaption: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  progressWrap: { flex: 1, flexDirection: 'row', gap: 8 },
   progressPill: { flex: 1, height: 6, borderRadius: 999, backgroundColor: colors.border },
   progressPillActive: { backgroundColor: colors.primary },
   scroll: { flex: 1 },
