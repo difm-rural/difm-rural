@@ -19,16 +19,21 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
-import CapabilityPicker from '../components/CapabilityPicker'
+import { CATEGORIES, CATEGORY_CAPABILITIES } from '../lib/categories'
 
 // Step meta indexed by step number (0–3). The requester/provider choice is retired:
 // everyone goes through the same flow and is recorded as 'both' on completion.
 const STEP_META = [
-  { title: 'RURAL CONNECTIONS', subtitle: null },                       // 0 welcome
-  { title: 'Your profile', subtitle: 'How others will see you' },       // 1 profile
-  { title: 'Your skills',  subtitle: 'What can you help with?' },       // 2 skills
-  { title: 'All set!',     subtitle: 'Your profile is ready' },         // 3 summary
+  { title: 'RURAL CONNECTIONS', subtitle: null },                                  // 0 welcome
+  { title: 'Your profile', subtitle: 'How others will see you' },                  // 1 profile
+  { title: 'Offer work?',  subtitle: 'Optional — the areas you can help with' },   // 2 offer
+  { title: 'All set!',     subtitle: 'Your profile is ready' },                    // 3 summary
 ]
+
+// Which top-level categories a capability list implies (any capability under a
+// category selects it). Used to seed the category chips from stored skills.
+const deriveCategories = (sk = []) =>
+  CATEGORIES.filter(c => (CATEGORY_CAPABILITIES[c] || []).some(cap => sk.includes(cap)))
 
 function getInitials(name) {
   if (!name) return '?'
@@ -69,7 +74,7 @@ function ProgressBar({ pct }) {
 export default function OnboardingScreen({ profile: initialProfile, onComplete }) {
   const insets = useSafeAreaInsets()
 
-  // step 0 = welcome, 1 = profile, 2 = skills, 3 = summary
+  // step 0 = welcome, 1 = profile, 2 = offer (areas), 3 = summary
   const [step, setStep]         = useState(0)
   const [saving, setSaving]     = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -85,7 +90,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   const [longitude, setLongitude] = useState(initialProfile?.longitude || null)
   const [bio,       setBio]       = useState(initialProfile?.bio       || '')
   const [avatarUrl,      setAvatarUrl]      = useState(initialProfile?.avatar_url || null)
-  const [skills,         setSkills]         = useState(initialProfile?.skills         || [])
+  const [offerCategories, setOfferCategories] = useState(deriveCategories(initialProfile?.skills))
   const [qualifications, setQualifications] = useState(initialProfile?.qualifications || [])
   const [qualInput,      setQualInput]      = useState('')
   const [showQualInput,  setShowQualInput]  = useState(false)
@@ -115,7 +120,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       setLatitude(profile.latitude || null)
       setLongitude(profile.longitude || null)
       setBio(profile.bio || '')
-      setSkills(profile.skills || [])
+      setOfferCategories(deriveCategories(profile.skills || []))
       setQualifications(profile.qualifications || [])
       setAvatarUrl(profile.avatar_url || null)
     }
@@ -175,10 +180,15 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         Alert.alert('Error', 'Not logged in. Please restart the app.')
         return
       }
+      // Chips are category-level, but matching SQL compares capability-level skills,
+      // so expand the chosen categories to the union of their capabilities on save.
+      const expandedSkills = Array.from(new Set(
+        offerCategories.flatMap(c => CATEGORY_CAPABILITIES[c] || [])
+      ))
       const { error } = await supabase
         .from('profiles')
         .update({
-          skills:         skills,
+          skills:         expandedSkills,
           qualifications: qualifications,
         })
         .eq('id', user.id)
@@ -221,9 +231,9 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
   // ─── Skills ───────────────────────────────────────────────────────────────────
 
-  function toggleSkill(skill) {
-    setSkills(prev =>
-      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+  function toggleCategory(c) {
+    setOfferCategories(prev =>
+      prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
     )
   }
 
@@ -403,10 +413,26 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           <Text style={styles.introText}>
-            Select what you can help with — grouped by category. This helps match you with relevant jobs.
+            Planning to offer services or take on jobs? Pick the areas you can help with — or tap Skip below if you're mostly here to find help.
           </Text>
 
-          <CapabilityPicker selected={skills} onToggle={toggleSkill} />
+          <View style={styles.chipGrid}>
+            {CATEGORIES.map(c => {
+              const selected = offerCategories.includes(c)
+              return (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.chip, selected && styles.chipSelected]}
+                  onPress={() => toggleCategory(c)}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={c}>
+                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{c}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
 
           <Text style={[styles.fieldLabel, { marginTop: 20 }]}>
             Qualifications <Text style={styles.optional}>(optional)</Text>
@@ -470,8 +496,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   }
 
   function renderStep3() {
-    const shownSkills = skills.slice(0, 4)
-    const extraSkills = skills.length > 4 ? skills.length - 4 : 0
+    const shownSkills = offerCategories.slice(0, 4)
+    const extraSkills = offerCategories.length > 4 ? offerCategories.length - 4 : 0
     const nameToShow  = displayName || fullName || 'Welcome!'
     const locationStr = getDisplayLocation(address)
 
@@ -495,7 +521,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           <View style={styles.summaryMeta}>
             {!!locationStr && <Text style={styles.summaryMetaText}><Icon name="location-outline" size={12} color={colors.textMuted} /> {locationStr}</Text>}
           </View>
-          {skills.length > 0 && (
+          {offerCategories.length > 0 && (
             <View style={styles.summaryChips}>
               {shownSkills.map(s => (
                 <View key={s} style={styles.summaryChip}>
