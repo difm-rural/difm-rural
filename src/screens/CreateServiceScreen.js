@@ -1832,9 +1832,8 @@ export default function CreateServiceScreen({ navigation, route }) {
             {RENDERERS[step - 1]()}
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
 
-      <SafeAreaView edges={['bottom']} style={styles.footer}>
+        <SafeAreaView edges={['bottom']} style={styles.footer}>
         {step === 1 ? (
           <Button
             title="Next"
@@ -1870,7 +1869,8 @@ export default function CreateServiceScreen({ navigation, route }) {
             )}
           </View>
         )}
-      </SafeAreaView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </View>
   )
 }
