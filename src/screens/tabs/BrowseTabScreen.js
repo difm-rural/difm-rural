@@ -19,11 +19,8 @@ import ServiceListCard from '../../components/ServiceListCard'
 import EmptyState from '../../components/EmptyState'
 import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
-import { CATEGORY_FILTERS } from '../../lib/categories'
 import { availabilityDisplay } from '../../lib/providerAvailability'
 import { canProvide } from '../../lib/roles'
-
-const FILTERS = CATEGORY_FILTERS
 
 function itemMatchesSearch(item, query) {
   if (!query.trim()) return true
@@ -78,7 +75,6 @@ export default function BrowseTabScreen({ navigation }) {
   const [userLng,     setUserLng]     = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
-  const [filter,      setFilter]      = useState('All')
   const [search,      setSearch]      = useState('')
 
   useFocusEffect(useCallback(() => { load() }, []))
@@ -185,7 +181,6 @@ export default function BrowseTabScreen({ navigation }) {
   // Filter and annotate with GPS distance
   const filtered = (() => {
     let items = [...services]
-    if (filter !== 'All') items = items.filter(i => i.category === filter)
     if (search.trim())    items = items.filter(i => itemMatchesSearch(i, search))
     items = items.sort((a, b) =>
       (a._availabilityRank ?? 3) - (b._availabilityRank ?? 3)
@@ -251,25 +246,6 @@ export default function BrowseTabScreen({ navigation }) {
           <Text style={styles.manageBannerText}>Edit, pause advertising, or delete a listing</Text>
         </TouchableOpacity>
       )}
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterContent}>
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f.id}
-            style={[styles.chip, filter === f.id && styles.chipActive]}
-            onPress={() => setFilter(f.id)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: filter === f.id }}>
-            <Text style={[styles.chipText, filter === f.id && styles.chipTextActive]}>
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       {loading ? (
         <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
@@ -394,22 +370,6 @@ const styles = StyleSheet.create({
   manageBannerTitle: { fontSize: 14, color: colors.primary, fontWeight: '800', marginBottom: 3 },
   manageBannerText: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
 
-  filterBar: { flexGrow: 0, backgroundColor: colors.background },
-  filterContent: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chipActive:     { backgroundColor: colors.textPrimary, borderColor: colors.textPrimary },
-  chipText:       { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  chipTextActive: { color: colors.white },
 
   section: { marginTop: 20 },
   sectionHeader: {
