@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import { useUser } from '../../context/UserContext'
-import { JOB_CATEGORIES } from '../../lib/categories'
 import { canProvide } from '../../lib/roles'
 import { coarseSuburb, getCurrentLocation, haversineDistance, reverseGeocode } from '../../lib/location'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../../lib/watchlist'
@@ -30,7 +29,6 @@ import EmptyState from '../../components/EmptyState'
 import Button from '../../components/Button'
 import Icon from '../../components/Icon'
 
-const FILTERS = ['All', ...JOB_CATEGORIES]
 
 const SORT_OPTIONS = [
   { value: 'nearest', label: 'Nearest first' },
@@ -103,7 +101,6 @@ export default function JobsTabScreen({ navigation }) {
   const [coords, setCoords]           = useState(null)
   const [loading, setLoading]         = useState(true)
   const [refreshing, setRefreshing]   = useState(false)
-  const [filter, setFilter]           = useState('All')
   const [search, setSearch]           = useState('')
   const [sort, setSort]               = useState('nearest')
   const [radius, setRadius]           = useState('any')
@@ -221,12 +218,11 @@ export default function JobsTabScreen({ navigation }) {
   }
 
   function clearFilters() {
-    setFilter('All')
     setSearch('')
     setRadius('any')
   }
 
-  const hasActiveFilter = filter !== 'All' || !!search.trim() || radius !== 'any'
+  const hasActiveFilter = !!search.trim() || radius !== 'any'
 
   async function openSaveSearch() {
     if (!userId) {
@@ -243,7 +239,7 @@ export default function JobsTabScreen({ navigation }) {
       place = coarseSuburb(address) || 'your location'
       setSaveLocation(place)
     }
-    const subject = search.trim() || (filter !== 'All' ? filter : 'Open jobs')
+    const subject = search.trim() || 'Open jobs'
     const scope = radius !== 'any' ? ` within ${radius} km of ${place || 'your location'}` : ''
     setSaveName(`${subject}${scope}`)
     setSaveOpen(true)
@@ -256,7 +252,7 @@ export default function JobsTabScreen({ navigation }) {
       await saveJobSearch(userId, {
         name: saveName,
         query: search,
-        category: filter === 'All' ? null : filter,
+        category: null,
         locationName: radius === 'any' ? null : saveLocation,
         latitude: radius === 'any' ? null : coords?.latitude,
         longitude: radius === 'any' ? null : coords?.longitude,
@@ -279,7 +275,6 @@ export default function JobsTabScreen({ navigation }) {
   // Filter, annotate with distance, apply radius, then sort.
   const visibleJobs = (() => {
     let items = boardJobs
-    if (filter !== 'All') items = items.filter(j => j.category === filter)
     if (search.trim())    items = items.filter(j => jobMatchesSearch(j, search))
 
     if (coords) {
@@ -393,42 +388,20 @@ export default function JobsTabScreen({ navigation }) {
       {/* Divider marks the switch from your own items to the open board */}
       {hasPersonalSection && <View style={styles.sectionDivider} />}
 
-      {/* Board heading + distance scope */}
+      {/* Board heading + distance / sort controls */}
       <View style={styles.boardHeader}>
-        <Text style={styles.boardTitle}>
+        <Text style={styles.boardTitle} numberOfLines={1}>
           {isProvider ? 'Open jobs' : 'What others need'}
         </Text>
         {coords && (
-          <OptionPill
-            label="Distance"
-            icon="location-outline"
-            options={RADIUS_OPTIONS}
-            value={radius}
-            onChange={setRadius}
-          />
-        )}
-      </View>
-
-      {/* Filters + sort on one coordinated row */}
-      <View style={styles.controlsRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContent}>
-          {FILTERS.map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[styles.chip, filter === f && styles.chipActive]}
-              onPress={() => setFilter(f)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: filter === f }}>
-              <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>{f}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {coords && (
-          <View style={styles.sortWrap}>
+          <View style={styles.boardControls}>
+            <OptionPill
+              label="Distance"
+              icon="location-outline"
+              options={RADIUS_OPTIONS}
+              value={radius}
+              onChange={setRadius}
+            />
             <OptionPill
               label="Sort"
               icon="swap-vertical-outline"
@@ -465,12 +438,9 @@ export default function JobsTabScreen({ navigation }) {
       if (search.trim()) {
         title = 'No jobs match your search'
         body = `Nothing matches “${search.trim()}”. Try a different term.`
-      } else if (filter !== 'All') {
-        title = 'No jobs in this category yet'
-        body = 'Try a different category, or widen your search radius.'
       } else {
         title = `No jobs within ${radius} km`
-        body = 'Try a wider distance, or clear filters to see everything.'
+        body = 'Try a wider distance or a different search.'
       }
       return (
         <EmptyState
@@ -684,7 +654,8 @@ const styles = StyleSheet.create({
     marginTop: 11,
     marginBottom: 10,
   },
-  boardTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  boardTitle: { flexShrink: 1, marginRight: 8, fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  boardControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   // Sort / distance pill
   pill: {
@@ -722,27 +693,6 @@ const styles = StyleSheet.create({
   pickerRowTextActive: { color: colors.primary, fontWeight: '700' },
 
   // Filters + sort row
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingRight: 16,
-  },
-  filterScroll:  { flex: 1 },
-  filterContent: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
-  sortWrap:      { paddingLeft: 8 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipActive:     { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText:       { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
-  chipTextActive: { color: colors.white },
-
   saveSearchRow: { marginHorizontal: 16, marginBottom: 14, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', gap: 10 },
   saveSearchTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
   saveSearchSub: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 2 },
