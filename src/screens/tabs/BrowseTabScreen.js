@@ -220,6 +220,14 @@ export default function BrowseTabScreen({ navigation }) {
     <View style={styles.screen}>
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity
+          style={[styles.helpBtn, { top: insets.top + 12 }]}
+          onPress={() => navigation.navigate('HowItWorks')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="How it works">
+          <Icon name="help-circle-outline" size={24} color={colors.primary} />
+        </TouchableOpacity>
         <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.title}>Listings</Text>
         <Text style={styles.subtitle}>Find rural listings near you</Text>
@@ -326,6 +334,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 18,
   },
+  helpBtn: { position: 'absolute', right: 20, zIndex: 2, minHeight: 36, justifyContent: 'center' },
   brandLabel: {
     fontSize: 12,
     fontWeight: '700',

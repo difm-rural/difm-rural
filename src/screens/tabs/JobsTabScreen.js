@@ -533,6 +533,14 @@ export default function JobsTabScreen({ navigation }) {
         </View>
       </Modal>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity
+          style={[styles.helpBtn, { top: insets.top + 12 }]}
+          onPress={() => navigation.navigate('HowItWorks')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="How it works">
+          <Icon name="help-circle-outline" size={24} color={colors.primary} />
+        </TouchableOpacity>
         <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         <Text style={styles.headerSub}>The community job board</Text>
@@ -599,6 +607,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   brandLabel:  { color: colors.accent, fontSize: 12, letterSpacing: 1.5, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6 },
+  helpBtn:     { position: 'absolute', right: 20, zIndex: 2, minHeight: 36, justifyContent: 'center' },
   headerTitle: { color: colors.textPrimary, fontSize: 28, fontWeight: '700' },
   headerSub:   { color: colors.textSecondary, fontSize: 14, marginTop: 2, marginBottom: 9 },
 

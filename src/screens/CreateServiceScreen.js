@@ -995,6 +995,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <>
         <Text style={styles.stepHeading}>{step1Heading(kind)}</Text>
+        <Text style={styles.stepIntro}>Got something to offer? List a service, grazing, gear or goods — people contact you.</Text>
 
         {!!draftSource && (
           <View style={styles.sourceNote}>
@@ -1931,6 +1932,7 @@ const styles = StyleSheet.create({
   floatingPreviewSupporting: { color: colors.white, fontSize: 11, lineHeight: 15, marginTop: 4 },
   floatingPreviewPlaceholder: { opacity: 0.72 },
   stepHeading: { fontSize: 24, lineHeight: 30, fontWeight: '700', color: colors.textPrimary, marginBottom: 16, letterSpacing: 0 },
+  stepIntro: { fontSize: 14, lineHeight: 20, color: colors.textSecondary, marginTop: -8, marginBottom: 18 },
   fieldLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, marginTop: 14 },
   fieldHelp: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: -2, marginBottom: 10 },
   optional: { fontSize: 13, fontWeight: '400', color: colors.textMuted },

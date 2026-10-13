@@ -19,6 +19,7 @@ import BrowseTabScreen   from '../screens/tabs/BrowseTabScreen'
 import ActivityTabScreen from '../screens/tabs/ActivityTabScreen'
 import AccountTabScreen  from '../screens/tabs/AccountTabScreen'
 import NotificationsScreen from '../screens/NotificationsScreen'
+import HowItWorksScreen from '../screens/HowItWorksScreen'
 import { onBadgeRefresh } from '../lib/badgeEvents'
 
 // ─── Post job wizard screens ──────────────────────────────────────────────────
@@ -127,6 +128,7 @@ function JobsStackNav() {
       <JobsNav.Screen name="JobMap"               component={JobMapScreen}           />
       <JobsNav.Screen name="Notifications"        component={NotificationsScreen}    />
       <JobsNav.Screen name="InvitedJobs"          component={InvitedJobsScreen}      />
+      <JobsNav.Screen name="HowItWorks"           component={HowItWorksScreen}       />
     </JobsNav.Navigator>
   )
 }
@@ -149,6 +151,7 @@ function BrowseStackNav() {
       <BrowseNav.Screen name="ProviderProfile"  component={ProviderProfileScreen}  />
       <BrowseNav.Screen name="ReviewsList"      component={ReviewsListScreen}      />
       <BrowseNav.Screen name="JobMap"           component={JobMapScreen}           />
+      <BrowseNav.Screen name="HowItWorks"       component={HowItWorksScreen}       />
     </BrowseNav.Navigator>
   )
 }
@@ -198,6 +201,7 @@ function AccountStackNav() {
       <AccountNav.Screen name="Connections"       component={ConnectionsScreen}        />
       <AccountNav.Screen name="ConnectionDetail"  component={ConnectionDetailScreen}   />
       <AccountNav.Screen name="SavedInterests"     component={SavedInterestsScreen}     />
+      <AccountNav.Screen name="HowItWorks"         component={HowItWorksScreen}         />
     </AccountNav.Navigator>
   )
 }

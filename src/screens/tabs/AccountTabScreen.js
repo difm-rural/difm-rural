@@ -951,7 +951,7 @@ export default function AccountTabScreen({ navigation, route }) {
       <View style={styles.card}>
         <MenuRow
           icon="help-circle-outline" label="Help & FAQ"
-          onPress={() => Alert.alert('Help', 'Help documentation coming soon.')}
+          onPress={() => navigation.navigate('HowItWorks')}
         />
         <MenuRow
           icon="mail-outline" label="Contact us" last

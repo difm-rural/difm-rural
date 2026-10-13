@@ -542,6 +542,9 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
         <View style={styles.whatsNextCard}>
           <Text style={styles.whatsNextTitle}>What's next?</Text>
           <Text style={styles.whatsNextBody}>
+            Two ways to use Rural Connections: post a Job when you need a hand, or create a Listing to offer a service or sell something. You can do both.
+          </Text>
+          <Text style={[styles.whatsNextBody, { marginTop: 10 }]}>
             Start by posting a task or browsing services in your area. You can update your profile anytime from the Account tab.
           </Text>
         </View>
