@@ -1714,7 +1714,7 @@ export default function CreateServiceScreen({ navigation, route }) {
             )}
           </View>
           <View style={styles.finalCardBody}>
-            <Text style={styles.finalCardTitle}>{title || 'Your service title'}</Text>
+            <Text style={styles.finalCardTitle}>{title || 'Your listing title'}</Text>
             <View style={styles.finalCardPriceBadge}>
               <Text style={styles.finalCardPriceText}>{formatRate()}</Text>
             </View>
@@ -1748,7 +1748,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         </View>
         {isEditing && (
           <View style={styles.managementCard}>
-            <Text style={styles.managementTitle}>Service advertising</Text>
+            <Text style={styles.managementTitle}>Listing advertising</Text>
             <Text style={styles.managementBody}>
               {serviceActive
                 ? 'This service is visible to requesters. Pause advertising while you make adjustments.'
@@ -1759,7 +1759,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               title={serviceActive ? 'Pause advertising' : 'Resume advertising'}
               onPress={() => setServiceActive(prev => !prev)}
               style={{ marginBottom: 10 }}
-              accessibilityLabel={serviceActive ? 'Pause service advertising' : 'Resume service advertising'}
+              accessibilityLabel={serviceActive ? 'Pause listing advertising' : 'Resume listing advertising'}
             />
             <Button
               variant="destructive"

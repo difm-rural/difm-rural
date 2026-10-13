@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import {
   Alert,
   Image,
@@ -9,6 +10,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
@@ -18,6 +20,8 @@ import ReviewList from '../components/ReviewList'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import { KIND_ENQUIRY } from '../../shared/listingPricing'
+import { listingChatParams, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
+import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -35,14 +39,6 @@ function formatPricingType(type) {
     case 'day_rate': return 'Day rate'
     default:         return type
   }
-}
-
-// Display-only add-on price token; unit defaults to "unit" so per_unit never
-// renders a dangling "/". flat -> "+$120", per_km -> "+$3/km", per_unit -> "+$2.50/bale".
-function formatAddOnValue(a) {
-  if (a.basis === 'per_km')   return `+$${a.amount}/km`
-  if (a.basis === 'per_unit') return `+$${a.amount}/${a.unit_label || 'unit'}`
-  return `+$${a.amount}`
 }
 
 // A single additional rate option (base rate is shown separately).
@@ -77,9 +73,6 @@ function asNumber(value, fallback = 0) {
   return Number.isFinite(next) ? next : fallback
 }
 
-function formatCurrency(value) {
-  return asNumber(value).toFixed(2)
-}
 
 // Recurring cadence inferred from a unit label (grazing/lease), else null.
 function cadenceFromUnit(u) {
@@ -98,6 +91,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const [isBooked, setIsBooked] = useState(false)
   const [activeBooking, setActiveBooking] = useState(null)
   const [currentUserId, setCurrentUserId] = useState(null)
+  const [openingEnquiry, setOpeningEnquiry] = useState(false)
 
   const rate = asNumber(service.rate) // base rate — shown in the Service details card (unchanged)
   const variants = Array.isArray(service.pricing_variants) ? service.pricing_variants : []
@@ -105,14 +99,14 @@ export default function ServiceDetailScreen({ route, navigation }) {
   // Effective option drives the estimator + what flows to the booking. Falls back
   // to the base service fields; note variant uses min_units, base uses minimum_units.
   const effectivePricingType = selectedOption ? selectedOption.pricing_type : service.pricing_type
-  const effectiveRate = asNumber(selectedOption ? selectedOption.rate : service.rate)
-  const effectiveMin = (selectedOption ? selectedOption.min_units : service.minimum_units) || 1
+  const estimate = listingEstimate(service, selectedOption, quantity)
+  const effectiveMin = estimate.minimumUnits
   const effectiveUnitLabel = effectivePricingType === 'hourly' ? 'hour'
     : effectivePricingType === 'day_rate' ? 'day'
     : (selectedOption ? (selectedOption.unit_label || 'unit') : (service.unit_label || 'unit'))
   const isEstimatable = ['hourly', 'per_unit', 'day_rate'].includes(effectivePricingType)
   const isQuoteRequired = effectivePricingType === 'quote_required'
-  const total = isQuoteRequired ? null : isEstimatable ? formatCurrency(quantity * effectiveRate) : formatCurrency(effectiveRate)
+  const total = estimate.baseAmount?.toFixed(2)
   const baseRateToken = service.pricing_type === 'quote_required'
     ? 'Quote required'
     : formatVariantValue({ pricing_type: service.pricing_type, rate: service.rate, unit_label: service.unit_label, min_units: service.minimum_units > 1 ? service.minimum_units : null, min_charge: service.min_charge })
@@ -126,9 +120,14 @@ export default function ServiceDetailScreen({ route, navigation }) {
   useEffect(() => {
     fetchService()
     if (!profile) fetchProfile()
-    fetchBookingStatus()
     fetchProviderExtras()
   }, [])
+
+  // Returning from booking detail may follow a confirmation, completion or
+  // cancellation. Refresh the active record instead of retaining its old state.
+  useFocusEffect(useCallback(() => {
+    fetchBookingStatus()
+  }, [service.id, service.provider_id, service.kind]))
 
   async function fetchProviderExtras() {
     if (!service.provider_id) return
@@ -171,7 +170,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
     }
     const { data } = await supabase
       .from('bookings')
-      .select('id, status, provider_id, requester_id, service_id')
+      .select('*')
       .eq('service_id', service.id)
       .eq('requester_id', user.id)
       .in('status', BOOKING_ACTIVE_STATUSES)
@@ -180,6 +179,46 @@ export default function ServiceDetailScreen({ route, navigation }) {
     const booking = data?.[0] || null
     setActiveBooking(booking)
     setIsBooked(!!booking)
+  }
+
+  async function handleEnquiry() {
+    if (openingEnquiry) return
+    setOpeningEnquiry(true)
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      // A guest has no session; other auth failures should remain retryable.
+      if (error && error.name !== 'AuthSessionMissingError') throw error
+      if (user) {
+        navigation.navigate('Chat', listingChatParams(service, profile))
+        return
+      }
+      Alert.alert(
+        'Sign in to enquire',
+        'Sign in to message the person who listed this.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Sign in',
+            onPress: async () => {
+              try {
+                await AsyncStorage.setItem(PENDING_LISTING_ENQUIRY_KEY, JSON.stringify({
+                  service: { ...service, profile }, savedAt: Date.now(),
+                }))
+                // The most recently chosen guest action wins after sign-in.
+                await AsyncStorage.removeItem('pendingJobView')
+                navigation.navigate('Login')
+              } catch {
+                Alert.alert('Could not continue', 'Please try opening your enquiry again.')
+              }
+            },
+          },
+        ]
+      )
+    } catch {
+      Alert.alert('Could not open enquiry', 'Please check your connection and try again.')
+    } finally {
+      setOpeningEnquiry(false)
+    }
   }
 
   function handleCancelBooking() {
@@ -279,7 +318,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {isOwnService && (
           <View style={styles.previewNote}>
             <Text style={styles.previewNoteText}>
-              <Icon name="eye-outline" size={14} color={colors.info} /> Requesters see this. It's a preview of your live listing — edit it from “Manage your services”.
+              <Icon name="eye-outline" size={14} color={colors.info} /> Requesters see this. It's a preview of your live listing — edit it from “Manage your listings”.
             </Text>
           </View>
         )}
@@ -405,11 +444,12 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {Array.isArray(service.pricing_add_ons) && service.pricing_add_ons.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Extra charges</Text>
+            <Text style={styles.descText}>{EXTRA_CHARGES_EXPLANATION}</Text>
             {service.pricing_add_ons.map((a, i) => (
               <DetailRow
                 key={i}
                 label={`${a.label || 'Extra'}${a.optional ? ' (optional)' : ''}`}
-                value={formatAddOnValue(a)}
+                value={formatExtraCharge(a)}
                 last={i === service.pricing_add_ons.length - 1}
               />
             ))}
@@ -436,7 +476,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
             <Text style={styles.bookedInfoText}>
               {activeBooking?.status === 'cancellation_requested'
                 ? 'Cancellation requested. Waiting for provider confirmation.'
-                : 'You have an active booking for this service.'}
+                : isBookingWithdrawable(activeBooking?.status)
+                  ? 'You have a booking request for this service.'
+                  : 'You have an active booking for this service.'}
             </Text>
           </View>
         )}
@@ -470,33 +512,38 @@ export default function ServiceDetailScreen({ route, navigation }) {
         )}
 
         {/* Cost estimator */}
-        {isEstimatable && !isEnquiryKind && (
+        {!isQuoteRequired && !isEnquiryKind && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Estimate your cost</Text>
-            <View style={styles.estimatorRow}>
+            {isEstimatable && <View style={styles.estimatorRow}>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQuantity(q => Math.max(effectiveMin, q - 1))}
+                onPress={() => setQuantity(Math.max(effectiveMin, estimate.quantity - 1))}
                 accessibilityRole="button"
                 accessibilityLabel="Decrease quantity">
                 <Icon name="remove" size={22} color={colors.primary} />
               </TouchableOpacity>
               <View style={styles.qtyDisplay}>
-                <Text style={styles.qtyNum}>{quantity}</Text>
-                <Text style={styles.qtyUnit}>{effectiveUnitLabel}{quantity !== 1 ? 's' : ''}</Text>
+                <Text style={styles.qtyNum}>{estimate.quantity}</Text>
+                <Text style={styles.qtyUnit}>{effectiveUnitLabel}{estimate.quantity !== 1 ? 's' : ''}</Text>
               </View>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQuantity(q => q + 1)}
+                onPress={() => setQuantity(estimate.quantity + 1)}
                 accessibilityRole="button"
                 accessibilityLabel="Increase quantity">
                 <Icon name="add" size={22} color={colors.primary} />
               </TouchableOpacity>
-            </View>
+            </View>}
             <View style={styles.estimateResult}>
-              <Text style={styles.estimateLabel}>Estimated total</Text>
+              <Text style={styles.estimateLabel}>Base estimate</Text>
               <Text style={styles.estimateTotal}>${total} NZD</Text>
             </View>
+            {estimate.minimumCharge > 0 && (
+              <DetailRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)} NZD`} last />
+            )}
+            <Text style={styles.descText}>{BASE_ESTIMATE_EXPLANATION}</Text>
+            <Text style={styles.descText}>You arrange payment directly with the provider — Rural Connections doesn't handle payments.</Text>
           </View>
         )}
       </ScrollView>
@@ -507,24 +554,23 @@ export default function ServiceDetailScreen({ route, navigation }) {
           <Button
             variant="primary"
             title="Enquire"
-            onPress={() => navigation.navigate('Chat', {
-              serviceId:     service.id,
-              otherUserId:   service.provider_id,
-              jobTitle:      service.title,
-              otherUserName: profile?.full_name || 'Provider',
-            })}
+            onPress={handleEnquiry}
+            loading={openingEnquiry}
             accessibilityLabel="Enquire about this listing"
           />
         ) : (
           <>
             <Button
               variant={!isOwnService && isBooked ? 'secondary' : 'primary'}
-              title={isOwnService ? 'Manage your listings' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : `Book now · $${total} NZD`}
+              title={isOwnService ? 'Manage your listings' : isBooked ? 'View booking' : isQuoteRequired ? 'Request quote' : 'Request a booking'}
               onPress={isOwnService
                 ? goToManageServices
                 : isBooked
-                ? () => Alert.alert('Your booking', 'Status: Pending confirmation.\nThe provider will be in touch soon.', [{ text: 'OK' }])
-                : () => navigation.navigate('BookingConfirm', { service, quantity, ...(selectedOption ? { selectedOption } : {}) })}
+                ? () => navigation.navigate('ServiceBookingDetail', {
+                    booking: { ...activeBooking, service, provider: profile },
+                    viewerRole: 'requester',
+                  })
+                : () => navigation.navigate('BookingConfirm', { service, quantity: estimate.quantity, ...(selectedOption ? { selectedOption } : {}) })}
               accessibilityLabel={isOwnService ? 'Manage your listings' : isBooked ? 'View your booking' : 'Book this service'}
             />
             {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (

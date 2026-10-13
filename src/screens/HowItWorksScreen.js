@@ -40,11 +40,11 @@ export default function HowItWorksScreen({ navigation }) {
 
         <Section
           title="Need something done? Post a Job."
-          body="Describe what you need — fencing, a digger for a day, feed, a hand over lambing. Nearby locals send you quotes, and you choose who to go with."
+          body="Describe what you need — fencing, a digger for a day, feed, a hand over lambing. Nearby locals send you offers, and you choose who to go with."
         />
         <Section
           title="Got something to offer? Create a Listing."
-          body="Advertise a service, grazing, gear to hire, or something to sell. People who are interested contact you directly — to book it, or to ask a question first."
+          body="Advertise a service, grazing, gear to hire, or something to sell. People can send an enquiry about a listing, or a booking request for a service or hire. A booking is confirmed when the provider accepts."
         />
         <Section
           title="The quick difference"
@@ -55,7 +55,7 @@ export default function HowItWorksScreen({ navigation }) {
           body="Agree the price and what's included before work starts. Meet in person for anything you're unsure about, and trust your judgement. Be fair and prompt — it's a small community and word travels."
         />
 
-        <Text style={styles.closing}>Still stuck? Contact us from the Account tab.</Text>
+        <Text style={styles.closing}>Still stuck? Open Account → Help &amp; feedback → Send feedback.</Text>
       </ScrollView>
     </View>
   )

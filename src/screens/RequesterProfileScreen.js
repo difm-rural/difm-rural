@@ -216,7 +216,7 @@ export default function RequesterProfileScreen({ route, navigation }) {
         <View style={styles.statsRow}>
           <View style={styles.statTile}>
             <Text style={styles.statValue}>{totalPosted}</Text>
-            <Text style={styles.statLabel}>Tasks posted</Text>
+            <Text style={styles.statLabel}>Jobs posted</Text>
           </View>
           <View style={[styles.statTile, styles.statTileMid]}>
             <Text style={styles.statValue}>{totalCompleted}</Text>

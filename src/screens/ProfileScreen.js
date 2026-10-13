@@ -300,7 +300,7 @@ export default function ProfileScreen({ navigation }) {
   // ─── Dashboard mode ────────────────────────────────────────────
   function handleRoleChange() {
     const options = [
-      { text: 'Requester — Post tasks', role: 'requester' },
+      { text: 'Requester — Post jobs', role: 'requester' },
       { text: 'Provider — Do jobs',     role: 'provider'  },
       { text: 'Both — Post & do jobs',  role: 'both'      },
       { text: 'Cancel', style: 'cancel' },

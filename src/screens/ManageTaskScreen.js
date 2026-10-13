@@ -875,7 +875,7 @@ export default function ManageTaskScreen({ navigation, route }) {
               {bids.length > 0 && (
                 <View style={[styles.statusBadge, { backgroundColor: '#fef3c7' }]}>
                   <Text style={[styles.statusBadgeText, { color: '#92400e' }]}>
-                    {bids.length} bid{bids.length > 1 ? 's' : ''}
+                    {bids.length} offer{bids.length > 1 ? 's' : ''}
                   </Text>
                 </View>
               )}

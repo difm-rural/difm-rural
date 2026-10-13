@@ -203,7 +203,7 @@ export default function MyJobsScreen({ navigation, route }) {
 
           {completedPosted.length > 0 && (
             <View style={styles.cardSection}>
-              <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>Tasks I posted</Text>
+              <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>Jobs I posted</Text>
               <FlatList
                 horizontal
                 data={completedPosted}
@@ -264,12 +264,12 @@ export default function MyJobsScreen({ navigation, route }) {
 
         {/* Active posted tasks */}
         <View style={styles.cardSection}>
-          <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>My posted tasks</Text>
+          <Text style={[styles.sectionLabel, { paddingHorizontal: 16 }]}>My posted jobs</Text>
           {activePosted.length === 0 ? (
             <EmptyState
               compact
               icon="clipboard-outline"
-              title="No active tasks"
+              title="No active jobs"
               body="Post a job and it'll show up here while it's live."
             />
           ) : (
@@ -307,8 +307,8 @@ export default function MyJobsScreen({ navigation, route }) {
               onPress={() => setPastTasksExpanded(e => !e)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={`Past tasks, ${pastPosted.length} items`}>
-              <Text style={styles.pastSectionLabel}>Past tasks ({pastPosted.length})</Text>
+              accessibilityLabel={`Past jobs, ${pastPosted.length} items`}>
+              <Text style={styles.pastSectionLabel}>Past jobs ({pastPosted.length})</Text>
               <Text style={styles.pastChevron}><Icon name={pastTasksExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} /></Text>
             </TouchableOpacity>
             {pastTasksExpanded && (

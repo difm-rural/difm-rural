@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   FlatList,
@@ -54,23 +54,33 @@ export default function LandingScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false)
   const [mode, setMode] = useState('home')
   const [search, setSearch] = useState('')
+  const [loadErrors, setLoadErrors] = useState({ jobs: false, listings: false })
+  const loadingRef = useRef(false)
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    await Promise.all([fetchJobs(), fetchServices()])
-    setLoading(false)
-    setRefreshing(false)
+    if (loadingRef.current) return
+    loadingRef.current = true
+    try {
+      const results = await Promise.allSettled([fetchJobs(), fetchServices()])
+      setLoadErrors({ jobs: results[0].status === 'rejected', listings: results[1].status === 'rejected' })
+    } finally {
+      loadingRef.current = false
+      setLoading(false)
+      setRefreshing(false)
+    }
   }
 
   async function fetchJobs() {
-    const { data: jobsData } = await supabase
+    const { data: jobsData, error } = await supabase
       .from('jobs_public')
       .select('*')
       .eq('status', 'open')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
+    if (error) throw error
     const raw = jobsData || []
     if (raw.length === 0) { setJobs([]); return }
 
@@ -88,13 +98,14 @@ export default function LandingScreen({ navigation }) {
   }
 
   async function fetchServices() {
-    const { data: servicesData } = await supabase
+    const { data: servicesData, error } = await supabase
       .from('services')
       .select('*')
       .eq('is_active', true)
       .is('closed_at', null)
       .order('created_at', { ascending: false })
 
+    if (error) throw error
     const raw = servicesData || []
     if (raw.length === 0) { setServices([]); return }
 
@@ -109,6 +120,7 @@ export default function LandingScreen({ navigation }) {
   }
 
   function onRefresh() {
+    if (loadingRef.current) return
     setRefreshing(true)
     load()
   }
@@ -136,6 +148,9 @@ export default function LandingScreen({ navigation }) {
 
   const showJobs = mode !== 'services'
   const isEmpty = (showJobs ? filteredJobs.length === 0 : true) && filteredServices.length === 0
+  const hasError = loadErrors.listings || (showJobs && loadErrors.jobs)
+  const failedContent = loadErrors.listings && showJobs && loadErrors.jobs ? 'jobs and listings'
+    : loadErrors.listings ? 'listings' : 'jobs'
 
   return (
     <View style={styles.screen}>
@@ -161,23 +176,37 @@ export default function LandingScreen({ navigation }) {
         />
       </View>
 
+      <ScrollView
+        style={{ flex: 1 }}
+        alwaysBounceVertical
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        showsVerticalScrollIndicator={false}>
       {loading ? (
         <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
-      ) : isEmpty ? (
+      ) : <>
+      {hasError && <EmptyState
+        icon="cloud-offline-outline"
+        title={`Couldn't load ${failedContent}`}
+        body="Check your connection and try again."
+        actionLabel="Retry"
+        onAction={onRefresh}
+      />}
+      {isEmpty && !hasError ? (
         <EmptyState
           icon="map-outline"
-          title="Nothing listed yet"
-          body="Be the first in your area — check back soon, or post a job to get started."
+          title={search.trim() ? `No ${showJobs ? 'jobs or listings' : 'listings'} match your search` : 'Nothing listed yet'}
+          body={search.trim() ? `Nothing matches “${search.trim()}”. Try another word or clear your search.`
+            : 'Be the first in your area — check back soon, or post a job to get started.'}
+          actionLabel={search.trim() ? 'Clear search' : 'Post a job'}
+          onAction={search.trim() ? () => setSearch('') : () => navigation.navigate('GuestPostJob')}
         />
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        >
+        <>
           {showJobs && (
             <HorizontalSection
-              title="Available tasks"
+              title="Open jobs"
               items={filteredJobs}
               onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
               onGuestAction={handleGuestAction}
@@ -189,8 +218,10 @@ export default function LandingScreen({ navigation }) {
             onPressItem={item => navigation.navigate('ServiceDetail', { service: item })}
             onGuestAction={handleGuestAction}
           />
-        </ScrollView>
+        </>
       )}
+      </>}
+      </ScrollView>
 
       <View style={[styles.tabBar, { paddingBottom: insets.bottom || 10 }]}>
         <TouchableOpacity
@@ -207,7 +238,7 @@ export default function LandingScreen({ navigation }) {
           accessibilityRole="button"
           accessibilityState={{ selected: mode === 'services' }}>
           <Icon name="construct-outline" size={22} color={mode === 'services' ? colors.primary : colors.textMuted} />
-          <Text style={[styles.tabLabel, mode === 'services' && styles.tabActive]}>Services</Text>
+          <Text style={[styles.tabLabel, mode === 'services' && styles.tabActive]}>Listings</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tab}

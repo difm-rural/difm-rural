@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -13,20 +12,21 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../lib/uploadAvatar'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { CATEGORIES, CATEGORY_CAPABILITIES } from '../lib/categories'
+import { completeOnboarding, onboardingPublicProfile } from '../lib/onboarding'
+import { coarseSuburb } from '../lib/location'
 
 // Step meta indexed by step number (0–3). The requester/provider choice is retired:
 // everyone goes through the same flow and is recorded as 'both' on completion.
 const STEP_META = [
   { title: 'RURAL CONNECTIONS', subtitle: null },                                  // 0 welcome
-  { title: 'Your profile', subtitle: 'How others will see you' },                  // 1 profile
-  { title: 'Offer work?',  subtitle: 'Optional — the areas you can help with' },   // 2 offer
+  { title: 'Welcome to Rural Connections', subtitle: 'Step 1 of 2 — your name and location' }, // 1 profile
+  { title: 'What can you help with?', subtitle: 'Step 2 of 2 — optional skills' }, // 2 skills
   { title: 'All set!',     subtitle: 'Your profile is ready' },                    // 3 summary
 ]
 
@@ -40,12 +40,6 @@ const deriveCategories = (sk) => {
 function getInitials(name) {
   if (!name) return '?'
   return name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
-}
-
-function getDisplayLocation(addr) {
-  if (!addr) return ''
-  const parts = addr.split(',').map(s => s.trim()).filter(Boolean)
-  return parts.slice(-3, -1).join(', ').trim() || addr
 }
 
 function StepDots({ current, total }) {
@@ -76,30 +70,19 @@ function ProgressBar({ pct }) {
 export default function OnboardingScreen({ profile: initialProfile, onComplete }) {
   const insets = useSafeAreaInsets()
 
-  // step 0 = welcome, 1 = profile, 2 = offer (areas), 3 = summary
-  const [step, setStep]         = useState(0)
+  // Two setup steps, followed by completion choices. Skills are optional.
+  const [step, setStep]         = useState(1)
   const [saving, setSaving]     = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const completingRef = useRef(false)
 
   // Profile fields
-  const [fullName,    setFullName]    = useState(initialProfile?.full_name    || '')
-  const [displayName, setDisplayName] = useState(
-    initialProfile?.display_name || initialProfile?.full_name?.trim().split(/\s+/)[0] || ''
-  )
-  const [phone,     setPhone]     = useState(initialProfile?.phone     || '')
-  const [address,   setAddress]   = useState(initialProfile?.address   || '')
+  const [fullName, setFullName] = useState(initialProfile?.full_name || initialProfile?.display_name || '')
+  const [address, setAddress] = useState(initialProfile?.address || initialProfile?.region || '')
   const [latitude,  setLatitude]  = useState(initialProfile?.latitude  || null)
   const [longitude, setLongitude] = useState(initialProfile?.longitude || null)
-  const [bio,       setBio]       = useState(initialProfile?.bio       || '')
   const [avatarUrl,      setAvatarUrl]      = useState(initialProfile?.avatar_url || null)
   const [offerCategories, setOfferCategories] = useState(deriveCategories(initialProfile?.skills))
-  const [qualifications, setQualifications] = useState(initialProfile?.qualifications || [])
-  const [qualInput,      setQualInput]      = useState('')
-  const [showQualInput,  setShowQualInput]  = useState(false)
-
-  // Derived
-  const initials = getInitials(displayName || fullName)
-
+  const savedOfferCategories = useRef(deriveCategories(initialProfile?.skills))
   // ─── Fresh data load ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -115,59 +98,64 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       .eq('id', user.id)
       .single()
     if (profile) {
-      setFullName(profile.full_name || '')
-      setDisplayName(profile.display_name || profile.full_name?.trim().split(/\s+/)[0] || '')
-      setPhone(profile.phone || '')
-      setAddress(profile.address || '')
+      setFullName(profile.full_name || profile.display_name || '')
+      setAddress(profile.address || profile.region || '')
       setLatitude(profile.latitude || null)
       setLongitude(profile.longitude || null)
-      setBio(profile.bio || '')
       setOfferCategories(deriveCategories(profile.skills || []))
-      setQualifications(profile.qualifications || [])
+      savedOfferCategories.current = deriveCategories(profile.skills || [])
       setAvatarUrl(profile.avatar_url || null)
     }
   }
 
   // ─── Persistence helpers ──────────────────────────────────────────────────────
 
-  async function markComplete() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.id) { onComplete(); return }
-    // Record everyone as 'both' (requester + provider) — set here so it applies even
-    // when the user skips. The legacy `role` column maps 'both' → provider.
-    await supabase
-      .from('profiles')
-      .update({ onboarding_completed: true, primary_role: 'both', role: 'provider' })
-      .eq('id', user.id)
-    onComplete()
+  async function markComplete(destination = 'home') {
+    if (completingRef.current || saving) return
+    completingRef.current = true
+    setSaving(true)
+    try {
+      await completeOnboarding(supabase)
+      onComplete(destination)
+    } catch (error) {
+      Alert.alert('Could not finish setup',
+        error.message || 'Please check your connection and try again.', [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Retry', onPress: () => markComplete(destination) },
+        ])
+    } finally {
+      completingRef.current = false
+      setSaving(false)
+    }
   }
 
   // Saves the profile step (step 1) and advances to the skills step.
   async function saveStep2AndAdvance() {
+    if (saving) return
     setSaving(true)
     try {
+      const publicProfile = onboardingPublicProfile(fullName, address)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user?.id) {
         Alert.alert('Error', 'Not logged in. Please restart the app.')
         return
       }
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({
-          full_name:    fullName.trim()    || null,
-          display_name: displayName.trim() || null,
-          phone:        phone.trim()       || null,
+          ...publicProfile,
+          region: coarseSuburb(address),
           address:      address            || null,
           latitude:     latitude           || null,
           longitude:    longitude          || null,
-          bio:          bio.trim()         || null,
         })
         .eq('id', user.id)
-      if (error) {
-        Alert.alert('Error saving', error.message)
-        return
-      }
+        .select('id').single()
+      if (error) throw error
+      if (!data) throw new Error('Your profile could not be saved. Please try again.')
       setStep(2)
+    } catch (error) {
+      Alert.alert('Could not save profile', error.message || 'Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -175,6 +163,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
   // Saves the skills step (step 2) and advances to the summary step.
   async function saveStep3AndAdvance() {
+    if (saving) return
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -187,48 +176,25 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
       const expandedSkills = Array.from(new Set(
         offerCategories.flatMap(c => CATEGORY_CAPABILITIES[c] || [])
       ))
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({
           skills:         expandedSkills,
-          qualifications: qualifications,
         })
         .eq('id', user.id)
+        .select('id').single()
       if (error) {
         Alert.alert('Error saving', error.message)
         return
       }
+      if (!data) throw new Error('Profile not saved')
+      savedOfferCategories.current = offerCategories
       setStep(3)
+    } catch {
+      Alert.alert('Could not save skills', 'Check your connection and try again, or choose Skip for now.')
     } finally {
       setSaving(false)
     }
-  }
-
-  // ─── Avatar ───────────────────────────────────────────────────────────────────
-
-  async function handleAvatarPress() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    Alert.alert('Profile photo', 'Choose an option', [
-      { text: 'Take a photo',        onPress: () => doUpload(user.id, true) },
-      { text: 'Choose from library', onPress: () => doUpload(user.id, false) },
-      avatarUrl
-        ? { text: 'Remove photo', style: 'destructive', onPress: () => doRemove(user.id) }
-        : null,
-      { text: 'Cancel', style: 'cancel' },
-    ].filter(Boolean))
-  }
-
-  async function doUpload(userId, useCamera) {
-    setUploading(true)
-    const url = await pickAndUploadAvatar(userId, useCamera)
-    if (url) setAvatarUrl(url)
-    setUploading(false)
-  }
-
-  async function doRemove(userId) {
-    await removeAvatarRecord(userId)
-    setAvatarUrl(null)
   }
 
   // ─── Skills ───────────────────────────────────────────────────────────────────
@@ -239,66 +205,25 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
     )
   }
 
-  function confirmAddQual() {
-    const text = qualInput.trim()
-    if (!text) return
-    setQualifications(q => [...q, text])
-    setQualInput('')
-    setShowQualInput(false)
-  }
-
-  function removeQual(idx) {
-    setQualifications(q => q.filter((_, i) => i !== idx))
-  }
-
   // ─── Navigation ───────────────────────────────────────────────────────────────
 
   function handleNext() {
-    if (step === 0) { setStep(1); return }          // welcome → profile
     if (step === 1) { saveStep2AndAdvance(); return } // profile → skills
     if (step === 2) { saveStep3AndAdvance(); return } // skills → summary
     if (step === 3) { markComplete(); return }        // summary → done
   }
 
   async function handleSkip() {
-    // Welcome (step 0) cannot be skipped
-    if (step === 0) return
-    await markComplete()
+    if (saving) return
+    if (step === 2) {
+      setOfferCategories(savedOfferCategories.current)
+      setStep(3)
+      return
+    }
+    if (step === 1) await markComplete()
   }
 
   // ─── Step renderers ───────────────────────────────────────────────────────────
-
-  function renderStep0() {
-    return (
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
-        keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
-
-        <View style={styles.infoCard}>
-          <Icon name="flash-outline" size={22} color={colors.primary} />
-          <View style={styles.infoCardBody}>
-            <Text style={styles.infoCardLabel}>
-              Quick setup — 3 steps
-            </Text>
-            <Text style={styles.infoCardSub}>
-              Takes less than 2 minutes. You can skip anything and update it later in Account settings.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.infoCard}>
-          <Icon name="lock-closed-outline" size={22} color={colors.primary} />
-          <View style={styles.infoCardBody}>
-            <Text style={styles.infoCardLabel}>Your privacy matters</Text>
-            <Text style={styles.infoCardSub}>
-              Your contact details are only shared with providers once a job is confirmed.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-    )
-  }
 
   function renderStep1() {
     return (
@@ -312,92 +237,35 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           contentContainerStyle={[styles.stepContent, { paddingBottom: insets.bottom + 120 }]}
           keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
-          {/* Avatar */}
-          <View style={styles.avatarRow}>
-            <TouchableOpacity
-              style={styles.avatarWrap}
-              onPress={handleAvatarPress}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Change profile photo">
-              <View style={styles.avatarCircle}>
-                {uploading ? (
-                  <ActivityIndicator color={colors.primary} />
-                ) : avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
-                ) : (
-                  <Text style={styles.avatarInitials}>{initials}</Text>
-                )}
-              </View>
-              <View style={styles.cameraOverlay}>
-                <Icon name="camera" size={12} color={colors.white} />
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.fieldLabel}>Full name</Text>
+          <Text style={styles.introText}>Post a job when you need a hand. Browse listings for services, grazing, hire and local goods. You can request help and offer it from the same account.</Text>
+          <Text style={styles.fieldLabel}>Public name</Text>
           <TextInput
             style={styles.input}
             value={fullName}
             onChangeText={setFullName}
-            placeholder="First and last name"
+            placeholder="First name, nickname or business name"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="words"
             returnKeyType="next"
-            accessibilityLabel="Full name"
+            accessibilityLabel="Public name"
           />
-
-          <Text style={styles.fieldLabel}>Display name</Text>
-          <TextInput
-            style={styles.input}
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="First name or nickname"
-            placeholderTextColor={colors.textMuted}
-            returnKeyType="next"
-            accessibilityLabel="Display name"
-          />
-          <Text style={styles.fieldHelper}>This is how you'll appear to others</Text>
-
-          <Text style={styles.fieldLabel}>Phone number</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="e.g. 027 123 4567"
-            placeholderTextColor={colors.textMuted}
-            keyboardType="phone-pad"
-            returnKeyType="next"
-            accessibilityLabel="Phone number"
-          />
+          <Text style={styles.fieldHelper}>This name appears on your profile, jobs, listings and messages.</Text>
 
           <Text style={styles.fieldLabel}>Location</Text>
           <AddressAutocomplete
             defaultValue={address}
             placeholder="Search suburb, town or region..."
+            onChangeText={text => { setAddress(text); setLatitude(null); setLongitude(null) }}
             onSelect={({ address: addr, latitude: lat, longitude: lng }) => {
               setAddress(addr || '')
               setLatitude(lat)
               setLongitude(lng)
             }}
           />
-          <Text style={styles.fieldHelper}>Used to match you with nearby jobs</Text>
+          <Text style={styles.fieldHelper}>A town or region is enough. Type it if search is unavailable.</Text>
+          <Text style={styles.introText}>Your name and region are public. Phone numbers and exact profile addresses are not shown on public profiles. Job and booking locations are handled separately.</Text>
+          <Text style={styles.fieldHelper}>Add a photo, phone number, bio and qualifications later in Account.</Text>
 
-          <Text style={styles.fieldLabel}>
-            Short bio <Text style={styles.optional}>(optional)</Text>
-          </Text>
-          <TextInput
-            style={[styles.input, styles.inputMulti]}
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Tell others about yourself and your property..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-            returnKeyType="done"
-            accessibilityLabel="Short bio"
-          />
         </ScrollView>
       </KeyboardAvoidingView>
     )
@@ -415,7 +283,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           <Text style={styles.introText}>
-            Planning to offer services or take on jobs? Pick the areas you can help with — or tap Skip below if you're mostly here to find help.
+            Choose the areas you can help with. This is optional — choose Skip for now to continue without saving changes to your skills. You can update them later in Account.
           </Text>
 
           <View style={styles.chipGrid}>
@@ -436,62 +304,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             })}
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 20 }]}>
-            Qualifications <Text style={styles.optional}>(optional)</Text>
-          </Text>
-
-          {qualifications.map((q, i) => (
-            <View key={i} style={styles.qualRow}>
-              <Icon name="school-outline" size={16} color={colors.textSecondary} />
-              <Text style={styles.qualText} numberOfLines={2}>{q}</Text>
-              <TouchableOpacity
-                onPress={() => removeQual(i)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${q}`}>
-                <Icon name="close" size={14} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          {showQualInput ? (
-            <View style={styles.qualInputRow}>
-              <TextInput
-                style={styles.qualInput}
-                value={qualInput}
-                onChangeText={setQualInput}
-                placeholder="e.g. Growsafe certified"
-                placeholderTextColor={colors.textMuted}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={confirmAddQual}
-                accessibilityLabel="Qualification"
-              />
-              <TouchableOpacity
-                style={styles.qualAddBtn}
-                onPress={confirmAddQual}
-                accessibilityRole="button"
-                accessibilityLabel="Add">
-                <Text style={styles.qualAddBtnText}>Add</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.qualCancelBtn}
-                onPress={() => { setShowQualInput(false); setQualInput('') }}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel">
-                <Icon name="close" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.qualAddRow}
-              onPress={() => setShowQualInput(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Add a qualification">
-              <Icon name="add" size={18} color={colors.primary} />
-              <Text style={styles.qualAddText}>Add a qualification...</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
     )
@@ -500,8 +312,8 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
   function renderStep3() {
     const shownSkills = offerCategories.slice(0, 4)
     const extraSkills = offerCategories.length > 4 ? offerCategories.length - 4 : 0
-    const nameToShow  = displayName || fullName || 'Welcome!'
-    const locationStr = getDisplayLocation(address)
+    const nameToShow  = fullName || 'Welcome!'
+    const locationStr = coarseSuburb(address)
 
     return (
       <ScrollView
@@ -545,27 +357,31 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
             Two ways to use Rural Connections: post a Job when you need a hand, or create a Listing to offer a service or sell something. You can do both.
           </Text>
           <Text style={[styles.whatsNextBody, { marginTop: 10 }]}>
-            Start by posting a task or browsing services in your area. You can update your profile anytime from the Account tab.
+            Start by posting a job or browsing listings in your area. You can update your profile anytime from the Account tab.
           </Text>
         </View>
 
         <View style={styles.actionCards}>
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={markComplete}
+            onPress={() => markComplete('post_job')}
+            disabled={saving}
+            accessibilityState={{ disabled: saving }}
             accessibilityRole="button"
-            accessibilityLabel="Post a task">
+            accessibilityLabel="Post a job">
             <Icon name="clipboard-outline" size={22} color={colors.primary} />
-            <Text style={styles.actionCardTitle}>Post a task</Text>
+            <Text style={styles.actionCardTitle}>Post a job</Text>
             <Text style={styles.actionCardSub}>Get rural help sorted</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={markComplete}
+            onPress={() => markComplete('listings')}
+            disabled={saving}
+            accessibilityState={{ disabled: saving }}
             accessibilityRole="button"
             accessibilityLabel="Browse listings">
             <Icon name="search-outline" size={22} color={colors.primary} />
-            <Text style={styles.actionCardTitle}>Browse services</Text>
+            <Text style={styles.actionCardTitle}>Browse listings</Text>
             <Text style={styles.actionCardSub}>Find local providers</Text>
           </TouchableOpacity>
         </View>
@@ -577,10 +393,11 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
   const meta        = STEP_META[step] || STEP_META[0]
   const isLastStep  = step === 3
-  const totalSteps  = 4
-  const currentDot  = step + 1
-  const progressPct = ({ 0: 25, 1: 50, 2: 75, 3: 100 }[step] ?? 100)
-  const btnLabel    = isLastStep ? 'Go to dashboard' : saving ? 'Saving…' : 'Next'
+  const totalSteps = 2
+  const currentDot = step
+  const progressPct = step === 1 ? 50 : 100
+  const btnLabel = isLastStep ? 'Explore the app' : saving ? 'Saving…' : 'Continue'
+  const skipLabel = step === 2 ? 'Skip for now' : 'Finish setup later'
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -593,7 +410,7 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           ) : (
             <Text style={styles.stepKicker}>{meta.title}</Text>
           )}
-          <StepDots current={currentDot} total={totalSteps} />
+          {!isLastStep && <StepDots current={currentDot} total={totalSteps} />}
         </View>
 
         {step === 0 ? (
@@ -612,7 +429,6 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
 
       {/* Step content */}
       <View style={{ flex: 1 }}>
-        {step === 0 && renderStep0()}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
@@ -632,9 +448,11 @@ export default function OnboardingScreen({ profile: initialProfile, onComplete }
           <TouchableOpacity
             style={styles.skipBtn}
             onPress={handleSkip}
+            disabled={saving}
+            accessibilityState={{ disabled: saving }}
             accessibilityRole="button"
-            accessibilityLabel="Skip setup">
-            <Text style={styles.skipBtnText}>Skip setup</Text>
+            accessibilityLabel={skipLabel}>
+            <Text style={styles.skipBtnText}>{skipLabel}</Text>
           </TouchableOpacity>
         )}
       </View>

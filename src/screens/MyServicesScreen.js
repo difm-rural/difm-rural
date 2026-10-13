@@ -82,7 +82,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           style={[styles.toggleSwitch, service.is_active && styles.toggleSwitchOn]}
           onPress={() => onToggleActive(service)}
           accessibilityRole="switch"
-          accessibilityLabel={service.is_active ? 'Pause service advertising' : 'Resume service advertising'}
+          accessibilityLabel={service.is_active ? 'Pause listing advertising' : 'Resume listing advertising'}
           accessibilityState={{ checked: service.is_active }}>
           <View style={[styles.toggleThumb, service.is_active && styles.toggleThumbOn]} />
         </TouchableOpacity>
@@ -98,7 +98,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
       <Text style={styles.rowDate}>{listedAgo(service.created_at)}</Text>
       {service.bookingCount > 0 && (
         <View style={styles.bookingCountWrap}>
-          <Text style={styles.bookingCountText}>{service.bookingCount} booking{service.bookingCount !== 1 ? 's' : ''}</Text>
+          <Text style={styles.bookingCountText}>{service.bookingCount} booking record{service.bookingCount !== 1 ? 's' : ''}</Text>
         </View>
       )}
 
@@ -157,7 +157,7 @@ export default function MyServicesScreen({ navigation, route }) {
       .order('created_at', { ascending: false })
 
     if (servicesError) {
-      Alert.alert('Could not load services', servicesError.message)
+      Alert.alert('Could not load listings', servicesError.message)
       setLoading(false)
       setRefreshing(false)
       return

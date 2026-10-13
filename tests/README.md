@@ -1,5 +1,77 @@
 # DIFM Rural — E2E Tests
 
+## Help and feedback device checks
+
+From Account, open Help & feedback. How it works should open the explainer;
+Send feedback should open an email draft to hello@ruralconnections.nz with
+app version, build, platform and update details. With no configured mail app,
+check the fallback message and long-press copying of the visible email address
+and version details. Send feedback must only open a draft, not send email.
+
+## Lighter onboarding device checks
+
+Setup starts with public name and town/region, followed by optional skills and
+completion choices. Check blank-field guidance and typed location when Places
+search is unavailable. Confirm the public name appears consistently on jobs,
+listings and messages. Skills → Skip for now should reach the choices without
+saving edited skills; Finish setup later from the first screen should leave
+setup only after the completion save succeeds. Existing phone, bio and
+qualifications must remain unchanged. Pending guest actions should still resume.
+
+## Activity messages checks
+
+Run `node --test --test-isolation=none tests/message-threads.test.mjs`.
+On a phone, send a listing enquiry, leave Chat and open Activity → Messages
+before anyone replies. Reopen the correct listing/person conversation and go
+Back to Messages. Repeat with two enquirers on one listing, and with job and
+booking chats. Conversations should sort by latest message; pull-to-refresh
+should show incoming replies. Offline loads should offer Retry. Check that
+Activity's Post a job opens the wizard directly and Active includes requests.
+
+## Marketplace recovery device checks
+
+On guest Home and Listings, check these separately:
+
+- Offline load: connection error with Retry, rather than an empty-marketplace message.
+- Empty results with no search: genuine empty state; pull-to-refresh remains available.
+- Unmatched search: Clear search, rather than Add a listing. Clearing restores results.
+- Search, go offline, retry, then reconnect: the query stays intact throughout recovery.
+- Guest Home partial failure: the failed feed offers Retry while successfully loaded content stays available.
+- Empty/error screens on a small phone: pull-to-refresh and buttons work with the keyboard open.
+
+## Sign-in regression checks
+
+Run `node --test --test-isolation=none tests/sign-in.test.mjs` for email
+validation, code paste handling and actionable failure messages.
+
+On the release build, test an incomplete email, an expired code, full-code
+paste into the first and another box, OS autofill, repeated rapid submissions,
+and failed resend with the network unavailable. A failed resend must not claim
+a code was sent or clear the entered code. Successful sends start a 60-second
+cooldown; returning to email entry must not bypass it for the same address.
+Confirm fields stay usable with the keyboard on a small phone. Google sign-in
+must not be offered.
+
+## Local guest enquiry regression checks
+
+Pricing checks: `node --test --test-isolation=none tests/listing-estimate.test.mjs`.
+On a phone, verify a $50/hour listing with a $150 minimum shows a $150 base
+estimate for one hour on detail and review, and stores $150 on the request.
+Repeat with a rate variant. Delivery extras and terms should be repeated on
+review and clearly excluded from the base estimate; payment stays direct.
+
+Run `node --test --test-isolation=none tests/listing-enquiry.test.mjs`.
+These checks require installed dependencies but no Supabase credentials. They
+cover saved listing/recipient restoration, onboarding readiness, expired or
+invalid intents, and Back behaviour using the installed navigation routers.
+
+On the release build, also check a signed-out enquiry on grazing, lease and
+for-sale listings: choose Sign in, finish or skip setup, and confirm Chat opens
+for the correct listing and person. Back should show that listing, then Listings.
+Repeat with an existing account, dismiss the sign-in prompt, and confirm a
+signed-in enquiry still opens Chat directly. No message should be sent until
+the tester presses Send.
+
 ## Setup
 
 Before running tests, create two dedicated test accounts in Supabase Auth:

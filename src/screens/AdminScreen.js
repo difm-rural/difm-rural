@@ -283,8 +283,8 @@ export default function AdminScreen({ navigation }) {
           <StatTile label="Jobs" value={counts.jobs} />
           <StatTile label="Open jobs" value={counts.openJobs} tone="warn" />
           <StatTile label="Awarded" value={counts.awardedJobs} />
-          <StatTile label="Services" value={counts.services} />
-          <StatTile label="Active services" value={counts.activeServices} />
+          <StatTile label="Listings" value={counts.services} />
+          <StatTile label="Active listings" value={counts.activeServices} />
           <StatTile label="Bookings" value={counts.bookings} />
           <StatTile label="Active bookings" value={counts.activeBookings} tone="warn" />
           <StatTile label="Offers" value={counts.bids} />
@@ -312,7 +312,7 @@ export default function AdminScreen({ navigation }) {
           ))}
         </Section>
 
-        <Section title="Recent services">
+        <Section title="Recent listings">
           {recentServices.map(service => (
             <Row
               key={service.id}

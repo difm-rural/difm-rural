@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
+import { RESEND_COOLDOWN_MS, validEmail, signInError, updateCodeDigits } from '../lib/signIn'
 import {
   authenticate,
   clearSessionTokens,
@@ -44,11 +45,30 @@ export default function LoginScreen({ navigation, route }) {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendSeconds, setResendSeconds] = useState(0)
+  const requestBusy = useRef(false)
+  const verified = useRef(false)
+  const cooldowns = useRef({})
+  const sentEmails = useRef(new Set())
   const [focused, setFocused] = useState(null)
   const [biometricReady, setBiometricReady] = useState(false)
   const [biometricType,  setBiometricType]  = useState('fingerprint')
 
   const inputRefs = useRef([...Array(6)].map(() => React.createRef()))
+
+  useEffect(() => {
+    const update = () => setResendSeconds(Math.max(0,
+      Math.ceil(((cooldowns.current[email.trim().toLowerCase()] || 0) - Date.now()) / 1000)))
+    update()
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [email])
+
+  function startCooldown(address) {
+    cooldowns.current[address] = Date.now() + RESEND_COOLDOWN_MS
+    setResendSeconds(RESEND_COOLDOWN_MS / 1000)
+  }
 
   // Re-check on every focus so the button appears immediately after enabling
   // and disappears after sign-out clears the stored tokens.
@@ -72,6 +92,9 @@ export default function LoginScreen({ navigation, route }) {
   // ─── Biometric login ──────────────────────────────────────────────────────────
 
   async function handleBiometricLogin() {
+    if (requestBusy.current || verified.current) return
+    requestBusy.current = true
+    setLoading(true)
     try {
       const success = await authenticate()
       if (!success) return
@@ -99,48 +122,54 @@ export default function LoginScreen({ navigation, route }) {
       }
       // On success AppNavigator handles redirect via onAuthStateChange
     } catch (e) {
-      Alert.alert('Error', e.message)
+      Alert.alert('Could not sign in', 'Please try again, or sign in with an email code.')
+    } finally {
+      requestBusy.current = false
+      setLoading(false)
     }
   }
 
   // ─── OTP flow ─────────────────────────────────────────────────────────────────
 
   async function handleSendCode() {
+    if (requestBusy.current || verified.current) return
     const trimmed = email.trim().toLowerCase()
-    if (!trimmed) {
-      Alert.alert('Email required', 'Please enter your email address.')
+    if (!validEmail(trimmed)) {
+      Alert.alert('Check your email address', 'Enter a complete email address, such as name@example.com.')
       return
     }
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email:   trimmed,
-      options: { shouldCreateUser: true },
-    })
-    if (error) {
-      Alert.alert('Error', error.message)
-    } else {
-      setStage('verify')
+    if ((cooldowns.current[trimmed] || 0) > Date.now()) {
+      if (sentEmails.current.has(trimmed)) setStage('verify')
+      else Alert.alert('Please wait', 'Please wait a minute before requesting another code.')
+      return
     }
-    setLoading(false)
+    requestBusy.current = true
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: trimmed, options: { shouldCreateUser: true },
+      })
+      if (error) throw error
+      sentEmails.current.add(trimmed)
+      startCooldown(trimmed)
+      setCode(['', '', '', '', '', ''])
+      setStage('verify')
+    } catch (error) {
+      if (error?.status === 429 || ['over_email_send_rate_limit', 'over_request_rate_limit'].includes(error?.code)) startCooldown(trimmed)
+      Alert.alert('Code not sent', signInError(error))
+    } finally {
+      requestBusy.current = false
+      setLoading(false)
+    }
   }
 
   function handleDigitChange(index, value) {
-    const newCode = [...code]
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, '').split('')
-      digits.forEach((d, i) => {
-        if (index + i < 6) newCode[index + i] = d
-      })
-      setCode(newCode)
-      const lastFilled = Math.min(index + digits.length - 1, 5)
-      inputRefs.current[lastFilled]?.current?.focus()
-      if (index + digits.length >= 6) verifyCode(newCode.join(''))
-      return
-    }
-    newCode[index] = value
+    if (requestBusy.current || verified.current) return
+    const newCode = updateCodeDigits(code, index, value)
     setCode(newCode)
-    if (value && index < 5) inputRefs.current[index + 1]?.current?.focus()
-    if (newCode.every(d => d !== '')) verifyCode(newCode.join(''))
+    const nextEmpty = newCode.findIndex(d => !d)
+    if (nextEmpty === -1) verifyCode(newCode.join(''))
+    else if (value.replace(/\D/g, '')) inputRefs.current[nextEmpty]?.current?.focus()
   }
 
   function handleDigitKeyPress(index, key) {
@@ -150,22 +179,22 @@ export default function LoginScreen({ navigation, route }) {
   }
 
   async function verifyCode(codeString) {
+    if (requestBusy.current || verified.current || !/^\d{6}$/.test(codeString)) return
+    requestBusy.current = true
     setLoading(true)
+    try {
     const { data, error } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
       token: codeString,
       type:  'email',
     })
 
-    if (error) {
-      Alert.alert('Invalid code', 'The code is incorrect or has expired. Please try again.')
-      setCode(['', '', '', '', '', ''])
-      inputRefs.current[0]?.current?.focus()
-      setLoading(false)
-      return
-    }
+    if (error) throw error
+    if (!data?.session) throw new Error('Missing session')
+    verified.current = true
 
     // Handle biometric token storage after successful OTP
+    try {
     if (data?.session) {
       const available = await isBiometricAvailable()
       if (available) {
@@ -206,19 +235,42 @@ export default function LoginScreen({ navigation, route }) {
         }
       }
     }
+    } catch {
+      // Optional biometric setup must not turn a successful email sign-in into
+      // a code error. The user can enable it later from Account.
+    }
 
     // AppNavigator handles redirect via onAuthStateChange
-    setLoading(false)
+    } catch (error) {
+      Alert.alert('Could not sign in', signInError(error, true))
+      setCode(['', '', '', '', '', ''])
+      inputRefs.current[0]?.current?.focus()
+    } finally {
+      requestBusy.current = false
+      setLoading(false)
+    }
   }
 
   async function resendCode() {
-    await supabase.auth.signInWithOtp({
-      email:   email.trim().toLowerCase(),
-      options: { shouldCreateUser: true },
-    })
-    Alert.alert('Code sent', 'A new code has been sent to your email.')
-    setCode(['', '', '', '', '', ''])
-    inputRefs.current[0]?.current?.focus()
+    const address = email.trim().toLowerCase()
+    if (requestBusy.current || verified.current || (cooldowns.current[address] || 0) > Date.now()) return
+    requestBusy.current = true
+    setResending(true)
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email: address, options: { shouldCreateUser: true } })
+      if (error) throw error
+      sentEmails.current.add(address)
+      startCooldown(address)
+      Alert.alert('Code sent', 'Check your email and use the latest 6-digit code. If it doesn’t arrive, check your spam folder.')
+      setCode(['', '', '', '', '', ''])
+      inputRefs.current[0]?.current?.focus()
+    } catch (error) {
+      if (error?.status === 429 || ['over_email_send_rate_limit', 'over_request_rate_limit'].includes(error?.code)) startCooldown(address)
+      Alert.alert('Code not sent', signInError(error))
+    } finally {
+      requestBusy.current = false
+      setResending(false)
+    }
   }
 
   // ─── Verify stage ─────────────────────────────────────────────────────────────
@@ -234,6 +286,7 @@ export default function LoginScreen({ navigation, route }) {
               onPress={() => { setStage('email'); setCode(['', '', '', '', '', '']) }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
+              disabled={loading || resending}
               accessibilityLabel="Back to email entry">
               <Icon name="chevron-back" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -270,10 +323,15 @@ export default function LoginScreen({ navigation, route }) {
                 onFocus={() => setFocused(index)}
                 onBlur={() => setFocused(null)}
                 keyboardType="number-pad"
-                maxLength={6}
+                maxLength={12}
+                autoFocus={index === 0}
+                autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                textContentType={index === 0 ? 'oneTimeCode' : 'none'}
+                autoCorrect={false}
+                autoCapitalize="none"
                 textAlign="center"
                 accessibilityLabel={`Digit ${index + 1}`}
-                editable={!loading}
+                editable={!loading && !resending}
               />
             ))}
           </View>
@@ -288,11 +346,14 @@ export default function LoginScreen({ navigation, route }) {
           <TouchableOpacity
             style={styles.resendBtn}
             onPress={resendCode}
-            disabled={loading}
+            disabled={loading || resending || resendSeconds > 0}
             accessibilityRole="button"
+            accessibilityState={{ disabled: loading || resending || resendSeconds > 0, busy: resending }}
             accessibilityLabel="Resend sign in code">
-            <Text style={styles.resendText}>Didn't get it? Resend code</Text>
+            <Text style={styles.resendText}>{resending ? 'Sending code…' : resendSeconds > 0
+              ? `Resend code in ${resendSeconds}s` : 'Didn’t get it? Resend code'}</Text>
           </TouchableOpacity>
+          <Text style={styles.footerText}>Use the latest code. Check your spam folder if the email hasn’t arrived.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     )
@@ -322,7 +383,7 @@ export default function LoginScreen({ navigation, route }) {
 
         <View style={styles.brandLockup}>
           <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.brandLockupBadge} />
-          <Text style={styles.brandLockupName}>Rural Connect</Text>
+          <Text style={styles.brandLockupName}>Rural Connections</Text>
           <Text style={styles.brandLockupSub}>Post jobs, make offers & book services</Text>
         </View>
 
@@ -344,6 +405,8 @@ export default function LoginScreen({ navigation, route }) {
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
           returnKeyType="done"
           onSubmitEditing={handleSendCode}
           editable={!loading}
@@ -369,14 +432,6 @@ export default function LoginScreen({ navigation, route }) {
             accessibilityLabel={`Sign in with ${biometricLabel}`}
           />
         )}
-
-        <Button
-          variant="secondary"
-          title="Continue with Google"
-          disabled
-          style={{ marginTop: 12 }}
-          accessibilityLabel="Continue with Google (coming soon)"
-        />
 
         <Text style={styles.footerText}>
           New to Rural Connections? Just enter your email —{'\n'}
@@ -450,12 +505,13 @@ const styles = StyleSheet.create({
 
   digitContainer: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 6,
     justifyContent: 'center',
     marginVertical: 24,
   },
   digitBox: {
-    width: 48,
+    flex: 1,
+    maxWidth: 48,
     height: 56,
     borderRadius: 10,
     borderWidth: 1.5,

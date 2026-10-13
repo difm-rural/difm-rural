@@ -21,6 +21,9 @@ import AccountTabScreen  from '../screens/tabs/AccountTabScreen'
 import NotificationsScreen from '../screens/NotificationsScreen'
 import HowItWorksScreen from '../screens/HowItWorksScreen'
 import { onBadgeRefresh } from '../lib/badgeEvents'
+import { canResumeGuestAction, listingEnquiryNavigationState, parsePendingListingEnquiry, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
+import { ONBOARDING_DESTINATIONS } from '../lib/onboarding'
+import { bookingRequestCopy } from '../lib/bookingRequestCopy'
 
 // ─── Post job wizard screens ──────────────────────────────────────────────────
 import PostJobStep1JobType  from '../screens/postjob/PostJobStep1JobType'
@@ -35,6 +38,7 @@ import { useUser }          from '../context/UserContext'
 import ManageTaskScreen     from '../screens/ManageTaskScreen'
 import JobDetailScreen      from '../screens/JobDetailScreen'
 import ChatScreen           from '../screens/ChatScreen'
+import MessagesScreen from '../screens/MessagesScreen'
 import ServiceDetailScreen  from '../screens/ServiceDetailScreen'
 import ServiceBookingDetailScreen from '../screens/ServiceBookingDetailScreen'
 import BookingConfirmScreen from '../screens/BookingConfirmScreen'
@@ -169,6 +173,7 @@ function ActivityStackNav() {
       <ActivityNav.Screen name="MyJobs"        component={MyJobsScreen}        />
       <ActivityNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <ActivityNav.Screen name="Chat"          component={ChatScreen}          />
+      <ActivityNav.Screen name="Messages"      component={MessagesScreen}      />
       <ActivityNav.Screen name="ServiceDetail"      component={ServiceDetailScreen}    />
       <ActivityNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <ActivityNav.Screen name="BookingConfirm"     component={BookingConfirmScreen}   />
@@ -413,6 +418,7 @@ export default function AppNavigator() {
   const navigationRef = useNavigationContainerRef()
   const sessionRef = useRef(null)
   const profileRef = useRef(null)
+  const onboardingDestinationRef = useRef(null)
   useEffect(() => { sessionRef.current = session }, [session])
   useEffect(() => { profileRef.current = profile }, [profile])
 
@@ -518,22 +524,61 @@ export default function AppNavigator() {
     }
   }, [])
 
-  // After a guest taps "Offer on this job" they're sent to sign in; once the
-  // authenticated tabs are actually mounted (immediately for existing users,
-  // after onboarding for new ones) return them to that job ready to offer.
-  const authedTabsActive = !!session && !showOnboarding && !loading
+  // Resume a guest enquiry or job action only once the authenticated tabs are
+  // mounted (after onboarding for new accounts). Enquiries restore a listing
+  // beneath Chat so Back returns to the listing instead of the login screen.
+  const authedTabsActive = canResumeGuestAction(session, profile, loading, showOnboarding)
   useEffect(() => {
     if (!authedTabsActive) return
     let cancelled = false
+    async function openOnboardingDestination() {
+      const destination = ONBOARDING_DESTINATIONS[onboardingDestinationRef.current]
+      if (!destination) return
+      for (let attempt = 0; attempt < 40; attempt++) {
+        if (cancelled) return
+        const root = navigationRef.isReady() ? navigationRef.getRootState() : null
+        if (root?.routeNames?.includes(destination.tab)) {
+          navigationRef.navigate(destination.tab, { screen: destination.screen, params: destination.params })
+          onboardingDestinationRef.current = null
+          return
+        }
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
     ;(async () => {
       try {
+        const enquiryRaw = await AsyncStorage.getItem(PENDING_LISTING_ENQUIRY_KEY)
+        if (cancelled) return
+        if (enquiryRaw) {
+          const pending = parsePendingListingEnquiry(enquiryRaw)
+          if (!pending) {
+            await AsyncStorage.removeItem(PENDING_LISTING_ENQUIRY_KEY)
+          } else {
+            // Wait for the authenticated tab tree, not just a ready guest or
+            // onboarding navigator. Keep the intent until navigation succeeds.
+            for (let attempt = 0; attempt < 40; attempt++) {
+              if (cancelled) return
+              const root = navigationRef.isReady() ? navigationRef.getRootState() : null
+              if (root?.routeNames?.includes('Browse')) {
+                navigationRef.resetRoot(listingEnquiryNavigationState(pending))
+                onboardingDestinationRef.current = null
+                await AsyncStorage.removeItem(PENDING_LISTING_ENQUIRY_KEY)
+                return
+              }
+              await new Promise(resolve => setTimeout(resolve, 100))
+            }
+            return
+          }
+        }
+        if (cancelled) return
         const raw = await AsyncStorage.getItem('pendingJobView')
-        if (!raw) return
+        if (!raw) { await openOnboardingDestination(); return }
         await AsyncStorage.removeItem('pendingJobView')
         const parsed = JSON.parse(raw)
         const job = parsed?.job
         const fresh = parsed?.savedAt && Date.now() - parsed.savedAt < 60 * 60 * 1000
-        if (!job || !fresh) return
+        if (!job || !fresh) { await openOnboardingDestination(); return }
+        onboardingDestinationRef.current = null
         // The tab tree may still be mounting — retry until the ref is ready.
         const go = (attempt = 0) => {
           if (cancelled) return
@@ -545,7 +590,7 @@ export default function AppNavigator() {
         }
         go()
       } catch (e) {
-        console.log('Error opening pending job view:', e)
+        console.log('Error resuming pending guest action:', e)
       }
     })()
     return () => { cancelled = true }
@@ -601,16 +646,18 @@ export default function AppNavigator() {
       }
 
       await AsyncStorage.removeItem('pendingBooking')
+      const requestCopy = bookingRequestCopy(pending.isQuoteRequired === true)
       Alert.alert(
-        'Booking requested',
-        `Your booking request has been sent to ${pending.providerName || 'the provider'}.`
+        requestCopy.successTitle,
+        requestCopy.nextStep
       )
     } catch (error) {
       console.log('Error posting pending booking:', error)
     }
   }
 
-  function handleOnboardingComplete() {
+  function handleOnboardingComplete(destination = 'home') {
+    onboardingDestinationRef.current = destination
     setShowOnboarding(false)
     if (profile?.id) fetchBadgeCounts(profile.id, profile)
   }

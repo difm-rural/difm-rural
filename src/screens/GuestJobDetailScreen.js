@@ -6,6 +6,7 @@ import { colors } from '../theme/tokens'
 import { coarseSuburb, stripPlusCode } from '../lib/location'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
+import { PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
 
 export default function GuestJobDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
@@ -25,6 +26,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
   async function savePendingJobView() {
     try {
       await AsyncStorage.setItem('pendingJobView', JSON.stringify({ job, savedAt: Date.now() }))
+      await AsyncStorage.removeItem(PENDING_LISTING_ENQUIRY_KEY)
     } catch (e) {
       console.log('Could not save pending job view:', e)
     }

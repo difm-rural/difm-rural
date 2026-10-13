@@ -113,7 +113,7 @@ export default function ConnectionDetailScreen({ navigation, route }) {
         ) : services.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.muted}>
-              {name.split(' ')[0]} has no active services listed right now. You can still view their profile or post a job they can offer on.
+              {name.split(' ')[0]} has no active listings right now. You can still view their profile or post a job they can offer on.
             </Text>
           </View>
         ) : (

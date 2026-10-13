@@ -176,9 +176,9 @@ export default function HomeTabScreen({ navigation }) {
   // Three stat tiles for the "Your activity" row (mock-style): posts you've made,
   // offers you've placed, and everything active/booked.
   const activityTiles = [
-    { label: 'Open jobs',   count: summary.activeJobs || 0,  target: 'Activity' },
-    { label: 'Offers made', count: summary.pendingBids || 0, target: 'Jobs' },
-    { label: 'In progress', count: (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0), target: 'Activity' },
+    { label: 'Active jobs posted', count: summary.activeJobs || 0, target: 'Activity' },
+    { label: 'Offers on open jobs', count: summary.pendingBids || 0, target: 'Activity' },
+    { label: 'Work & requests', count: (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0), target: 'Activity' },
   ]
 
   function openAttentionItem(item) {
@@ -369,7 +369,7 @@ export default function HomeTabScreen({ navigation }) {
               body={
                 isProvider && !isRequester
                   ? 'Find jobs on the board or advertise a service when you are ready.'
-                  : 'Post a job or browse services to get started.'
+                  : 'Post a job or browse listings to get started.'
               }
             />
           </View>

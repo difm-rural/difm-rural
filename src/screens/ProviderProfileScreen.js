@@ -403,8 +403,8 @@ export default function ProviderProfileScreen({ route, navigation }) {
                 style={styles.showAllBtn}
                 onPress={() => setShowAllServices(true)}
                 accessibilityRole="button"
-                accessibilityLabel={`See all ${services.length} services`}>
-                <Text style={styles.showAllText}>See all {services.length} services <Icon name="arrow-forward" size={13} color={colors.primary} /></Text>
+                accessibilityLabel={`See all ${services.length} listings`}>
+                <Text style={styles.showAllText}>See all {services.length} listings <Icon name="arrow-forward" size={13} color={colors.primary} /></Text>
               </TouchableOpacity>
             )}
           </View>

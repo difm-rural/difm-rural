@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
   Keyboard,
   RefreshControl,
@@ -14,13 +14,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
-import { useUser } from '../../context/UserContext'
 import ServiceListCard from '../../components/ServiceListCard'
 import EmptyState from '../../components/EmptyState'
 import { SkeletonList } from '../../components/SkeletonCard'
 import { getCurrentLocation, haversineDistance } from '../../lib/location'
 import { availabilityDisplay } from '../../lib/providerAvailability'
-import { canProvide } from '../../lib/roles'
 
 function itemMatchesSearch(item, query) {
   if (!query.trim()) return true
@@ -66,8 +64,6 @@ function ServiceSection({ title, items, onPressItem }) {
 
 export default function BrowseTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
-  const { profile } = useUser()
-  const isProvider = canProvide(profile)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [services,    setServices]    = useState([])
   const [userRegion,  setUserRegion]  = useState('')
@@ -76,10 +72,15 @@ export default function BrowseTabScreen({ navigation }) {
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
   const [search,      setSearch]      = useState('')
+  const [loadError, setLoadError] = useState(false)
+  const loadingRef = useRef(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
 
   async function load() {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    try {
     const { data: { user } } = await supabase.auth.getUser()
     setCurrentUserId(user?.id || null)
 
@@ -102,32 +103,27 @@ export default function BrowseTabScreen({ navigation }) {
       }
     } catch { /* location denied — fall back to region text matching */ }
 
-    await fetchServices(user?.id || null)
-    setLoading(false)
-    setRefreshing(false)
+    await fetchServices()
+    setLoadError(false)
+    } catch {
+      setLoadError(true)
+    } finally {
+      loadingRef.current = false
+      setLoading(false)
+      setRefreshing(false)
+    }
   }
 
-  async function fetchServices(userId = currentUserId) {
-    const { data: servicesData } = await supabase
+  async function fetchServices() {
+    const { data: servicesData, error } = await supabase
       .from('services')
       .select('*')
       .eq('is_active', true)
       .is('closed_at', null)
       .order('created_at', { ascending: false })
 
-    let raw = servicesData || []
-    if (userId) {
-      const { data: ownServicesData } = await supabase
-        .from('services')
-        .select('*')
-        .eq('provider_id', userId)
-        .order('created_at', { ascending: false })
-
-      const byId = {}
-      raw.forEach(service => { byId[service.id] = service })
-      ownServicesData?.forEach(service => { byId[service.id] = service })
-      raw = Object.values(byId)
-    }
+    if (error) throw error
+    const raw = servicesData || []
 
     if (raw.length === 0) { setServices([]); return }
 
@@ -168,13 +164,14 @@ export default function BrowseTabScreen({ navigation }) {
   }
 
   function onRefresh() {
+    if (loadingRef.current) return
     setRefreshing(true)
     load()
   }
 
   function handlePress(item) {
     // Tapping any card — including your own listings — opens the requester-facing
-    // preview. Editing happens only via the "Manage your services" banner.
+    // preview. Editing happens via the secondary "My listings" action.
     navigation.navigate('ServiceDetail', { service: item })
   }
 
@@ -206,15 +203,7 @@ export default function BrowseTabScreen({ navigation }) {
     if (userLat != null && i._distanceKm != null) return parseFloat(i._distanceKm) > 50
     return !isNearUser(i, userRegion)
   })
-  const yourServices = isProvider && currentUserId
-    ? filtered.filter(i => i.provider_id === currentUserId)
-    : []
-  const otherServices = isProvider && currentUserId
-    ? filtered.filter(i => i.provider_id !== currentUserId)
-    : []
-  const isEmpty = isProvider
-    ? yourServices.length === 0 && otherServices.length === 0
-    : nearYou.length === 0 && allServices.length === 0
+  const isEmpty = filtered.length === 0
 
   return (
     <View style={styles.screen}>
@@ -230,7 +219,7 @@ export default function BrowseTabScreen({ navigation }) {
         </TouchableOpacity>
         <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
         <Text style={styles.title}>Listings</Text>
-        <Text style={styles.subtitle}>Find rural listings near you</Text>
+        <Text style={styles.subtitle}>Services, grazing, hire and local goods</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search fencing, water, machinery..."
@@ -244,63 +233,50 @@ export default function BrowseTabScreen({ navigation }) {
         />
       </View>
 
-      {isProvider && (
+      {currentUserId && (
         <TouchableOpacity
           style={styles.manageBanner}
           onPress={() => navigation.navigate('MyServices')}
           accessibilityRole="button"
-          accessibilityLabel="Manage your advertised listings">
-          <Text style={styles.manageBannerTitle}>Manage your listings</Text>
-          <Text style={styles.manageBannerText}>Edit, pause advertising, or delete a listing</Text>
+          accessibilityLabel="My listings">
+          <Text style={styles.manageBannerTitle}>My listings</Text>
+          <Text style={styles.manageBannerText}>Manage live, paused and closed listings</Text>
         </TouchableOpacity>
       )}
 
+      <ScrollView
+        style={{ flex: 1 }}
+        alwaysBounceVertical
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
       {loading ? (
         <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
+      ) : loadError ? (
+        <EmptyState icon="cloud-offline-outline"
+          title="Couldn't load listings"
+          body="Check your connection and try again."
+          actionLabel="Retry" onAction={onRefresh} />
+      ) : isEmpty && search.trim() ? (
+        <EmptyState icon="search-outline"
+          title={`No listings match “${search.trim()}”`}
+          body="Try another word or clear your search."
+          actionLabel="Clear search" onAction={() => setSearch('')} />
       ) : isEmpty ? (
-        isProvider ? (
-          <EmptyState
-            icon="construct-outline"
-            title="No listings yet"
-            body="Be the first — add a listing so locals nearby can find you."
-            actionLabel="Add a listing"
-            actionIcon="arrow-forward"
-            onAction={() => navigation.navigate('MyServices')}
-          />
-        ) : (
           <EmptyState
             icon="pricetags-outline"
             title="No listings available yet"
-            body="Check back soon, or post a job to get quotes from providers."
+            body="Check back soon, or post a job to get offers from locals."
             actionLabel="Post a job"
             actionIcon="arrow-forward"
-            onAction={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })}
+            onAction={() => {
+              if (!currentUserId) navigation.navigate('GuestPostJob')
+              else navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })
+            }}
           />
-        )
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-          }>
-
-          {isProvider ? (
-            <>
-              <ServiceSection
-                title="Your listings"
-                items={yourServices}
-                onPressItem={handlePress}
-              />
-
-              <ServiceSection
-                title="Other listings"
-                items={otherServices}
-                onPressItem={handlePress}
-              />
-            </>
-          ) : (
-            <>
+        <>
               <ServiceSection
                 title="Near you"
                 items={nearYou}
@@ -318,10 +294,9 @@ export default function BrowseTabScreen({ navigation }) {
                   <Text style={styles.noMoreText}>All available listings shown above</Text>
                 </View>
               )}
-            </>
-          )}
-        </ScrollView>
+        </>
       )}
+      </ScrollView>
     </View>
   )
 }
@@ -373,10 +348,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.border,
     padding: 12,
   },
-  manageBannerTitle: { fontSize: 14, color: colors.primary, fontWeight: '800', marginBottom: 3 },
+  manageBannerTitle: { fontSize: 14, color: colors.primary, fontWeight: '600', marginBottom: 3 },
   manageBannerText: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
 
 

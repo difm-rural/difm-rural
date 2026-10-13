@@ -30,7 +30,7 @@ const AUDIENCES = [
 
 const ACTIONS = [
   { id: 'post_job', label: 'Post a job' },
-  { id: 'browse_services', label: 'Browse services' },
+  { id: 'browse_services', label: 'Browse listings' },
   { id: 'manage_profile', label: 'Update profile' },
   { id: 'none', label: 'Information only' },
 ]

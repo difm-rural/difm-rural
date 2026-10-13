@@ -442,7 +442,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         {isEditMode && editBidCount > 0 && (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              <Icon name="warning-outline" size={14} color={colors.warning} /> This job has {editBidCount} bid{editBidCount > 1 ? 's' : ''}. Editing may affect existing bids.
+              <Icon name="warning-outline" size={14} color={colors.warning} /> This job has {editBidCount} offer{editBidCount > 1 ? 's' : ''}. Editing may affect existing offers.
             </Text>
           </View>
         )}

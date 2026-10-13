@@ -652,7 +652,7 @@ export default function ActivityTabScreen({ navigation }) {
         </View>
 
         <View style={styles.segment}>
-          {[['progress', 'In progress'], ['history', 'History']].map(([id, label]) => (
+          {[['progress', 'Active'], ['history', 'History']].map(([id, label]) => (
             <TouchableOpacity
               key={id}
               style={[styles.segmentBtn, activityView === id && styles.segmentBtnActive]}
@@ -671,17 +671,24 @@ export default function ActivityTabScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
 
+        <TouchableOpacity style={styles.myJobsBtn} onPress={() => navigation.navigate('Messages')}
+          accessibilityRole="button" accessibilityLabel="Messages: jobs, bookings and listing enquiries">
+          <Icon name="chatbubbles-outline" size={20} color={colors.primary} />
+          <Text style={styles.myJobsBtnText}>Messages</Text>
+          <Icon name="chevron-forward" size={18} color={colors.primary} />
+        </TouchableOpacity>
+
         {/* Empty state */}
         {activityView === 'progress' && totalActive === 0 && (
           <EmptyState
             tone="positive"
             icon="checkmark-circle-outline"
             title="All caught up"
-            body="Your active tasks and bookings will appear here as they come in."
+            body="Your jobs, booking requests and bookings will appear here as they come in."
             actionLabel={isRequester ? 'Post a job' : isProvider ? 'Browse jobs' : undefined}
             onAction={
               isRequester
-                ? () => navigation.getParent()?.navigate('Home')
+                ? () => navigation.navigate('PostJob', { origin: 'Activity' })
                 : isProvider
                 ? () => navigation.getParent()?.navigate('Jobs')
                 : undefined
@@ -726,7 +733,7 @@ export default function ActivityTabScreen({ navigation }) {
         {/* Requester: Booked services */}
         {isRequester && myBookings.length > 0 && (
           <View style={styles.cardSection}>
-            <Text style={styles.sectionLabel}>Your bookings</Text>
+            <Text style={styles.sectionLabel}>Your requests and bookings</Text>
             <FlatList
               horizontal
               data={myBookings}
@@ -783,7 +790,7 @@ export default function ActivityTabScreen({ navigation }) {
         {/* Provider: Service bookings */}
         {isProvider && providerBookings.length > 0 && (
           <View style={styles.cardSection}>
-            <Text style={styles.sectionLabel}>Service bookings</Text>
+            <Text style={styles.sectionLabel}>Received requests and bookings</Text>
             <FlatList
               horizontal
               data={providerBookings}
@@ -854,7 +861,7 @@ export default function ActivityTabScreen({ navigation }) {
 
               {completedBookings.length > 0 && (
                 <View style={styles.cardSection}>
-                  <Text style={styles.sectionLabel}>Completed services</Text>
+                  <Text style={styles.sectionLabel}>Completed bookings</Text>
                   <FlatList
                     horizontal
                     data={completedBookings}

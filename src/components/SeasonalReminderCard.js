@@ -7,7 +7,7 @@ import Icon from './Icon'
 
 const ACTION_LABELS = {
   post_job: 'Post a job',
-  browse_services: 'Browse services',
+  browse_services: 'Browse listings',
   manage_profile: 'Update profile',
 }
 

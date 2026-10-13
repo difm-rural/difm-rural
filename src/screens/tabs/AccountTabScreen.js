@@ -17,6 +17,8 @@ import {
   View,
 } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import Constants from 'expo-constants'
+import * as Updates from 'expo-updates'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../../lib/uploadAvatar'
@@ -58,6 +60,7 @@ const SECTION_TITLES = {
   profile: 'Profile',
   account: 'Account settings',
   privacy: 'Privacy',
+  help: 'Help & feedback',
 }
 
 function getDisplayLocation(addr) {
@@ -146,6 +149,28 @@ export default function AccountTabScreen({ navigation, route }) {
   const { refreshProfile } = useUser()
 
   const [section, setSection]               = useState('hub')
+  const [openingFeedback, setOpeningFeedback] = useState(false)
+  const feedbackAddress = 'hello@ruralconnections.nz'
+  const appVersion = Constants.expoConfig?.version || 'Unknown'
+  const buildVersion = Platform.OS === 'ios'
+    ? Constants.platform?.ios?.buildNumber || Constants.expoConfig?.ios?.buildNumber
+    : Constants.platform?.android?.versionCode ?? Constants.expoConfig?.android?.versionCode
+  const versionDetails = `App version: ${appVersion}\nBuild: ${buildVersion ?? 'Development'}\nPlatform: ${Platform.OS} ${Platform.Version}\nUpdate: ${Updates.updateId || 'Bundled version'}`
+
+  async function sendFeedback() {
+    if (openingFeedback) return
+    setOpeningFeedback(true)
+    const subject = `Rural Connections feedback — ${appVersion}`
+    const body = `Screen:\n\nWhat I was trying to do:\n\nSteps to reproduce:\n\nWhat I expected:\n\nWhat happened:\n\n${versionDetails}`
+    try {
+      await Linking.openURL(`mailto:${feedbackAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)
+    } catch {
+      Alert.alert('Email app unavailable',
+        `Send feedback to ${feedbackAddress} using your preferred email service. Press and hold the address and version details on this screen to copy them.`)
+    } finally {
+      setOpeningFeedback(false)
+    }
+  }
   const [loading, setLoading]               = useState(true)
   const [saving, setSaving]                 = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -599,7 +624,11 @@ export default function AccountTabScreen({ navigation, route }) {
           onPress={() => setSection('account')}
         />
         <HubButton
-          icon="lock-closed-outline" label="Privacy" sub="Security, terms, support"
+          icon="help-circle-outline" label="Help & feedback" sub="How it works, send feedback, app version"
+          onPress={() => setSection('help')}
+        />
+        <HubButton
+          icon="lock-closed-outline" label="Privacy" sub="Security, terms and privacy"
           onPress={() => setSection('privacy')}
         />
       </View>
@@ -947,16 +976,29 @@ export default function AccountTabScreen({ navigation, route }) {
         />
       </View>
 
-      <Text style={styles.sectionLabel}>Support</Text>
+    </View>
+  )
+
+  const helpContent = (
+    <View style={styles.body}>
+      <Text style={styles.sectionLabel}>Help</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="help-circle-outline" label="Help & FAQ"
+          icon="help-circle-outline" label="How it works" last
           onPress={() => navigation.navigate('HowItWorks')}
         />
-        <MenuRow
-          icon="mail-outline" label="Contact us" last
-          onPress={() => Linking.openURL('mailto:hello@ruralconnections.nz')}
-        />
+      </View>
+      <Text style={styles.sectionLabel}>Feedback</Text>
+      <View style={[styles.card, { padding: 16 }]}>
+        <Text style={[styles.rowSub, { marginBottom: 12 }]}>Tell us which screen you were on, what you expected and what happened. Your email draft includes the version details below.</Text>
+        <Button title="Send feedback" icon="mail-outline" onPress={sendFeedback} loading={openingFeedback} />
+        <Text style={[styles.rowSub, { marginTop: 16 }]}>No email app? Press and hold this address to copy it, then use your preferred email service.</Text>
+        <Text selectable style={[styles.rowLabel, { marginTop: 8 }]}>{feedbackAddress}</Text>
+      </View>
+      <Text style={styles.sectionLabel}>App version</Text>
+      <View style={[styles.card, { padding: 16 }]}>
+        <Text selectable style={styles.rowLabel}>{versionDetails}</Text>
+        <Text style={[styles.rowSub, { marginTop: 8 }]}>Press and hold to copy these details into your report.</Text>
       </View>
     </View>
   )
@@ -988,6 +1030,7 @@ export default function AccountTabScreen({ navigation, route }) {
         {section === 'profile' && profileContent}
         {section === 'account' && accountContent}
         {section === 'privacy' && privacyContent}
+        {section === 'help'    && helpContent}
       </ScrollView>
 
       {/* ── Location modal ──────────────────────────────────────────────────── */}

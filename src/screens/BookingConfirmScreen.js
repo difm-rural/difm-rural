@@ -22,6 +22,8 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
+import { bookingRequestCopy } from '../lib/bookingRequestCopy'
+import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
 
 function formatDisplayDate(d) {
   return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -50,18 +52,14 @@ const MATERIALS_LABELS = {
   requester_supplies: 'You supply',
 }
 
-function asNumber(value, fallback = 0) {
-  const next = Number(value)
-  return Number.isFinite(next) ? next : fallback
-}
 
-function AuthSheet({ onDismiss, onLogin, onRegister }) {
+function AuthSheet({ onDismiss, onLogin, onRegister, copy }) {
   return (
     <View style={StyleSheet.absoluteFill}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onDismiss} />
       <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Sign in to book</Text>
-        <Text style={styles.sheetMessage}>Create a free account to confirm your booking.</Text>
+        <Text style={styles.sheetTitle}>{copy.authTitle}</Text>
+        <Text style={styles.sheetMessage}>{copy.authMessage}</Text>
         <TouchableOpacity
           style={styles.sheetPrimary}
           onPress={onRegister}
@@ -84,12 +82,13 @@ function AuthSheet({ onDismiss, onLogin, onRegister }) {
 export default function BookingConfirmScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { service, quantity: initialQty, selectedOption } = route.params || {}
-  const qty = initialQty || 1
   const option = selectedOption || null
-  const effectivePricingType = option ? option.pricing_type : service?.pricing_type
-  const rate = asNumber(option ? option.rate : service?.rate)
+  const estimate = listingEstimate(service, option, initialQty)
+  const qty = estimate.quantity
+  const effectivePricingType = estimate.pricingType
   const isQuoteRequired = effectivePricingType === 'quote_required'
-  const total = (qty * rate).toFixed(2)
+  const requestCopy = bookingRequestCopy(isQuoteRequired)
+  const total = estimate.baseAmount?.toFixed(2)
 
   const unitLabel = effectivePricingType === 'hourly' ? 'hour'
     : effectivePricingType === 'day_rate' ? 'day'
@@ -107,7 +106,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
   const basePaymentExplanation = isQuoteRequired
-    ? 'The provider will confirm pricing before the work goes ahead. You arrange payment directly with them.'
+    ? 'You arrange payment directly with the provider — Rural Connections doesn\'t handle payments.'
     : service?.payment_timing === 'upfront'
     ? 'This provider asks for payment upfront. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
     : 'You arrange payment directly with the provider once the work is complete — Rural Connections doesn\'t handle payments.'
@@ -131,7 +130,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
       requester_id:   requesterId,
       provider_id:    service.provider_id,
       quantity:       qty,
-      total_amount:   isQuoteRequired ? 0 : parseFloat(total),
+      total_amount:   estimate.baseAmount ?? 0,
       payment_timing: service.payment_timing,
       status:         'pending',
       scheduled_date: scheduleType === 'specific' ? (date ? date.toISOString().split('T')[0] : null) : scheduleType,
@@ -185,6 +184,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
     await AsyncStorage.setItem('pendingBooking', JSON.stringify({
       serviceTitle: service.title,
       providerName: service.profile?.full_name || 'The provider',
+      isQuoteRequired,
       booking: buildBookingPayload(null),
     }))
   }
@@ -244,10 +244,9 @@ export default function BookingConfirmScreen({ route, navigation }) {
       return
     }
 
-    const providerName = service.profile?.full_name || 'The provider'
     Alert.alert(
-      'Booking requested!',
-      `${providerName} will confirm shortly.`,
+      requestCopy.successTitle,
+      requestCopy.nextStep,
       [{ text: 'OK', onPress: navigateToServices }]
     )
   }
@@ -269,8 +268,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Booking</Text>
-        <Text style={styles.headerTitle} accessibilityRole="header">Confirm booking</Text>
+        <Text style={styles.kicker}>{isQuoteRequired ? 'Quote request' : 'Booking request'}</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">Review your request</Text>
       </View>
 
       <ScrollView
@@ -282,13 +281,17 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
         {/* Booking summary */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Booking summary</Text>
+          <Text style={styles.cardLabel}>Request summary</Text>
           <SummaryRow label="Service" value={service.title} />
           <SummaryRow label="Provider" value={service.profile?.full_name || 'Provider'} />
-          {service.pricing_type !== 'fixed' && !isQuoteRequired && (
+          {option?.label ? <SummaryRow label="Rate option" value={option.label} /> : null}
+          {effectivePricingType !== 'fixed' && !isQuoteRequired && (
             <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
           )}
-          <SummaryRow label="Total" value={isQuoteRequired ? 'Quote to be confirmed' : `$${total} NZD`} />
+          <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `$${total} NZD`} />
+          {!isQuoteRequired && estimate.minimumCharge > 0 && (
+            <SummaryRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)} NZD`} />
+          )}
           {service.materials ? (
             <SummaryRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
           ) : null}
@@ -298,6 +301,24 @@ export default function BookingConfirmScreen({ route, navigation }) {
             last
           />
         </View>
+
+        {Array.isArray(service.pricing_add_ons) && service.pricing_add_ons.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Extra charges</Text>
+            <Text style={styles.paymentInfoText}>{EXTRA_CHARGES_EXPLANATION}</Text>
+            {service.pricing_add_ons.map((charge, index) => (
+              <SummaryRow key={index}
+                label={`${charge.label || 'Extra'}${charge.optional ? ' (optional)' : ''}`}
+                value={formatExtraCharge(charge)} last={index === service.pricing_add_ons.length - 1} />
+            ))}
+          </View>
+        )}
+        {service.pricing_terms ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Terms &amp; conditions</Text>
+            <Text style={styles.paymentInfoText}>{service.pricing_terms}</Text>
+          </View>
+        ) : null}
 
         {/* Scheduling */}
         <View style={styles.card}>
@@ -414,23 +435,25 @@ export default function BookingConfirmScreen({ route, navigation }) {
         {/* Total + payment explanation */}
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : 'Base estimate'}</Text>
             <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `$${total} NZD`}</Text>
           </View>
           <View style={styles.paymentInfoBox}>
+            <Text style={[styles.paymentInfoText, { marginBottom: 8 }]}>{requestCopy.nextStep}</Text>
+            <Text style={[styles.paymentInfoText, { marginBottom: 8 }]}>{BASE_ESTIMATE_EXPLANATION}</Text>
             <Text style={styles.paymentInfoText}>{paymentExplanation}</Text>
           </View>
         </View>
 
       </ScrollView>
 
-      {/* Confirm button */}
+      {/* Send request */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Button
-          title="Confirm booking"
+          title={requestCopy.action}
           onPress={handleConfirm}
           loading={submitting}
-          accessibilityLabel="Confirm booking"
+          accessibilityLabel={requestCopy.action}
         />
       </View>
 
@@ -441,6 +464,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
         animationType="slide"
         onRequestClose={() => setShowAuthSheet(false)}>
         <AuthSheet
+          copy={requestCopy}
           onDismiss={() => setShowAuthSheet(false)}
           onLogin={() => requireAuth('login')}
           onRegister={() => requireAuth('register')}
