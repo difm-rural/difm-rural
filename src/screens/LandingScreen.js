@@ -148,7 +148,8 @@ export default function LandingScreen({ navigation }) {
 
       <View style={styles.header}>
         <Text style={styles.title} accessibilityRole="header">Find rural help</Text>
-        <Text style={styles.subtitle}>Browse jobs and services before you sign in.</Text>
+        <Text style={styles.subtitle}>Find nearby people with the practical skills your property needs — or turn your rural know-how into work in your community.</Text>
+        <Text style={styles.hint}>New here? Tap Account below to log in or sign up.</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search water, fencing, tractor..."
@@ -245,7 +246,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  subtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 16 },
+  subtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8, marginBottom: 8 },
+  hint: { fontSize: 14, lineHeight: 20, color: colors.textMuted, marginBottom: 16 },
   searchInput: {
     backgroundColor: colors.white,
     borderRadius: 12,
