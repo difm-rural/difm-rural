@@ -19,6 +19,7 @@ export default async function JobPage({params}:{params:Promise<{id:string}>}) {
       {job.location_name && <p>Location: {job.location_name}</p>}
       {job.hide_exact_location && <p className="muted">The exact property location is shared with the accepted provider.</p>}
     </article>
+    {(own || (offers || []).some(b=>b.status==='accepted' && b.provider_id===user.id)) && <Link className="lform-cancel" href={'/activity/job/'+id+'/manage'}>Manage job {job.status==='completed'?'& reviews':''}</Link>}
     {(offers || []).some(b=>b.status==='accepted' && (own || b.provider_id===user.id)) && <Link className="lform-save" href={'/activity/job/'+id}>Open conversation</Link>}
     {own ? <section className="card"><h2>Offers</h2>{!offers?.length && <p className="muted">Offers will appear here when people respond.</p>}{offers?.map(b=><article className="work-offer" key={b.id}><h3>{names.get(b.provider_id) || 'Provider'} · ${b.amount} NZD</h3><p className="work-description">{b.message}</p><p>{statusLabel(b.status)}</p>{job.status==='open' && b.status==='pending' && <ActionForm action={acceptOffer} label="Accept offer"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to this provider and declines the other offers.</p></ActionForm>}</article>)}</section>
     : offers?.some(b=>b.provider_id===user.id) ? <div className="card"><h2>Your offer</h2><p>You have already responded to this job.</p><Link href="/activity" className="card-link">Track it in Activity →</Link></div>

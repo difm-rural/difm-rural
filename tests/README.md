@@ -156,6 +156,14 @@ node tests/e2e-job-flow.js
   the job ID is printed so you can remove it manually.
 # Web Home and connected flows
 
+Web Activity: `node --test --test-isolation=none tests/web-activity.test.mjs`
+checks participant-specific actions, completion/review eligibility, grazing
+close/relist choices and Active/History classification. Before release, use two
+accounts to complete a job and booking, withdraw an unaccepted request, confirm
+a cancellation, close/relist grazing, and save/edit reviews from History. Check
+that an unrelated account cannot perform these actions and that a stale form
+reports a changed arrangement rather than a successful update.
+
 `node --test --test-isolation=none tests/web-home.test.mjs` checks booking
 estimate rules, conversation notification destinations and request wording.
 

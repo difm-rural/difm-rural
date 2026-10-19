@@ -29,6 +29,7 @@ export default async function ConversationPage({params}:{params:Promise<{kind:st
   if(!error)await supabase.from('notifications').update({read:true}).eq('user_id',user.id).eq('type','new_message').eq(kind==='booking'?'metadata->>booking_id':'metadata->>job_id',id).eq('metadata->>sender_id',other)
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/activity" className="card-link">Back to Activity</Link><h1>{person?.full_name || 'Conversation'}</h1><h2>{title}</h2><LiveRefresh/>
     {error?<p role="alert">Could not load messages. Refresh to retry.</p>:<div className="card enq-messages">{!messages?.length && <p className="muted">Send a message to get started.</p>}{messages?.map(m=><div key={m.id} className={m.sender_id===user.id?'bubble mine':'bubble theirs'}><p>{messagePreview(m.content)}</p><span className="bubble-time">{new Date(m.created_at).toLocaleString('en-NZ')}</span></div>)}</div>}
+    <Link href={'/activity/'+kind+'/'+id+'/manage'} className="card-link">View arrangement actions & reviews →</Link>
     {closed?<p className="muted">This conversation is read-only because the arrangement has ended.</p>:<ReplyForm enquirerId={other} {...(kind==='booking'?{bookingId:id}:{jobId:id})}/>}
   </section></AppShell>
 }

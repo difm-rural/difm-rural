@@ -171,6 +171,16 @@ a.row:hover { background: var(--sage); }
 .work-card-location { font-size: 12px; margin: 0; padding: 0 16px 16px; color: var(--muted); }
 .work-listing-hero { max-width: 580px; }
 .work-offer { border-top: 1px solid var(--line); padding: 18px 0; }
+.activity-segments { display: inline-flex; align-self: start; justify-self: start; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.activity-segments a { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 22px; font-size: 14px; font-weight: 700; }
+.activity-segments a[aria-current="page"] { background: var(--forest); color: white; }
+.activity-segments span { font-size: 12px; opacity: .8; }
+.activity-action { border-top: 1px solid var(--line); padding: 16px 0; }
+.activity-action summary { min-height: 30px; color: var(--forest-deep); cursor: pointer; font-weight: 700; }
+.activity-action .lform { margin-top: 14px; }
+.activity-confirm { display: flex; align-items: start; gap: 10px; line-height: 1.6; font-size: 14px; }
+.activity-confirm input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--forest); flex-shrink: 0; }
+.activity-received { background: var(--sage); padding: 16px; border-radius: 10px; margin-bottom: 22px; }
 @media(max-width:1050px) { .home-columns { grid-template-columns: 1fr; } .home-aside { grid-template-columns: repeat(2,minmax(0,1fr)); } .home-explainer { grid-column: 1/-1; } }
 @media(max-width:620px) { .home-heading { align-items: start; } .home-heading h1 { font-size: 28px; } .home-actions { gap: 10px; } .home-action { padding: 16px; grid-template-columns: 1fr; } .home-action > svg:first-child { grid-row: auto; } .home-action strong { font-size: 16px; padding: 0; } .home-action-arrow { display: none; } .home-aside { grid-template-columns: 1fr; } .home-stats { gap: 8px; } .home-stat { padding: 16px 6px; } }
 .enq { padding: clamp(24px, 4vw, 44px); display: flex; flex-direction: column; min-height: 100vh; }
