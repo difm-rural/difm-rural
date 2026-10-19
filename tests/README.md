@@ -154,3 +154,27 @@ node tests/e2e-job-flow.js
   policy.
 - The test cleans up after itself. If cleanup fails (e.g. RLS blocks delete),
   the job ID is printed so you can remove it manually.
+# Web Home and connected flows
+
+`node --test --test-isolation=none tests/web-home.test.mjs` checks booking
+estimate rules, conversation notification destinations and request wording.
+
+Before release, test with two signed-in web accounts:
+
+- Home's four action cards open job posting, listing discovery, job discovery
+  and listing creation. Counts agree with the same account in the mobile app.
+- Post a job through all three steps; Back retains the draft. An unaccepted
+  provider sees only the public area, and the accepted provider can see the
+  property location. No job is published before the final Post job action.
+- Send an offer, accept it as the requester, and verify the job is awarded and
+  competing pending offers are rejected. Repeat acceptance must not award twice.
+- Search jobs and listings, clear an unmatched search, and retry a failed load.
+- Send a listing enquiry as a visitor to another member's listing. Both parties
+  can retrieve it from Messages, including before any reply. Other enquirers on
+  the same listing remain separate conversations.
+- Send priced and quote-required booking requests. Verify the estimate includes
+  minimum charges and extra charges remain separate. Respond in Activity, then
+  open the specific booking conversation from a Home notification.
+- Check Home, the sidebar and forms at phone and desktop widths. Browser visual
+  verification is still required; automated checks do not cover layout or live
+  message delivery.

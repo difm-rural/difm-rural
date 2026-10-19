@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 
 // Reply to one enquirer on one listing. Insert passes RLS WITH CHECK
 // (auth.uid()=sender_id); the messages_notify_new trigger pushes the enquirer.
-export function ReplyForm({ serviceId, enquirerId }: { serviceId: string; enquirerId: string }) {
+export function ReplyForm({ serviceId, bookingId, jobId, enquirerId }: { serviceId?: string; bookingId?: string; jobId?: string; enquirerId: string }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -26,8 +26,8 @@ export function ReplyForm({ serviceId, enquirerId }: { serviceId: string; enquir
       setError('Your session expired — please sign in again.')
       return
     }
-    const { error: insertError } = await supabase.from('messages').insert({
-      service_id: serviceId,
+    const { error: insertError } = await supabase.from(bookingId ? 'service_booking_messages' : 'messages').insert({
+      ...(bookingId ? {booking_id:bookingId} : jobId ? {job_id:jobId} : {service_id:serviceId}),
       sender_id: user.id,
       receiver_id: enquirerId,
       content,

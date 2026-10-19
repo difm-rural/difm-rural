@@ -3,6 +3,8 @@ import { Inbox, MessagesSquare } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { ReplyForm } from './reply-form'
+import { LiveRefresh } from '@/components/live-refresh'
+import { messagePreview } from '@/lib/work'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,65 +29,46 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Pr
   const selService = sp.s ?? null
   const selCounterpart = sp.c ?? null
 
-  // My listings (filter — services RLS also exposes everyone's active ones).
-  const { data: svc } = await supabase.from('services').select('id, title').eq('provider_id', me)
-  const services = svc ?? []
-  const serviceIds = services.map(s => s.id)
-  const titleById = new Map(services.map(s => [s.id, s.title as string]))
-
-  // Thread list: latest message per (listing, enquirer) pair on my listings.
-  const threads: { serviceId: string; counterpart: string; last: Msg; awaiting: boolean }[] = []
-  if (serviceIds.length) {
-    const { data: msgs } = await supabase
-      .from('messages')
-      .select('id, service_id, sender_id, receiver_id, content, created_at')
-      .not('service_id', 'is', null)
-      .in('service_id', serviceIds)
-      .order('created_at', { ascending: false })
-    const seen = new Set<string>()
-    for (const m of (msgs ?? []) as Msg[]) {
-      const counterpart = m.sender_id === me ? m.receiver_id : m.sender_id
-      const key = `${m.service_id}:${counterpart}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      threads.push({ serviceId: m.service_id, counterpart, last: m, awaiting: m.sender_id !== me })
-    }
-    threads.sort((a, b) =>
-      (Number(b.awaiting) - Number(a.awaiting)) ||
-      (new Date(b.last.created_at).getTime() - new Date(a.last.created_at).getTime()))
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const selectedService = selService && uuid.test(selService) ? selService : null
+  const selectedPerson = selCounterpart && uuid.test(selCounterpart) ? selCounterpart : null
+  const {data: msgs, error: messageError} = await supabase.from('messages')
+    .select('id, service_id, sender_id, receiver_id, content, created_at').not('service_id','is',null)
+    .or('sender_id.eq.' + me + ',receiver_id.eq.' + me).order('created_at',{ascending:false})
+  const threads: {serviceId:string;counterpart:string;last:Msg;awaiting:boolean}[]=[]
+  const seen=new Set<string>()
+  for(const m of (msgs || []) as Msg[]){
+    const counterpart=m.sender_id===me?m.receiver_id:m.sender_id,key=m.service_id+':'+counterpart
+    if(seen.has(key))continue
+    seen.add(key);threads.push({serviceId:m.service_id,counterpart,last:m,awaiting:m.sender_id!==me})
   }
-
-  // Names for every enquirer.
-  const ids = [...new Set(threads.map(t => t.counterpart))]
-  const nameById = new Map<string, string>()
-  if (ids.length) {
-    const { data } = await supabase.from('profiles_public').select('id, full_name').in('id', ids)
-    for (const p of data ?? []) nameById.set(p.id, (p.full_name as string) ?? 'Someone')
+  const serviceIds=[...new Set([...threads.map(t=>t.serviceId),...(selectedService?[selectedService]:[])])]
+  const services=serviceIds.length?await supabase.from('services').select('id,title,provider_id,is_active,closed_at').in('id',serviceIds):{data:[]}
+  const titleById=new Map((services.data || []).map(s=>[s.id,s.title]))
+  const ids=[...new Set([...threads.map(t=>t.counterpart),...(selectedPerson?[selectedPerson]:[])])]
+  const profiles=ids.length?await supabase.from('profiles_public').select('id,full_name').in('id',ids):{data:[]}
+  const nameById=new Map((profiles.data || []).map(p=>[p.id,p.full_name]))
+  const listing=(services.data || []).find(s=>s.id===selectedService)
+  const existing=threads.some(t=>t.serviceId===selectedService && t.counterpart===selectedPerson)
+  const validOpen=!!(selectedService && selectedPerson && selectedPerson!==me && (existing || (listing?.provider_id===selectedPerson && listing?.is_active && !listing?.closed_at)))
+  const openMsgs=validOpen?((msgs || []) as Msg[]).filter(m=>m.service_id===selectedService && ((m.sender_id===me && m.receiver_id===selectedPerson)||(m.receiver_id===me && m.sender_id===selectedPerson))).reverse():[]
+  const openName=validOpen?nameById.get(selectedPerson!) || 'Community member':''
+  const openTitle=validOpen?titleById.get(selectedService!) || 'Listing':''
+  if(validOpen && !messageError){
+    await supabase.from('notifications').update({read:true}).eq('user_id',me).eq('type','new_message')
+      .eq('metadata->>service_id',selectedService).eq('metadata->>sender_id',selectedPerson)
   }
-
-  // Open thread — pair-scoped, only if the listing is mine.
-  const validOpen = !!(selService && selCounterpart && serviceIds.includes(selService))
-  let openMsgs: Msg[] = []
-  if (validOpen) {
-    const { data } = await supabase
-      .from('messages')
-      .select('id, service_id, sender_id, receiver_id, content, created_at')
-      .eq('service_id', selService as string)
-      .or(`and(sender_id.eq.${me},receiver_id.eq.${selCounterpart}),and(sender_id.eq.${selCounterpart},receiver_id.eq.${me})`)
-      .order('created_at', { ascending: true })
-    openMsgs = (data ?? []) as Msg[]
-  }
-  const openName = validOpen ? (nameById.get(selCounterpart as string) ?? 'Enquirer') : ''
-  const openTitle = validOpen ? (titleById.get(selService as string) ?? 'Listing') : ''
 
   return (
     <AppShell providerName={(profile?.full_name as string) ?? 'Provider'}>
       <section className="enq">
         <header className="enq-head">
           <p className="eyebrow">Provider console</p>
-          <h1>Enquiries</h1>
+          <h1>Messages</h1>
+          {messageError && <p role="alert" className="form-error">Could not load messages. Refresh to try again.</p>}
         </header>
 
+        <LiveRefresh />
         <div className="enq-panes">
           {/* Thread list */}
           <aside className="enq-list">
@@ -107,7 +90,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Pr
                           <span className="enq-time">{timeAgo(t.last.created_at)}</span>
                         </span>
                         <span className="enq-listing">{titleById.get(t.serviceId) ?? 'a listing'}</span>
-                        <span className="enq-snippet">{fromMe ? 'You: ' : ''}{(t.last.content ?? '').slice(0, 80)}</span>
+                        <span className="enq-snippet">{fromMe ? 'You: ' : ''}{messagePreview(t.last.content).slice(0, 80)}</span>
                         {t.awaiting && <span className="enq-flag">Awaiting your reply</span>}
                       </Link>
                     </li>
@@ -132,7 +115,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Pr
                     <p className="empty">No messages in this thread.</p>
                   ) : openMsgs.map(m => (
                     <div key={m.id} className={m.sender_id === me ? 'bubble mine' : 'bubble theirs'}>
-                      <p>{m.content}</p>
+                      <p>{messagePreview(m.content)}</p>
                       <span className="bubble-time">{stamp(m.created_at)}</span>
                     </div>
                   ))}
