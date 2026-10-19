@@ -83,6 +83,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { service, quantity: initialQty, selectedOption } = route.params || {}
   const option = selectedOption || null
+  const isGrazing = service?.kind === 'grazing'
   const estimate = listingEstimate(service, option, initialQty)
   const qty = estimate.quantity
   const effectivePricingType = estimate.pricingType
@@ -97,15 +98,17 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const [scheduleType,   setScheduleType]   = useState('asap')
   const [date,           setDate]           = useState(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [location, setLocation] = useState('')
-  const [latitude, setLatitude] = useState(null)
-  const [longitude, setLongitude] = useState(null)
+  const [location, setLocation] = useState(isGrazing ? service.location_name || '' : '')
+  const [latitude, setLatitude] = useState(isGrazing ? service.latitude ?? null : null)
+  const [longitude, setLongitude] = useState(isGrazing ? service.longitude ?? null : null)
   const [locationNote, setLocationNote] = useState('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
-  const basePaymentExplanation = isQuoteRequired
+  const basePaymentExplanation = isGrazing
+    ? 'Agree the grazing duration and payment schedule with the provider. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
+    : isQuoteRequired
     ? 'You arrange payment directly with the provider — Rural Connections doesn\'t handle payments.'
     : service?.payment_timing === 'upfront'
     ? 'This provider asks for payment upfront. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
@@ -282,13 +285,16 @@ export default function BookingConfirmScreen({ route, navigation }) {
         {/* Booking summary */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Request summary</Text>
-          <SummaryRow label="Service" value={service.title} />
+          <SummaryRow label="Listing" value={service.title} />
           <SummaryRow label="Provider" value={service.profile?.full_name || 'Provider'} />
           {option?.label ? <SummaryRow label="Rate option" value={option.label} /> : null}
           {effectivePricingType !== 'fixed' && !isQuoteRequired && (
             <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
           )}
           <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `$${total} NZD`} />
+          {isGrazing && !isQuoteRequired && /\/(week|month)$/.test(unitLabel) && (
+            <SummaryRow label="Estimate period" value={`One ${unitLabel.endsWith('/week') ? 'week' : 'month'}; agree the full duration with the provider`} />
+          )}
           {!isQuoteRequired && estimate.minimumCharge > 0 && (
             <SummaryRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)} NZD`} />
           )}
@@ -297,7 +303,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           ) : null}
           <SummaryRow
             label="Payment"
-            value={service.payment_timing === 'upfront' ? 'Upfront' : 'On completion'}
+            value={isGrazing ? 'Agree with provider' : service.payment_timing === 'upfront' ? 'Upfront' : 'On completion'}
             last
           />
         </View>
@@ -376,11 +382,11 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
         {/* Location */}
         <View style={[styles.card, styles.locationCard]}>
-          <Text style={styles.cardLabel}>Where?</Text>
+          <Text style={styles.cardLabel}>{isGrazing ? 'Grazing location' : 'Where?'}</Text>
           <View style={styles.inputWrap}>
             <AddressAutocomplete
               value={location}
-              placeholder="Your address or property location"
+              placeholder={isGrazing ? 'Grazing property location' : 'Your address or property location'}
               onChangeText={(text) => {
                 setLocation(text)
                 setLatitude(null)
@@ -419,7 +425,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           <View style={styles.inputWrap}>
             <TextInput
               style={[styles.input, styles.multiline]}
-              placeholder="Any specific requirements or details..."
+              placeholder={isGrazing ? 'Livestock type, number of head, grazing duration and any requirements...' : 'Any specific requirements or details...'}
               placeholderTextColor={colors.textMuted}
               value={notes}
               onChangeText={setNotes}

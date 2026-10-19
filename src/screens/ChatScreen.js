@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import {
   Alert,
   FlatList,
@@ -16,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import EnquiryPersonCard from '../components/EnquiryPersonCard'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
 import { markNotificationsReadFor } from '../lib/notifications'
 
@@ -48,14 +50,19 @@ export default function ChatScreen({ route, navigation }) {
     bookingId,
     jobId,
     serviceId,
+    senderId: otherUserId,
     type: 'new_message',
   })
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let channel
+    let active = true
 
     async function setup() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (!active) return
+      if (authError) throw authError
+      if (!user || !chatId || !otherUserId) throw new Error('Please reopen this conversation after signing in.')
       setCurrentUserId(user.id)
 
       if (isServiceBookingChat) {
@@ -90,10 +97,13 @@ export default function ChatScreen({ route, navigation }) {
           `and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`
         )
       }
-      const { data } = await query.order('created_at', { ascending: false })
+      const { data, error } = await query.order('created_at', { ascending: false })
+      if (!active) return
+      if (error) throw error
 
       setMessages(data || [])
       await markChatNotificationsRead()
+      if (!active) return
 
       channel = supabase
         .channel(`${messageTable}-${chatId}`)
@@ -101,6 +111,7 @@ export default function ChatScreen({ route, navigation }) {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: messageTable, filter: `${idColumn}=eq.${chatId}` },
           payload => {
+            if (!active) return
             const m = payload.new
             // postgres_changes can only filter on service_id, so drop any message
             // outside the (me, otherUserId) pair for a one-to-many listing thread.
@@ -119,25 +130,28 @@ export default function ChatScreen({ route, navigation }) {
         channel.on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `id=eq.${bookingId}` },
-            payload => { setJobStatus(payload.new?.status || null) }
+            payload => { if (active) setJobStatus(payload.new?.status || null) }
           )
       } else if (!isListingChat) {
         channel.on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'jobs', filter: `id=eq.${jobId}` },
-            payload => { setJobStatus(payload.new?.status || null) }
+            payload => { if (active) setJobStatus(payload.new?.status || null) }
           )
       }
       channel
         .subscribe()
     }
 
-    setup()
+    setup().catch(error => {
+      if (active) Alert.alert('Could not load messages', error.message || 'Check your connection and reopen the conversation.')
+    })
 
     return () => {
+      active = false
       if (channel) supabase.removeChannel(channel)
     }
-  }, [chatId, isServiceBookingChat])
+  }, [chatId, messageTable, idColumn, isServiceBookingChat, isListingChat, otherUserId]))
 
   async function sendMessage() {
     const content = text.trim()
@@ -344,6 +358,9 @@ export default function ChatScreen({ route, navigation }) {
           contentContainerStyle={styles.messageList}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={isListingChat && otherUserId ? (
+            <EnquiryPersonCard serviceId={serviceId} personId={otherUserId} />
+          ) : null}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No messages yet</Text>

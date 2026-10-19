@@ -121,7 +121,7 @@ export function statusLabel(status, bidCount = 0) {
     case BOOKING_STATUS.CONFIRMED:              // bookings: provider confirmed
       return 'Confirmed'
     case JOB_STATUS.IN_PROGRESS:                return 'In progress'
-    case JOB_STATUS.AWAITING_COMPLETION:        return 'Awaiting confirmation'
+    case JOB_STATUS.AWAITING_COMPLETION:        return 'Completion recorded'
     case BOOKING_STATUS.CANCELLATION_REQUESTED: return 'Cancellation requested'
     case JOB_STATUS.COMPLETED:                  return 'Completed'
     case BOOKING_STATUS.WITHDRAWN:              return 'Withdrawn'

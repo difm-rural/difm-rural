@@ -118,9 +118,10 @@ export const LISTING_KINDS: Option[] = [
 export const KIND_IS_RESOURCE: Record<ListingKind, boolean> = {
   service: false, grazing: true, hire: true, lease: true, for_sale: true,
 }
-// Which kinds are enquiry-only (bypass bookings) vs bookable (service/hire).
-// Single source of truth shared by the create flow and the listing detail.
+// Kinds managed as listings that can be closed after an arrangement or sale.
 export const KIND_ENQUIRY: ListingKind[] = ['for_sale', 'grazing', 'lease']
+// Grazing supports both enquiries and booking requests.
+export const KIND_ENQUIRY_ONLY: ListingKind[] = ['for_sale', 'lease']
 
 // Per-kind pricing defaults — applied to NEW listings only, still editable.
 // service.pricingType '' == normalizePricingType(undefined), i.e. the canonical

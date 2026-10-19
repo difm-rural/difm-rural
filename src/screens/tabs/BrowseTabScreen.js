@@ -343,16 +343,16 @@ const styles = StyleSheet.create({
   },
 
   manageBanner: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary,
     padding: 12,
   },
-  manageBannerTitle: { fontSize: 14, color: colors.primary, fontWeight: '600', marginBottom: 3 },
-  manageBannerText: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
+  manageBannerTitle: { fontSize: 14, color: colors.white, fontWeight: '600', marginBottom: 3 },
+  manageBannerText: { fontSize: 12, color: colors.white, opacity: 0.85, lineHeight: 16 },
 
 
   section: { marginTop: 20 },

@@ -18,7 +18,6 @@ import {
   confirmBooking as apiConfirmBooking,
   declineBooking as apiDeclineBooking,
   markBookingReady as apiMarkBookingReady,
-  confirmBookingComplete as apiConfirmBookingComplete,
   confirmBookingCancellation as apiConfirmBookingCancellation,
   dismissProviderBooking as apiDismissProviderBooking,
   cancelBookingByRequester as apiCancelBookingByRequester,
@@ -33,6 +32,7 @@ import Loading from '../../components/Loading'
 import { loadReview, saveReview } from '../../lib/reviews'
 import { canProvide } from '../../lib/roles'
 import { markNotificationsReadFor } from '../../lib/notifications'
+import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { bookingNextMove, jobNextMove } from '../../lib/nextMove'
 
 function bookingNeedsQuote(booking) {
@@ -46,7 +46,6 @@ function BookingWorkCard({
   onConfirm,
   onDecline,
   onReady,
-  onConfirmComplete,
   onCancelRequest,
   onConfirmCancellation,
   onDismiss,
@@ -60,14 +59,13 @@ function BookingWorkCard({
       full_name: viewerRole === 'provider' ? booking.requesterName : booking.providerName,
     },
   }
-  // Once the provider has marked it complete (awaiting_completion), the requester
-  // confirms rather than cancels — so no cancel button at that point.
+  // Completed work goes to History and reviews; cancellation is only for
+  // requests and work that has not been completed.
   const canRequesterCancel = viewerRole === 'requester'
     && ['pending', 'quote_sent', 'confirmed', 'in_progress'].includes(booking.status)
-  const requesterNeedsConfirm = viewerRole === 'requester' && booking.status === 'awaiting_completion'
   const providerNeedsQuote = viewerRole === 'provider' && booking.status === 'pending' && serviceItem.pricing_type === 'quote_required'
   const providerPending = viewerRole === 'provider' && booking.status === 'pending' && !providerNeedsQuote
-  const providerActive = viewerRole === 'provider' && isBookingUnderway(booking.status)
+  const providerActive = viewerRole === 'provider' && serviceItem.kind !== 'grazing' && isBookingUnderway(booking.status)
   const providerCanConfirmCancellation = viewerRole === 'provider' && booking.status === 'cancellation_requested'
   const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
   const canReview = booking.status === 'completed' && !!onReview
@@ -152,16 +150,6 @@ function BookingWorkCard({
         </TouchableOpacity>
       )}
 
-      {requesterNeedsConfirm && (
-        <TouchableOpacity
-          style={styles.miniPrimaryBtn}
-          onPress={onConfirmComplete}
-          accessibilityRole="button"
-          accessibilityLabel="Confirm booking complete">
-          <Text style={styles.miniPrimaryText}>Mark as complete</Text>
-        </TouchableOpacity>
-      )}
-
       {canRequesterCancel && (
         <TouchableOpacity
           style={styles.miniDangerBtn}
@@ -217,6 +205,17 @@ export default function ActivityTabScreen({ navigation }) {
   const [cancelBookingTarget, setCancelBookingTarget] = useState(null)
 
   useFocusEffect(useCallback(() => { load() }, []))
+  useFocusEffect(useCallback(() => {
+    let active = true
+    const unsubscribe = onBadgeRefresh(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!active || !user) return
+      const { count, error } = await supabase.from('notifications').select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id).eq('read', false)
+      if (active && !error) setUnreadCount(count || 0)
+    })
+    return () => { active = false; unsubscribe() }
+  }, []))
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -488,7 +487,7 @@ export default function ActivityTabScreen({ navigation }) {
   function completeBooking(bookingId) {
     Alert.alert(
       'Mark as complete?',
-      'This tells the requester the work is done and asks them to confirm completion.',
+      'This closes the booking and invites the requester to leave a review.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -529,27 +528,6 @@ export default function ActivityTabScreen({ navigation }) {
     const { error } = await apiConfirmBookingCancellation(bookingId, user.id)
     if (error) Alert.alert('Could not confirm cancellation', error.message)
     load()
-  }
-
-  function confirmBookingComplete(bookingId) {
-    Alert.alert(
-      'Mark as complete?',
-      'Confirm the work is done. This closes the booking and you can leave a review.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark as complete',
-          onPress: async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-            const { error } = await apiConfirmBookingComplete(bookingId, user.id)
-            if (error) Alert.alert('Could not confirm', error.message)
-            else await markNotificationsReadFor({ bookingId })
-            load()
-          },
-        },
-      ]
-    )
   }
 
   async function openBookingReview(booking) {
@@ -743,7 +721,6 @@ export default function ActivityTabScreen({ navigation }) {
                   booking={b}
                   viewerRole="requester"
                   onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: 'requester' })}
-                  onConfirmComplete={() => confirmBookingComplete(b.id)}
                   onCancelRequest={() => cancelRequesterBooking(b)}
                 />
               )}

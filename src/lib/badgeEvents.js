@@ -10,6 +10,6 @@ export function onBadgeRefresh(listener) {
 
 export function requestBadgeRefresh() {
   listeners.forEach(listener => {
-    try { listener() } catch { /* listener errors must not break callers */ }
+    try { listener()?.catch?.(() => {}) } catch { /* listener errors must not break callers */ }
   })
 }

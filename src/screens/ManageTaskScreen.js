@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { isJobActive, isJobAwarded, jobStatusLabel } from '../lib/lifecycle'
-import { confirmJobComplete, cancelJob, deleteJob, acceptBid as apiAcceptBid } from '../lib/jobActions'
+import { cancelJob, deleteJob, acceptBid as apiAcceptBid } from '../lib/jobActions'
 import { OFFER_MATERIALS_LABELS, formatOfferAmount } from '../lib/offers'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
@@ -462,34 +462,6 @@ export default function ManageTaskScreen({ navigation, route }) {
     Alert.alert('Update sent', `The other party has been told you are about ${minutes} minutes late.`)
   }
 
-  function handleConfirmComplete() {
-    if (!ensureTaskOwner()) return
-    Alert.alert(
-      'Confirm complete',
-      'Mark this job as complete? This confirms the work is done.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            const { error } = await confirmJobComplete(job.id, currentUserId)
-            if (error) {
-              Alert.alert('Could not confirm', error.message)
-              if (error.code === 'stale') resyncJob()
-              return
-            }
-            setJob(prev => ({ ...prev, status: 'completed' }))
-            if (acceptedBid?.providerId) {
-              setReviewVisible(true)
-            } else {
-              Alert.alert('Job completed', 'This job has been marked complete.')
-            }
-          },
-        },
-      ]
-    )
-  }
-
   function handleRepeat() {
     if (!ensureTaskOwner()) return
     navigation.navigate('PostJob', {
@@ -666,19 +638,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           {isTaskOwner && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Actions</Text>
-            {job.status === 'awaiting_completion' && (
-              <View style={styles.infoBox}>
-                <Text style={styles.infoBoxText}>
-                  {otherPartyFirstName} has marked this job as done. Confirm to finalise and leave a review.
-                </Text>
-              </View>
-            )}
             <View style={styles.actionBtns}>
-              <Button
-                title="Confirm job complete"
-                onPress={handleConfirmComplete}
-                accessibilityLabel="Confirm job complete"
-              />
               <Button
                 variant="destructive"
                 title="Cancel job"

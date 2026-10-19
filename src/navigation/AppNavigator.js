@@ -1,4 +1,5 @@
 import { NavigationContainer, useNavigationContainerRef, getFocusedRouteNameFromRoute } from '@react-navigation/native'
+import { stackRootAction } from '../../shared/stackNavigation'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import React, { useEffect, useRef, useState } from 'react'
@@ -20,7 +21,8 @@ import ActivityTabScreen from '../screens/tabs/ActivityTabScreen'
 import AccountTabScreen  from '../screens/tabs/AccountTabScreen'
 import NotificationsScreen from '../screens/NotificationsScreen'
 import HowItWorksScreen from '../screens/HowItWorksScreen'
-import { onBadgeRefresh } from '../lib/badgeEvents'
+import { onBadgeRefresh, requestBadgeRefresh } from '../lib/badgeEvents'
+import { watchNotifications } from '../lib/liveNotifications'
 import { canResumeGuestAction, listingEnquiryNavigationState, parsePendingListingEnquiry, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
 import { ONBOARDING_DESTINATIONS } from '../lib/onboarding'
 import { bookingRequestCopy } from '../lib/bookingRequestCopy'
@@ -231,7 +233,7 @@ const TAB_ROOT = {
 
 // Screens that keep the bottom tab bar: every tab root, plus job management.
 // Everything else (detail / workflow screens) hides it.
-const TAB_BAR_ROUTES = new Set([...Object.values(TAB_ROOT), 'ManageTask'])
+const TAB_BAR_ROUTES = new Set([...Object.values(TAB_ROOT), 'ManageTask', 'Notifications', 'Messages'])
 
 const TAB_ICONS = {
   Home:     ['home-outline', 'home'],
@@ -286,8 +288,11 @@ function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBad
             onPress={() => {
               if (route.name === 'Jobs') clearJobsBadge?.()
               if (route.name === 'Browse') clearServicesBadge?.()
-              // Always land on the tab's root screen (pops Notifications etc.)
-              navigation.navigate(route.name, { screen: TAB_ROOT[route.name] })
+              // Return to the existing root rather than navigating to a new
+              // root route above Notifications/Chat in the tab's stack.
+              const rootAction = stackRootAction(route.state)
+              if (rootAction) navigation.dispatch(rootAction)
+              navigation.navigate(route.name)
             }}
             activeOpacity={0.7}
             accessibilityRole="tab"
@@ -421,6 +426,10 @@ export default function AppNavigator() {
   const onboardingDestinationRef = useRef(null)
   useEffect(() => { sessionRef.current = session }, [session])
   useEffect(() => { profileRef.current = profile }, [profile])
+  useEffect(() => {
+    if (!session?.user?.id) return
+    return watchNotifications(supabase, session.user.id, requestBadgeRefresh, AppState)
+  }, [session?.user?.id])
 
   // Tapping a push opens the notifications inbox (each row deep-links from there).
   useEffect(() => {

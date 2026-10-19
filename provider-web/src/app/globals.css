@@ -205,6 +205,27 @@ a.row:hover { background: var(--sage); }
 .lform-pricing-placeholder h2 { margin: 0 0 4px; font-size: 15px; font-weight: 750; color: var(--forest-deep); }
 .lform-pricing-placeholder p { margin: 0; font-size: 13px; }
 .lform-actions { display: flex; align-items: center; gap: 10px; }
+.lform-progress { display: flex; flex-wrap: wrap; gap: 10px 18px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.lform-progress > span { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.lform-progress > span > span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--canvas); border: 1px solid var(--line); }
+.lform-progress .active { color: var(--forest-deep); font-weight: 750; }
+.lform-progress .active > span, .lform-progress .complete > span { background: var(--forest); color: white; border-color: var(--forest); }
+.lform-step-heading h2 { margin: 6px 0; font-size: 24px; color: var(--forest-deep); scroll-margin-top: 24px; }
+.lform-step-heading h2:focus { outline: none; }
+.lform-step-heading p { margin: 0; line-height: 1.5; }
+.lform-step, .lform-review { display: grid; gap: 22px; }
+.lform-step[hidden] { display: none; }
+.lform-card-details > summary { cursor: pointer; font-weight: 700; color: var(--forest-deep); padding: 12px 0; }
+.lform-wizard-actions { justify-content: space-between; position: sticky; bottom: 0; padding: 16px 0; background: var(--paper); border-top: 1px solid var(--line); z-index: 2; }
+.lform-review-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lform-review-heading h3 { margin: 0; font-size: 16px; }
+.lform-review-edit { background: none; border: 0; color: var(--forest-deep); text-decoration: underline; cursor: pointer; min-height: 44px; }
+.lform-review dl { display: grid; grid-template-columns: minmax(100px, 1fr) 3fr; gap: 12px; margin: 0; }
+.lform-review dt { color: var(--muted); font-size: 13px; }
+.lform-review dd { margin: 0; overflow-wrap: anywhere; }
+.lform-review dd p { margin: 0 0 8px; }
+.lform-review-description { white-space: pre-wrap; }
+@media (max-width: 620px) { .lform-progress { gap: 8px 12px; } .lform-review dl { grid-template-columns: 1fr; gap: 6px; } .lform-review dd { margin-bottom: 10px; } }
 .lform-save { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 9px; background: var(--forest); color: white; font-size: 14px; font-weight: 800; cursor: pointer; }
 .lform-save:disabled { opacity: .5; cursor: default; }
 .lform-save.as-link { min-height: 38px; padding: 0 14px; font-size: 13px; }

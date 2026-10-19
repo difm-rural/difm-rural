@@ -5,6 +5,8 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  InputAccessoryView,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -150,6 +152,22 @@ async function edgeFunctionErrorMessage(error, fallback) {
 
 export default function CreateServiceScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const formScrollRef = useRef(null)
+  const descriptionTopRef = useRef(0)
+  const descriptionFocusedRef = useRef(false)
+  const editingWithKeyboard = keyboardVisible
+
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true))
+    const shown = Keyboard.addListener('keyboardDidShow', () => {
+      if (descriptionFocusedRef.current) {
+        formScrollRef.current?.scrollTo({ y: Math.max(0, descriptionTopRef.current - 12), animated: true })
+      }
+    })
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false))
+    return () => { show.remove(); shown.remove(); hide.remove() }
+  }, [])
   const editingService = route?.params?.service || null
   const isEditing = !!editingService?.id
   const [creationMode, setCreationMode] = useState(isEditing ? 'manual' : (route?.params?.startMode || 'kind'))
@@ -1058,6 +1076,10 @@ export default function CreateServiceScreen({ navigation, route }) {
           textAlignVertical="top"
           autoCapitalize="sentences"
           accessibilityLabel="Listing description"
+          inputAccessoryViewID={Platform.OS === 'ios' ? 'listing-description-done' : undefined}
+          onLayout={event => { descriptionTopRef.current = event.nativeEvent.layout.y }}
+          onFocus={() => { descriptionFocusedRef.current = true }}
+          onBlur={() => { descriptionFocusedRef.current = false }}
         />
 
         <Text style={styles.fieldLabel}>Listing photo <Text style={styles.optional}>(optional)</Text></Text>
@@ -1787,50 +1809,8 @@ export default function CreateServiceScreen({ navigation, route }) {
   if (creationMode === 'choose') return renderStartChoice()
   if (creationMode === 'website') return renderWebsiteDraft()
 
-  return (
-    <View style={styles.screen}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <View style={styles.headerActions}>
-          <Text style={styles.compactTitle} numberOfLines={1} accessibilityRole="header">
-            {isEditing ? 'Edit listing' : (KIND_COPY[kind]?.header || 'Advertise a listing')}
-          </Text>
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={cancelCreation}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={isEditing ? 'Cancel editing service' : 'Cancel creating service'}>
-            <Text style={styles.headerCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.progressRow}>
-          {renderProgress()}
-          <Text style={styles.stepCaption}>{STEP_LABELS[step - 1]}</Text>
-        </View>
-      </View>
-
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-        enabled={Platform.OS === 'ios'}>
-        <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: stepTranslateX }] }]}>
-          {step === 2 && renderFloatingCardPreview()}
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={[
-              styles.scrollContent,
-              step === 2 && styles.scrollContentWithFloatingPreview,
-              { paddingBottom: insets.bottom + 150 },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets={true}>
-            {RENDERERS[step - 1]()}
-          </ScrollView>
-        </Animated.View>
-
-        <SafeAreaView edges={['bottom']} style={styles.footer}>
+  const stepActions = (
+    <SafeAreaView edges={editingWithKeyboard ? [] : ['bottom']} style={styles.footer}>
         {step === 1 ? (
           <Button
             title="Next"
@@ -1866,13 +1846,73 @@ export default function CreateServiceScreen({ navigation, route }) {
             )}
           </View>
         )}
-        </SafeAreaView>
+    </SafeAreaView>
+  )
+
+  return (
+    <View style={styles.screen}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.headerActions}>
+          <Text style={styles.compactTitle} numberOfLines={1} accessibilityRole="header">
+            {isEditing ? 'Edit listing' : (KIND_COPY[kind]?.header || 'Advertise a listing')}
+          </Text>
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={cancelCreation}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={isEditing ? 'Cancel editing service' : 'Cancel creating service'}>
+            <Text style={styles.headerCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.progressRow}>
+          {renderProgress()}
+          <Text style={styles.stepCaption}>{STEP_LABELS[step - 1]}</Text>
+        </View>
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}>
+        <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: stepTranslateX }] }]}>
+          {step === 2 && !editingWithKeyboard && renderFloatingCardPreview()}
+          <ScrollView
+            ref={formScrollRef}
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.scrollContent,
+              step === 2 && !editingWithKeyboard && styles.scrollContentWithFloatingPreview,
+              { paddingBottom: insets.bottom + (editingWithKeyboard ? 24 : 150) },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+            // KeyboardAvoidingView handles iOS sizing; adding automatic keyboard
+            // insets here as well would compensate for the keyboard twice.
+            automaticallyAdjustKeyboardInsets={false}>
+            {RENDERERS[step - 1]()}
+            {editingWithKeyboard && stepActions}
+          </ScrollView>
+        </Animated.View>
+
+        {!editingWithKeyboard && stepActions}
       </KeyboardAvoidingView>
+      {Platform.OS === 'ios' && <InputAccessoryView nativeID="listing-description-done">
+        <View style={styles.keyboardToolbar}>
+          <TouchableOpacity onPress={Keyboard.dismiss} style={styles.keyboardDone}
+            accessibilityRole="button" accessibilityLabel="Done editing description">
+            <Text style={styles.keyboardDoneText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </InputAccessoryView>}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  keyboardToolbar: { backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'flex-end' },
+  keyboardDone: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20 },
+  keyboardDoneText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   screen: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 10, backgroundColor: colors.background },
   compactDetailsHeader: { paddingBottom: 9 },

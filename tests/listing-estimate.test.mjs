@@ -11,6 +11,14 @@ test('minimum charge is a floor: one $50 hour costs at least $150, four cost $20
   assert.equal(listingEstimate(service, null, 4).baseAmount, 200)
 })
 
+test('grazing estimates respect head capacity for a single pricing period', () => {
+  const listing = { kind: 'grazing', pricing_type: 'per_unit', unit_label: 'head/week', rate: 10, max_units: 20 }
+  assert.equal(listingEstimate(listing, null, 8).baseAmount, 80)
+  assert.equal(listingEstimate(listing, null, 30).quantity, 20)
+  assert.equal(listingEstimate(listing, null, 30).baseAmount, 200)
+  assert.equal(listingEstimate({ ...listing, unit_label: 'ha' }, null, 30).quantity, 30)
+})
+
 test('quantity minimums apply to hourly, daily and per-unit estimates', () => {
   for (const pricing_type of ['hourly', 'day_rate', 'per_unit']) {
     const estimate = listingEstimate({ pricing_type, rate: '50', minimum_units: '3' }, null, 1)

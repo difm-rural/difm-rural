@@ -21,13 +21,13 @@ async function commit(query, staleMessage) {
   return { data, error: null }
 }
 
-// Provider flags the job done; requester then confirms.
-// (The "accepted provider can mark awaiting_completion" RLS policy enforces who.)
+// The accepted provider completes the job; the requester can review it.
+// RLS restricts this to the accepted provider.
 export function markJobComplete(jobId) {
   return commit(
     supabase
       .from('jobs')
-      .update({ status: JOB_STATUS.AWAITING_COMPLETION })
+      .update({ status: JOB_STATUS.COMPLETED })
       .eq('id', jobId)
       .in('status', [JOB_STATUS.ACCEPTED, JOB_STATUS.IN_PROGRESS]),
     'This job is no longer in progress — please refresh.'

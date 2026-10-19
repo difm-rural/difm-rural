@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react'
 import {
   FlatList,
+  AppState,
   RefreshControl,
   StyleSheet,
   Text,
@@ -8,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import { stackRootAction } from '../../shared/stackNavigation'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
@@ -21,7 +23,7 @@ import {
   notificationTimeAgo,
   openNotificationTarget,
 } from '../lib/notifications'
-import { requestBadgeRefresh } from '../lib/badgeEvents'
+import { onBadgeRefresh, requestBadgeRefresh } from '../lib/badgeEvents'
 
 export default function NotificationsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
@@ -31,7 +33,28 @@ export default function NotificationsScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false)
   const autoOpenedRef = useRef(null)
 
-  useFocusEffect(useCallback(() => { load() }, []))
+  useFocusEffect(useCallback(() => {
+    let active = true
+    let refreshingInbox = false
+    load()
+    async function refreshInbox() {
+      if (refreshingInbox) return
+      refreshingInbox = true
+      try {
+        const list = await fetchNotifications(100)
+        if (active) setItems(list.map(n => ({ ...n, _wasUnread: !n.read })))
+      } finally {
+        refreshingInbox = false
+      }
+    }
+    // Keep the open inbox current, including when returning from an email app.
+    const timer = setInterval(refreshInbox, 10000)
+    const unsubscribe = onBadgeRefresh(() => refreshInbox())
+    const appState = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshInbox()
+    })
+    return () => { active = false; clearInterval(timer); appState.remove(); unsubscribe() }
+  }, [route?.params?.openNotificationId]))
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -143,11 +166,14 @@ export default function NotificationsScreen({ navigation, route }) {
         <View style={styles.headerTopRow}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              const rootAction = stackRootAction(navigation.getState())
+              if (rootAction) navigation.dispatch(rootAction)
+            }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
+            accessibilityLabel="Done with notifications, return to main screen">
+            <Text style={styles.backBtnText}>Done</Text>
           </TouchableOpacity>
           {hasUnread && (
             <TouchableOpacity

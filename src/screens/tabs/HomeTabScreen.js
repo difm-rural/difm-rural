@@ -24,6 +24,7 @@ import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import { fetchConnectionsForRequester } from '../../lib/connections'
+import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
@@ -62,6 +63,13 @@ export default function HomeTabScreen({ navigation }) {
   const [refreshing, setRefreshing]     = useState(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
+  useFocusEffect(useCallback(() => {
+    let active = true
+    const unsubscribe = onBadgeRefresh(() => {
+      fetchNotifications(8).then(rows => { if (active) setNotifications(rows) }).catch(() => {})
+    })
+    return () => { active = false; unsubscribe() }
+  }, []))
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -158,6 +166,8 @@ export default function HomeTabScreen({ navigation }) {
   const unread      = notifications.filter(n => !n.read)
   const nextMoveKeys = new Set(nextMoves.map(item => `${item.entityType}:${item.entityId}`))
   const remainingNotifications = unread.filter(notification => {
+    // An outstanding booking/job action does not replace a new chat message.
+    if (notification.type === 'new_message') return true
     const metadata = notification.metadata || {}
     const key = metadata.booking_id
       ? `booking:${metadata.booking_id}`

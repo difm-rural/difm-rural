@@ -1,5 +1,32 @@
 # DIFM Rural — E2E Tests
 
+## Off-screen chat notification checks
+
+Run `node --test --test-isolation=none tests/chat-notification-focus.test.mjs`.
+Open a chat, return to Activity/Notifications, then have the other participant
+send a new message. The message notification must remain unread until that
+conversation is opened. The open notification inbox refreshes within 10 seconds
+and on foregrounding. Different people enquiring about one listing must not
+clear each other's notifications. Past notifications already marked read are
+not reset; use a newly sent message to verify the fix.
+
+## Provider-led completion
+
+Run `node --test --test-isolation=none tests/provider-completion.test.mjs`.
+Apply `20261014120000_provider_led_completion.sql` before using the updated
+completion buttons against the shared database. It enables accepted providers
+to complete jobs and bookings directly, preserves quote/cancellation guards,
+normalises old-client completion writes, notifies both participants about
+reviews, and converts existing awaiting-completion work into completed work.
+
+On a phone, test accepted/in-progress jobs and confirmed/in-progress bookings:
+provider Mark complete should move the record directly to History; requester
+receives a completion notification and can review without a confirmation step.
+Also check that unrelated providers cannot complete work, pending bookings
+cannot be completed, repeated completion does not succeed twice, and quotes
+and cancellations retain their existing permissions. Test an older app build
+if one is still used by testers.
+
 ## Help and feedback device checks
 
 From Account, open Help & feedback. How it works should open the explainer;

@@ -68,25 +68,13 @@ export function jobNextMove(job, viewerRole, {
       })
     }
     if (viewerRole === 'provider') {
-      return move('Waiting on you', 'Complete the work, then mark it ready', {
+      return move('Waiting on you', 'Complete the work, then mark it complete', {
         tone: 'active',
         icon: 'construct-outline',
         actionLabel: 'View job',
       })
     }
-    return move(`Waiting on ${other}`, 'They will mark the job ready when finished')
-  }
-
-  if (job.status === 'awaiting_completion') {
-    if (viewerRole === 'requester') {
-      return move('Ready to confirm', 'Confirm that the work is complete', {
-        needsAction: true,
-        tone: 'attention',
-        icon: 'checkmark-circle-outline',
-        actionLabel: 'Confirm',
-      })
-    }
-    return move(`Waiting on ${other}`, 'Completion is ready for confirmation')
+    return move(`Waiting on ${other}`, 'They will mark the job complete when finished')
   }
 
   return null
@@ -121,6 +109,12 @@ export function bookingNextMove(booking, viewerRole, { otherName } = {}) {
   }
 
   if (booking.status === 'confirmed' || booking.status === 'in_progress') {
+    if (service.kind === 'grazing') {
+      return move('Grazing arrangement accepted', 'Use Chat to agree ongoing grazing details, dates and payment directly with each other.'
+        + (viewerRole === 'provider' ? ' When the arrangement has finished, choose Complete arrangement to close the listing or relist for new requests.' : ''), {
+        tone: 'active', icon: 'chatbubble-outline', actionLabel: 'View booking',
+      })
+    }
     const schedule = scheduledLabel(booking)
     if (schedule) {
       return move(schedule, viewerRole === 'provider' ? 'You are booked for this service' : `${other} is booked`, {
@@ -129,22 +123,13 @@ export function bookingNextMove(booking, viewerRole, { otherName } = {}) {
       })
     }
     if (viewerRole === 'provider') {
-      return move('Waiting on you', 'Complete the service, then mark it ready', {
+      return move('Waiting on you', 'Complete the service, then mark it complete', {
         tone: 'active',
         icon: 'construct-outline',
         actionLabel: 'View booking',
       })
     }
-    return move(`Waiting on ${other}`, 'They will mark the service ready when finished')
-  }
-
-  if (booking.status === 'awaiting_completion') {
-    if (viewerRole === 'requester') {
-      return move('Ready to confirm', 'Confirm that the service is complete', {
-        needsAction: true, tone: 'attention', icon: 'checkmark-circle-outline', actionLabel: 'Confirm',
-      })
-    }
-    return move(`Waiting on ${other}`, 'Completion is ready for confirmation')
+    return move(`Waiting on ${other}`, 'They will mark the service complete when finished')
   }
 
   if (booking.status === 'cancellation_requested') {

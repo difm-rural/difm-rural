@@ -7,6 +7,7 @@
 // (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { pushMessageForDevice } from '../../../shared/pushDelivery.js'
 
 // Short, human title per notification type; body comes from the row.
 const TITLES: Record<string, string> = {
@@ -96,22 +97,21 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { data: tokens } = await supabase
+  const { data: tokens, error: tokenError } = await supabase
     .from('device_push_tokens')
-    .select('token')
+    .select('token,platform,channel_id')
     .eq('user_id', record.user_id)
 
-  const recipients = (tokens ?? []).map((t: { token: string }) => t.token).filter(Boolean)
+  if (tokenError) {
+    console.error('send-push: device lookup failed', { notificationId: record.id, code: tokenError.code })
+    return new Response('Device lookup failed', { status: 500 })
+  }
+  const recipients = (tokens ?? []).filter((t: { token: string }) => t.token)
   if (recipients.length === 0) return new Response('ok', { status: 200 })
 
   const title = TITLES[record.type] ?? 'Rural Connections'
-  const messages = recipients.map((to: string) => ({
-    to,
-    sound: 'default',
-    title,
-    body: record.body,
-    data: record.metadata ?? {},
-  }))
+  const messages = recipients.map((device: { token: string; platform?: string; channel_id?: string | null }) =>
+    pushMessageForDevice(device, record, title))
 
   // Expo accepts up to 100 messages per request.
   const deadTokens: string[] = []
@@ -124,9 +124,20 @@ Deno.serve(async (req) => {
         body: JSON.stringify(chunk),
       })
       const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.data) {
+        console.error('send-push: Expo response failed', { notificationId: record.id, httpStatus: res.status })
+        continue
+      }
       const data = json?.data
       if (Array.isArray(data)) {
         data.forEach((ticket: any, idx: number) => {
+          if (ticket?.status === 'error') {
+            console.error('send-push: Expo rejected notification', {
+              notificationId: record.id, error: ticket?.details?.error,
+            })
+          } else if (ticket?.id) {
+            console.info('send-push: Expo accepted notification', { notificationId: record.id, ticketId: ticket.id })
+          }
           if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
             deadTokens.push(chunk[idx].to)
           }

@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { fetchBookingDetail } from '../lib/bookingDetail'
 import { bookingStatusLabel, BOOKING_STATUS, BOOKING_UNDERWAY_STATUSES, isBookingUnderway, isBookingDismissable } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
@@ -25,7 +26,6 @@ import { bookingNextMove } from '../lib/nextMove'
 import { loadReview } from '../lib/reviews'
 import {
   updateBookingStatus,
-  confirmBookingComplete,
   sendBookingQuote,
   acceptBookingQuote,
   dismissProviderBooking as dismissBookingApi,
@@ -63,6 +63,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const initialBooking = route.params?.booking || null
   const viewerRole = route.params?.viewerRole || 'provider'
   const [booking, setBooking] = useState(initialBooking)
+  const [savingArrangement, setSavingArrangement] = useState(false)
   const [quoteAmount, setQuoteAmount] = useState('')
   const [quoteNotes, setQuoteNotes] = useState('')
   const [savingQuote, setSavingQuote] = useState(false)
@@ -134,16 +135,22 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
   async function fetchBooking() {
     if (!initialBooking?.id) return
-    const { data } = await supabase
-      .from('bookings')
-      .select('*, service:service_id(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
-      .eq('id', initialBooking.id)
-      .single()
-    if (data) setBooking(data)
-    if (data?.quote_amount != null) setQuoteAmount(String(data.quote_amount))
-    if (data?.quote_notes) setQuoteNotes(data.quote_notes)
-    const schedule = await fetchWorkSchedule({ bookingId: initialBooking.id })
-    setWorkSchedule(schedule)
+    try {
+      const data = await fetchBookingDetail(supabase, initialBooking.id)
+      setBooking(previous => ({ ...previous, ...data,
+        requester: data.requester || previous?.requester,
+        provider: data.provider || previous?.provider,
+      }))
+      if (data.quote_amount != null) setQuoteAmount(String(data.quote_amount))
+      if (data.quote_notes) setQuoteNotes(data.quote_notes)
+      const schedule = await fetchWorkSchedule({ bookingId: initialBooking.id })
+      setWorkSchedule(schedule)
+    } catch {
+      Alert.alert('Could not load booking', 'Check your connection and try again.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Retry', onPress: fetchBooking },
+      ])
+    }
   }
 
   if (!booking) {
@@ -287,38 +294,56 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   function markReady() {
     Alert.alert(
       'Mark as complete?',
-      'This tells the requester the work is done and asks them to confirm completion.',
+      'This closes the booking and invites the requester to leave a review.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Mark complete',
-          onPress: () => updateStatus('awaiting_completion', BOOKING_UNDERWAY_STATUSES, 'The requester has been asked to confirm completion.'),
+          onPress: () => updateStatus('completed', BOOKING_UNDERWAY_STATUSES, 'The booking is complete. The requester can now leave a review.'),
         },
       ]
     )
   }
 
-  function confirmComplete() {
-    Alert.alert(
-      'Mark as complete?',
-      'Confirm the work is done. This closes the booking and you can leave a review.',
-      [
+  async function completeGrazing(relist) {
+    if (savingArrangement) return
+    setSavingArrangement(true)
+    try {
+      const { error } = await supabase.rpc('complete_grazing_arrangement', {
+        p_booking_id: booking.id, p_relist: relist,
+      })
+      if (error) throw error
+      await fetchBooking()
+      Alert.alert('Arrangement complete', relist
+        ? 'The listing is live for new enquiries and booking requests. You can both leave a review of this arrangement.'
+        : 'The listing is closed and hidden from discovery. You can both leave a review. Relist when grazing is available again.')
+    } catch (error) {
+      Alert.alert('Could not complete arrangement', error.message || 'Check your connection and try again.')
+    } finally { setSavingArrangement(false) }
+  }
+
+  function finishGrazing() {
+    Alert.alert('Complete grazing arrangement?',
+      'When the arrangement has finished, mark it complete and close this listing. If grazing is available again, choose relist to keep it advertised. Other bookings are unchanged.', [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark as complete',
-          onPress: async () => {
-            const { error } = await confirmBookingComplete(booking.id, booking.requester_id)
-            if (error) {
-              Alert.alert('Could not confirm', error.message)
-              if (error.code === 'stale') fetchBooking()
-              return
-            }
-            setBooking(prev => ({ ...prev, status: 'completed' }))
-            setReviewVisible(true)
-          },
-        },
-      ]
-    )
+        { text: 'Complete & close listing', onPress: () => completeGrazing(false) },
+        { text: 'Complete & relist', onPress: () => completeGrazing(true) },
+      ])
+  }
+
+  async function relistGrazing() {
+    if (savingArrangement) return
+    setSavingArrangement(true)
+    try {
+      const { data, error } = await supabase.from('services')
+        .update({ is_active: true, closed_at: null }).eq('id', service.id)
+        .eq('provider_id', booking.provider_id).select('id')
+      if (error) throw error
+      if (!data?.length) throw new Error('This listing is unavailable. Refresh and try again.')
+      await fetchBooking()
+      Alert.alert('Listing live', 'Your grazing listing is available for new enquiries and booking requests.')
+    } catch (error) { Alert.alert('Could not relist', error.message) }
+    finally { setSavingArrangement(false) }
   }
 
   async function submitReview({ rating, comment }) {
@@ -383,10 +408,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const requesterCanAcceptQuote = viewerRole === 'requester' && booking.status === 'quote_sent'
   const providerCanConfirm = viewerRole === 'provider' && !isQuoteRequired && booking.status === 'pending'
   const providerCanDecline = viewerRole === 'provider' && ['pending', 'quote_sent'].includes(booking.status)
-  const providerCanReady = viewerRole === 'provider' && isBookingUnderway(booking.status)
+  const providerCanReady = viewerRole === 'provider' && service.kind !== 'grazing' && isBookingUnderway(booking.status)
   const providerCanConfirmCancel = viewerRole === 'provider' && booking.status === 'cancellation_requested'
   const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
-  const requesterCanConfirmComplete = viewerRole === 'requester' && booking.status === 'awaiting_completion'
   const canReview = booking.status === 'completed'
 
   return (
@@ -413,7 +437,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         automaticallyAdjustKeyboardInsets={true}>
         <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 14 }} />
 
-        {['confirmed', 'in_progress'].includes(booking.status) ? (
+        {service.kind !== 'grazing' && ['confirmed', 'in_progress'].includes(booking.status) ? (
           <WorkScheduleCard
             schedule={workSchedule}
             canSetWindow={viewerRole === 'provider'}
@@ -428,15 +452,17 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           />
         ) : null}
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>People</Text>
-          <DetailRow label="Requester" value={requester?.full_name || booking.requesterName || 'Requester'} />
-          <DetailRow label="Provider" value={provider?.full_name || booking.providerName || 'Provider'} />
-        </View>
-
         <ReputationCard
-          label={`${otherRoleLabel} rating`}
-          name={otherUser?.full_name || otherRoleLabel}
+          label={otherRoleLabel}
+          name={otherUser?.full_name
+            || (viewerRole === 'provider' ? booking.requesterName : booking.providerName)
+            || 'Name unavailable'}
+          memberSince={otherUser?.created_at}
+          onPressReviews={() => navigation.navigate('ReviewsList', {
+            revieweeId: viewerRole === 'provider' ? booking.requester_id : booking.provider_id,
+            revieweeName: otherUser?.full_name || otherRoleLabel,
+            revieweeRole: viewerRole === 'provider' ? 'requester' : 'provider',
+          })}
           ratingAvg={otherStats?.ratingAvg}
           ratingCount={otherStats?.ratingCount}
           reviews={otherReviews}
@@ -511,14 +537,6 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {requesterCanConfirmComplete && (
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeTitle}>Provider marked this complete</Text>
-            <Text style={styles.noticeText}>
-              Confirm the work is done to close the booking — you can then leave a review.
-            </Text>
-          </View>
-        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
@@ -527,12 +545,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <Button title="Confirm" onPress={confirmBooking} style={styles.footerBtn} />
         )}
         {providerCanQuote && (
-          <Button
-            title={booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}
-            onPress={sendQuote}
-            loading={savingQuote}
-            style={styles.footerBtn}
-          />
+          <Button title={booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}
+            onPress={sendQuote} loading={savingQuote} style={styles.footerBtn} />
         )}
         {providerCanDecline && (
           <Button variant="destructive" title="Decline" onPress={declineBooking} style={styles.footerBtn} />
@@ -541,11 +555,15 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <Button title="Accept quote" onPress={acceptQuote} style={styles.footerBtn} />
         )}
         {providerCanReady && (
-          <Button title="Mark job complete" onPress={markReady} style={styles.footerBtn} />
+          <Button title="Mark complete" onPress={markReady} style={styles.footerBtn} />
         )}
-        {requesterCanConfirmComplete && (
-          <Button title="Confirm complete" onPress={confirmComplete} style={styles.footerBtn} />
+        {viewerRole === 'provider' && service.kind === 'grazing' && isBookingUnderway(booking.status) && (
+          <Button title="Complete arrangement" onPress={finishGrazing} loading={savingArrangement} style={styles.footerBtn} />
         )}
+        {viewerRole === 'provider' && service.kind === 'grazing' && booking.status === 'completed' && service.closed_at && (
+          <Button title="Relist grazing" onPress={relistGrazing} loading={savingArrangement} style={styles.footerBtn} />
+        )}
+
         {canReview && (
           <Button
             title={myReview ? 'Edit review' : `Review ${otherRoleLabel.toLowerCase()}`}

@@ -42,9 +42,9 @@ export function declineBooking(bookingId) {
     'This request can no longer be declined — please refresh.')
 }
 
-// Provider flags the work done; requester then confirms.
+// Provider completes the booking; the requester can review it.
 export function markBookingReady(bookingId) {
-  return updateBookingStatus(bookingId, BOOKING_STATUS.AWAITING_COMPLETION,
+  return updateBookingStatus(bookingId, BOOKING_STATUS.COMPLETED,
     [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.IN_PROGRESS],
     'This booking is no longer in progress — please refresh.')
 }

@@ -82,14 +82,14 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           style={[styles.toggleSwitch, service.is_active && styles.toggleSwitchOn]}
           onPress={() => onToggleActive(service)}
           accessibilityRole="switch"
-          accessibilityLabel={service.is_active ? 'Pause listing advertising' : 'Resume listing advertising'}
+          accessibilityLabel={service.closed_at ? 'Relist listing' : service.is_active ? 'Pause listing advertising' : 'Resume listing advertising'}
           accessibilityState={{ checked: service.is_active }}>
           <View style={[styles.toggleThumb, service.is_active && styles.toggleThumbOn]} />
         </TouchableOpacity>
       </View>
 
       <Text style={[styles.statusText, !service.is_active && styles.statusTextPaused]}>
-        {service.is_active ? 'Advertising live' : 'Advertising paused'}
+        {service.closed_at ? 'Listing closed · Switch on to relist' : service.is_active ? 'Advertising live' : 'Advertising paused'}
       </Text>
 
       <Text style={styles.rowMeta}>
@@ -204,14 +204,14 @@ export default function MyServicesScreen({ navigation, route }) {
     }
 
     const newVal = !service.is_active
-    setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: newVal } : s))
+    setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: newVal, ...(newVal ? { closed_at: null } : {}) } : s))
     const { error } = await supabase
       .from('services')
-      .update({ is_active: newVal })
+      .update({ is_active: newVal, ...(newVal ? { closed_at: null } : {}) })
       .eq('id', service.id)
       .eq('provider_id', providerId)
     if (error) {
-      setServices(prev => prev.map(s => s.id === service.id ? { ...s, is_active: !newVal } : s))
+      setServices(prev => prev.map(s => s.id === service.id ? service : s))
       Alert.alert('Error', error.message)
     }
   }

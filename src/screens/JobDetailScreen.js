@@ -4,7 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
-import { markJobComplete, confirmJobComplete, acceptBid } from '../lib/jobActions'
+import { markJobComplete, acceptBid } from '../lib/jobActions'
 import { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
 import ReceivedReview from '../components/ReceivedReview'
 import Icon from '../components/Icon'
@@ -94,7 +94,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [savingReview, setSavingReview] = useState(false)
   const [receivedReview, setReceivedReview] = useState(null)
 
-  // Requester-side: confirm completion + review the provider
+  // Requester-side: review the provider after provider-led completion.
   const [providerReview, setProviderReview] = useState(null)
   const [providerReviewVisible, setProviderReviewVisible] = useState(false)
   const [savingProviderReview, setSavingProviderReview] = useState(false)
@@ -262,31 +262,6 @@ export default function JobDetailScreen({ route, navigation }) {
       const review = await loadReview({ jobId: job.id, reviewerId: currentUser.id, reviewerRole: 'requester' })
       setProviderReview(review)
     } catch { }
-  }
-
-  function handleConfirmComplete() {
-    Alert.alert('Confirm complete', 'Mark this job as complete? This confirms the work is done.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          const { error } = await confirmJobComplete(job.id, currentUser.id)
-          if (error) {
-            Alert.alert('Could not confirm', error.message)
-            if (error.code === 'stale') fetchData()
-            return
-          }
-          trackEvent('job_completed', { job_id: job.id })
-          setJob(prev => ({ ...prev, status: 'completed' }))
-          const accepted = bids.find(b => b.status === 'accepted')
-          if (accepted?.provider_id) {
-            setProviderReviewVisible(true)
-          } else {
-            Alert.alert('Job completed', 'This job has been marked complete.')
-          }
-        },
-      },
-    ])
   }
 
   async function handleSubmitProviderReview({ rating, comment }) {
@@ -573,7 +548,7 @@ export default function JobDetailScreen({ route, navigation }) {
     function handleMarkComplete() {
       Alert.alert(
         'Mark as completed',
-        `Let ${requesterFirstName} know the work is done? They'll confirm to finalise the job.`,
+        `Mark the work complete? This closes the job and invites ${requesterFirstName} to leave a review.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -586,8 +561,8 @@ export default function JobDetailScreen({ route, navigation }) {
                 return
               }
               trackEvent('job_marked_complete', { job_id: job.id })
-              setJob(prev => ({ ...prev, status: 'awaiting_completion' }))
-              Alert.alert('Thanks!', `${requesterFirstName} has been asked to confirm the job is complete.`)
+              setJob(prev => ({ ...prev, status: 'completed' }))
+              Alert.alert('Thanks!', `${requesterFirstName} has been notified and can now leave a review.`)
             },
           },
         ]
@@ -657,7 +632,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   {isCompleted
                     ? `This job is complete. You can now review ${requesterFirstName}.`
                     : isAwaitingCompletion
-                      ? `You've marked this job done. Waiting for ${requesterFirstName} to confirm.`
+                      ? 'Completion recorded. Refresh to see the completed job.'
                       : `This job has been awarded to you for $${myBid.amount} NZD. Use chat to confirm timing and details with ${requesterFirstName}.`}
                 </Text>
               </View>
@@ -739,7 +714,7 @@ export default function JobDetailScreen({ route, navigation }) {
               isAwaitingCompletion ? (
                 <View style={styles.awaitingBox}>
                   <Text style={styles.awaitingBoxText}>
-                    <Icon name="hourglass-outline" size={14} color="#92400e" /> Waiting for {requesterFirstName} to confirm completion.
+                    <Icon name="checkmark-circle-outline" size={14} color={colors.primary} /> Completion recorded. Refresh to see the completed job.
                   </Text>
                 </View>
               ) : (
@@ -1045,25 +1020,6 @@ export default function JobDetailScreen({ route, navigation }) {
             style={{ marginBottom: 16 }}
             accessibilityLabel="Manage this job"
           />
-        )}
-
-        {/* Requester: provider has marked the job done — confirm + review */}
-        {isJobOwner && job.status === 'awaiting_completion' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Confirm completion</Text>
-            <View style={styles.infoBoxGreen}>
-              <Text style={styles.infoBoxGreenText}>
-                {acceptedProviderName} has marked this job as done. Confirm to finalise and leave a review.
-              </Text>
-            </View>
-            <Button
-              icon="checkmark"
-              title="Confirm job complete"
-              onPress={handleConfirmComplete}
-              style={{ marginTop: 12 }}
-              accessibilityLabel="Confirm job complete"
-            />
-          </View>
         )}
 
         {/* Requester: completed — leave / edit the provider review */}

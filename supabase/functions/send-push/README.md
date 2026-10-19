@@ -1,5 +1,13 @@
 # send-push
 
+Android devices register the alert channel they create in
+`device_push_tokens.channel_id`. The function targets that channel only when
+registered, preserving delivery to older installations. Updated devices use
+`activity-alerts-v1` with default sound and high importance. Expo ticket errors
+and accepted ticket IDs are logged without push tokens; HTTP 200 alone does
+not confirm delivery to the phone. Phone notification permissions, channel
+settings and Do Not Disturb still control audible alerts.
+
 Sends an Expo push when a `notifications` row is inserted. Wired up by a
 Supabase **Database Webhook**, so push delivery rides on the same trigger-driven
 notifications the in-app inbox uses.

@@ -19,7 +19,7 @@ import { cancelBookingByRequester } from '../lib/bookingActions'
 import ReviewList from '../components/ReviewList'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
-import { KIND_ENQUIRY } from '../../shared/listingPricing'
+import { KIND_ENQUIRY, KIND_ENQUIRY_ONLY } from '../../shared/listingPricing'
 import { listingChatParams, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
 import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
 
@@ -158,7 +158,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
     const { data: { user } } = await supabase.auth.getUser()
     setCurrentUserId(user?.id || null)
     if (!user) return
-    if (KIND_ENQUIRY.includes(service.kind)) { // enquiry kinds have no bookings
+    if (KIND_ENQUIRY_ONLY.includes(service.kind)) {
       setActiveBooking(null)
       setIsBooked(false)
       return
@@ -274,10 +274,10 @@ export default function ServiceDetailScreen({ route, navigation }) {
     : 'Flexible'
   const photos = Array.isArray(service.photos) ? service.photos : []
   const isOwnService = !!currentUserId && currentUserId === service.provider_id
-  const isEnquiryKind = KIND_ENQUIRY.includes(service.kind)
+  const isEnquiryKind = KIND_ENQUIRY_ONLY.includes(service.kind)
   // Payment row is kind-aware: bookable kinds keep upfront/on-completion; grazing
   // & lease show their recurring cadence (or nothing); for_sale shows nothing.
-  const paymentValue = !isEnquiryKind
+  const paymentValue = !KIND_ENQUIRY.includes(service.kind)
     ? (service.payment_timing === 'upfront' ? 'Upfront' : 'On completion')
     : (service.kind === 'grazing' || service.kind === 'lease')
     ? ({ weekly: 'Paid weekly', monthly: 'Paid monthly' }[cadenceFromUnit(service.unit_label)] || null)
@@ -543,6 +543,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
               <DetailRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)} NZD`} last />
             )}
             <Text style={styles.descText}>{BASE_ESTIMATE_EXPLANATION}</Text>
+            {service.kind === 'grazing' && /\/(week|month)$/.test(effectiveUnitLabel || '') && (
+              <Text style={styles.descText}>This estimate covers one {effectiveUnitLabel.endsWith('/week') ? 'week' : 'month'}. Agree the grazing duration and payment schedule with the provider.</Text>
+            )}
             <Text style={styles.descText}>You arrange payment directly with the provider — Rural Connections doesn't handle payments.</Text>
           </View>
         )}
@@ -573,6 +576,11 @@ export default function ServiceDetailScreen({ route, navigation }) {
                 : () => navigation.navigate('BookingConfirm', { service, quantity: estimate.quantity, ...(selectedOption ? { selectedOption } : {}) })}
               accessibilityLabel={isOwnService ? 'Manage your listings' : isBooked ? 'View your booking' : 'Book this service'}
             />
+            {service.kind === 'grazing' && !isOwnService && (
+              <Button variant="secondary" title="Enquire" onPress={handleEnquiry}
+                loading={openingEnquiry} style={{ marginTop: 10 }}
+                accessibilityLabel="Enquire about this grazing listing" />
+            )}
             {!isOwnService && isBooked && activeBooking?.status !== 'cancellation_requested' && (
               <Button
                 variant="destructive"

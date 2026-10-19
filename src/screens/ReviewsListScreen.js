@@ -75,23 +75,27 @@ function ReviewCard({ review, reviewerName, reviewerInitials, jobCategory }) {
 
 export default function ReviewsListScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
-  const { revieweeId, revieweeName } = route.params
+  const { revieweeId, revieweeName, revieweeRole } = route.params
 
   const [reviews, setReviews]               = useState([])
   const [reviewerProfiles, setReviewerProfiles] = useState([])
   const [jobCatMap, setJobCatMap]           = useState({})
   const [loading, setLoading]               = useState(true)
   const [refreshing, setRefreshing]         = useState(false)
+  const [error, setError]                   = useState(false)
 
-  useFocusEffect(useCallback(() => { fetchAll() }, [revieweeId]))
+  useFocusEffect(useCallback(() => { fetchAll() }, [revieweeId, revieweeRole]))
 
   async function fetchAll() {
+    setError(false)
     try {
-      const { data: revs } = await supabase
+      let query = supabase
         .from('reviews')
         .select('*')
         .eq('reviewee_id', revieweeId)
-        .order('created_at', { ascending: false })
+      if (revieweeRole) query = query.eq('reviewee_role', revieweeRole)
+      const { data: revs, error: reviewError } = await query.order('created_at', { ascending: false })
+      if (reviewError) throw reviewError
 
       const allRevs = revs || []
       setReviews(allRevs)
@@ -106,7 +110,7 @@ export default function ReviewsListScreen({ route, navigation }) {
             ? supabase.from('profiles_public').select('id, full_name').in('id', reviewerIds)
             : Promise.resolve({ data: [] }),
           jobIds.length > 0
-            ? supabase.from('jobs').select('id, category').in('id', jobIds)
+            ? supabase.from('jobs_public').select('id, category').in('id', jobIds)
             : Promise.resolve({ data: [] }),
         ])
 
@@ -117,7 +121,7 @@ export default function ReviewsListScreen({ route, navigation }) {
         setJobCatMap(catMap)
       }
     } catch {
-      // show partial data
+      setError(true)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -172,7 +176,7 @@ export default function ReviewsListScreen({ route, navigation }) {
     <View style={styles.screen}>
       {header}
       <FlatList
-        data={reviews}
+        data={error ? [] : reviews}
         keyExtractor={item => item.id || String(Math.random())}
         renderItem={({ item }) => (
           <ReviewCard
@@ -194,8 +198,10 @@ export default function ReviewsListScreen({ route, navigation }) {
         ListEmptyComponent={
           <EmptyState
             icon="star-outline"
-            title="No reviews yet"
-            body="Reviews will appear here after jobs are completed."
+            title={error ? "Couldn't load reviews" : 'No reviews yet'}
+            body={error ? 'Check your connection and try again.' : 'Reviews will appear here after completed jobs or bookings.'}
+            actionLabel={error ? 'Retry' : undefined}
+            onAction={error ? onRefresh : undefined}
           />
         }
       />

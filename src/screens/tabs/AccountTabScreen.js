@@ -19,6 +19,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker'
 import Constants from 'expo-constants'
 import * as Updates from 'expo-updates'
+import { testPhoneAlert } from '../../lib/push'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../../lib/uploadAvatar'
@@ -150,6 +151,20 @@ export default function AccountTabScreen({ navigation, route }) {
 
   const [section, setSection]               = useState('hub')
   const [openingFeedback, setOpeningFeedback] = useState(false)
+  const [testingPhoneAlert, setTestingPhoneAlert] = useState(false)
+
+  async function handleTestPhoneAlert() {
+    if (testingPhoneAlert) return
+    setTestingPhoneAlert(true)
+    try {
+      await testPhoneAlert()
+      Alert.alert('Test alert scheduled', 'An alert should appear in 5 seconds. Dismiss this message, then go to Home or lock your phone. This tests your phone’s alert display and sound; it does not send a message to anyone.')
+    } catch (error) {
+      Alert.alert('Phone alert test unavailable', error.message || 'Please check your phone notification settings and try again.')
+    } finally {
+      setTestingPhoneAlert(false)
+    }
+  }
   const feedbackAddress = 'hello@ruralconnections.nz'
   const appVersion = Constants.expoConfig?.version || 'Unknown'
   const buildVersion = Platform.OS === 'ios'
@@ -981,6 +996,11 @@ export default function AccountTabScreen({ navigation, route }) {
 
   const helpContent = (
     <View style={styles.body}>
+      <Text style={styles.sectionLabel}>Phone notifications</Text>
+      <View style={[styles.card, { padding: 16 }]}>
+        <Text style={[styles.rowSub, { marginBottom: 12 }]}>Check whether this phone can show and sound an alert. This local test works without receiving a message.</Text>
+        <Button title="Test phone alert" icon="notifications-outline" onPress={handleTestPhoneAlert} loading={testingPhoneAlert} />
+      </View>
       <Text style={styles.sectionLabel}>Help</Text>
       <View style={styles.card}>
         <MenuRow

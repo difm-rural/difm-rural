@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
 import ReviewList from './ReviewList'
 
@@ -7,6 +7,8 @@ import ReviewList from './ReviewList'
 export default function ReputationCard({
   label,
   name,
+  memberSince,
+  onPressReviews,
   ratingAvg = 0,
   ratingCount = 0,
   reviews = [],
@@ -15,15 +17,25 @@ export default function ReputationCard({
   const summary = ratingCount > 0
     ? `★ ${Number(ratingAvg).toFixed(1)} (${ratingCount} review${ratingCount === 1 ? '' : 's'})`
     : '★ No rating yet'
+  const joined = memberSince ? new Date(memberSince) : null
+  const since = joined && !Number.isNaN(joined.getTime())
+    ? joined.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' }) : null
 
   return (
     <View style={[styles.card, style]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={styles.header}>
         <Text style={styles.name}>{name}</Text>
-        <Text style={styles.summary}>{summary}</Text>
+        {onPressReviews ? (
+          <TouchableOpacity onPress={onPressReviews} style={styles.reviewButton}
+            accessibilityRole="button" accessibilityLabel={`View reviews and comments for ${name}`}>
+            <Text style={[styles.summary, styles.reviewLink]}>{summary}</Text>
+            <Text style={styles.reviewLink}>View reviews ›</Text>
+          </TouchableOpacity>
+        ) : <Text style={styles.summary}>{summary}</Text>}
       </View>
-      <ReviewList reviews={reviews} emptyText="No written reviews yet." />
+      {since ? <Text style={styles.memberSince}>Member since {since}</Text> : null}
+      {!onPressReviews && <ReviewList reviews={reviews} emptyText="No written reviews yet." />}
     </View>
   )
 }
@@ -56,5 +68,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   name: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  memberSince: { fontSize: 13, color: colors.textSecondary, paddingHorizontal: 16, paddingBottom: 12 },
   summary: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  reviewButton: { minHeight: 44, justifyContent: 'center', gap: 4 },
+  reviewLink: { fontSize: 13, color: colors.primary, fontWeight: '700' },
 })
