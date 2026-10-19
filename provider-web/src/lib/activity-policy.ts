@@ -1,9 +1,11 @@
+import type { BookingRecord } from './booking-detail'
 export type WorkKind = 'job' | 'booking'
 export type WorkRole = 'requester' | 'provider'
 export type ActivityWork = {
   id: string; kind: WorkKind; status: string; requesterId: string; providerId: string | null;
   title: string; location: string | null; notes: string | null;
   cancellationReason?: string | null; cancellationNote?: string | null;
+  booking?:BookingRecord;
   serviceId?: string; listingKind?: string; closedAt?: string | null;
 }
 export type WorkAction = 'complete' | 'cancel' | 'withdraw' | 'request_cancel' | 'confirm_cancel' | 'close_grazing' | 'relist_grazing' | 'relist' | 'review'

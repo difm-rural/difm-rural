@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { BOOKING_ACTIVE_STATUSES, JOB_ACTIVE_STATUSES } from './lifecycle'
+import { bookingPricingType } from './listingEstimate'
 
 function firstName(name, fallback) {
   const value = String(name || '').trim()
@@ -84,7 +85,7 @@ export function bookingNextMove(booking, viewerRole, { otherName } = {}) {
   if (!booking) return null
   const service = booking.service || booking.services || {}
   const other = firstName(otherName, viewerRole === 'requester' ? 'the provider' : 'the requester')
-  const quoteRequired = service.pricing_type === 'quote_required'
+  const quoteRequired = bookingPricingType(booking) === 'quote_required'
 
   if (booking.status === 'pending') {
     if (viewerRole === 'provider') {

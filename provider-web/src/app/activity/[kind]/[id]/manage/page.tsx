@@ -7,6 +7,9 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { loadActivityWork } from '@/lib/activity-data'
 import { workActions, workRole, type WorkAction } from '@/lib/activity-policy'
 import { statusLabel } from '@/lib/work'
+import { BookingDetails } from '../../../booking-details'
+import { allPublicReviews } from '@/lib/profile-data'
+import { BookingSchedule } from '../../../booking-schedule'
 import { manageArrangement, reviewArrangement } from '../../../actions'
 
 const ACTIONS: Record<Exclude<WorkAction,'review'>,{label:string;detail:string}>={
@@ -30,6 +33,8 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     other?supabase.from('profiles_public').select('full_name,created_at').eq('id',other).maybeSingle():Promise.resolve({data:null}),
     supabase.from('reviews').select('id,reviewer_id,reviewer_role,rating,comment,created_at').eq(kind==='job'?'job_id':'booking_id',id),
   ])
+  let ratingCount=0,average=0,ratingError=false
+  if(other){try{const received= (await allPublicReviews(supabase,other)).filter(r=>r.reviewee_role===(role==='provider'?'requester':'provider'));ratingCount=received.length;average=ratingCount?received.reduce((sum,r)=>sum+r.rating,0)/ratingCount:0}catch{ratingError=true}}
   const ownReview=reviews?.find(r=>r.reviewer_id===user.id && r.reviewer_role===role)
   const received=reviews?.find(r=>r.reviewer_id===other && r.reviewer_role!==role)
   const history=!['open','pending','quote_sent','confirmed','accepted','in_progress','awaiting_completion','cancellation_requested'].includes(work.status)
@@ -38,16 +43,17 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     <header className="home-heading"><div><p className="eyebrow">{statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
     <article className="card work-detail"><h2>{kind==='booking'?'Booking details':'Job details'}</h2><p>{role==='provider'?'Requester':'Provider'}: {person?.full_name || (other?'Name unavailable':'No provider accepted yet')}</p>
       {person?.created_at && <p className="muted">Member since {new Date(person.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}
-      {other && <p><Link href={'/people/'+other} className="card-link">View profile & reviews →</Link></p>}
-      {work.location && <p>Location: {work.location}</p>}{work.notes && <p className="work-description">{work.notes}</p>}
+      {other && <p><Link href={'/people/'+other+'/reviews?role='+(role==='provider'?'requester':'provider')} className="card-link">{ratingError?'View profile & reviews':ratingCount?'★ '+average.toFixed(1)+' · '+ratingCount+' reviews — read comments':'No reviews yet — view profile'}</Link></p>}
+      {kind==='job' && work.location && <p>Location: {work.location}</p>}{kind==='job' && work.notes && <p className="work-description">{work.notes}</p>}
       {work.status==='cancellation_requested' && <p className="home-load-error">Cancellation requested — waiting for the provider to confirm.</p>}
       {work.cancellationReason && <p>Cancellation reason: {work.cancellationReason}</p>}
       {work.cancellationNote && <p className="work-description">{work.cancellationNote}</p>}
-      {work.listingKind==='grazing' && ['confirmed','in_progress'].includes(work.status) && <p>Grazing arrangement accepted. Use Chat to agree ongoing details, dates and payment. When it finishes, the provider can complete it and close or relist the listing.</p>}
       {other && <Link className="lform-save" href={'/activity/'+kind+'/'+id}>Open conversation</Link>}
       {kind==='job' && <p><Link className="card-link" href={'/jobs/'+id}>View job and offers →</Link></p>}
       {kind==='job' && role==='requester' && <div className="lform-actions">{work.status==='open' && <Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{['completed','cancelled'].includes(work.status) && <Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}</div>}
     </article>
+    {work.booking && <BookingDetails booking={work.booking} userId={user.id}/>}
+    {work.booking && work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
     {actions.filter(a=>a!=='review').length>0 && <section className="card"><h2>Manage this arrangement</h2><p className="muted">Choose an action to see what will happen before confirming.</p>
       {actions.filter((a):a is Exclude<WorkAction,'review'>=>a!=='review').map(intent=><details className="activity-action" key={intent}><summary>{ACTIONS[intent].label}</summary>
         <ActionForm action={manageArrangement} label={ACTIONS[intent].label}>

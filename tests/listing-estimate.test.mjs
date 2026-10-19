@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-const source = await readFile(new URL('../src/lib/listingEstimate.js', import.meta.url), 'utf8')
-const { listingEstimate, formatExtraCharge } = await import(
-  `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+import { listingEstimate, formatExtraCharge } from '../shared/listingEstimate.ts'
 
 test('minimum charge is a floor: one $50 hour costs at least $150, four cost $200', () => {
   const service = { pricing_type: 'hourly', rate: 50, min_charge: 150 }

@@ -2,8 +2,6 @@ import Link from 'next/link'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
-import { ActionForm } from '@/components/action-form'
-import { respondBooking } from '../work-actions'
 import { statusLabel } from '@/lib/work'
 import { activityIsActive } from '@/lib/activity-policy'
 export const dynamic='force-dynamic'
@@ -43,10 +41,6 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
         {b.status==='confirmed' && <p>{b.service?.kind==='grazing'?'Grazing arrangement accepted. Use Chat to agree ongoing dates, details and payment.':'Your booking is confirmed. Use Chat to arrange details and payment.'}</p>}
         <Link href={'/activity/booking/'+b.id+'/manage'} className="lform-save">{b.status==='completed'?'View details & reviews':'View details & actions'}</Link>
         <Link href={'/activity/booking/'+b.id} className="card-link">Open conversation →</Link>
-        {provider && b.status==='pending' && <ActionForm action={respondBooking} label={b.service?.pricing_type==='quote_required'?'Send quote':'Confirm booking'}><input type="hidden" name="booking_id" value={b.id}/><input type="hidden" name="intent" value={b.service?.pricing_type==='quote_required'?'quote':'confirm'}/>{b.service?.pricing_type==='quote_required' && <><label className="lform-field">Quote (NZD)<input type="number" name="amount" min="0.01" step="0.01" required/></label><label className="lform-field">Quote notes<textarea name="notes"/></label></>}</ActionForm>}
-        {provider && ['pending','quote_sent'].includes(b.status) && <ActionForm action={respondBooking} label="Decline request"><input type="hidden" name="booking_id" value={b.id}/><input type="hidden" name="intent" value="decline"/></ActionForm>}
-        {!provider && b.status==='quote_sent' && <ActionForm action={respondBooking} label="Accept quote"><input type="hidden" name="booking_id" value={b.id}/><input type="hidden" name="intent" value="accept"/></ActionForm>}
-        {provider && b.status==='cancellation_requested' && <ActionForm action={respondBooking} label="Confirm cancellation"><input type="hidden" name="booking_id" value={b.id}/><input type="hidden" name="intent" value="cancel"/><p>The requester has asked to cancel this arrangement.</p></ActionForm>}
       </article>})}</div>
     </section>
   </section></AppShell>

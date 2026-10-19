@@ -1,22 +1,26 @@
 'use client'
-import { useState } from 'react'
-import { ActionForm } from '@/components/action-form'
-import { requestBooking } from '../../../work-actions'
-import { bookingEstimate, type BookingRate } from '@/lib/booking-estimate'
-export function RequestForm({listing}:{listing:BookingRate & {id:string;location_name?:string|null}}){
-  const [quantity,setQuantity]=useState(Math.max(1,listing.minimum_units || 1))
-  const estimate=bookingEstimate(listing,quantity),quote=listing.pricing_type==='quote_required'
-  const unit=listing.pricing_type==='hourly'?'hours':listing.pricing_type==='day_rate'?'days':listing.unit_label || 'units'
-  return <ActionForm action={requestBooking} label={quote?'Request a quote':'Send booking request'}>
-    <input type="hidden" name="service_id" value={listing.id}/>
-    <label className="lform-field">Quantity ({unit})<input name="quantity" type="number" min={listing.minimum_units || 1} step="any" required value={quantity} onChange={e=>setQuantity(Number(e.target.value))}/></label>
-    <div className="card"><h3>{quote?'Price to be quoted':'Base estimate: $'+estimate.amount?.toFixed(2)+' NZD'}</h3>{listing.min_charge ? <p>Minimum charge included: ${listing.min_charge} NZD</p>:null}
-    {estimate.quantity!==quantity && <p>Quantity adjusted to the listing limits: {estimate.quantity} {unit}.</p>}
-    {listing.kind==='grazing' && /\/(week|month)$/.test(listing.unit_label || '') && <p>This estimate covers one {listing.unit_label?.endsWith('/week')?'week':'month'}. Agree the full duration with the provider.</p>}
-    <p>Extra charges may apply — agree the final price with the provider.</p></div>
-    <label className="lform-field">{listing.kind==='grazing'?'Grazing location':'Where is the work needed?'} *<input name="location" required defaultValue={listing.kind==='grazing'?listing.location_name || '':''}/></label>
-    <label className="lform-field">Preferred start date (optional)<input name="date" type="date"/></label>
-    <label className="lform-field">Notes (optional)<textarea name="notes" rows={4} placeholder={listing.kind==='grazing'?'Livestock type, head count and grazing duration':'Details for the provider'}/></label>
-    <p>{quote?'The provider will send a quote for you to review.':'The provider will review your request. Your booking is confirmed when they accept.'}</p><p>You arrange payment directly with the provider.</p>
-  </ActionForm>
+import {useState} from 'react'
+import {ActionForm} from '@/components/action-form'
+import {requestBooking} from '../../../work-actions'
+import {formatRate,variantDisplay,isValidVariant} from '@shared/listingPricing'
+import {bookingEstimate} from '@/lib/booking-estimate'
+import {selectedRate,pricingRevision,unitName,paymentCopy,type PricingListing} from '@/lib/booking-detail'
+export function RequestForm({listing,requestId,initialVariant='',initialQuantity=1}:{listing:PricingListing & {id:string;location_name?:string|null;latitude?:number|null;longitude?:number|null};requestId:string;initialVariant?:string;initialQuantity?:number}){
+ const [id]=useState(requestId)
+ const [index,setIndex]=useState(initialVariant),[quantity,setQuantity]=useState(initialQuantity),[schedule,setSchedule]=useState('flexible'),[date,setDate]=useState(''),[notes,setNotes]=useState(''),[location,setLocation]=useState(listing.kind==='grazing'?listing.location_name || '':''),[locationNote,setLocationNote]=useState('')
+ const [coords,setCoords]=useState<{latitude:number;longitude:number}|null>(listing.kind==='grazing'&&listing.latitude!=null&&listing.longitude!=null?{latitude:listing.latitude,longitude:listing.longitude}:null),[locating,setLocating]=useState(false),[error,setError]=useState('')
+ const choice=selectedRate(listing,index),rate=choice.rate,estimate=bookingEstimate(rate,quantity),quote=rate.pricing_type==='quote_required',unit=unitName(rate)
+ function gps(){if(!navigator.geolocation){setError('GPS is unavailable in this browser. Enter the address manually.');return}setLocating(true);setError('');navigator.geolocation.getCurrentPosition(p=>{setCoords({latitude:p.coords.latitude,longitude:p.coords.longitude});setLocating(false)},()=>{setLocating(false);setError('Could not read your location. Allow location access or continue with the address.')},{timeout:15000,enableHighAccuracy:true})}
+ return <ActionForm action={requestBooking} label={quote?'Request a quote':'Send booking request'} disabled={locating}>
+ <input type="hidden" name="service_id" value={listing.id}/><input type="hidden" name="request_id" value={id}/><input type="hidden" name="pricing_revision" value={pricingRevision(listing)}/><input type="hidden" name="variant_index" value={index}/><input type="hidden" name="latitude" value={coords?.latitude ?? ''}/><input type="hidden" name="longitude" value={coords?.longitude ?? ''}/>
+ {!!listing.pricing_variants?.length&&<label className="lform-field">Rate option<select value={index} onChange={e=>{setIndex(e.target.value);setQuantity(Math.max(1,selectedRate(listing,e.target.value).rate.minimum_units || 1))}}><option value="">Standard rate - {formatRate(listing.pricing_type,listing.rate,listing.unit_label)}</option>{listing.pricing_variants.map((v,i)=><option key={i} value={i} disabled={!isValidVariant(v)}>{variantDisplay(v)}</option>)}</select></label>}
+ {['hourly','day_rate','per_unit'].includes(rate.pricing_type)?<label className="lform-field">Quantity ({unit})<input name="quantity" type="number" min={Math.max(1,rate.minimum_units || 1)} step="any" required value={quantity} onChange={e=>setQuantity(Number(e.target.value))}/></label>:<input type="hidden" name="quantity" value="1"/>}
+ <div className="card"><h3>{quote?'Price to be quoted':'Base estimate: $'+estimate.amount?.toFixed(2)+' NZD'}</h3><p>{choice.label || 'Standard rate'} · {formatRate(rate.pricing_type,rate.rate,rate.unit_label)}</p>{rate.min_charge?<p>Minimum charge included: ${rate.min_charge} NZD</p>:null}{estimate.quantity!==quantity&&<p>Quantity adjusted to listing limits: {estimate.quantity} {unit}.</p>}{listing.kind==='grazing'&&/\/(week|month)$/.test(rate.unit_label || '')&&<p>This estimate covers one {rate.unit_label?.endsWith('/week')?'week':'month'}. Agree the full duration with the provider.</p>}<p>Extra charges may apply — agree the final price with the provider.</p></div>
+ <label className="lform-field">{listing.kind==='grazing'?'Grazing location':'Where is the work needed?'} *<input name="location" required maxLength={300} value={location} onChange={e=>{setLocation(e.target.value);setCoords(null)}}/></label>
+ <div className="lform-actions"><button type="button" className="lform-cancel" onClick={gps}>Use current GPS location</button>{coords&&<button type="button" className="lform-cancel" onClick={()=>setCoords(null)}>Clear GPS</button>}</div>{coords&&<p className="muted">GPS: {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}</p>}<p className="muted">Use current GPS only if you are at the booking location. This does not change the address above.</p>{locating&&<p role="status">Finding location…</p>}{error&&<p role="alert">{error}</p>}
+ <label className="lform-field">Arrival directions (optional)<textarea name="location_note" rows={2} maxLength={2000} value={locationNote} onChange={e=>setLocationNote(e.target.value)}/></label>
+ <label className="lform-field">Preferred timing<select name="schedule_type" value={schedule} onChange={e=>setSchedule(e.target.value)}><option value="asap">As soon as possible</option><option value="flexible">Flexible</option><option value="specific">On a specific date</option></select></label>{schedule==='specific'&&<label className="lform-field">Preferred date *<input name="date" type="date" required value={date} onChange={e=>setDate(e.target.value)}/></label>}
+ <label className="lform-field">Notes (optional)<textarea name="notes" rows={4} maxLength={5000} value={notes} onChange={e=>setNotes(e.target.value)} placeholder={listing.kind==='grazing'?'Livestock type, head count and grazing duration':'Details for the provider'}/></label>
+ <p>{quote?'The provider will send a quote for you to review.':'The provider will review your request. Your booking is confirmed when they accept.'}</p><p>{paymentCopy(listing)}</p><p className="muted">Your booking location and notes are shared with the provider to review your request.</p>
+ </ActionForm>
 }

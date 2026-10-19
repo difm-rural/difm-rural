@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { fetchBookingDetail } from '../lib/bookingDetail'
+import { bookingPricingType } from '../lib/listingEstimate'
 import { bookingStatusLabel, BOOKING_STATUS, BOOKING_UNDERWAY_STATUSES, isBookingUnderway, isBookingDismissable } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
@@ -171,7 +172,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const provider = booking.provider || { full_name: booking.providerName }
   const otherUser = viewerRole === 'provider' ? requester : provider
   const otherRoleLabel = viewerRole === 'provider' ? 'Requester' : 'Provider'
-  const isQuoteRequired = service.pricing_type === 'quote_required'
+  const isQuoteRequired = bookingPricingType(booking) === 'quote_required'
   const nextMove = bookingNextMove(booking, viewerRole, { otherName: otherUser?.full_name })
 
   function openMap() {
@@ -494,8 +495,10 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <Text style={styles.cardLabel}>Job details</Text>
           <DetailRow label="Service" value={service.title} />
           <DetailRow label="Category" value={service.category} />
+          <DetailRow label="Selected rate" value={booking.pricing_snapshot?.option_label} />
           <DetailRow label="Timing" value={booking.scheduled_date} />
-          <DetailRow label="Amount" value={formatMoney(booking.quote_amount || booking.total_amount, service)} />
+          <DetailRow label="Quantity" value={String(booking.quantity ?? 1)} />
+          <DetailRow label={booking.quote_amount != null ? 'Quote' : 'Base estimate'} value={isQuoteRequired && booking.quote_amount == null ? 'Quote required' : formatMoney(booking.quote_amount ?? booking.total_amount, service)} />
           <DetailRow label="Quote note" value={booking.quote_notes} />
           <DetailRow label="Requester note" value={booking.notes} />
         </View>

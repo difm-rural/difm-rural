@@ -6,6 +6,7 @@ const moduleFromSource = source => import(`data:text/javascript;base64,${Buffer.
 globalThis.completionLifecycle = await moduleFromSource(await read('../src/lib/lifecycle.js'))
 globalThis.completionClient = {}
 const replacements = source => source
+  .replace("import { bookingPricingType } from './listingEstimate'",`import { bookingPricingType } from '${new URL('../shared/listingEstimate.ts',import.meta.url).href}'`)
   .replace("import { supabase } from './supabase'", 'const supabase = globalThis.completionClient')
   .replace("import { JOB_STATUS, JOB_ACTIVE_STATUSES } from './lifecycle'", 'const { JOB_STATUS, JOB_ACTIVE_STATUSES } = globalThis.completionLifecycle')
   .replace("import { BOOKING_STATUS, isBookingWithdrawable } from './lifecycle'", 'const { BOOKING_STATUS, isBookingWithdrawable } = globalThis.completionLifecycle')
@@ -13,6 +14,7 @@ const replacements = source => source
 const { markJobComplete } = await moduleFromSource(replacements(await read('../src/lib/jobActions.js')))
 const { markBookingReady } = await moduleFromSource(replacements(await read('../src/lib/bookingActions.js')))
 const { bookingNextMove } = await moduleFromSource((await read('../src/lib/nextMove.js'))
+  .replace("import { bookingPricingType } from './listingEstimate'",`import { bookingPricingType } from '${new URL('../shared/listingEstimate.ts',import.meta.url).href}'`)
   .replace("import { supabase } from './supabase'", 'const supabase = {}')
   .replace("import { BOOKING_ACTIVE_STATUSES, JOB_ACTIVE_STATUSES } from './lifecycle'", 'const { BOOKING_ACTIVE_STATUSES, JOB_ACTIVE_STATUSES } = globalThis.completionLifecycle'))
 

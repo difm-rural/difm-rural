@@ -1,3 +1,4 @@
+import {bookingDetailUrl} from './web-booking-modules.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {readFile} from 'node:fs/promises'
@@ -47,7 +48,7 @@ test('itemised offers calculate their amount, retain pricing terms and reject in
  assert.equal(offerInput(form(values),false).value.materials,null)
 })
 let actionSource=await readFile(new URL('../provider-web/src/app/work-actions.ts',import.meta.url),'utf8')
-actionSource=actionSource.replace("import { redirect } from 'next/navigation'","const redirect=(path)=>{throw new Error('REDIRECT:'+path)}").replace("import { revalidatePath } from 'next/cache'","const revalidatePath=()=>{}").replace("import { requireProvider } from '@/lib/auth'","const requireProvider=async()=>globalThis.__jobTestAuth").replace("'@/lib/job-input'",JSON.stringify(helperUrl)).replace("'@/lib/offer-input'",JSON.stringify(offerUrl)).replace("'@/lib/booking-estimate'",JSON.stringify(new URL('../provider-web/src/lib/booking-estimate.ts',import.meta.url).href))
+actionSource=actionSource.replace("import { redirect } from 'next/navigation'","const redirect=(path)=>{throw new Error('REDIRECT:'+path)}").replace("import { revalidatePath } from 'next/cache'","const revalidatePath=()=>{}").replace("import { requireProvider } from '@/lib/auth'","const requireProvider=async()=>globalThis.__jobTestAuth").replace("'@/lib/job-input'",JSON.stringify(helperUrl)).replace("'@/lib/offer-input'",JSON.stringify(offerUrl)).replace("'@/lib/booking-detail'",JSON.stringify(bookingDetailUrl))
 const {postJob,editJob,changeOffer,removeJob}=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(actionSource)).toString('base64'))
 function client(tables){const calls=[];return {calls,from(table){let row=tables[table];const q={select(){return q},eq(key,value){calls.push([table,key,value]);if(row&&key in row&&row[key]!==value)row=null;return q},maybeSingle(){return {data:row,error:null}},single(){return {data:row,error:null}},update(patch){calls.push(['update',table,patch]);return q},insert(patch){calls.push(['insert',table,patch]);return {error:null}},then(resolve){return Promise.resolve({data:row?[row]:[],count:tables.offerCount ?? 0,error:null}).then(resolve)}};return q},async rpc(name,args){calls.push(['rpc',name,args]);return {error:null}}}}
 test('editing derives ownership from sign-in and refuses accepted or foreign jobs',async()=>{

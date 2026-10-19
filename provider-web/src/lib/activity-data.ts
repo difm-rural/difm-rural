@@ -3,11 +3,11 @@ import type { ActivityWork, WorkKind } from './activity-policy'
 
 export async function loadActivityWork(client: SupabaseClient, kind: WorkKind, id: string): Promise<ActivityWork | null> {
   if (kind === 'booking') {
-    const { data: b, error } = await client.from('bookings').select('*, service:services(id,title,kind,closed_at)').eq('id', id).single()
+    const { data: b, error } = await client.from('bookings').select('*, service:services(*)').eq('id', id).single()
     if (error) throw error
     if (!b) return null
     return {id:b.id,kind,status:b.status,requesterId:b.requester_id,providerId:b.provider_id,
-      title:b.service?.title || 'Booking',location:b.location_name,notes:b.notes,
+      booking:b,title:b.service?.title || 'Booking',location:b.location_name,notes:b.notes,
       serviceId:b.service_id,listingKind:b.service?.kind,closedAt:b.service?.closed_at,
       cancellationReason:b.cancellation_reason,cancellationNote:b.cancellation_note}
   }

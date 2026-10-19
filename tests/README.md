@@ -248,3 +248,45 @@ Signed-in browser acceptance checks (desktop and phone widths):
 
 Signed-in browser acceptance remains a manual check; unit/build/SQL checks do
 not verify image upload UX, email sign-in delivery or browser layout.
+
+## Web listing and booking detail
+
+Run `node --test --test-isolation=none tests/web-booking-detail.test.mjs`.
+The `20261019150000_booking_pricing_snapshot.sql` migration has been applied to
+the linked database. New web requests save their reviewed rate, selected option,
+minimums, extras and terms. Old requests retain their stored amount and clearly
+identify live-listing terms instead of presenting them as historical terms.
+
+`tests/booking-pricing-snapshot.sql` verifies immutability in a disposable empty
+local PostgreSQL database and rolls all fixtures back. Never run that fixture
+against the linked application database.
+
+Manual signed-in checks:
+
+- Open every listing kind; browse all photos, open/close the photo dialog with
+  keyboard controls, and check location, availability, materials and payment.
+- A $50/hour service with a $150 minimum estimates one hour at $150. Select a
+  rate option with different minimums, continue to request review, and verify the
+  selected option, adjusted quantity and amount survive submission.
+- For grazing, check head capacity, the single-week/month estimate explanation,
+  enquiries, booking requests, and complete/close/relist actions.
+- For sale/lease listings offer enquiries. Existing requests reopen the actual
+  booking record; failed request checks must not invite another request.
+- Change a listing's price, terms or extras after requesting it. The booking
+  keeps its original reviewed pricing. If pricing changes while reviewing a new
+  request, submission asks the requester to review the latest listing.
+- Send/update/accept a quote from booking detail. A quote changed on another
+  device must reject stale acceptance. Priced requests can be accepted/declined
+  from detail; pending requests must not look confirmed.
+- Check requester/provider names, membership date, rating and linked comments.
+  Test cancellation, completion and reviews from the same detail screen.
+- Confirm an arrival window as the provider and check it as the requester.
+  Times display in New Zealand time. Check delay updates and invalid intervals.
+- Send a request, simulate a lost response and retry. It reopens the same request.
+  Test network failures with Retry and entered request/quote fields retained.
+- Verify app/web compatibility using an updated app: saved request pricing,
+  rather than the current listing, determines whether to confirm or quote.
+  Existing installed apps need the next app update for this compatibility fix.
+
+Browser interaction/layout and physical-device checks remain manual; the code
+checks create no live booking requests, schedules, messages or notifications.

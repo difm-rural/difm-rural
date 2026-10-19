@@ -1,3 +1,4 @@
+import { bookingPricingType } from '../../lib/listingEstimate'
 import React, { useCallback, useState } from 'react'
 import {
   Alert,
@@ -36,7 +37,7 @@ import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { bookingNextMove, jobNextMove } from '../../lib/nextMove'
 
 function bookingNeedsQuote(booking) {
-  return (booking?.service || booking?.services)?.pricing_type === 'quote_required'
+  return bookingPricingType(booking || {}) === 'quote_required'
 }
 
 function BookingWorkCard({
@@ -63,7 +64,7 @@ function BookingWorkCard({
   // requests and work that has not been completed.
   const canRequesterCancel = viewerRole === 'requester'
     && ['pending', 'quote_sent', 'confirmed', 'in_progress'].includes(booking.status)
-  const providerNeedsQuote = viewerRole === 'provider' && booking.status === 'pending' && serviceItem.pricing_type === 'quote_required'
+  const providerNeedsQuote = viewerRole === 'provider' && booking.status === 'pending' && bookingPricingType(booking) === 'quote_required'
   const providerPending = viewerRole === 'provider' && booking.status === 'pending' && !providerNeedsQuote
   const providerActive = viewerRole === 'provider' && serviceItem.kind !== 'grazing' && isBookingUnderway(booking.status)
   const providerCanConfirmCancellation = viewerRole === 'provider' && booking.status === 'cancellation_requested'
