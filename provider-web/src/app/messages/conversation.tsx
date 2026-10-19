@@ -76,6 +76,7 @@ export function Conversation({context}:{context:ConversationContext}){
   }
   return <section className="message-conversation" aria-label={'Conversation with '+context.name}>
     <header className="enq-thread-head"><Link href="/messages" className="card-link">← All messages</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
+      <Link href={'/people/'+context.person} className="card-link">Profile & reviews →</Link>
       {context.kind!=='listing' && <Link className="card-link" href={'/activity/'+context.kind+'/'+context.id+'/manage'}>Arrangement details & reviews →</Link>}
     </header>
     {readError && <p className="form-error" role="alert">{readError}</p>}

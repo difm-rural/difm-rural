@@ -38,6 +38,7 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     <header className="home-heading"><div><p className="eyebrow">{statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
     <article className="card work-detail"><h2>{kind==='booking'?'Booking details':'Job details'}</h2><p>{role==='provider'?'Requester':'Provider'}: {person?.full_name || (other?'Name unavailable':'No provider accepted yet')}</p>
       {person?.created_at && <p className="muted">Member since {new Date(person.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}
+      {other && <p><Link href={'/people/'+other} className="card-link">View profile & reviews →</Link></p>}
       {work.location && <p>Location: {work.location}</p>}{work.notes && <p className="work-description">{work.notes}</p>}
       {work.status==='cancellation_requested' && <p className="home-load-error">Cancellation requested — waiting for the provider to confirm.</p>}
       {work.cancellationReason && <p>Cancellation reason: {work.cancellationReason}</p>}
@@ -45,6 +46,7 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
       {work.listingKind==='grazing' && ['confirmed','in_progress'].includes(work.status) && <p>Grazing arrangement accepted. Use Chat to agree ongoing details, dates and payment. When it finishes, the provider can complete it and close or relist the listing.</p>}
       {other && <Link className="lform-save" href={'/activity/'+kind+'/'+id}>Open conversation</Link>}
       {kind==='job' && <p><Link className="card-link" href={'/jobs/'+id}>View job and offers →</Link></p>}
+      {kind==='job' && role==='requester' && <div className="lform-actions">{work.status==='open' && <Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{['completed','cancelled'].includes(work.status) && <Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}</div>}
     </article>
     {actions.filter(a=>a!=='review').length>0 && <section className="card"><h2>Manage this arrangement</h2><p className="muted">Choose an action to see what will happen before confirming.</p>
       {actions.filter((a):a is Exclude<WorkAction,'review'>=>a!=='review').map(intent=><details className="activity-action" key={intent}><summary>{ACTIONS[intent].label}</summary>

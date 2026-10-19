@@ -4,7 +4,7 @@ import { FormEvent, useState } from 'react'
 import { ArrowLeft, ArrowRight, LoaderCircle, LockKeyhole } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-export function LoginForm() {
+export function LoginForm({destination='/'}:{destination?:string}) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -18,7 +18,7 @@ export function LoginForm() {
     const supabase = createClient()
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}` },
     })
     setLoading(false)
     if (signInError) setError(signInError.message)
@@ -37,7 +37,7 @@ export function LoginForm() {
     })
     setLoading(false)
     if (verifyError) setError('That code is invalid or has expired. Request a new code and try again.')
-    else window.location.assign('/')
+    else window.location.assign(destination)
   }
 
   if (sent) {

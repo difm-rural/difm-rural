@@ -12,6 +12,7 @@ export function messagePreview(content: string | null) {
 }
 export function notificationHref(notification: {type:string;metadata?:Record<string,unknown> | null}) {
   const m=notification.metadata || {}
+  if(notification.type==='availability_check' || m.availability_prompt)return '/account/availability'
   if(notification.type==='new_message' && m.sender_id){
     const kind=m.booking_id?'booking':m.job_id?'job':m.service_id?'listing':null
     const id=m.booking_id || m.job_id || m.service_id

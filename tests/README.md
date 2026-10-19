@@ -194,7 +194,7 @@ Before release, test with two signed-in web accounts:
 
 - Home's four action cards open job posting, listing discovery, job discovery
   and listing creation. Counts agree with the same account in the mobile app.
-- Post a job through all three steps; Back retains the draft. An unaccepted
+- Post a job through all five steps; Previous retains the draft. An unaccepted
   provider sees only the public area, and the accepted provider can see the
   property location. No job is published before the final Post job action.
 - Send an offer, accept it as the requester, and verify the job is awarded and
@@ -209,3 +209,42 @@ Before release, test with two signed-in web accounts:
 - Check Home, the sidebar and forms at phone and desktop widths. Browser visual
   verification is still required; automated checks do not cover layout or live
   message delivery.
+
+## Web job posting and management
+
+Run `node --test --test-isolation=none tests/web-job-editor.test.mjs`.
+Apply `20261019130000_web_job_management.sql` followed by
+`20261019140000_web_job_offer_details.sql` before deploying this web version.
+Both migrations have been applied to the linked database.
+
+`web-job-management.sql` runs the RPC ownership and lifecycle checks on a
+**disposable, empty local PostgreSQL database only**. It creates fixture tables
+and roles, loads the real migrations, checks rejection and success paths, and
+rolls everything back. Example: `psql -X -f tests/web-job-management.sql`.
+Do not run this fixture on the linked application database.
+
+Signed-in browser acceptance checks (desktop and phone widths):
+
+- Post with photos, date range, materials, site access and private property
+  location. Verify the review before publishing and the same details in the app.
+- Leave the wizard and reopen it in the same tab. Resume or discard the saved
+  draft. Failed uploads and saves must retain entered details. No job should be
+  published before the final action, and retrying must not create a duplicate.
+- Edit an open job with offers; check the warning and saved details. Accepted
+  jobs must reject editing. Changing the site clears the old mapped area;
+  otherwise existing mapped-area, visibility and recurrence settings remain.
+- Repeat a completed/cancelled job. Dates reset, a new job is created, and the
+  original offers, conversations, reviews and lifecycle remain unchanged.
+- Send/edit an itemised hourly or fixed offer with availability and materials.
+  Check the pricing basis and line amounts in both clients. Withdraw a pending
+  offer; accepted offers must reject editing and withdrawal.
+- Ask and answer a public question. A non-owner must not answer for the owner.
+- Cancel through Activity. Delete requires explicit confirmation; open jobs
+  with offers and jobs with an engaged provider cannot be deleted directly.
+- Share a job, open the link signed out, sign in, and arrive at that job.
+- With two accounts, verify hidden address/GPS/location note remain absent for
+  unaccepted providers and become visible to the accepted provider. Public
+  photos and Q&A must explain that private details should not be included.
+
+Signed-in browser acceptance remains a manual check; unit/build/SQL checks do
+not verify image upload UX, email sign-in delivery or browser layout.

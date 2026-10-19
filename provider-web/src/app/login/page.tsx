@@ -1,20 +1,22 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { LoginForm } from './login-form'
+import { safeReturnPath } from '@/lib/return-path'
 
-export default async function LoginPage() {
+export default async function LoginPage({searchParams}:{searchParams:Promise<{next?:string}>}) {
+  const destination=safeReturnPath((await searchParams).next)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) redirect('/')
+  if (user) redirect(destination)
 
   return (
     <main className="login-page">
       <section className="login-brand">
         <p className="eyebrow light">Rural Connections</p>
-        <h1>Advertise your work. Fill your week.</h1>
-        <p>Manage your listings, respond to enquiries and keep your bookings moving — all from the provider console.</p>
+        <h1>Find help. Find work. Stay connected.</h1>
+        <p>Post jobs, discover local listings and manage your arrangements from the web console.</p>
         <div className="login-rule" />
-        <p className="login-note">For Rural Connections providers. Sign in with the email on your provider account.</p>
+        <p className="login-note">For Rural Connections members. Sign in with the same email you use in the app.</p>
       </section>
       <section className="login-panel">
         <div className="login-card">
@@ -26,10 +28,10 @@ export default async function LoginPage() {
               <path d="M42 49h14v19H42z" fill="#245c45" />
             </svg>
           </div>
-          <p className="eyebrow">Provider console</p>
+          <p className="eyebrow">Web console</p>
           <h2>Welcome back</h2>
-          <p className="muted">Use the same email as your provider account in the app. We will email you a one-time sign-in code.</p>
-          <LoginForm />
+          <p className="muted">Use the same email as your account in the app. We will email you a one-time sign-in code.</p>
+          <LoginForm destination={destination}/>
         </div>
       </section>
     </main>

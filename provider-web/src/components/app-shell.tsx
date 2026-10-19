@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronRight, House, ListChecks, LogOut, MessagesSquare, Search, BriefcaseBusiness, Activity, Bell } from 'lucide-react'
+import { ChevronRight, House, ListChecks, LogOut, MessagesSquare, Search, BriefcaseBusiness, Activity, Bell, UserRound } from 'lucide-react'
 import { useWebAlerts } from './web-alerts'
 
 // Provider nav placeholders — the three screens land on these routes later.
@@ -14,6 +14,7 @@ const navigation = [
   { href: '/messages', label: 'Messages', icon: MessagesSquare },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/listings', label: 'My listings', icon: ListChecks },
+  { href: '/account', label: 'Account', icon: UserRound },
 ]
 
 export function AppShell({ children, providerName }: { children: React.ReactNode; providerName: string }) {

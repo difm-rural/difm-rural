@@ -19,7 +19,7 @@ export default async function ListingPage({params}:{params:Promise<{id:string}>}
       {s.pricing_terms && <><h2>Pricing terms</h2><p className="work-description">{s.pricing_terms}</p></>}
       <p>You arrange payment directly with the provider. Rural Connections does not handle payments.</p>
     </article>
-    <article className="card"><h2>{owner?.full_name || 'Listing provider'}</h2>{owner?.created_at && <p className="muted">Member since {new Date(owner.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}</article>
+    <article className="card"><h2><Link href={'/people/'+s.provider_id}>{owner?.full_name || 'Listing provider'}</Link></h2>{owner?.created_at && <p className="muted">Member since {new Date(owner.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}<Link href={'/people/'+s.provider_id} className="card-link">View profile →</Link><p><Link href={'/people/'+s.provider_id+'/reviews?role=provider'} className="card-link">Read reviews and comments →</Link></p></article>
     <div className="lform-actions">{own ? <Link className="lform-save" href={'/listings/'+id+'/edit'}>Edit listing</Link> : <><Link className="lform-save" href={'/enquiries?s='+encodeURIComponent(id)+'&c='+encodeURIComponent(s.provider_id)}>Enquire about this listing</Link>{!['for_sale','lease'].includes(s.kind) && <Link className="lform-cancel" href={'/browse/'+id+'/request'}>{s.pricing_type==='quote_required'?'Request a quote':'Request a booking'}</Link>}</>}</div>
   </section></AppShell>
 }

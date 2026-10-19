@@ -3,12 +3,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Rural Connections — for providers",
-    template: "%s | Rural Connections Providers",
+    default: "Rural Connections — Web console",
+    template: "%s | Rural Connections",
   },
   description:
-    "Advertise your rural services, grazing, gear, space and goods, and manage enquiries and bookings — the provider side of Rural Connections.",
-  applicationName: "Rural Connections Providers",
+    "Post jobs, discover local listings, and manage messages, bookings and your Rural Connections profile.",
+  applicationName: "Rural Connections",
 };
 
 export const viewport: Viewport = {
