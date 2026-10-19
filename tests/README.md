@@ -156,6 +156,29 @@ node tests/e2e-job-flow.js
   the job ID is printed so you can remove it manually.
 # Web Home and connected flows
 
+Web Messages and Notifications:
+`node --test --test-isolation=none tests/web-messaging.test.mjs tests/web-messaging-data.test.mjs`
+checks domain/participant isolation, sent-thread retrieval, safe attachments,
+focus-gated read eligibility, database query scoping and unavailable/offline
+conversations. Before release, use two accounts to check:
+
+- Messages contains listing, job and booking threads, including a sent enquiry
+  before its first reply. Different enquirers on one listing stay separate.
+- A new message updates the inbox and sidebar without manually refreshing.
+  Keep the recipient's tab hidden or another conversation open: the new notice
+  stays unread until the correct conversation is visible and focused.
+- Photos preview before sending, open full size after delivery and remain
+  readable in the mobile app. Denied location permission explains what to do;
+  successful location sharing previews coordinates before Send.
+- A failed send retains text/attachment for retry. Repeating the same send
+  attempt must not create duplicate messages. Ended arrangements are read-only.
+- All/Unread notification filters, pagination, individual marking and Mark all
+  read work. Opening a message notice targets its exact conversation; opening
+  a removed target gives a useful error. Mark all read leaves newer notices
+  outside the displayed snapshot untouched.
+- Check desktop two-pane and phone single-pane layouts, keyboard access,
+  incoming-message scrolling and draft retention during live refreshes.
+
 Web Activity: `node --test --test-isolation=none tests/web-activity.test.mjs`
 checks participant-specific actions, completion/review eligibility, grazing
 close/relist choices and Active/History classification. Before release, use two

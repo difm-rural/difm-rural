@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronRight, House, ListChecks, LogOut, MessagesSquare, Search, BriefcaseBusiness, Activity } from 'lucide-react'
+import { ChevronRight, House, ListChecks, LogOut, MessagesSquare, Search, BriefcaseBusiness, Activity, Bell } from 'lucide-react'
+import { useWebAlerts } from './web-alerts'
 
 // Provider nav placeholders — the three screens land on these routes later.
 const navigation = [
@@ -10,12 +11,14 @@ const navigation = [
   { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
   { href: '/browse', label: 'Listings', icon: Search },
   { href: '/activity', label: 'Activity', icon: Activity },
-  { href: '/enquiries', label: 'Messages', icon: MessagesSquare },
+  { href: '/messages', label: 'Messages', icon: MessagesSquare },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/listings', label: 'My listings', icon: ListChecks },
 ]
 
 export function AppShell({ children, providerName }: { children: React.ReactNode; providerName: string }) {
   const pathname = usePathname()
+  const counts = useWebAlerts()
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -31,6 +34,7 @@ export function AppShell({ children, providerName }: { children: React.ReactNode
             return (
               <Link key={item.href} href={item.href} className={active ? 'nav-item active' : 'nav-item'}>
                 <Icon size={18} /><span>{item.label}</span>{active && <ChevronRight size={15} className="nav-arrow" />}
+                {counts && (item.href==='/messages'?counts.messages:item.href==='/notifications'?counts.notifications:0)>0 && <span className="web-badge" aria-label={(item.href==='/messages'?counts.messages:counts.notifications)+' unread'}>{item.href==='/messages'?counts.messages:counts.notifications}</span>}
               </Link>
             )
           })}

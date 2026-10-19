@@ -13,8 +13,8 @@ test('web booking review includes minimums, grazing capacity and one-off fixed p
 test('Home notifications reopen their specific job, booking or enquiry conversation',()=>{
   assert.equal(notificationHref({type:'new_message',metadata:{booking_id:'b',service_id:'s'}}),'/activity/booking/b')
   assert.equal(notificationHref({type:'new_message',metadata:{job_id:'j'}}),'/activity/job/j')
-  assert.equal(notificationHref({type:'new_message',metadata:{service_id:'s',sender_id:'p'}}),'/enquiries?s=s&c=p')
-  assert.equal(notificationHref({type:'new_booking',metadata:{booking_id:'b'}}),'/activity#booking-b')
+  assert.equal(notificationHref({type:'new_message',metadata:{service_id:'s',sender_id:'p'}}),'/messages?kind=listing&id=s&person=p')
+  assert.equal(notificationHref({type:'new_booking',metadata:{booking_id:'b'}}),'/activity/booking/b/manage')
   assert.equal(notificationHref({type:'new_bid',metadata:{job_id:'j'}}),'/jobs/j')
 })
 test('pending requests and attachment messages use truthful readable text',()=>{
