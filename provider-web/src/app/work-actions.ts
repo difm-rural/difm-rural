@@ -15,8 +15,8 @@ export async function postJob(_: ActionState, data: FormData): Promise<ActionSta
 }
 export async function editJob(_: ActionState,data:FormData):Promise<ActionState & {jobId?:string}>{return saveJob(data,true)}
 async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {jobId?:string}>{
-  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),source=text(data,'repeated_from_job_id')
-  if(!validId(id) || (source&&!validId(source)))return {error:'This draft reference is invalid. Start a new job from Jobs.'}
+  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),source=text(data,'repeated_from_job_id'),invite=text(data,'invite_provider_id')
+  if(!validId(id) || (source&&!validId(source)) || (invite&&(!validId(invite)||invite===user.id||editing)))return {error:'This draft reference is invalid. Start a new job from Jobs.'}
   let current:(JobSeed & {area_polygon:unknown;area_hectares:number|null})|null=null
   if(editing || source){
     const {data:job,error}=await supabase.from('jobs').select(JOB_EDITOR_COLUMNS).eq('id',editing?id:source).eq('requester_id',user.id).single()
@@ -31,6 +31,9 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   if(editing){
     const {data:rows,error}=await supabase.from('jobs').update({...input.value,...areaPatch}).eq('id',id).eq('requester_id',user.id).eq('status','open').select('id')
     if(error || !rows?.length)return {error:'Could not save. The job may have changed or been accepted. Your changes remain in the form; refresh its status before retrying.'}
+  }else if(invite){
+    const result=await supabase.rpc('create_invited_job',{p_job_id:id,p_details:{...input.value,area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,repeated_from_job_id:source || null},p_provider_id:invite,p_public:data.get('also_public')==='on'})
+    if(result.error)return {error:'Could not create the job and invitation. Your draft is kept. Check that this person is a previous provider and try again.'}
   }else{
     // A retry uses the same draft id, so a lost response cannot create a second job.
     const {data:existing,error:lookupError}=await supabase.from('jobs').select('id').eq('id',id).eq('requester_id',user.id).maybeSingle()

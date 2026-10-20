@@ -1,0 +1,14 @@
+import Link from 'next/link'
+import {AppShell} from '@/components/app-shell'
+import {requireProvider} from '@/lib/auth'
+import {ActionForm} from '@/components/action-form'
+import {respondInvitation} from '../actions'
+import {allRows,type DiscoveryJob} from '@/lib/discovery-data'
+export default async function InvitationsPage(){
+ const {supabase,user,profile}=await requireProvider('/connections/invitations')
+ let invites:{id:string;job_id:string;requester_id:string;status:string;created_at:string}[]=[],error=false
+ const jobs:DiscoveryJob[]=[]
+ try{invites=await allRows(()=>supabase.from('job_invites').select('id,job_id,requester_id,status,created_at').eq('provider_id',user.id).in('status',['pending','seen']).order('created_at',{ascending:false}).order('id'));for(let i=0;i<invites.length;i+=200){const ids=invites.slice(i,i+200).map(r=>r.job_id);jobs.push(...await allRows<DiscoveryJob>(()=>supabase.from('jobs_public').select('id,title,description,category,location_name,location_area,latitude,longitude,created_at,price_type,price,status,requester_id').in('id',ids).eq('status','open').order('id')))}}catch{error=true}
+ const visible=invites.map(i=>({...i,job:jobs.find(j=>j.id===i.job_id)})).filter(i=>i.job)
+ return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/connections" className="card-link">Back to Connections</Link><h1>Job invitations</h1><p className="muted">Open jobs people have invited you to. An invitation asks for an offer; it does not commit you to doing the work.</p>{error?<div className="card" role="alert"><h2>Couldn&apos;t load invitations</h2><Link href="/connections/invitations" className="card-link">Retry</Link></div>:!visible.length?<div className="home-empty"><h2>No open invitations</h2><p>New invitations will appear here and in Notifications.</p><Link href="/jobs" className="card-link">Browse public jobs</Link></div>:visible.map(i=><article className="card work-detail" key={i.id}><h2>{i.job!.title}</h2><p>{i.job!.category} · {i.job!.location_area || i.job!.location_name || 'Area to be arranged'}</p><p className="work-clamp">{i.job!.description}</p><ActionForm action={respondInvitation} label="View job"><input name="invite_id" type="hidden" value={i.id}/><input name="intent" type="hidden" value="open"/></ActionForm><details className="activity-action"><summary>Decline invitation</summary><ActionForm action={respondInvitation} label="Decline invitation"><input name="invite_id" type="hidden" value={i.id}/><input name="intent" type="hidden" value="decline"/><p>This removes the invitation from this list. If you have already sent an offer, manage that offer from the job or Activity.</p><label className="account-setting"><input name="confirmed" type="checkbox" required/>I do not want to respond to this invitation.</label></ActionForm></details></article>)}</section></AppShell>
+}

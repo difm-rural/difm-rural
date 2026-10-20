@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, CheckCircle2, Plus, Search, Leaf, MessageSquare, Bell, ListChecks } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Plus, Search, Leaf, MessageSquare, Bell, ListChecks, UsersRound } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
@@ -34,6 +34,7 @@ export default async function HomePage() {
   const pending = (bookings.data || []).filter(b => (b.provider_id === user.id && ['pending','cancellation_requested'].includes(b.status)) || (b.requester_id === user.id && b.status === 'quote_sent'))
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page">
     <header className="home-heading"><div><p className="eyebrow">Rural Connections</p><h1>What needs doing?</h1><p className="muted">{hasError ? 'Good to see you, ' + name : total ? total + ' active item' + (total === 1 ? '' : 's') + ' on the go' : 'Good to see you, ' + name}</p></div><LiveRefresh /></header>
+    {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Welcome to Rural Connections</h2><p>Add your public name and town or region so people know who they are arranging work with.</p><Link href="/setup" className="card-link">Finish your profile →</Link><p className="muted">You can explore first and return here later.</p></section>}
     <div className="home-actions">{actions.map(a => <Link key={a.title} href={a.href} className={'home-action ' + (a.primary ? 'primary' : '')}><a.icon size={22}/><strong>{a.title}</strong><span>{a.text}</span><ArrowRight size={18} className="home-action-arrow"/></Link>)}</div>
     {hasError && <div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
     <div className="home-columns"><div>
@@ -47,6 +48,7 @@ export default async function HomePage() {
         {!hasError && total === 0 && <div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or browse listings to get started.</p></div>}
       </section>
     </div><aside className="home-aside">
+      <Link href="/connections" className="card home-quick"><UsersRound size={22}/><span><strong>Connections</strong><small>People you’ve worked with · Job invitations</small></span><ArrowRight size={17}/></Link>
       <Link href="/messages" className="card home-quick"><MessageSquare size={22}/><span><strong>Messages</strong><small>Enquiries, jobs and bookings</small></span><ArrowRight size={17}/></Link>
       <Link href="/listings" className="card home-quick"><ListChecks size={22}/><span><strong>My listings</strong><small>{listings.error ? 'Manage your listings' : (listings.data || []).filter(s => s.is_active && !s.closed_at).length + ' live · Manage live, paused and closed listings'}</small></span><ArrowRight size={17}/></Link>
       <div className="home-explainer"><h3>Jobs & listings</h3><p><strong>Jobs</strong> are work you need done. Local people can send you an offer.</p><p><strong>Listings</strong> advertise services, grazing, hire and local goods.</p></div>

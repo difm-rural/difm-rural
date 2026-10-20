@@ -27,7 +27,7 @@ export async function visitNotification(_:ActionState,data:FormData):Promise<Act
   if(error)return {error:'Could not open this notification. Try again.'}
   if(!n)return {error:'This notification is no longer available.'}
   const meta=n.metadata || {}
-  const target=meta.booking_id?{table:'bookings',id:meta.booking_id}:meta.job_id?{table:'jobs_public',id:meta.job_id}:meta.service_id?{table:'services',id:meta.service_id}:null
+  const target=meta.booking_id?{table:'bookings',id:meta.booking_id}:meta.job_id?{table:'jobs_public',id:meta.job_id}:meta.service_id?{table:'services',id:meta.service_id}:meta.saved_interest_id?{table:'saved_interests',id:meta.saved_interest_id}:null
   if(target){
     const {data:record,error:targetError}=await supabase.from(target.table).select('id').eq('id',target.id).maybeSingle()
     if(targetError)return {error:'Could not load the related item. Check your connection and try again.'}

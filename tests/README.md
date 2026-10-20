@@ -290,3 +290,60 @@ Manual signed-in checks:
 
 Browser interaction/layout and physical-device checks remain manual; the code
 checks create no live booking requests, schedules, messages or notifications.
+
+## Web discovery and connections
+
+Run `node --test --test-isolation=none tests/web-discovery.test.mjs` and the full
+unit suite. The `20261019205939_web_connection_invites.sql` migration has been
+applied to the linked database. It creates guarded invitation functions; it
+does not create jobs, invitations or notifications by itself.
+
+`tests/web-connection-invites.sql` exercises the actual migration and Connections
+view in a disposable empty local PostgreSQL database. It checks role ownership,
+private defaults, explicit public posting, notification deduplication and
+rollback when an invitation fails. Never run this fixture on the linked DB.
+
+Manual signed-in acceptance checks:
+
+- Search Jobs/Listings by title, description, category and visible location.
+  Paginate a result set larger than 60 items. Retry offline loads with the same
+  query/options; errors must not show empty-marketplace copy.
+- Expand Search options, choose distance/nearest sorting and a browsing location.
+  Current GPS is retained privately for six hours without editing the profile or
+  placing coordinates in the URL. Profile location can be restored explicitly.
+  With no location, show guidance instead of fabricated distances.
+- Hidden or missing job pins remain unknown and are excluded from radius
+  searches. Any distance includes those jobs. Sorting nearest places unknown
+  distances last. Live discovery must exclude paused/closed listings and private
+  invited jobs; invitations have a separate retrieval screen.
+- Save/remove jobs from the board and detail. Check Saved jobs and the app share
+  the same records. Closed jobs remain saved; inaccessible jobs have a useful
+  unavailable state with a remove action.
+- Save a search with Saved only, instant or daily updates; manage it under
+  Account → Saved interests. Reopen a stored distance search after changing the
+  browsing location: it retains its saved origin. Edit delivery/pause settings,
+  resume an automatically paused interest, and remove an interest.
+- Saved alerts can match jobs with private pins without exposing those pins;
+  their results can differ from a radius-filtered board. Alert digests open the
+  saved search; individual job-match notifications open the job.
+- Connections include completed work in both roles and merge repeated work with
+  the same person. Check public profile/reviews, live listings and shared history.
+  Unrelated relationships and private contact details must remain inaccessible.
+- Invite a previous provider to an existing open job. Retry: no duplicate invite
+  or notification. Closed jobs and unrelated providers must reject invitations.
+- Create an invited job from Connections. It defaults to private; choosing the
+  public board is explicit. Simulate a failed/lost response and retry: there is
+  one job and invitation, or neither if creation fails. Verify the recipient can
+  retrieve it from Job invitations and Notifications, view it, send an offer or
+  decline the invitation. Invitations do not automatically accept work.
+
+No live invitations, saved alerts, jobs or messages are sent by these automated
+checks. Signed-in browser layout and real delivery remain manual checks.
+
+### Web first-time experience
+- Sign in with a new test email; paste the emailed code. Confirm setup asks only for public name and town/region. Optional profile details are deferred to Account.
+- Try Post a job, Browse listings and Explore the app on separate setup runs. Try Finish setup later; Home should offer a profile reminder when name or region is missing.
+- Simulate a failed profile update: setup must stay open with typed values and Retry guidance, without marking completion.
+- Open a listing request or a message link while signed out. Sign in and finish or defer setup; confirm the original destination (including variant/quantity or conversation) is retained.
+- Try invalid email, expired code, failed resend and rapid repeated submissions. Resend must show a cooldown and only announce success after the request succeeds.
+- Test pasted codes and email-code autofill on iOS and Android browsers. These device checks remain manual.

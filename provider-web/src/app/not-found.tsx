@@ -1,0 +1,2 @@
+import Link from 'next/link'
+export default function NotFound(){return <main className="page work-page"><p className="eyebrow">Rural Connections</p><h1>This page isn&apos;t available</h1><p>The link may be out of date, or this item may no longer be available to you.</p><div className="lform-actions"><Link href="/" className="lform-save">Go to Home</Link><Link href="/browse" className="card-link">Browse listings</Link><Link href="/account/help" className="card-link">Help & feedback</Link></div></main>}

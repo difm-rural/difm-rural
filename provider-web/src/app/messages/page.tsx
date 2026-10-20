@@ -9,7 +9,9 @@ import { Conversation } from './conversation'
 
 export const dynamic='force-dynamic'
 export default async function MessagesPage({searchParams}:{searchParams:Promise<{kind?:string;id?:string;person?:string}>}){
-  const {supabase,user,profile}=await requireProvider();const params=await searchParams
+  const params=await searchParams
+  const query=new URLSearchParams(Object.entries(params).filter((entry):entry is [string,string]=>typeof entry[1]==='string'))
+  const {supabase,user,profile}=await requireProvider('/messages'+(query.size?'?'+query:''))
   const ref={kind:params.kind,id:params.id,person:params.person} as ConversationRef
   const selected=validConversation(ref)
   let threads:InboxThread[]=[],context:ConversationContext|null=null,inboxError=false,conversationError=false

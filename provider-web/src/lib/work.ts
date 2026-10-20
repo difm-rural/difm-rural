@@ -23,6 +23,7 @@ export function notificationHref(notification: {type:string;metadata?:Record<str
   if(notification.type==='new_message' && m.service_id && m.sender_id)return '/enquiries?s='+encodeURIComponent(String(m.service_id))+'&c='+encodeURIComponent(String(m.sender_id))
   if(m.booking_id)return '/activity/booking/'+encodeURIComponent(String(m.booking_id))+'/manage'
   if(m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))
+  if(m.saved_interest_id)return '/jobs?interest='+encodeURIComponent(String(m.saved_interest_id))
   if(m.service_id)return '/browse/'+encodeURIComponent(String(m.service_id))
   return '/activity'
 }

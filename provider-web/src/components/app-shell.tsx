@@ -2,15 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronRight, House, ListChecks, LogOut, MessagesSquare, Search, BriefcaseBusiness, Activity, Bell, UserRound } from 'lucide-react'
+import { ChevronRight, House, ListChecks, LogOut, MessagesSquare, Search, BriefcaseBusiness, Activity, Bell, UserRound, UsersRound } from 'lucide-react'
 import { useWebAlerts } from './web-alerts'
 
-// Provider nav placeholders — the three screens land on these routes later.
+// Shared navigation for requester and provider workflows.
 const navigation = [
   { href: '/', label: 'Home', icon: House },
   { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
   { href: '/browse', label: 'Listings', icon: Search },
   { href: '/activity', label: 'Activity', icon: Activity },
+  { href: '/connections', label: 'Connections', icon: UsersRound },
   { href: '/messages', label: 'Messages', icon: MessagesSquare },
   { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/listings', label: 'My listings', icon: ListChecks },

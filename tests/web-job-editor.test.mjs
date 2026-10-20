@@ -79,3 +79,13 @@ test('shared job links survive sign-in and external redirects are rejected',()=>
  for(const value of ['https://evil.example','//evil.example','/\\evil.example','/login','/auth/callback','/\n/evil.example',null])assert.equal(safeReturnPath(value),'/')
  assert.equal(safeReturnPath('/jobs/'+id+'?ref=share'),'/jobs/'+id+'?ref=share')
 })
+
+test('invited posting uses one atomic RPC with private visibility by default',async()=>{
+ const invite='00000000-0000-0000-0000-000000000003',supabase=client({});globalThis.__jobTestAuth={supabase,user:{id:me}}
+ const result=await postJob({error:''},form({...valid,job_id:id,invite_provider_id:invite,requester_id:'forged',visibility:'public'}))
+ assert.equal(result.jobId,id)
+ const call=supabase.calls.find(c=>c[0]==='rpc');assert.equal(call[1],'create_invited_job');assert.equal(call[2].p_public,false);assert.equal(call[2].p_provider_id,invite);assert.equal('requester_id' in call[2].p_details,false)
+ assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ supabase.rpc=async()=>({error:new Error('Unavailable')})
+ assert.ok((await postJob({error:''},form({...valid,job_id:id,invite_provider_id:invite}))).error)
+})

@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { LoginForm } from './login-form'
 import { safeReturnPath } from '@/lib/return-path'
 
-export default async function LoginPage({searchParams}:{searchParams:Promise<{next?:string}>}) {
-  const destination=safeReturnPath((await searchParams).next)
+export default async function LoginPage({searchParams}:{searchParams:Promise<{next?:string;error?:string}>}) {
+  const params=await searchParams
+  const destination=safeReturnPath(params.next)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) redirect(destination)
@@ -16,7 +17,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
         <h1>Find help. Find work. Stay connected.</h1>
         <p>Post jobs, discover local listings and manage your arrangements from the web console.</p>
         <div className="login-rule" />
-        <p className="login-note">For Rural Connections members. Sign in with the same email you use in the app.</p>
+        <p className="login-note">New here? Your first sign-in creates your account. Already use the app? Use the same email to keep everything together.</p>
       </section>
       <section className="login-panel">
         <div className="login-card">
@@ -29,8 +30,9 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
             </svg>
           </div>
           <p className="eyebrow">Web console</p>
-          <h2>Welcome back</h2>
-          <p className="muted">Use the same email as your account in the app. We will email you a one-time sign-in code.</p>
+          <h2>Welcome to Rural Connections</h2>
+          <p className="muted">Sign in or create an account with your email. We will send a one-time code; no password needed.</p>
+          {params.error==='link' && <p className="form-error" role="alert">That sign-in link could not be used. Request a new code below and enter it here.</p>}
           <LoginForm destination={destination}/>
         </div>
       </section>
