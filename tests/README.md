@@ -347,3 +347,11 @@ checks. Signed-in browser layout and real delivery remain manual checks.
 - Open a listing request or a message link while signed out. Sign in and finish or defer setup; confirm the original destination (including variant/quantity or conversation) is retained.
 - Try invalid email, expired code, failed resend and rapid repeated submissions. Resend must show a cooldown and only announce success after the request succeeds.
 - Test pasted codes and email-code autofill on iOS and Android browsers. These device checks remain manual.
+
+### Public website guest browsing
+The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/[id]` without authentication. Action links target the confirmed console origin `https://difm-rural.vercel.app/login?next=…`; the console preserves the action through sign-in and setup. No guest action submits a message, offer or request automatically.
+- Browse/search while signed out, including an unmatched phrase, an empty database and a disconnected request. Confirm distinct states and query-preserving Retry.
+- Open a paused/closed listing or private/non-open job URL: it must be unavailable publicly. Public job pages exclude exact address, GPS, location notes and property polygons entirely; profile reads use profiles_public.
+- From a listing, choose Enquire or Request booking/quote; sign in and finish/defer setup. Confirm the intended conversation or request review opens. From a job, choose Send an offer or Ask a question; confirm the correct job and section opens.
+- Test back navigation across ruralconnections.nz and the console, and narrow mobile browsers. No live test messages, offers, bookings or emails were submitted by automated verification.
+- Deploy both public-web and provider-web changes. Public-web continues to use its existing Supabase URL and publishable key; no database migration is needed.

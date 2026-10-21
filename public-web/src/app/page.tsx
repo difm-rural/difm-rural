@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import {consoleLink} from '@/lib/console-link';
 import {
   ArrowRight,
   BadgeCheck,
@@ -121,8 +123,8 @@ function JobCard({ job }: { job: PublicJob }) {
           <span>{job.category || "Rural job"}</span>
           <span className="price">{formatJobPrice(job)}</span>
         </div>
-        <h3>{job.title}</h3>
-        <p>{job.description || "Open job — tap through in the app for details."}</p>
+        <h3>{job.id.startsWith("example-") ? job.title : <Link href={"/jobs/"+job.id}>{job.title} →</Link>}</h3>
+        <p>{job.description || "Open job — view the details to find out more."}</p>
         <div className="service-location">
           <MapPin size={15} aria-hidden="true" />
           {job.location_area || "New Zealand"}
@@ -154,7 +156,7 @@ function ServiceCard({ service }: { service: PublicService }) {
           <span>{service.category || "Rural listing"}</span>
           <span className="price">{formatServicePrice(service)}</span>
         </div>
-        <h3>{service.title}</h3>
+        <h3>{service.id.startsWith("example-") ? service.title : <Link href={"/listings/"+service.id}>{service.title} →</Link>}</h3>
         <p>{service.description || "Contact the provider through Rural Connections to discuss the work."}</p>
         <div className="service-location">
           <MapPin size={15} aria-hidden="true" />
@@ -166,16 +168,18 @@ function ServiceCard({ service }: { service: PublicService }) {
 }
 
 export default async function Home() {
-  const liveServices = await getFeaturedServices();
+  const [serviceResult, jobResult] = await Promise.allSettled([getFeaturedServices(), getFeaturedJobs()]);
+  const liveServices = serviceResult.status === "fulfilled" ? serviceResult.value : [];
+  const loadError=serviceResult.status === "rejected" || jobResult.status === "rejected";
   const services = liveServices.length ? liveServices : exampleServices;
-  const liveJobs = await getFeaturedJobs();
+  const liveJobs = jobResult.status === "fulfilled" ? jobResult.value : [];
   const jobs = liveJobs.length ? liveJobs : exampleJobs;
 
   return (
     <main>
       <div className="launch-banner" role="status">
-        <strong>Launching shortly</strong>
-        <span>Rural Connections is getting ready to connect rural New Zealand.</span>
+        <strong>Explore Rural Connections</strong>
+        <span>Browse jobs and listings. Sign in when you are ready to get in touch.</span>
       </div>
 
       <header className="site-header">
@@ -189,13 +193,14 @@ export default async function Home() {
         </a>
         <nav className="desktop-nav" aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
-          <a href="#jobs">Jobs</a>
-          <a href="#listings">Listings</a>
+          <a href={consoleLink("/jobs/new")}>Post a job</a>
+          <Link href="/jobs">Jobs</Link>
+          <Link href="/listings">Listings</Link>
           <a href="#why-rural-connections">Why us</a>
           <a href="mailto:hello@ruralconnections.nz">Contact</a>
         </nav>
-        <a className="header-cta" href="difmrural://">
-          Open the app <ArrowRight size={16} aria-hidden="true" />
+        <a className="header-cta" href={consoleLink()}>
+          Sign in <ArrowRight size={16} aria-hidden="true" />
         </a>
       </header>
 
@@ -208,10 +213,10 @@ export default async function Home() {
             know-how into work in your community.
           </p>
           <div className="hero-actions">
-            <a className="button primary" href="#listings">
+            <Link className="button primary" href="/listings">
               Find local help <ArrowRight size={18} aria-hidden="true" />
-            </a>
-            <a className="button secondary" href="#offer-a-listing">
+            </Link>
+            <a className="button secondary" href={consoleLink("/listings/new")}>
               Create a listing
             </a>
           </div>
@@ -307,9 +312,11 @@ export default async function Home() {
               : "Examples of the work people post on Rural Connections."}
           </p>
         </div>
+        {loadError && <p role="alert">Could not load the latest marketplace items. The cards below may be examples. Open Browse jobs or Browse listings to retry.</p>}
         <div className="service-grid">
           {jobs.slice(0, 3).map((job) => <JobCard job={job} key={job.id} />)}
         </div>
+        <Link className="button secondary" href="/jobs">Browse all jobs →</Link>
       </section>
 
       <section className="services-section" id="listings">
@@ -328,8 +335,8 @@ export default async function Home() {
           {services.slice(0, 6).map((service) => <ServiceCard service={service} key={service.id} />)}
         </div>
         <div className="services-foot">
-          <span><BadgeCheck size={18} aria-hidden="true" /> Provider details stay inside Rural Connections.</span>
-          <a href="difmrural://">Browse in the app <ArrowRight size={16} aria-hidden="true" /></a>
+          <span><BadgeCheck size={18} aria-hidden="true" /> Browse freely. Sign in to enquire or request a booking.</span>
+          <Link href="/listings">Browse all listings <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
       </section>
 
@@ -376,10 +383,10 @@ export default async function Home() {
           Create a listing, show people what you offer, and connect with locals who need
           practical rural help.
         </p>
-        <a className="button primary" href="difmrural://">
-          Open Rural Connections <ArrowRight size={18} aria-hidden="true" />
+        <a className="button primary" href={consoleLink("/listings/new")}>
+          Create a listing <ArrowRight size={18} aria-hidden="true" />
         </a>
-        <small>Already have the app installed? This link will open it directly.</small>
+        <small>Sign in with your email to create a listing. You can use the same account in the app.</small>
       </section>
 
       <footer>
@@ -395,8 +402,9 @@ export default async function Home() {
         </div>
         <div className="footer-links">
           <a href="#how-it-works">How it works</a>
-          <a href="#jobs">Jobs</a>
-          <a href="#listings">Listings</a>
+          <a href={consoleLink("/jobs/new")}>Post a job</a>
+          <Link href="/jobs">Jobs</Link>
+          <Link href="/listings">Listings</Link>
           <a href="/privacy">Privacy</a>
           <a href="difmrural://">Open the app</a>
         </div>
