@@ -537,10 +537,10 @@ export default function ServiceDetailScreen({ route, navigation }) {
             </View>}
             <View style={styles.estimateResult}>
               <Text style={styles.estimateLabel}>Base estimate</Text>
-              <Text style={styles.estimateTotal}>${total} NZD</Text>
+              <Text style={styles.estimateTotal}>${total}</Text>
             </View>
             {estimate.minimumCharge > 0 && (
-              <DetailRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)} NZD`} last />
+              <DetailRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)}`} last />
             )}
             <Text style={styles.descText}>{BASE_ESTIMATE_EXPLANATION}</Text>
             {service.kind === 'grazing' && /\/(week|month)$/.test(effectiveUnitLabel || '') && (

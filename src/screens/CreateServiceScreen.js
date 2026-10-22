@@ -1282,7 +1282,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                   value={rate}
                   onChangeText={setRate}
                   keyboardType="numeric"
-                  accessibilityLabel="Rate in NZD"
+                  accessibilityLabel="Rate in dollars"
                 />
               </View>
               {pricingType === 'per_unit' && cfg.unit === 'free' && (
@@ -1433,7 +1433,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                   value={minCharge}
                   onChangeText={setMinCharge}
                   keyboardType="numeric"
-                  accessibilityLabel="Minimum charge in NZD"
+                  accessibilityLabel="Minimum charge in dollars"
                 />
               </>
             )}

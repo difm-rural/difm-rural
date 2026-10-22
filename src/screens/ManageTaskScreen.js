@@ -231,7 +231,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     const provName = bid.provider?.full_name || 'this provider'
     Alert.alert(
       'Accept offer?',
-      `Accept ${provName}'s offer of $${bid.amount} NZD? All other offers will be declined.`,
+      `Accept ${provName}'s offer of $${bid.amount}? All other offers will be declined.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -322,7 +322,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   )
 
   const badge = getBadge()
-  const budgetText = job.price_type === 'fixed' ? `$${job.price} NZD` : 'Open to offers'
+  const budgetText = job.price_type === 'fixed' ? `$${job.price}` : 'Open to offers'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
   const isAwarded = isJobAwarded(job.status)
@@ -610,7 +610,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                 </TouchableOpacity>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxText}>
-                    Awarded · ${acceptedBid.bidAmount} NZD · Use chat with {otherPartyFirstName} to confirm timing and details
+                    Awarded · ${acceptedBid.bidAmount} · Use chat with {otherPartyFirstName} to confirm timing and details
                   </Text>
                 </View>
               </>

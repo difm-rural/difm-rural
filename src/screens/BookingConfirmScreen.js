@@ -291,12 +291,12 @@ export default function BookingConfirmScreen({ route, navigation }) {
           {effectivePricingType !== 'fixed' && !isQuoteRequired && (
             <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
           )}
-          <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `$${total} NZD`} />
+          <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `$${total}`} />
           {isGrazing && !isQuoteRequired && /\/(week|month)$/.test(unitLabel) && (
             <SummaryRow label="Estimate period" value={`One ${unitLabel.endsWith('/week') ? 'week' : 'month'}; agree the full duration with the provider`} />
           )}
           {!isQuoteRequired && estimate.minimumCharge > 0 && (
-            <SummaryRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)} NZD`} />
+            <SummaryRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)}`} />
           )}
           {service.materials ? (
             <SummaryRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
@@ -442,7 +442,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : 'Base estimate'}</Text>
-            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `$${total} NZD`}</Text>
+            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `$${total}`}</Text>
           </View>
           <View style={styles.paymentInfoBox}>
             <Text style={[styles.paymentInfoText, { marginBottom: 8 }]}>{requestCopy.nextStep}</Text>

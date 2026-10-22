@@ -7,7 +7,7 @@ import {respondBooking} from '../work-actions'
 export function BookingDetails({booking:b,userId}:{booking:BookingRecord;userId:string}){
  const s=b.service,snapshot=readPricingSnapshot(b.pricing_snapshot),rate=snapshot || s,role=b.provider_id===userId?'provider':'requester',quote=(rate?.pricing_type || '')==='quote_required',responses=bookingResponseActions(b,userId,s?.pricing_type || '')
  const extras=snapshot?.pricing_add_ons || s?.pricing_add_ons || [],terms=snapshot?snapshot.pricing_terms:s?.pricing_terms
- const money=(value:number)=>'$'+Number(value).toFixed(2)+' NZD'
+ const money=(value:number)=>'$'+Number(value).toFixed(2)+''
  const timing=b.scheduled_date==='asap'?'As soon as possible':b.scheduled_date==='flexible'?'Flexible':b.scheduled_date || 'To be arranged'
  return <>
  <p className="account-current">{bookingNextStep(b.status,role,quote,s?.kind)}</p>

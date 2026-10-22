@@ -165,7 +165,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   keyboardType="numeric"
                   returnKeyType="done"
                   onSubmitEditing={Keyboard.dismiss}
-                  accessibilityLabel="Price in NZD"
+                  accessibilityLabel="Price in dollars"
                 />
               </View>
             </View>

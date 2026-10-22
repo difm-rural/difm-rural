@@ -372,7 +372,7 @@ export default function JobsTabScreen({ navigation }) {
                   item={bid.jobs}
                   onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
                 />
-                <Text style={styles.bidLabel}>Offer sent: ${bid.amount} NZD</Text>
+                <Text style={styles.bidLabel}>Offer sent: ${bid.amount}</Text>
               </View>
             )}
             showsHorizontalScrollIndicator={false}

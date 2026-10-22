@@ -43,10 +43,10 @@ import {
 } from '../lib/workSchedule'
 
 function formatMoney(amount, service) {
-  if (amount != null) return `$${amount} NZD`
+  if (amount != null) return `$${amount}`
   if (service?.pricing_type === 'quote_required') return 'Quote to be confirmed'
   if (amount == null) return 'Not set'
-  return `$${amount} NZD`
+  return `$${amount}`
 }
 
 function DetailRow({ label, value }) {
@@ -507,7 +507,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Quote</Text>
             <View style={styles.inputBlock}>
-              <Text style={styles.inputLabel}>Amount NZD</Text>
+              <Text style={styles.inputLabel}>Amount ($)</Text>
               <TextInput
                 style={styles.input}
                 value={quoteAmount}

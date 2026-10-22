@@ -1016,10 +1016,10 @@ export function ListingForm({
         </section>
         <section className="lform-pricing">
           <div className="lform-review-heading"><h3>Pricing</h3><button type="button" className="lform-review-edit" onClick={() => goToStep(1)}>Edit pricing</button></div>
-          <dl><dt>Main rate</dt><dd>{pricingType === 'quote_required' ? 'Quote required' : '$' + rate + ' NZD · ' + (cfg ? pricingTypeLabel(cfg, pricingType) : pricingType) + (unitLabel ? ' · ' + unitLabel : '')}</dd>
+          <dl><dt>Main rate</dt><dd>{pricingType === 'quote_required' ? 'Quote required' : '$' + rate + ' · ' + (cfg ? pricingTypeLabel(cfg, pricingType) : pricingType) + (unitLabel ? ' · ' + unitLabel : '')}</dd>
           {minimumUnits && <><dt>Minimum quantity</dt><dd>{minimumUnits}</dd></>}
           {maxUnits && <><dt>Capacity</dt><dd>{maxUnits} head</dd></>}
-          {minCharge && <><dt>Minimum charge</dt><dd>{'$' + minCharge} NZD</dd></>}
+          {minCharge && <><dt>Minimum charge</dt><dd>{'$' + minCharge}</dd></>}
           {cfg?.showPayment && <><dt>Payment</dt><dd>{paymentTiming === 'upfront' ? 'Upfront' : 'On completion'}</dd></>}
           {cfg?.showMaterials && <><dt>Materials</dt><dd>{MATERIALS_OPTIONS.find(option => option.id === materials)?.label || materials}</dd></>}
           {pricingAddOns.some(a => a.label.trim() && a.amount.trim()) && <><dt>Extra charges</dt><dd>{pricingAddOns.filter(a => a.label.trim() && a.amount.trim()).map((a,i) => <p key={i}>{a.label}: {addOnDisplay(a)}</p>)}</dd></>}

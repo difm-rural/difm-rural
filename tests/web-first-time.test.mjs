@@ -5,7 +5,7 @@ import {stripTypeScriptTypes} from 'node:module'
 const moduleUrl=source=>'data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64')
 const returnUrl=moduleUrl(await readFile(new URL('../provider-web/src/lib/return-path.ts',import.meta.url),'utf8'))
 const helperUrl=moduleUrl((await readFile(new URL('../provider-web/src/lib/first-time.ts',import.meta.url),'utf8')).replace("'./return-path'",JSON.stringify(returnUrl)))
-const {setupInput,setupDestination,normaliseEmail,validEmail,signInFailure}=await import(helperUrl)
+const {setupInput,setupDestination,normaliseEmail,validEmail,signInFailure,signInRetrySeconds}=await import(helperUrl)
 const form=values=>{const f=new FormData();for(const [k,v] of Object.entries(values))f.set(k,v);return f}
 test('setup validates public fields and never overwrites optional or privileged profile fields',()=>{
  assert.equal(setupInput(form({name:' ',region:'Waikato'})).ok,false)
@@ -21,9 +21,17 @@ test('email validation and errors provide actionable copy without exposing raw e
  assert.equal(normaliseEmail(' Paul@Example.co.nz '),'paul@example.co.nz')
  for(const email of ['bad','a@','a b@c.nz'])assert.equal(validEmail(email),false)
  assert.equal(validEmail('paul@example.co.nz'),true)
- assert.match(signInFailure({status:429}),/Wait a few minutes/)
+ assert.match(signInFailure({status:429}),/app and web console share/)
  assert.match(signInFailure({code:'otp_expired'},true),/Request a new code/)
  assert.match(signInFailure(null),/connection/)
+})
+test('sign-in cooldown follows a bounded server retry time and falls back to one minute',()=>{
+ assert.equal(signInRetrySeconds({status:429,message:'For security purposes, you can only request this after 42 seconds.'}),42)
+ assert.equal(signInRetrySeconds({code:'over_email_send_rate_limit'}),60)
+ assert.equal(signInRetrySeconds({code:'over_request_rate_limit'}),60)
+ assert.equal(signInRetrySeconds({status:429,message:'after 999999 seconds'}),3600)
+ assert.equal(signInRetrySeconds({status:500}),0)
+ assert.match(signInFailure({status:429},true),/verification is temporarily limited/)
 })
 let session,updates,fail
 const mock={requireProvider:async()=>session,revalidatePath(){},redirect(path){throw new Error('REDIRECT:'+path)}}

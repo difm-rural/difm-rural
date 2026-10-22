@@ -43,8 +43,8 @@ export function draftToJobData(draft) {
 // Human-readable budget line for the draft preview.
 export function draftBudgetText(draft) {
   if (draft.budget_low && draft.budget_high && draft.budget_high !== draft.budget_low) {
-    return `$${draft.budget_low}–$${draft.budget_high} NZD${draft.price_type === 'open' ? ' · open to offers' : ''}`
+    return `$${draft.budget_low}–$${draft.budget_high}${draft.price_type === 'open' ? ' · open to offers' : ''}`
   }
-  if (draft.budget_low) return `Around $${draft.budget_low} NZD`
+  if (draft.budget_low) return `Around $${draft.budget_low}`
   return 'Open to offers'
 }

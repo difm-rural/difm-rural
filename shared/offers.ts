@@ -42,6 +42,6 @@ export function formatOfferAmount(amount:number, pricingType:string|null|undefin
     case 'hourly':   return `$${amount}/hr`
     case 'per_unit': return `$${amount}/unit`
     case 'quote':    return `$${amount} est.`
-    default:         return `$${amount} NZD`
+    default:         return `$${amount}`
   }
 }

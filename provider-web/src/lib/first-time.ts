@@ -13,8 +13,17 @@ export function setupInput(data:FormData){
 }
 export function normaliseEmail(value:string){return value.trim().toLowerCase()}
 export function validEmail(value:string){return value.length<=254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)}
-export function signInFailure(error:{code?:string;status?:number}|null,verifying=false){
-  if(error?.status===429 || error?.code==='over_email_send_rate_limit')return 'Too many attempts. Wait a few minutes before trying again.'
+type SignInError={code?:string;status?:number;message?:string}
+export function signInRetrySeconds(error:SignInError|null){
+  if(error?.status!==429 && !['over_email_send_rate_limit','over_request_rate_limit'].includes(error?.code || ''))return 0
+  // Only use the provider's bounded retry duration; never render raw error text.
+  const seconds=error?.message?.match(/after\s+(\d+)\s+seconds?/i)?.[1]
+  return seconds?Math.max(1,Math.min(3600,Number(seconds))):60
+}
+export function signInFailure(error:SignInError|null,verifying=false){
+  if(signInRetrySeconds(error))return verifying
+    ? 'Code verification is temporarily limited. Wait before trying again, then use the latest code sent for this sign-in.'
+    : 'Please wait before requesting another code. The app and web console share the same sign-in code limit. If you just signed into the app, wait about a minute, then request a new code here.'
   if(verifying && ['otp_expired','otp_disabled','validation_failed'].includes(error?.code || ''))return 'That code is invalid or has expired. Request a new code and try again.'
   return verifying?'Could not verify that code. Check your connection, or request a new code if it has expired.':'Could not send your code. Check your email address and connection, then try again.'
 }

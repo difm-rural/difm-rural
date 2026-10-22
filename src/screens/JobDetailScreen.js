@@ -53,7 +53,7 @@ function jobStaticMapUrl(job) {
 }
 
 function jobBudget(job) {
-  return job.price_type === 'fixed' ? `$${job.price} NZD`
+  return job.price_type === 'fixed' ? `$${job.price}`
     : job.price_type === 'unpaid' ? 'Free / in-kind'
     : 'Open to offers'
 }
@@ -435,7 +435,7 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   async function handleAcceptBid(bid) {
-    Alert.alert('Accept Offer', `Accept offer of $${bid.amount} NZD from ${bid.profiles?.full_name}?`, [
+    Alert.alert('Accept Offer', `Accept offer of $${bid.amount} from ${bid.profiles?.full_name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Accept',
@@ -633,7 +633,7 @@ export default function JobDetailScreen({ route, navigation }) {
                     ? `This job is complete. You can now review ${requesterFirstName}.`
                     : isAwaitingCompletion
                       ? 'Completion recorded. Refresh to see the completed job.'
-                      : `This job has been awarded to you for $${myBid.amount} NZD. Use chat to confirm timing and details with ${requesterFirstName}.`}
+                      : `This job has been awarded to you for $${myBid.amount}. Use chat to confirm timing and details with ${requesterFirstName}.`}
                 </Text>
               </View>
             )}
@@ -746,8 +746,8 @@ export default function JobDetailScreen({ route, navigation }) {
             <View style={styles.infoBoxBlue}>
               <Text style={styles.infoBoxBlueText}>
                 {otherBidCount > 0
-                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer of $${myBid.amount} NZD was the winning offer.`
-                  : `Your offer of $${myBid.amount} NZD was the only offer — you got it!`}
+                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer of $${myBid.amount} was the winning offer.`
+                  : `Your offer of $${myBid.amount} was the only offer — you got it!`}
               </Text>
             </View>
           )}
@@ -836,7 +836,7 @@ export default function JobDetailScreen({ route, navigation }) {
       {lineItems.length > 1 && (
         <View style={styles.bidTotalRow}>
           <Text style={styles.bidTotalLabel}>Offer total</Text>
-          <Text style={styles.bidTotalAmount}>${bidTotal.toFixed(2)} NZD</Text>
+          <Text style={styles.bidTotalAmount}>${bidTotal.toFixed(2)}</Text>
         </View>
       )}
 

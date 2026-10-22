@@ -25,8 +25,8 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
   const isOpen     = job.status === 'open'
   const paidAmount = job.completedAmount ?? job.acceptedBidAmount
   const budgetText = job.status === 'completed' && paidAmount != null
-    ? `Paid · $${paidAmount} NZD`
-    : job.price_type === 'fixed' ? `$${job.price} NZD`
+    ? `Paid · $${paidAmount}`
+    : job.price_type === 'fixed' ? `$${job.price}`
     : job.price_type === 'unpaid' ? 'Free'
     : 'Open to offers'
 
