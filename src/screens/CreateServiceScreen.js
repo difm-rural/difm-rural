@@ -23,6 +23,8 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
+import AddressAutocomplete from '../components/AddressAutocomplete'
+import { existingListingPin, listingLocationFields } from '../lib/listingLocation'
 import { CATEGORIES, LISTING_CATEGORIES } from '../lib/categories'
 import { categoryImage } from '../lib/categoryImages'
 import {
@@ -244,6 +246,8 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [paymentTiming, setPaymentTiming] = useState(editingService?.payment_timing || 'on_completion')
   const [materials, setMaterials] = useState(editingService?.materials || 'included')
   const [locationName, setLocationName] = useState(editingService?.location_name || '')
+  const [locationPin, setLocationPin] = useState(() => existingListingPin(editingService))
+  const [locationSelecting, setLocationSelecting] = useState(false)
   const [travelRange, setTravelRange] = useState(editingService?.travel_range_km != null ? String(editingService.travel_range_km) : '')
   const [availableFrom,   setAvailableFrom]   = useState(toDateValue(editingService?.availability))
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -277,6 +281,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setPaymentTiming('on_completion')
     setMaterials('included')
     setLocationName('')
+    setLocationPin(null)
     setTravelRange('')
     setAvailableFrom(null)
     setShowDatePicker(false)
@@ -314,6 +319,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   function canProceed() {
+    if (locationSelecting) return false
     if (step === 1) return !!(title.trim() && category)
     if (step === 2) return true
     if (step === 3) return !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
@@ -369,6 +375,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     setRate(nextPricingType === 'quote_required' ? '' : nextRate)
     setUnitLabel(nextPricingType === 'per_unit' ? (draft?.unit_label || 'job') : '')
     setLocationName(nextLocation)
+    setLocationPin(null)
     setTravelRange(draft?.travel_range_km != null ? String(draft.travel_range_km) : '')
     setDraftMissingFields(Array.isArray(draft?.missing_fields)
       ? draft.missing_fields.map(formatMissingField).filter(item => item && !/equipment/i.test(item))
@@ -801,6 +808,7 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   async function handlePublish() {
+    if (locationSelecting) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to publish a listing.')
@@ -856,6 +864,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       description: description.trim() || null,
       category,
       location_name: locationName.trim(),
+      ...listingLocationFields(locationPin),
       travel_range_km: travelRange ? parseFloat(travelRange) : null,
       kind,
       direction: 'offering',
@@ -1575,16 +1584,15 @@ export default function CreateServiceScreen({ navigation, route }) {
         <Text style={styles.stepHeading}>Where is it available?</Text>
 
         <Text style={styles.fieldLabel}>Location</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. Hawke's Bay"
-          placeholderTextColor={colors.textMuted}
+        <AddressAutocomplete
+          inline
+          placeholder="Search for a town or address..."
           value={locationName}
-          onChangeText={setLocationName}
-          autoCapitalize="words"
-          autoCorrect={false}
-          accessibilityLabel="Location"
+          onChangeText={text => { setLocationName(text); setLocationPin(null) }}
+          onSelect={selected => { setLocationName(selected.address); setLocationPin(existingListingPin(selected)) }}
+          onSelectingChange={setLocationSelecting}
         />
+        <Text style={styles.locationHelp}>{locationPin ? 'Map location selected — this listing can appear in nearby searches.' : 'Choose a suggestion to add a map location for nearby searches. You can also enter the location manually.'} This listing location is public; choose a town if you prefer not to show an exact address.</Text>
 
         <Text style={styles.fieldLabel}>Travel range <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
@@ -1910,6 +1918,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  locationHelp: { fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 8, marginBottom: 12 },
   keyboardToolbar: { backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'flex-end' },
   keyboardDone: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20 },
   keyboardDoneText: { color: colors.primary, fontSize: 16, fontWeight: '600' },

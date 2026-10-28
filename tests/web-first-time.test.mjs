@@ -62,3 +62,17 @@ test('authentication gates new members once, preserves the intended page, and fa
  authError={message:'offline'};await assert.rejects(requireProvider(),/Could not load your profile/)
  authUser=null;await assert.rejects(requireProvider('/jobs/new'),/REDIRECT:\/login\?next=%2Fjobs%2Fnew/)
 })
+
+test('the explicit profile save keeps both public names consistent and continues to Home or the original destination',async()=>{
+ reset();await assert.rejects(finishSetup({},form({name:' Peter Provider ',region:' Kaukapakapa ',intent:'continue',next:'/'})),/REDIRECT:\/$/)
+ assert.equal(updates[0].full_name,'Peter Provider');assert.equal(updates[0].display_name,'Peter Provider');assert.equal(updates[0].region,'Kaukapakapa');assert.equal(updates[0].onboarding_completed,true)
+ reset();await assert.rejects(finishSetup({},form({name:'Peter Provider',region:'Kaukapakapa',intent:'continue',next:'/browse/listing/request'})),/REDIRECT:\/browse\/listing\/request/)
+ reset();const invalid=await finishSetup({},form({name:'',region:'Kaukapakapa',intent:'continue'}));assert.ok(invalid.error);assert.equal(updates.length,0)
+})
+test('sidebar navigation defers setup only after a successful owned profile update and does not overwrite unsaved name or region',async()=>{
+ reset();fail=true;assert.match((await finishSetup({},form({intent:'later',next:'/jobs'}))).error,/try again/)
+ reset();await assert.rejects(finishSetup({},form({intent:'later',next:'/activity'})),/REDIRECT:\/activity/)
+ assert.deepEqual(updates,[{onboarding_completed:true,primary_role:'both',role:'provider'}])
+ authUser={id:'me'};authError=null;authProfile={id:'me',onboarding_completed:updates[0].onboarding_completed}
+ assert.equal((await requireProvider('/activity')).user.id,'me')
+})

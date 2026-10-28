@@ -376,3 +376,15 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - Change location/radius on one screen and switch tabs; the choice should persist for six hours. Choices are scoped per member (and separately for guests), rounded to two decimal places, and never update profile fields. Verify logout and sign-in with a different account do not reuse the prior member's browsing preference.
 - Test nearby zero results, All New Zealand, search/category combinations, private or missing pins, and current versus legacy listing coordinate fields. Nearby filters exclude unlocated pins with explanatory text; nationwide browsing includes them.
 - Check town lookup, denied permission, GPS timeout, storage failure/retry, keyboard visibility and scrolling on both physical iOS and Android phones. Local bundle exports validate compilation, not these device interactions.
+
+### Mobile listing address search
+- Edit a listing and type at least three characters in Location. Choose an inline address suggestion with the keyboard open; verify Next waits for the map lookup to finish.
+- Save and reopen: the selected location and map pin should remain. Editing other fields must preserve an existing current or legacy pin. Selecting a different address updates both coordinate formats; typing location text without selecting a suggestion clears the prior pin.
+- Test a failed suggestion request, failed details lookup and rapid typing. Show helpful fallback copy and keep manual location entry available; stale suggestions must not replace newer results.
+- Listing locations are public. Choose a town instead of an exact address if appropriate, and check that the saved listing appears in nearby discovery.
+
+### Console setup navigation and save clarity
+- Sign in with onboarding incomplete and open `/setup`. Confirm the normal console sidebar and red shed branding appear, with profile fields before the optional Jobs/Listings explanation.
+- Save profile and continue must save public name + town/region and return to Home or the original enquiry/booking destination. Save and post a job / Save and browse listings must save before opening those flows.
+- Finish setup later is a full-width-readable button, bypasses required fields, and explains that edits are unsaved. Choosing a sidebar destination likewise defers setup and reaches that destination without a redirect loop.
+- Simulate a failed profile update from both the main save and sidebar navigation: stay on setup, retain typed details, show Retry guidance and leave onboarding incomplete. Verify no other member's profile can be updated.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   StyleSheet,
@@ -17,11 +17,17 @@ export default function AddressAutocomplete({
   placeholder,
   autoFocus,
   onChangeText,
+  inline = false,
+  onSelectingChange,
 }) {
   const [query, setQuery]             = useState(value !== undefined ? value : (defaultValue || ''))
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading]         = useState(false)
   const [showList, setShowList]       = useState(false)
+  const [error, setError] = useState('')
+  const [selecting, setSelecting] = useState(false)
+  const request = useRef(0), debounce = useRef(null)
+  useEffect(() => () => { request.current++; clearTimeout(debounce.current); onSelectingChange?.(false) }, [onSelectingChange])
 
   // Sync when parent updates defaultValue (e.g. after DB load)
   useEffect(() => {
@@ -33,46 +39,55 @@ export default function AddressAutocomplete({
     if (value !== undefined) setQuery(value)
   }, [value])
 
-  async function fetchSuggestions(text) {
+  function fetchSuggestions(text) {
+    const id = ++request.current
+    clearTimeout(debounce.current)
     setQuery(text)
     onChangeText?.(text)
+    setError(''); setSuggestions([]); setShowList(false)
     if (text.length < 3) {
       setSuggestions([])
       setShowList(false)
-      return
+      setLoading(false); return
     }
     setLoading(true)
-    try {
-      const predictions = await placesAutocomplete(text)
-      setSuggestions(predictions)
-      setShowList(predictions.length > 0)
-    } catch {
-      setSuggestions([])
-      setShowList(false)
-    } finally {
-      setLoading(false)
-    }
+    debounce.current = setTimeout(async () => {
+      try {
+        const predictions = await placesAutocomplete(text)
+        if (id !== request.current) return
+        setSuggestions(predictions); setShowList(predictions.length > 0)
+        if (!predictions.length) setError('No addresses found. Try a nearby town or enter the location manually.')
+      } catch {
+        if (id === request.current) setError('Could not load address suggestions. Check your connection and try again, or enter the location manually.')
+      } finally { if (id === request.current) setLoading(false) }
+    }, 300)
   }
 
   async function handleSelect(prediction) {
+    if (selecting) return
+    const id = ++request.current
+    clearTimeout(debounce.current)
+    setSelecting(true); onSelectingChange?.(true); setLoading(true); setError('')
     setQuery(prediction.description)
+    onChangeText?.(prediction.description)
     setShowList(false)
     setSuggestions([])
     try {
       const data = await placeDetails(prediction.place_id)
+      if (id !== request.current) return
 
       onSelect({
         address:   prediction.description,
-        latitude:  data.latitude  || null,
-        longitude: data.longitude || null,
+        latitude:  data.latitude ?? null,
+        longitude: data.longitude ?? null,
       })
     } catch {
-      onSelect({ address: prediction.description })
-    }
+      if (id === request.current) { setError('Could not locate this address. Choose it again to add a map pin, or continue with the location text only.'); onSelect({ address: prediction.description, latitude: null, longitude: null }) }
+    } finally { if (id === request.current) { setSelecting(false); onSelectingChange?.(false); setLoading(false) } }
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, inline && styles.inlineContainer]}>
       <View style={styles.inputWrap}>
         <TextInput
           style={styles.input}
@@ -81,6 +96,7 @@ export default function AddressAutocomplete({
           value={query}
           onChangeText={fetchSuggestions}
           autoCorrect={false}
+          editable={!selecting}
           autoFocus={autoFocus}
           returnKeyType="search"
           accessibilityLabel="Address search"
@@ -91,7 +107,7 @@ export default function AddressAutocomplete({
       </View>
 
       {showList && suggestions.length > 0 && (
-        <View style={styles.list}>
+        <View style={[styles.list, inline && styles.inlineList]}>
           {suggestions.map((item, index) => (
             <TouchableOpacity
               key={item.place_id}
@@ -109,12 +125,16 @@ export default function AddressAutocomplete({
           ))}
         </View>
       )}
+      {!!error && <Text style={styles.error} accessibilityRole="alert">{error}</Text>}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: { zIndex: 999, elevation: 999 },
+  inlineContainer: { zIndex: 0, elevation: 0 },
+  inlineList: { position: 'relative', top: 0, marginTop: 6, maxHeight: undefined, elevation: 0, shadowOpacity: 0 },
+  error: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6 },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',

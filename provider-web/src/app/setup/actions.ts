@@ -16,6 +16,9 @@ export async function finishSetup(_:ActionState,data:FormData):Promise<ActionSta
   }catch{failed=true}
   if(failed)return {error:'Could not save your setup. Your details are still here. Check your connection and try again.'}
   revalidatePath('/')
+  revalidatePath('/account')
+  revalidatePath('/account/profile')
+  revalidatePath('/people/'+user.id)
   const intent=data.get('intent'),next=setupDestination(data.get('next'))
   redirect(next!=='/'?next:intent==='post_job'?'/jobs/new':intent==='listings'?'/browse':'/')
 }
