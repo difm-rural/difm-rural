@@ -369,3 +369,10 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - Verify 10/25/50/100/200 km and All New Zealand, nearest-first order, no-nearby matches, wider distance, search/category/kind combinations and pagination. Home's View all and navigation retain the same cookie preference.
 - Guest locations are rounded to two decimal places and stored in a six-hour HttpOnly cookie, never in search URLs or account profiles. Clear location resets the preference. All New Zealand retains the chosen centre for switching back to nearby.
 - Distance reads use jobs_public (which masks private pins) and live services only. Only calculated distance is attached to public card rows. Private/missing pins remain available under All New Zealand with explanatory copy.
+
+### Mobile nearby browsing
+- Guest Landing, guest job feed, signed-in Jobs, legacy job feed and Listings use the same distance choices: 10/25/50/100/200 km and All New Zealand. Default is 50 km, nearest first. Personal job/offer management sections are not filtered.
+- Signed-in users start from their own saved profile pin when available. Without a usable centre, show an explicit nationwide fallback and Choose location. GPS is requested only after Use my location; town search is available if permission is denied or GPS times out.
+- Change location/radius on one screen and switch tabs; the choice should persist for six hours. Choices are scoped per member (and separately for guests), rounded to two decimal places, and never update profile fields. Verify logout and sign-in with a different account do not reuse the prior member's browsing preference.
+- Test nearby zero results, All New Zealand, search/category combinations, private or missing pins, and current versus legacy listing coordinate fields. Nearby filters exclude unlocated pins with explanatory text; nationwide browsing includes them.
+- Check town lookup, denied permission, GPS timeout, storage failure/retry, keyboard visibility and scrolling on both physical iOS and Android phones. Local bundle exports validate compilation, not these device interactions.

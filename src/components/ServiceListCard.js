@@ -61,6 +61,7 @@ export default function ServiceListCard({ item, onPress }) {
         <Text style={[styles.provider, !!item.card_headline && styles.cardHeadlineCompact]} numberOfLines={1}>
           {item.card_headline || providerName}
         </Text>
+        {(item._distanceKm != null || item.location_name) && <Text style={styles.location} numberOfLines={1}>{item._distanceKm != null ? `About ${item._distanceKm} km away` : item.location_name}</Text>}
         <View style={styles.bottomRow}>
           <Text style={styles.rating}>{ratingText}</Text>
           <Text style={styles.price}>{price}</Text>
@@ -118,6 +119,7 @@ const styles = StyleSheet.create({
   content:  { flex: 1, minWidth: 0 },
   title:    { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
   provider: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 },
+  location: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 },
   cardHeadlineCompact: { color: colors.primary, fontWeight: '700' },
 
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },

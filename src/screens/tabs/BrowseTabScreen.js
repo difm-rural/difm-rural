@@ -17,7 +17,9 @@ import Icon from '../../components/Icon'
 import ServiceListCard from '../../components/ServiceListCard'
 import EmptyState from '../../components/EmptyState'
 import { SkeletonList } from '../../components/SkeletonCard'
-import { getCurrentLocation, haversineDistance } from '../../lib/location'
+import useNearbyBrowsing from '../../hooks/useNearbyBrowsing'
+import NearbyControls from '../../components/NearbyControls'
+import { filterNearby } from '../../lib/nearbyBrowsing'
 import { availabilityDisplay } from '../../lib/providerAvailability'
 
 function itemMatchesSearch(item, query) {
@@ -26,20 +28,6 @@ function itemMatchesSearch(item, query) {
   return [item.title, item.description, item.category, item.location_name].some(
     v => String(v || '').toLowerCase().includes(q)
   )
-}
-
-function isNearUser(item, userRegion) {
-  if (!userRegion || !item.location_name) return false
-  const regionWords = userRegion.toLowerCase().split(/[\s,]+/).filter(w => w.length > 2)
-  const loc = (item.location_name || '').toLowerCase()
-  return regionWords.some(word => loc.includes(word))
-}
-
-function getServiceCoords(item) {
-  const lat = item.service_latitude ?? null
-  const lng = item.service_longitude ?? null
-  if (lat == null || lng == null) return null
-  return { lat: parseFloat(lat), lng: parseFloat(lng) }
 }
 
 function ServiceSection({ title, items, onPressItem }) {
@@ -66,9 +54,7 @@ export default function BrowseTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const [currentUserId, setCurrentUserId] = useState(null)
   const [services,    setServices]    = useState([])
-  const [userRegion,  setUserRegion]  = useState('')
-  const [userLat,     setUserLat]     = useState(null)
-  const [userLng,     setUserLng]     = useState(null)
+  const nearby = useNearbyBrowsing()
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
   const [search,      setSearch]      = useState('')
@@ -83,25 +69,6 @@ export default function BrowseTabScreen({ navigation }) {
     try {
     const { data: { user } } = await supabase.auth.getUser()
     setCurrentUserId(user?.id || null)
-
-    if (user?.id) {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('region')
-        .eq('id', user.id)
-        .single()
-      setUserRegion(prof?.region || '')
-    } else {
-      setUserRegion('')
-    }
-
-    try {
-      const coords = await getCurrentLocation()
-      if (coords) {
-        setUserLat(coords.latitude)
-        setUserLng(coords.longitude)
-      }
-    } catch { /* location denied — fall back to region text matching */ }
 
     await fetchServices()
     setLoadError(false)
@@ -175,34 +142,8 @@ export default function BrowseTabScreen({ navigation }) {
     navigation.navigate('ServiceDetail', { service: item })
   }
 
-  // Filter and annotate with GPS distance
-  const filtered = (() => {
-    let items = [...services]
-    if (search.trim())    items = items.filter(i => itemMatchesSearch(i, search))
-    items = items.sort((a, b) =>
-      (a._availabilityRank ?? 3) - (b._availabilityRank ?? 3)
-      || new Date(b.created_at) - new Date(a.created_at)
-    )
-
-    if (userLat != null && userLng != null) {
-      items = items.map(i => {
-        const coords = getServiceCoords(i)
-        if (!coords) return { ...i, _distanceKm: null }
-        const d = haversineDistance(userLat, userLng, coords.lat, coords.lng)
-        return { ...i, _distanceKm: d.toFixed(1) }
-      })
-    }
-    return items
-  })()
-
-  const nearYou = filtered.filter(i => {
-    if (userLat != null && i._distanceKm != null) return parseFloat(i._distanceKm) <= 50
-    return isNearUser(i, userRegion)
-  })
-  const allServices = filtered.filter(i => {
-    if (userLat != null && i._distanceKm != null) return parseFloat(i._distanceKm) > 50
-    return !isNearUser(i, userRegion)
-  })
+  const result = filterNearby(services.filter(item => itemMatchesSearch(item, search)), nearby)
+  const filtered = result.items
   const isEmpty = filtered.length === 0
 
   return (
@@ -251,6 +192,7 @@ export default function BrowseTabScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+      <NearbyControls nearby={nearby} unlocated={result.unlocated} />
       {loading ? (
         <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
       ) : loadError ? (
@@ -258,6 +200,9 @@ export default function BrowseTabScreen({ navigation }) {
           title="Couldn't load listings"
           body="Check your connection and try again."
           actionLabel="Retry" onAction={onRefresh} />
+      ) : isEmpty && result.active ? (
+        <EmptyState icon="location-outline" title={search.trim() ? `No nearby listings match “${search.trim()}”` : `No listings within ${nearby.radius} km`}
+          body="Try a wider distance or browse All New Zealand." actionLabel="All New Zealand" onAction={() => nearby.setRadius(null)} />
       ) : isEmpty && search.trim() ? (
         <EmptyState icon="search-outline"
           title={`No listings match “${search.trim()}”`}
@@ -277,23 +222,7 @@ export default function BrowseTabScreen({ navigation }) {
           />
       ) : (
         <>
-              <ServiceSection
-                title="Near you"
-                items={nearYou}
-                onPressItem={handlePress}
-              />
-
-              <ServiceSection
-                title="All listings"
-                items={allServices}
-                onPressItem={handlePress}
-              />
-
-              {allServices.length === 0 && nearYou.length > 0 && (
-                <View style={styles.noMore}>
-                  <Text style={styles.noMoreText}>All available listings shown above</Text>
-                </View>
-              )}
+          <ServiceSection title={result.active ? 'Near you' : 'All listings'} items={filtered} onPressItem={handlePress} />
         </>
       )}
       </ScrollView>

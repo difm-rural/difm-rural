@@ -14,6 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import useNearbyBrowsing from '../hooks/useNearbyBrowsing'
+import NearbyControls from '../components/NearbyControls'
+import { filterNearby } from '../lib/nearbyBrowsing'
 import EmptyState from '../components/EmptyState'
 import { SkeletonList } from '../components/SkeletonCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
@@ -48,6 +51,7 @@ function HorizontalSection({ title, items, onPressItem, onGuestAction }) {
 
 export default function LandingScreen({ navigation }) {
   const insets = useSafeAreaInsets()
+  const nearby = useNearbyBrowsing()
   const [jobs, setJobs] = useState([])
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
@@ -137,15 +141,18 @@ export default function LandingScreen({ navigation }) {
   }
 
   const q = search.trim().toLowerCase()
-  const filteredJobs = q
-    ? jobs.filter(j => [j.title, j.description, j.category, j.location_name]
+  const searchedJobs = q
+    ? jobs.filter(j => [j.title, j.description, j.category, j.location_area, j.location_name]
         .some(v => String(v || '').toLowerCase().includes(q)))
     : jobs
-  const filteredServices = q
+  const searchedServices = q
     ? services.filter(s => [s.title, s.description, s.category, s.location_name]
         .some(v => String(v || '').toLowerCase().includes(q)))
     : services
 
+  const jobResult = filterNearby(searchedJobs, nearby)
+  const listingResult = filterNearby(searchedServices, nearby)
+  const filteredJobs = jobResult.items, filteredServices = listingResult.items
   const showJobs = mode !== 'services'
   const isEmpty = (showJobs ? filteredJobs.length === 0 : true) && filteredServices.length === 0
   const hasError = loadErrors.listings || (showJobs && loadErrors.jobs)
@@ -183,6 +190,7 @@ export default function LandingScreen({ navigation }) {
         contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
+      <NearbyControls nearby={nearby} unlocated={listingResult.unlocated + (showJobs ? jobResult.unlocated : 0)} />
       {loading ? (
         <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
       ) : <>
@@ -196,11 +204,11 @@ export default function LandingScreen({ navigation }) {
       {isEmpty && !hasError ? (
         <EmptyState
           icon="map-outline"
-          title={search.trim() ? `No ${showJobs ? 'jobs or listings' : 'listings'} match your search` : 'Nothing listed yet'}
-          body={search.trim() ? `Nothing matches “${search.trim()}”. Try another word or clear your search.`
+          title={search.trim() ? `No ${showJobs ? 'jobs or listings' : 'listings'} match your search` : jobResult.active ? `No ${showJobs ? 'jobs or listings' : 'listings'} within ${nearby.radius} km` : 'Nothing listed yet'}
+          body={jobResult.active ? 'Try a wider distance or browse All New Zealand.' : search.trim() ? `Nothing matches “${search.trim()}”. Try another word or clear your search.`
             : 'Be the first in your area — check back soon, or post a job to get started.'}
-          actionLabel={search.trim() ? 'Clear search' : 'Post a job'}
-          onAction={search.trim() ? () => setSearch('') : () => navigation.navigate('GuestPostJob')}
+          actionLabel={jobResult.active ? 'All New Zealand' : search.trim() ? 'Clear search' : 'Post a job'}
+          onAction={jobResult.active ? () => nearby.setRadius(null) : search.trim() ? () => setSearch('') : () => navigation.navigate('GuestPostJob')}
         />
       ) : (
         <>

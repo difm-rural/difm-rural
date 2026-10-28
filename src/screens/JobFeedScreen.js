@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Location from 'expo-location'
+import useNearbyBrowsing from '../hooks/useNearbyBrowsing'
+import NearbyControls from '../components/NearbyControls'
+import { filterNearby } from '../lib/nearbyBrowsing'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../lib/watchlist'
@@ -15,51 +17,29 @@ export default function JobFeedScreen({ navigation }) {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [userRegion, setUserRegion] = useState(null)
+  const nearby = useNearbyBrowsing()
+  const [loadError, setLoadError] = useState(false)
   const [userId, setUserId] = useState(null)
   const [watchedIds, setWatchedIds] = useState(new Set())
-  const regionRef = useRef(null)
+  const loadingRef = useRef(false)
   const userIdRef = useRef(null)
 
-  useEffect(() => { init() }, [])
-
-  // Refresh watchlist when returning to this screen
-  useFocusEffect(useCallback(() => {
-    if (userIdRef.current) {
-      fetchWatchlistIds(userIdRef.current).then(ids => setWatchedIds(ids))
-    }
-    fetchJobs()
-  }, []))
+  useFocusEffect(useCallback(() => { init() }, []))
 
   async function init() {
-    const { data: { user } } = await supabase.auth.getUser()
-    userIdRef.current = user?.id
-    setUserId(user?.id)
-
-    const region = await getUserRegion()
-    regionRef.current = region
-    setUserRegion(region)
-    await fetchJobs(region, user?.id)
-  }
-
-  async function getUserRegion() {
+    if (loadingRef.current) return
+    loadingRef.current = true
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') return null
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      const [place] = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      })
-      return [place.city, place.district, place.region, place.subregion]
-        .filter(Boolean)
-        .map(s => s.toLowerCase())
-    } catch {
-      return null
-    }
+      const { data: { user } } = await supabase.auth.getUser()
+      userIdRef.current = user?.id
+      setUserId(user?.id)
+      await fetchJobs(user?.id)
+      setLoadError(false)
+    } catch { setLoadError(true) }
+    finally { loadingRef.current = false; setLoading(false); setRefreshing(false) }
   }
 
-  async function fetchJobs(region = regionRef.current, uid = userIdRef.current) {
+  async function fetchJobs(uid = userIdRef.current) {
     const { data: jobsData, error } = await supabase
       .from('jobs_public')
       .select('*')
@@ -67,12 +47,7 @@ export default function JobFeedScreen({ navigation }) {
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.log('Error fetching jobs:', error.message)
-      setLoading(false)
-      setRefreshing(false)
-      return
-    }
+    if (error) throw error
 
     const rawJobs = jobsData || []
 
@@ -94,7 +69,7 @@ export default function JobFeedScreen({ navigation }) {
       }))
 
       setWatchedIds(watchIds)
-      setJobs(sortByLocality(jobsWithAll, region))
+      setJobs(jobsWithAll)
     } else {
       setJobs([])
     }
@@ -123,23 +98,12 @@ export default function JobFeedScreen({ navigation }) {
     }
   }
 
-  function isLocal(locationName, region) {
-    if (!region || !locationName) return false
-    const loc = locationName.toLowerCase()
-    return region.some(kw => loc.includes(kw))
-  }
-
-  function sortByLocality(allJobs, region) {
-    if (!region) return allJobs
-    const local = allJobs.filter(j => isLocal(j.location_name, region))
-    const other = allJobs.filter(j => !isLocal(j.location_name, region))
-    return [...local, ...other]
-  }
-
   function onRefresh() {
     setRefreshing(true)
-    fetchJobs()
+    init()
   }
+
+  const result = filterNearby(jobs, nearby)
 
   if (loading) {
     return (
@@ -156,21 +120,17 @@ export default function JobFeedScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.heading} accessibilityRole="header">Available Jobs</Text>
-        {userRegion && <Text style={styles.localNote}>Local first</Text>}
+
       </View>
-      {jobs.length === 0 ? (
-        <EmptyState
-          icon="briefcase-outline"
-          title="No jobs posted yet"
-          body="New jobs from your area will appear here. Pull down to refresh."
-        />
-      ) : (
+      <NearbyControls nearby={nearby} unlocated={result.unlocated} />
         <FlatList
-          data={jobs}
+          data={loadError ? [] : result.items}
+          ListEmptyComponent={loadError ? <EmptyState icon="cloud-offline-outline" title="Couldn’t load jobs" body="Check your connection and try again." actionLabel="Retry" onAction={onRefresh} /> : <EmptyState icon="location-outline" title={result.active ? `No jobs within ${nearby.radius} km` : "No open jobs yet"} body={result.active ? "Try a wider distance or browse All New Zealand." : "Pull down to refresh."} actionLabel={result.active ? "All New Zealand" : "Refresh"} onAction={result.active ? () => nearby.setRadius(null) : onRefresh} />}
           renderItem={({ item }) => (
             <JobCard
               job={item}
               bidCount={item.bidCount || 0}
+              distanceKm={item._distanceKm}
               isWatched={watchedIds.has(item.id)}
               onWatchToggle={userId ? handleWatchToggle : undefined}
               onPress={() => navigation.navigate('JobDetail', { job: item })}
@@ -180,7 +140,6 @@ export default function JobFeedScreen({ navigation }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}
         />
-      )}
     </View>
   )
 }

@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Location from 'expo-location'
+import useNearbyBrowsing from '../hooks/useNearbyBrowsing'
+import NearbyControls from '../components/NearbyControls'
+import { filterNearby } from '../lib/nearbyBrowsing'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
@@ -22,12 +24,6 @@ import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServic
 import { CATEGORY_FILTERS } from '../lib/categories'
 
 const FILTERS = CATEGORY_FILTERS
-
-function isNearUser(item, userRegion) {
-  if (!userRegion || !userRegion.length || !item.location_name) return false
-  const loc = (item.location_name || '').toLowerCase()
-  return userRegion.some(kw => loc.includes(kw))
-}
 
 function HorizontalSection({ title, items, onPressItem, onGuestHeartPress }) {
   if (!items.length) return null
@@ -59,48 +55,34 @@ function HorizontalSection({ title, items, onPressItem, onGuestHeartPress }) {
 
 export default function GuestJobFeedScreen({ navigation }) {
   const insets = useSafeAreaInsets()
+  const nearby = useNearbyBrowsing()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [userRegion, setUserRegion] = useState(null)
+  const [loadError, setLoadError] = useState(false)
   const [filter, setFilter] = useState('All')
   const [search, setSearch] = useState('')
-  const regionRef = useRef(null)
+  const loadingRef = useRef(false)
 
   useEffect(() => { init() }, [])
 
   async function init() {
-    const region = await getUserRegion()
-    regionRef.current = region
-    setUserRegion(region)
-    await fetchJobs()
-  }
-
-  async function getUserRegion() {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') return null
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      const [place] = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      })
-      return [place.city, place.district, place.region, place.subregion]
-        .filter(Boolean)
-        .map(s => s.toLowerCase())
-    } catch {
-      return null
-    }
+    if (loadingRef.current) return
+    loadingRef.current = true
+    try { await fetchJobs(); setLoadError(false) }
+    catch { setLoadError(true) }
+    finally { loadingRef.current = false; setLoading(false); setRefreshing(false) }
   }
 
   async function fetchJobs() {
-    const { data: jobsData } = await supabase
+    const { data: jobsData, error } = await supabase
       .from('jobs_public')
       .select('*')
       .eq('status', 'open')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
+    if (error) throw error
     const raw = jobsData || []
     if (raw.length === 0) { setJobs([]); setLoading(false); setRefreshing(false); return }
 
@@ -121,7 +103,7 @@ export default function GuestJobFeedScreen({ navigation }) {
 
   function onRefresh() {
     setRefreshing(true)
-    fetchJobs()
+    init()
   }
 
   function handleGuestAction() {
@@ -141,15 +123,14 @@ export default function GuestJobFeedScreen({ navigation }) {
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       items = items.filter(i =>
-        [i.title, i.description, i.category, i.location_name].some(v => String(v || '').toLowerCase().includes(q))
+        [i.title, i.description, i.category, i.location_area, i.location_name].some(v => String(v || '').toLowerCase().includes(q))
       )
     }
     return items
   })()
 
-  const nearYou = filtered.filter(i => isNearUser(i, userRegion))
-  const furtherAway = filtered.filter(i => !isNearUser(i, userRegion))
-  const bothEmpty = nearYou.length === 0 && furtherAway.length === 0
+  const result = filterNearby(filtered, nearby)
+  const bothEmpty = result.items.length === 0
 
   return (
     <View style={styles.screen}>
@@ -199,49 +180,18 @@ export default function GuestJobFeedScreen({ navigation }) {
         ))}
       </ScrollView>
 
-      {/* Content */}
-      {loading ? (
-        <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
-      ) : bothEmpty ? (
-        filter !== 'All' || search.trim() ? (
-          <EmptyState
-            icon="search-outline"
-            title="No jobs match"
-            body="Try a different search or filter."
-          />
-        ) : (
-          <EmptyState
-            icon="briefcase-outline"
-            title="No jobs nearby yet"
-            body="New jobs appear here as locals post them. Pull down to refresh."
-          />
-        )
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-          }>
-          <HorizontalSection
-            title="Near you"
-            items={nearYou}
-            onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
-            onGuestHeartPress={handleGuestAction}
-          />
-          <HorizontalSection
-            title="Further away"
-            items={furtherAway}
-            onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
-            onGuestHeartPress={handleGuestAction}
-          />
-          {furtherAway.length === 0 && nearYou.length > 0 && (
-            <View style={styles.noMore}>
-              <Text style={styles.noMoreText}>No more jobs found</Text>
-            </View>
-          )}
-        </ScrollView>
-      )}
+      <ScrollView alwaysBounceVertical keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 32 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
+        <NearbyControls nearby={nearby} unlocated={result.unlocated} />
+        {loading ? <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
+          : loadError ? <EmptyState icon="cloud-offline-outline" title="Couldn't load jobs" body="Check your connection and try again." actionLabel="Retry" onAction={onRefresh} />
+          : bothEmpty ? <EmptyState icon="search-outline" title={result.active ? `No matching jobs within ${nearby.radius} km` : filter !== 'All' || search.trim() ? 'No jobs match' : 'No open jobs yet'}
+            body={result.active ? 'Try a wider distance or browse All New Zealand.' : 'Try another search, or pull down to refresh.'}
+            actionLabel={result.active ? 'All New Zealand' : 'Clear search'} onAction={result.active ? () => nearby.setRadius(null) : () => { setSearch(''); setFilter('All') }} />
+          : <HorizontalSection title={result.active ? 'Near you' : 'Open jobs'} items={result.items}
+              onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })} onGuestHeartPress={handleGuestAction} />}
+      </ScrollView>
     </View>
   )
 }

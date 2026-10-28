@@ -19,7 +19,7 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import { useUser } from '../../context/UserContext'
 import { canProvide } from '../../lib/roles'
-import { coarseSuburb, getCurrentLocation, haversineDistance, reverseGeocode } from '../../lib/location'
+import { coarseSuburb, reverseGeocode } from '../../lib/location'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../../lib/watchlist'
 import { saveJobSearch, SAVED_INTEREST_FREQUENCIES } from '../../lib/savedInterests'
 import JobCard from '../../components/JobCard'
@@ -28,24 +28,19 @@ import SkeletonCard from '../../components/SkeletonCard'
 import EmptyState from '../../components/EmptyState'
 import Button from '../../components/Button'
 import Icon from '../../components/Icon'
+import NearbyControls from '../../components/NearbyControls'
+import useNearbyBrowsing from '../../hooks/useNearbyBrowsing'
+import { filterNearby } from '../../lib/nearbyBrowsing'
 
 
 const SORT_OPTIONS = [
   { value: 'nearest', label: 'Nearest first' },
   { value: 'newest',  label: 'Newest first' },
 ]
-const RADIUS_OPTIONS = [
-  { value: 'any', label: 'Any distance' },
-  { value: 10,    label: 'Within 10 km' },
-  { value: 25,    label: 'Within 25 km' },
-  { value: 50,    label: 'Within 50 km' },
-  { value: 100,   label: 'Within 100 km' },
-]
-
 function jobMatchesSearch(job, query) {
   if (!query.trim()) return true
   const q = query.trim().toLowerCase()
-  return [job.title, job.description, job.category, job.location_name].some(
+  return [job.title, job.description, job.category, job.location_area, job.location_name].some(
     v => String(v || '').toLowerCase().includes(q)
   )
 }
@@ -98,12 +93,13 @@ export default function JobsTabScreen({ navigation }) {
   const [myOpenJobs, setMyOpenJobs]   = useState([])
   const [myBidJobs, setMyBidJobs]     = useState([])
   const [watchedIds, setWatchedIds]   = useState(new Set())
-  const [coords, setCoords]           = useState(null)
+  const nearby = useNearbyBrowsing()
+  const coords = nearby.point, radius = nearby.radius ?? 'any'
+  const [boardError, setBoardError] = useState(false)
   const [loading, setLoading]         = useState(true)
   const [refreshing, setRefreshing]   = useState(false)
   const [search, setSearch]           = useState('')
   const [sort, setSort]               = useState('nearest')
-  const [radius, setRadius]           = useState('any')
   const [saveOpen, setSaveOpen]       = useState(false)
   const [saveName, setSaveName]       = useState('')
   const [saveLocation, setSaveLocation] = useState('')
@@ -112,20 +108,19 @@ export default function JobsTabScreen({ navigation }) {
   const [saveEmail, setSaveEmail]     = useState(false)
   const [saving, setSaving]           = useState(false)
   const userIdRef = useRef(null)
+  const loadingRef = useRef(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
 
   async function load() {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    try {
     const { data: { user } } = await supabase.auth.getUser()
     userIdRef.current = user?.id || null
     setUserId(user?.id || null)
 
-    try {
-      const loc = await getCurrentLocation()
-      if (loc) setCoords(loc)
-    } catch { /* distance is optional */ }
-
-    await Promise.all([
+    const results = await Promise.allSettled([
       fetchBoard(user?.id),
       user?.id && isRequester ? fetchMyOpenJobs(user.id) : Promise.resolve(),
       // Anyone (not just providers) can place an offer, so anyone may have offers
@@ -133,18 +128,20 @@ export default function JobsTabScreen({ navigation }) {
       user?.id ? fetchMyBids(user.id) : Promise.resolve(),
       user?.id ? fetchWatchlistIds(user.id).then(setWatchedIds) : Promise.resolve(),
     ])
-    setLoading(false)
-    setRefreshing(false)
+    setBoardError(results[0].status === 'rejected')
+    } catch { setBoardError(true) }
+    finally { loadingRef.current = false; setLoading(false); setRefreshing(false) }
   }
 
   async function fetchBoard(uid) {
-    const { data: jobsData } = await supabase
+    const { data: jobsData, error } = await supabase
       .from('jobs_public')
       .select('*')
       .eq('status', 'open')
       .eq('visibility', 'public')
       .order('created_at', { ascending: false })
 
+    if (error) throw error
     const raw = (jobsData || []).filter(j => j.requester_id !== uid)
     if (raw.length === 0) { setBoardJobs([]); return }
 
@@ -219,10 +216,10 @@ export default function JobsTabScreen({ navigation }) {
 
   function clearFilters() {
     setSearch('')
-    setRadius('any')
+    nearby.setRadius(null)
   }
 
-  const hasActiveFilter = !!search.trim() || radius !== 'any'
+  const hasActiveFilter = !!search.trim() || (!!coords && radius !== 'any')
 
   async function openSaveSearch() {
     if (!userId) {
@@ -233,7 +230,7 @@ export default function JobsTabScreen({ navigation }) {
       Alert.alert('Location unavailable', 'Allow location access before saving a distance-based search.')
       return
     }
-    let place = saveLocation
+    let place = nearby.label || saveLocation
     if (radius !== 'any' && coords && !place) {
       const address = await reverseGeocode(coords.latitude, coords.longitude)
       place = coarseSuburb(address) || 'your location'
@@ -272,38 +269,8 @@ export default function JobsTabScreen({ navigation }) {
     }
   }
 
-  // Filter, annotate with distance, apply radius, then sort.
-  const visibleJobs = (() => {
-    let items = boardJobs
-    if (search.trim())    items = items.filter(j => jobMatchesSearch(j, search))
-
-    if (coords) {
-      items = items.map(j => {
-        if (j.latitude == null || j.longitude == null) return { ...j, _distanceKm: null }
-        const d = haversineDistance(
-          coords.latitude, coords.longitude,
-          parseFloat(j.latitude), parseFloat(j.longitude)
-        )
-        return { ...j, _distanceKm: Math.round(d * 10) / 10 }
-      })
-      if (radius !== 'any') {
-        items = items.filter(j => j._distanceKm != null && j._distanceKm <= radius)
-      }
-    }
-
-    const byNewest = (a, b) => new Date(b.created_at) - new Date(a.created_at)
-    if (coords && sort === 'nearest') {
-      items = [...items].sort((a, b) => {
-        if (a._distanceKm == null && b._distanceKm == null) return byNewest(a, b)
-        if (a._distanceKm == null) return 1
-        if (b._distanceKm == null) return -1
-        return a._distanceKm - b._distanceKm
-      })
-    } else {
-      items = [...items].sort(byNewest)
-    }
-    return items
-  })()
+  const nearbyResult = filterNearby(boardJobs.filter(job => jobMatchesSearch(job, search)), nearby, sort)
+  const visibleJobs = nearbyResult.items
 
   // Board jobs the viewing provider has already offered on → surfaced on the card.
   const myOfferByJobId = new Map(myBidJobs.map(b => [b.job_id, b.amount]))
@@ -393,25 +360,11 @@ export default function JobsTabScreen({ navigation }) {
         <Text style={styles.boardTitle} numberOfLines={1}>
           {isProvider ? 'Open jobs' : 'What others need'}
         </Text>
-        {coords && (
           <View style={styles.boardControls}>
-            <OptionPill
-              label="Distance"
-              icon="location-outline"
-              options={RADIUS_OPTIONS}
-              value={radius}
-              onChange={setRadius}
-            />
-            <OptionPill
-              label="Sort"
-              icon="swap-vertical-outline"
-              options={SORT_OPTIONS}
-              value={sort}
-              onChange={setSort}
-            />
-          </View>
-        )}
+          <OptionPill label="Sort" icon="swap-vertical-outline" options={SORT_OPTIONS} value={sort} onChange={setSort} />
+        </View>
       </View>
+      <NearbyControls nearby={nearby} unlocated={nearbyResult.unlocated} />
       {hasActiveFilter && (
         <View style={styles.saveSearchRow}>
           <View style={{ flex: 1 }}>
@@ -433,6 +386,7 @@ export default function JobsTabScreen({ navigation }) {
 
   // Empty state — the message depends on WHY nothing is showing.
   function renderEmpty() {
+    if (boardError) return <EmptyState icon="cloud-offline-outline" title="Couldn’t load jobs" body="Check your connection and try again." actionLabel="Retry" onAction={onRefresh} />
     if (hasActiveFilter) {
       let title, body
       if (search.trim()) {
@@ -569,7 +523,7 @@ export default function JobsTabScreen({ navigation }) {
       </View>
 
       <FlatList
-        data={visibleJobs}
+        data={boardError ? [] : visibleJobs}
         keyExtractor={job => job.id}
         ListHeaderComponent={listHeader}
         renderItem={({ item: job }) => (
