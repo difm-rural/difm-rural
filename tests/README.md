@@ -355,3 +355,10 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - From a listing, choose Enquire or Request booking/quote; sign in and finish/defer setup. Confirm the intended conversation or request review opens. From a job, choose Send an offer or Ask a question; confirm the correct job and section opens.
 - Test back navigation across ruralconnections.nz and the console, and narrow mobile browsers. No live test messages, offers, bookings or emails were submitted by automated verification.
 - Deploy both public-web and provider-web changes. Public-web continues to use its existing Supabase URL and publishable key; no database migration is needed.
+
+### App-style website Home
+- Open public-web `/` signed out. Confirm Find rural help, one shared search, Open jobs and Available listings appear immediately, with live cards and no sample items or marketing hero.
+- Scroll both card rows using touch and keyboard; open a card and navigate back. View all retains the shared search. Search failures in one section must not hide the successful other section.
+- Search for an unmatched word: each section explains no matches and offers Clear search. Refresh and Retry preserve the query.
+- Check desktop and narrow browser layouts: the green wordmark, active guest navigation, account links and bottom tabs should remain usable, with scrolling limited to the card rows.
+- Sign in or Sign up from the main header/Account: an existing member should reach console Home. New members finish/defer setup then Explore the app to reach Home. Action-specific login from an enquiry, booking or job keeps its original destination.

@@ -29,11 +29,13 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
               <path d="M42 49h14v19H42z" fill="#245c45" />
             </svg>
           </div>
-          <p className="eyebrow">Web console</p>
+          <p className="eyebrow">Your account</p>
           <h2>Welcome to Rural Connections</h2>
           <p className="muted">Sign in or create an account with your email. We will send a one-time code; no password needed.</p>
           {params.error==='link' && <p className="form-error" role="alert">That sign-in link could not be used. Request a new code below and enter it here.</p>}
           <LoginForm destination={destination}/>
+          <p className="muted">Once signed in, Home brings your jobs, listings, messages and bookings together.</p>
+          <a href="https://ruralconnections.nz/" className="card-link">Continue browsing without signing in →</a>
         </div>
       </section>
     </main>
