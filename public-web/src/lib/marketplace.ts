@@ -1,5 +1,6 @@
 import {CATEGORIES} from '@shared/categories'
 import type {SupabaseClient} from '@supabase/supabase-js'
+import {point,distance,type Point} from './nearby'
 export const JOB_COLUMNS='id,title,description,category,price_type,price,location_area,photos,created_at,schedule_type,scheduled_date,date_from,date_to,materials_type,access_conditions,hide_exact_location'
 export const LISTING_COLUMNS='id,provider_id,title,description,category,kind,pricing_type,rate,unit_label,location_name,photos,created_at,card_headline,card_supporting_text,card_style,min_charge,minimum_units,max_units,pricing_variants,pricing_add_ons,pricing_terms,materials,payment_timing,travel_range_km,availability'
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -11,15 +12,27 @@ export function browseHref(path:string,f:ReturnType<typeof browseFilters>){const
 export function publicJobsQuery(client:SupabaseClient){return client.from('jobs_public').select(JOB_COLUMNS).eq('status','open').eq('visibility','public')}
 export function publicListingsQuery(client:SupabaseClient){return client.from('services').select(LISTING_COLUMNS).eq('is_active',true).is('closed_at',null)}
 export function publicQuery(client:SupabaseClient,kind:'jobs'|'listings'){return kind==='jobs'?publicJobsQuery(client):publicListingsQuery(client)}
-export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null}
-export async function publicRows(client:SupabaseClient,kind:'jobs'|'listings'){
+export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;distance?:number|null}
+export async function publicRows(client:SupabaseClient,kind:'jobs'|'listings',origin:Point|null=null){
  const rows:PublicRow[]=[]
  for(let offset=0;;offset+=500){const {data,error}=await publicQuery(client,kind).order('created_at',{ascending:false}).order('id').range(offset,offset+499);if(error)throw error;rows.push(...(data as unknown as PublicRow[] || []));if(!data || data.length<500)break}
- return rows
+ if(!origin)return rows
+ const pins=new Map<string,number|null>()
+ for(let offset=0;;offset+=500){
+  // The view masks private job pins. Keep all coordinates server-side; only
+  // the computed distance is attached to public cards.
+  const query=kind==='jobs'?client.from('jobs_public').select('id,latitude,longitude').eq('status','open').eq('visibility','public'):client.from('services').select('id,latitude,longitude').eq('is_active',true).is('closed_at',null)
+  const {data,error}=await query.order('id').range(offset,offset+499);if(error)throw error
+  for(const row of data || []){const p=point(row.latitude,row.longitude);pins.set(row.id,p?distance(origin,p):null)}
+  if(!data || data.length<500)break
+ }
+ return rows.map(row=>({...row,distance:pins.get(row.id) ?? null}))
 }
-type SearchRow={title?:string;description?:string|null;category?:string|null;kind?:string|null;location_area?:string|null;location_name?:string|null}
-export function publicResults<T extends SearchRow>(rows:T[],f:ReturnType<typeof browseFilters>){
- const query=f.q.toLocaleLowerCase('en-NZ'),filtered=rows.filter(r=>(!f.category||r.category===f.category)&&(!f.kind||r.kind===f.kind)&&(!query||[r.title,r.description,r.category,r.location_area,r.location_name].filter(Boolean).join(' ').toLocaleLowerCase('en-NZ').includes(query)))
+type SearchRow={title?:string;description?:string|null;category?:string|null;kind?:string|null;location_area?:string|null;location_name?:string|null;distance?:number|null}
+export function publicResults<T extends SearchRow>(rows:T[],f:ReturnType<typeof browseFilters>,radius:number|null=null){
+ const query=f.q.toLocaleLowerCase('en-NZ'),matching=rows.filter(r=>(!f.category||r.category===f.category)&&(!f.kind||r.kind===f.kind)&&(!query||[r.title,r.description,r.category,r.location_area,r.location_name].filter(Boolean).join(' ').toLocaleLowerCase('en-NZ').includes(query)))
+ const unlocated=matching.filter(r=>r.distance==null).length
+ const filtered=radius===null?matching:matching.filter(r=>typeof r.distance==='number'&&Number.isFinite(r.distance)&&r.distance<=radius).sort((a,b)=>a.distance!-b.distance!)
  const pages=Math.max(1,Math.ceil(filtered.length/18)),page=Math.min(f.page,pages)
- return {rows:filtered.slice((page-1)*18,page*18),count:filtered.length,pages,page}
+ return {rows:filtered.slice((page-1)*18,page*18),count:filtered.length,pages,page,unlocated}
 }

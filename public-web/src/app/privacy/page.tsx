@@ -206,6 +206,9 @@ export default function PrivacyPage() {
             </p>
             <p>
               The public website does not currently use advertising or behavioural tracking cookies.
+                If you choose a browsing location, an essential cookie remembers the approximate
+                location and distance preference for six hours. You can clear that location from
+                the browsing controls. This does not change your account profile.
               Our hosting providers may retain standard technical request logs for reliability and
               security.
             </p>

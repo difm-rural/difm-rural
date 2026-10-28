@@ -362,3 +362,10 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - Search for an unmatched word: each section explains no matches and offers Clear search. Refresh and Retry preserve the query.
 - Check desktop and narrow browser layouts: the green wordmark, active guest navigation, account links and bottom tabs should remain usable, with scrolling limited to the card rows.
 - Sign in or Sign up from the main header/Account: an existing member should reach console Home. New members finish/defer setup then Explore the app to reach Home. Action-specific login from an enquiry, booking or job keeps its original destination.
+
+### Nearby guest discovery
+- Home, Jobs and Listings default to a 50 km radius once a location is chosen. Before that, show the explicit nationwide fallback and location controls; do not prompt for GPS automatically.
+- Use my location requests browser permission only on click. Permission denial, timeout or unsupported GPS must offer town selection. Find town uses the existing NZ maps proxy; select a returned result to set the centre.
+- Verify 10/25/50/100/200 km and All New Zealand, nearest-first order, no-nearby matches, wider distance, search/category/kind combinations and pagination. Home's View all and navigation retain the same cookie preference.
+- Guest locations are rounded to two decimal places and stored in a six-hour HttpOnly cookie, never in search URLs or account profiles. Clear location resets the preference. All New Zealand retains the chosen centre for switching back to nearby.
+- Distance reads use jobs_public (which masks private pins) and live services only. Only calculated distance is attached to public card rows. Private/missing pins remain available under All New Zealand with explanatory copy.
