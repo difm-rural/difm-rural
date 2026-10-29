@@ -35,7 +35,7 @@ test('console handoff retains action, recipient and hash through existing sign-i
  const firstSource=(await readFile(new URL('../provider-web/src/lib/first-time.ts',import.meta.url),'utf8')).replace("'./return-path'",JSON.stringify(url(safeSource)))
  const {setupDestination}=await import(url(firstSource))
  for(const path of ['/messages?kind=listing&id=listing&person=provider','/browse/listing/request','/jobs/job#offer','/jobs/job#questions','/jobs/new','/listings/new']){
-  const link=new URL(consoleLink(path));assert.equal(link.origin,'https://difm-rural.vercel.app');assert.equal(link.pathname,'/login');assert.equal(setupDestination(link.searchParams.get('next')),path)
+  const link=new URL(consoleLink(path));assert.equal(link.origin,'https://dev.ruralconnections.nz');assert.equal(link.pathname,'/login');assert.equal(setupDestination(link.searchParams.get('next')),path)
  }
  for(const unsafe of ['https://evil.test','//evil.test','/\\evil.test'])assert.equal(new URL(consoleLink(unsafe)).searchParams.get('next'),'/')
 })

@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import {DevelopmentBadge} from '@/components/development-badge'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -23,12 +24,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
       <section className="login-panel">
         <div className="login-card">
           <div className="login-barn-mark" aria-hidden="true">
-            <svg viewBox="0 0 96 96" role="img">
-              <rect width="96" height="96" rx="24" fill="#245c45" />
-              <path d="M26 42.5V68h44V42.5L48 31 26 42.5Z" fill="white" />
-              <path d="M22 42 48 28l26 14" fill="none" stroke="white" strokeWidth="4" strokeLinecap="square" strokeLinejoin="miter" />
-              <path d="M42 49h14v19H42z" fill="#245c45" />
-            </svg>
+            <Image src="/brand/barn-badge-red.png" alt="" width={52} height={52} priority />
           </div>
           <p className="eyebrow">Your account <DevelopmentBadge/></p>
           <h2>Welcome to Rural Connections</h2>
