@@ -3,12 +3,22 @@ import Link from 'next/link'
 import {MapPin, ArrowUpRight} from 'lucide-react'
 import {formatRate, LISTING_KINDS} from '@shared/listingPricing'
 import type {PublicRow} from '@/lib/marketplace'
+const CATEGORY_ARTWORK: Record<string, string> = {
+  'fencing & gates': 'fencing',
+  'animals & farm sitting': 'animals',
+  'water & drainage': 'water',
+  'spraying & pest control': 'spraying',
+  'land & vegetation': 'land',
+  'cropping, hay & feed': 'cropping',
+  'earthworks & driveways': 'earthworks',
+  'machinery & repairs': 'machinery',
+  'buildings & maintenance': 'buildings',
+  'transport & delivery': 'transport',
+  'property & house sitting': 'property',
+  'general rural help': 'general',
+}
 function artwork(category:string|null){
-  if(category==='Fencing & Gates')return '/images/fencing.jpg'
-  if(category==='Animals & Farm Sitting')return '/images/animals.jpg'
-  if(category==='Earthworks & Driveways')return '/images/earthworks.jpg'
-  if(category==='Machinery & Repairs')return '/images/machinery.jpg'
-  return '/images/general.jpg'
+  return '/images/'+(CATEGORY_ARTWORK[(category || '').trim().toLowerCase()] || 'general')+'.jpg'
 }
 export function GuestCard({row,kind}:{row:PublicRow;kind:'jobs'|'listings'}){
   const listing=kind==='listings'
