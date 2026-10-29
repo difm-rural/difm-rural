@@ -1,3 +1,4 @@
+import DevelopmentBadge from '../../components/DevelopmentBadge'
 import React, { useCallback, useState } from 'react'
 import {
   Image,
@@ -219,7 +220,7 @@ export default function HomeTabScreen({ navigation }) {
       {/* Fixed header — stays put while content scrolls (matches the other tabs) */}
       <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.kicker}>Rural Connections</Text>
+          <Text style={styles.kicker}>Rural Connections <DevelopmentBadge/></Text>
           <View style={styles.titleRow}>
             <Image source={require('../../../assets/brand/barn-badge-red.png')} style={styles.brandBadge} />
             <Text style={styles.title}>

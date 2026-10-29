@@ -1,3 +1,4 @@
+import DevelopmentBadge from '../components/DevelopmentBadge'
 import { resolvePublicJobLocations } from '../lib/jobDiscovery'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -164,7 +165,7 @@ export default function LandingScreen({ navigation }) {
     <View style={styles.screen}>
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <View style={styles.topBarInner}>
-          <Text style={styles.wordmark}>Rural Connections</Text>
+          <Text style={styles.wordmark}>Rural Connections <DevelopmentBadge/></Text>
           <Text style={styles.tagline}>GET JOBS DONE</Text>
         </View>
       </View>

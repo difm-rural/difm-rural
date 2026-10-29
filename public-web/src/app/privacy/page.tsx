@@ -1,3 +1,4 @@
+import {DevelopmentBadge} from '@/components/development-badge'
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Mail, ShieldCheck } from "lucide-react";
@@ -28,7 +29,7 @@ export default function PrivacyPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/barn-badge-red.png" alt="" />
           <span>
-            <strong>Rural Connections</strong>
+            <strong>Rural Connections <DevelopmentBadge/></strong>
             <small>Local help. Rural know-how.</small>
           </span>
         </Link>

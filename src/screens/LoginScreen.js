@@ -1,3 +1,4 @@
+import DevelopmentBadge from '../components/DevelopmentBadge'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -383,7 +384,7 @@ export default function LoginScreen({ navigation, route }) {
 
         <View style={styles.brandLockup}>
           <Image source={require('../../assets/brand/barn-badge-red.png')} style={styles.brandLockupBadge} />
-          <Text style={styles.brandLockupName}>Rural Connections</Text>
+          <Text style={styles.brandLockupName}>Rural Connections <DevelopmentBadge/></Text>
           <Text style={styles.brandLockupSub}>Post jobs, make offers & book services</Text>
         </View>
 

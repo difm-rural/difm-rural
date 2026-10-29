@@ -1,5 +1,8 @@
 'use client'
 
+import {DevelopmentBadge} from '@/components/development-badge'
+
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -28,7 +31,7 @@ export function AppShell({ children, providerName, setupMode=false }: { children
       <aside className="sidebar">
         <div className="sidebar-brand">
           <Image src="/brand/barn-badge-red.png" alt="" width={40} height={40} className="console-shed-icon" />
-          <div><strong>Rural Connections</strong><span>Web console</span></div>
+          <div><strong>Rural Connections</strong><span>Web console · <DevelopmentBadge/></span></div>
         </div>
         <nav className="sidebar-nav" aria-label="Main navigation">
           <p className="nav-label">Workspace</p>
