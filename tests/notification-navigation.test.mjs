@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { CommonActions, StackRouter } from '@react-navigation/routers'
-import { stackRootAction } from '../shared/stackNavigation.js'
+import { stackRootAction, tabRootAction } from '../shared/stackNavigation.js'
 
 test('Done exits repeated notification/chat visits in one action', () => {
   const router = StackRouter({ initialRouteName: 'ActivityMain' })
@@ -37,4 +37,27 @@ test('tab presses do not pop a root, uninitialised, or non-stack navigator', () 
   assert.equal(stackRootAction({ type: 'tab', key: 'tabs', index: 2 }), null)
   assert.deepEqual(stackRootAction({ type: 'stack', key: 'messages', index: 2 }),
     { type: 'POP_TO_TOP', target: 'messages' })
+})
+
+test('Jobs tab returns to discovery when posting was the first screen', () => {
+  const router = StackRouter({ initialRouteName: 'JobsBoard' })
+  const options = { routeNames: ['JobsBoard', 'PostJob', 'PostJobStep2Location'], routeParamList: {}, routeGetIdList: {} }
+  for (const routes of [[{name:'PostJob'}], [{name:'PostJob'},{name:'PostJobStep2Location'}]]) {
+    let state = router.getRehydratedState({index:routes.length-1,routes},options)
+    state = router.getStateForAction(state,tabRootAction(state,'JobsBoard'),options)
+    assert.equal(state.routes.length,1)
+    assert.equal(state.routes[state.index].name,'JobsBoard')
+    assert.equal(router.getStateForAction(state,CommonActions.goBack(),options),null)
+    assert.equal(tabRootAction(state,'JobsBoard'),null)
+  }
+})
+test('tab root action retains an existing board and leaves lazy tabs to initialise', () => {
+  assert.equal(tabRootAction(undefined,'JobsBoard'),null)
+  const router=StackRouter({initialRouteName:'JobsBoard'})
+  const options={routeNames:['JobsBoard','PostJob'],routeParamList:{},routeGetIdList:{}}
+  let state=router.getRehydratedState({index:1,routes:[{name:'JobsBoard'},{name:'PostJob'}]},options)
+  const key=state.routes[0].key
+  state=router.getStateForAction(state,tabRootAction(state,'JobsBoard'),options)
+  assert.equal(state.routes[0].key,key)
+  assert.equal(state.routes.length,1)
 })

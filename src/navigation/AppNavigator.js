@@ -1,5 +1,5 @@
 import { NavigationContainer, useNavigationContainerRef, getFocusedRouteNameFromRoute } from '@react-navigation/native'
-import { stackRootAction } from '../../shared/stackNavigation'
+import { tabRootAction } from '../../shared/stackNavigation'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import React, { useEffect, useRef, useState } from 'react'
@@ -290,9 +290,9 @@ function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBad
               if (route.name === 'Browse') clearServicesBadge?.()
               // Return to the existing root rather than navigating to a new
               // root route above Notifications/Chat in the tab's stack.
-              const rootAction = stackRootAction(route.state)
+              const rootAction = tabRootAction(route.state, TAB_ROOT[route.name])
               if (rootAction) navigation.dispatch(rootAction)
-              navigation.navigate(route.name)
+              navigation.navigate(route.name, { screen: TAB_ROOT[route.name], initial: false })
             }}
             activeOpacity={0.7}
             accessibilityRole="tab"
