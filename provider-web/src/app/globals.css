@@ -491,3 +491,19 @@ a.row:hover { background: var(--sage); }
 .job-card-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 .development-badge { display: inline-block !important; flex: 0 0 auto; vertical-align: middle; padding: 3px 7px; border: 1px solid #e6c879; border-radius: 5px; background: #fff0c2; color: #744b08 !important; font-family: var(--sans); font-size: 10px !important; font-weight: 750; line-height: 1.3; letter-spacing: .04em; text-transform: none; white-space: nowrap; }
+
+.seasonal-section { margin: 24px 0; }
+.seasonal-section h2 { font-size: 20px; }
+.seasonal-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 16px; }
+.seasonal-card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white; }
+.seasonal-image { position: relative; height: 130px; background: var(--sage); }
+.seasonal-image img { width: 100%; height: 100%; object-fit: cover; }
+.seasonal-label { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 20px; background: #fffffff0; color: var(--forest); font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: .07em; }
+.seasonal-dismiss { position: absolute; right: 8px; top: 8px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fffffff0; color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.seasonal-dismiss:disabled { opacity: .6; cursor: wait; }
+.seasonal-body { padding: 16px; }
+.seasonal-body h3 { margin: 4px 0 8px; font-size: 18px; }
+.seasonal-body p { font-size: 13px; line-height: 1.6; }
+.seasonal-body .eyebrow { font-size: 10px; }
+.seasonal-body .seasonal-suggestion { font-size: 12px; }
+.seasonal-body .lform-save { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; }

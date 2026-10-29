@@ -1,3 +1,5 @@
+import {SeasonalReminders} from '@/components/seasonal-reminders'
+import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Plus, Search, Leaf, MessageSquare, Bell, ListChecks, UsersRound } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
@@ -8,12 +10,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
-  const [jobs, bookings, offers, notifications, listings] = await Promise.all([
+  const [jobs, bookings, offers, notifications, listings, seasonal] = await Promise.all([
     supabase.from('jobs').select('id,title,status').eq('requester_id', user.id).in('status', ACTIVE_JOBS),
     supabase.from('bookings').select('id,status,provider_id,requester_id,service:services(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
     supabase.from('bids').select('id,job_id,status').eq('provider_id', user.id).in('status', ['pending','accepted']),
     supabase.from('notifications').select('id,type,body,metadata,created_at').eq('user_id', user.id).eq('read',false).order('created_at',{ascending:false}).limit(20),
     supabase.from('services').select('id,is_active,closed_at').eq('provider_id',user.id),
+    loadSeasonalReminders(supabase),
   ])
   const offerIds = [...new Set((offers.data || []).map(o => o.job_id))]
   const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status').in('id',offerIds) : {data:[],error:null}
@@ -47,6 +50,7 @@ export default async function HomePage() {
       <section className="home-activity"><h2>Your activity</h2><div className="home-stats">{[{label:'Active jobs posted',count:jobs.error ? null : jobs.data?.length || 0},{label:'Offers on open jobs',count:offers.error || offerJobs.error ? null : pendingOffers},{label:'Work & requests',count:bookings.error || offerJobs.error ? null : workCount}].map(t => <Link href="/activity" className="home-stat" key={t.label}><strong>{t.count ?? '—'}</strong><span>{t.label}</span></Link>)}</div>
         {!hasError && total === 0 && <div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or browse listings to get started.</p></div>}
       </section>
+      <SeasonalReminders campaigns={seasonal}/>
     </div><aside className="home-aside">
       <Link href="/connections" className="card home-quick"><UsersRound size={22}/><span><strong>Connections</strong><small>People you’ve worked with · Job invitations</small></span><ArrowRight size={17}/></Link>
       <Link href="/messages" className="card home-quick"><MessageSquare size={22}/><span><strong>Messages</strong><small>Enquiries, jobs and bookings</small></span><ArrowRight size={17}/></Link>
