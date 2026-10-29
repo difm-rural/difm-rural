@@ -15,7 +15,9 @@ export async function getFeaturedJobs(): Promise<PublicJob[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!url || !publishableKey) throw new Error("Marketplace is not configured");
+  // Degrade to the example cards (page.tsx fallback) when unconfigured or on a query
+  // error, so a transient Supabase blip never takes down the public homepage.
+  if (!url || !publishableKey) return [];
 
   const supabase = createClient(url, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -33,8 +35,7 @@ export async function getFeaturedJobs(): Promise<PublicJob[]> {
     .order("created_at", { ascending: false })
     .limit(3);
 
-  if (error) throw error;
-  if (!data) return [];
+  if (error || !data) return [];
   return data as PublicJob[];
 }
 
