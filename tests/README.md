@@ -312,8 +312,9 @@ Manual signed-in acceptance checks:
   Current GPS is retained privately for six hours without editing the profile or
   placing coordinates in the URL. Profile location can be restored explicitly.
   With no location, show guidance instead of fabricated distances.
-- Hidden or missing job pins remain unknown and are excluded from radius
-  searches. Any distance includes those jobs. Sorting nearest places unknown
+- Jobs with hidden or missing pins use their public town area for approximate
+  matching when it can be located. Jobs without a usable public area remain
+  excluded from radius searches; Any distance includes them. Nearest places unknown
   distances last. Live discovery must exclude paused/closed listings and private
   invited jobs; invitations have a separate retrieval screen.
 - Save/remove jobs from the board and detail. Check Saved jobs and the app share
@@ -368,7 +369,7 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - Use my location requests browser permission only on click. Permission denial, timeout or unsupported GPS must offer town selection. Find town uses the existing NZ maps proxy; select a returned result to set the centre.
 - Verify 10/25/50/100/200 km and All New Zealand, nearest-first order, no-nearby matches, wider distance, search/category/kind combinations and pagination. Home's View all and navigation retain the same cookie preference.
 - Guest locations are rounded to two decimal places and stored in a six-hour HttpOnly cookie, never in search URLs or account profiles. Clear location resets the preference. All New Zealand retains the chosen centre for switching back to nearby.
-- Distance reads use jobs_public (which masks private pins) and live services only. Only calculated distance is attached to public card rows. Private/missing pins remain available under All New Zealand with explanatory copy.
+- Distance reads use jobs_public (which masks private pins) and live services only. Only calculated distance is attached to public card rows. Private jobs use public town centres for approximate matching; items with no usable public location remain available under All New Zealand with explanatory copy.
 
 ### Mobile nearby browsing
 - Guest Landing, guest job feed, signed-in Jobs, legacy job feed and Listings use the same distance choices: 10/25/50/100/200 km and All New Zealand. Default is 50 km, nearest first. Personal job/offer management sections are not filtered.
@@ -388,3 +389,9 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - Save profile and continue must save public name + town/region and return to Home or the original enquiry/booking destination. Save and post a job / Save and browse listings must save before opening those flows.
 - Finish setup later is a full-width-readable button, bypasses required fields, and explains that edits are unsaved. Choosing a sidebar destination likewise defers setup and reaches that destination without a redirect loop.
 - Simulate a failed profile update from both the main save and sidebar navigation: stay on setup, retain typed details, show Retry guidance and leave onboarding incomplete. Verify no other member's profile can be updated.
+
+### Private jobs in nearby discovery
+- Regression: a public/open job with `hide_exact_location=true`, masked coordinates and public area Waitoki 0871 must appear within 50 km of Kaukapakapa after resolving the public town centre.
+- The shared resolver may use only `location_area` for fallback lookup. It must never use a hidden street address, location note, polygon or base-table job coordinates. Preserve masked `latitude` / `longitude`; keep separate `discovery_*` town-centre metadata and label the distance as a town-area estimate.
+- Verify mobile guest/signed-in feeds, public website and console return the same nearby result. Existing public exact pins take precedence. Jobs without a usable public area remain unlocated and available under All New Zealand.
+- Town lookups are deduplicated and cached for 24 hours, with at most four simultaneous lookups; failed requests can be retried. No job/profile records are updated by discovery.

@@ -3,7 +3,7 @@ import {stripTypeScriptTypes} from 'node:module'
 const url=source=>'data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64')
 const file=name=>new URL('../provider-web/src/'+name,import.meta.url)
 export const discoveryUrl=url((await readFile(file('lib/discovery.ts'),'utf8')).replace("'@shared/categories'",JSON.stringify(new URL('../shared/categories.ts',import.meta.url).href)))
-export const dataUrl=url((await readFile(file('lib/discovery-data.ts'),'utf8')).replace("'./discovery'",JSON.stringify(discoveryUrl)))
+export const dataUrl=url((await readFile(file('lib/discovery-data.ts'),'utf8')).replace("'./discovery'",JSON.stringify(discoveryUrl)).replace("import {resolvePublicJobLocations} from './job-discovery'","const resolvePublicJobLocations=async rows=>rows"))
 export const connectionsUrl=url((await readFile(file('lib/connections-data.ts'),'utf8')).replace("'./discovery-data'",JSON.stringify(dataUrl)))
 const originSource=(await readFile(file('lib/browsing-origin.ts'),'utf8')).replace("import {cookies} from 'next/headers'","const cookies=async()=>globalThis.__discoveryCookies").replace("'./discovery'",JSON.stringify(discoveryUrl)).replace("'./discovery-data'",JSON.stringify(dataUrl))
 export const originUrl=url(originSource)

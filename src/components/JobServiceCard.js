@@ -255,7 +255,7 @@ export default function JobServiceCard({
         {/* Row 4: location + distance */}
         <Text style={styles.location} numberOfLines={1}>
           {item._distanceKm != null
-            ? `${item._distanceKm} km away`
+            ? `About ${item._distanceKm} km${item.discovery_location_approximate ? " · town area" : " away"}`
             : (stripPlusCode(item.location_name) || item.location_area || 'Location TBC')}
         </Text>
 

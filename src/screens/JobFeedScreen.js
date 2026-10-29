@@ -1,3 +1,4 @@
+import { resolvePublicJobLocations } from '../lib/jobDiscovery'
 import React, { useCallback, useRef, useState } from 'react'
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
@@ -49,7 +50,7 @@ export default function JobFeedScreen({ navigation }) {
 
     if (error) throw error
 
-    const rawJobs = jobsData || []
+    const rawJobs = await resolvePublicJobLocations(jobsData || [])
 
     if (rawJobs.length > 0) {
       const requesterIds = [...new Set(rawJobs.map(j => j.requester_id))]

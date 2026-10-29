@@ -25,7 +25,7 @@ export default function NearbyControls({ nearby, unlocated = 0 }) {
       <Icon name="location-outline" size={18} color={colors.primary} /><Text style={styles.summaryText} numberOfLines={2}>{title}</Text><Text style={styles.change}>Change</Text>
     </TouchableOpacity>
     {!nearby.point && nearby.radius !== null && <Text style={styles.hint}>Choose a location to see nearby results. Until then, showing all New Zealand.</Text>}
-    {nearby.point && nearby.radius !== null && unlocated > 0 && <Text style={styles.hint}>Items with private or missing map pins are included under All New Zealand.</Text>}
+    {nearby.point && nearby.radius !== null && unlocated > 0 && <Text style={styles.hint}>Items whose public location cannot be found are included under All New Zealand.</Text>}
     {!!nearby.error && !open && <Text style={styles.error} accessibilityRole="alert">{nearby.error}</Text>}
     <Modal visible={open} transparent animationType="slide" onRequestClose={() => { if (!busy) setOpen(false) }}>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><View style={[styles.sheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
@@ -40,7 +40,7 @@ export default function NearbyControls({ nearby, unlocated = 0 }) {
           {nearby.point && <TouchableOpacity style={styles.action} disabled={busy} onPress={async () => { if (await nearby.clearLocation()) setOpen(false) }} accessibilityRole="button"><Text style={styles.actionText}>Clear browsing location</Text></TouchableOpacity>}
           {busy && <ActivityIndicator color={colors.primary} accessibilityLabel="Updating browsing location"/>}
           {!!nearby.error && <Text style={styles.error} accessibilityRole="alert">{nearby.error}</Text>}
-          <Text style={styles.hint}>Distances are approximate. Private or missing map pins are not guessed; choose All New Zealand to include them.</Text>
+          <Text style={styles.hint}>Distances are approximate. Jobs with private pins use their public town area; exact locations stay hidden. Choose All New Zealand to include items without a usable public location.</Text>
         </ScrollView>
       </View></KeyboardAvoidingView>
     </Modal>

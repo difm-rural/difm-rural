@@ -1,3 +1,4 @@
+import { resolvePublicJobLocations } from '../lib/jobDiscovery'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
@@ -85,7 +86,7 @@ export default function LandingScreen({ navigation }) {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    const raw = jobsData || []
+    const raw = await resolvePublicJobLocations(jobsData || [])
     if (raw.length === 0) { setJobs([]); return }
 
     const requesterIds = [...new Set(raw.map(j => j.requester_id).filter(Boolean))]

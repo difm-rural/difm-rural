@@ -16,6 +16,6 @@ export function GuestCard({row,kind}:{row:PublicRow;kind:'jobs'|'listings'}){
     :row.price_type==='fixed'&&row.price!=null?'$'+row.price:'Open to offers'
   return <Link href={'/'+kind+'/'+row.id} className="guest-card">
     <div className="guest-card-image"><img src={row.photos?.[0] || artwork(row.category)} alt=""/><span>{listing?LISTING_KINDS.find(k=>k.id===row.kind)?.label || 'Listing':'Open job'}</span></div>
-    <div className="guest-card-body"><p className="guest-card-category">{row.category || 'Rural community'}</p><h3>{row.title}</h3><p className="guest-card-description">{row.description}</p><p className="guest-card-location"><MapPin size={14} aria-hidden="true"/>{(listing?row.location_name:row.location_area) || 'Location to be arranged'}{row.distance!=null?' · About '+row.distance.toFixed(1)+' km':''}</p><div className="guest-card-bottom"><strong>{price}</strong><ArrowUpRight size={18} aria-hidden="true"/></div></div>
+    <div className="guest-card-body"><p className="guest-card-category">{row.category || 'Rural community'}</p><h3>{row.title}</h3><p className="guest-card-description">{row.description}</p><p className="guest-card-location"><MapPin size={14} aria-hidden="true"/>{(listing?row.location_name:row.location_area) || 'Location to be arranged'}{row.distance!=null?' · About '+row.distance.toFixed(1)+' km'+(row.distanceApproximate?' · town area':''):''}</p><div className="guest-card-bottom"><strong>{price}</strong><ArrowUpRight size={18} aria-hidden="true"/></div></div>
   </Link>
 }

@@ -6,7 +6,7 @@ const url=source=>'data:text/javascript;base64,'+Buffer.from(stripTypeScriptType
 const categories=await readFile(new URL('../shared/categories.ts',import.meta.url),'utf8')
 const nearbyUrl=url(await readFile(new URL('../public-web/src/lib/nearby.ts',import.meta.url),'utf8'))
 const {point,distance,readGuestLocation}=await import(nearbyUrl)
-const source=(await readFile(new URL('../public-web/src/lib/marketplace.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(url(categories))).replace("'./nearby'",JSON.stringify(nearbyUrl))
+const source=(await readFile(new URL('../public-web/src/lib/marketplace.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(url(categories))).replace("'./nearby'",JSON.stringify(nearbyUrl)).replace("import {resolvePublicJobLocations} from './job-discovery'","const resolvePublicJobLocations=async rows=>globalThis.__publicAreaResolver?globalThis.__publicAreaResolver(rows):rows")
 const {publicJobsQuery,publicListingsQuery,publicRows,publicResults,browseFilters,browseHref,JOB_COLUMNS,LISTING_COLUMNS}=await import(url(source))
 const {consoleLink}=await import(url(await readFile(new URL('../public-web/src/lib/console-link.ts',import.meta.url),'utf8')))
 test('public queries exclude private, closed and paused items and avoid private profile and job columns',()=>{
@@ -63,11 +63,11 @@ test('nearby filtering happens before pagination and sorts nearest first without
 })
 test('distance reads use the public job view and return only calculated distances, never coordinates',async()=>{
  const calls=[];let selected=''
- const q={select(v){selected=v;calls.push(v);return q},eq(){return q},is(){return q},order(){return q},async range(){return {data:selected==='id,latitude,longitude'?[{id:'near',latitude:-36.85,longitude:174.76},{id:'private',latitude:null,longitude:null}]:[{id:'near',title:'Fencing'},{id:'private',title:'Fencing'}]}}}
+ const q={select(v){selected=v;calls.push(v);return q},eq(){return q},is(){return q},order(){return q},async range(){return {data:selected==='id,latitude,longitude,location_area'?[{id:'near',latitude:-36.85,longitude:174.76},{id:'private',latitude:null,longitude:null}]:[{id:'near',title:'Fencing'},{id:'private',title:'Fencing'}]}}}
  const rows=await publicRows({from(table){assert.equal(table,'jobs_public');return q}},'jobs',point(-36.85,174.76))
  assert.equal(rows[0].distance,0);assert.equal(rows[1].distance,null)
  for(const row of rows){assert.equal('latitude' in row,false);assert.equal('longitude' in row,false)}
- assert.ok(calls.includes('id,latitude,longitude'))
+ assert.ok(calls.includes('id,latitude,longitude,location_area'))
 })
 
 let savedCookie,storageFailure=false
@@ -87,4 +87,11 @@ test('location actions remember coarse coordinates privately, retain them across
  assert.ok((await chooseGuestRadius(999)).error)
  storageFailure=true;assert.ok((await chooseGuestRadius(10)).error);assert.equal(JSON.parse(savedCookie.value).radius,25)
  storageFailure=false;assert.equal((await forgetGuestLocation()).error,'');assert.equal(savedCookie,undefined)
+})
+
+test('public nearby cards include a private job through its public town and expose only an approximate distance',async()=>{
+ const {addPublicJobAreas}=await import('../shared/publicJobArea.ts')
+ globalThis.__publicAreaResolver=rows=>addPublicJobAreas(rows,async area=>area==='Waitoki 0871'?{latitude:-36.637,longitude:174.539}:null)
+ let selected='';const q={select(v){selected=v;return q},eq(){return q},order(){return q},async range(){return {data:selected==='id,latitude,longitude,location_area'?[{id:'spray',latitude:null,longitude:null,location_area:'Waitoki 0871'}]:[{id:'spray',title:'Spray paddocks for carrot weed',location_area:'Waitoki 0871'}]}}}
+ try{const rows=await publicRows({from(table){assert.equal(table,'jobs_public');return q}},'jobs',point(-36.62,174.5));assert.equal(publicResults(rows,browseFilters({}),50).rows[0].id,'spray');assert.equal(rows[0].distanceApproximate,true);assert.equal('discovery_latitude' in rows[0],false);assert.equal('latitude' in rows[0],false)}finally{delete globalThis.__publicAreaResolver}
 })

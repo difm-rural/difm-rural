@@ -17,7 +17,7 @@ function BrowseSection({kind,rows,failed,q,radius}:{kind:'jobs'|'listings';rows:
   {failed?<div className="guest-empty" role="alert"><h3>Couldn&apos;t load {kind}</h3><p>Check your connection and try again.</p><GuestRefresh label="Retry" className="button secondary"/></div>
   :!result.count?<div className="guest-empty"><h3>{q?'No '+kind+' match “'+q+'”':radius!==null?'No '+kind+' within '+radius+' km':kind==='jobs'?'No open jobs yet':'Nothing listed yet'}</h3><p>{radius!==null?'Try a wider distance or select All New Zealand above.':q?'Try another word or clear your search.':'Check back soon for new '+kind+' from your community.'}</p>{q?<Link href="/" className="public-link">Clear search</Link>:<Link href={href} className="public-link">Refresh {kind}</Link>}</div>
   :<><div className="guest-card-row" tabIndex={0} role="region" aria-label={title+' — scroll to browse'}>{result.rows.slice(0,8).map(row=><GuestCard key={row.id} row={row} kind={kind}/>)}</div><p className="guest-row-hint">{result.count>8?'Showing the latest 8 of '+result.count+' matches. ':''}Scroll to explore · <Link href={href}>View all {kind}</Link></p></>}
-  {radius!==null&&result.unlocated>0&&<p className="guest-row-hint">{result.unlocated} {kind} with private or missing map pins can be found under All New Zealand.</p>}
+  {radius!==null&&result.unlocated>0&&<p className="guest-row-hint">{result.unlocated} {kind} whose public area could not be located can be found under All New Zealand.</p>}
  </section>
 }
 export default async function Home({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){

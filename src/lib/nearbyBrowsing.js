@@ -27,7 +27,7 @@ export function readNearby(raw, now = Date.now()) {
 export function filterNearby(items, preference, sort = 'nearest') {
   const origin = preference.point, active = !!origin && preference.radius !== null
   const measured = items.map(item => {
-    const pin = nearbyPoint(item.latitude, item.longitude) || nearbyPoint(item.service_latitude, item.service_longitude)
+    const pin = nearbyPoint(item.latitude, item.longitude) || nearbyPoint(item.discovery_latitude, item.discovery_longitude) || nearbyPoint(item.service_latitude, item.service_longitude)
     const distance = origin && pin ? nearbyDistance(origin, pin) : null
     return { item, distance }
   })

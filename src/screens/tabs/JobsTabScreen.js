@@ -1,3 +1,4 @@
+import { resolvePublicJobLocations } from '../../lib/jobDiscovery'
 import React, { useCallback, useRef, useState } from 'react'
 import {
   Alert,
@@ -142,7 +143,7 @@ export default function JobsTabScreen({ navigation }) {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    const raw = (jobsData || []).filter(j => j.requester_id !== uid)
+    const raw = await resolvePublicJobLocations((jobsData || []).filter(j => j.requester_id !== uid))
     if (raw.length === 0) { setBoardJobs([]); return }
 
     const requesterIds = [...new Set(raw.map(j => j.requester_id))]

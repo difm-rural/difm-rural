@@ -1,3 +1,4 @@
+import {resolvePublicJobLocations} from './job-discovery'
 import {CATEGORIES} from '@shared/categories'
 import type {SupabaseClient} from '@supabase/supabase-js'
 import {point,distance,type Point} from './nearby'
@@ -12,21 +13,22 @@ export function browseHref(path:string,f:ReturnType<typeof browseFilters>){const
 export function publicJobsQuery(client:SupabaseClient){return client.from('jobs_public').select(JOB_COLUMNS).eq('status','open').eq('visibility','public')}
 export function publicListingsQuery(client:SupabaseClient){return client.from('services').select(LISTING_COLUMNS).eq('is_active',true).is('closed_at',null)}
 export function publicQuery(client:SupabaseClient,kind:'jobs'|'listings'){return kind==='jobs'?publicJobsQuery(client):publicListingsQuery(client)}
-export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;distance?:number|null}
+export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;distance?:number|null;distanceApproximate?:boolean}
 export async function publicRows(client:SupabaseClient,kind:'jobs'|'listings',origin:Point|null=null){
  const rows:PublicRow[]=[]
  for(let offset=0;;offset+=500){const {data,error}=await publicQuery(client,kind).order('created_at',{ascending:false}).order('id').range(offset,offset+499);if(error)throw error;rows.push(...(data as unknown as PublicRow[] || []));if(!data || data.length<500)break}
  if(!origin)return rows
- const pins=new Map<string,number|null>()
+ const pins=new Map<string,{distance:number|null;approximate:boolean}>()
  for(let offset=0;;offset+=500){
   // The view masks private job pins. Keep all coordinates server-side; only
   // the computed distance is attached to public cards.
-  const query=kind==='jobs'?client.from('jobs_public').select('id,latitude,longitude').eq('status','open').eq('visibility','public'):client.from('services').select('id,latitude,longitude').eq('is_active',true).is('closed_at',null)
+  const query=kind==='jobs'?client.from('jobs_public').select('id,latitude,longitude,location_area').eq('status','open').eq('visibility','public'):client.from('services').select('id,latitude,longitude').eq('is_active',true).is('closed_at',null)
   const {data,error}=await query.order('id').range(offset,offset+499);if(error)throw error
-  for(const row of data || []){const p=point(row.latitude,row.longitude);pins.set(row.id,p?distance(origin,p):null)}
+  const located=kind==='jobs'?await resolvePublicJobLocations(data || []):data || []
+  for(const row of located){const p=point(row.latitude,row.longitude)||point('discovery_latitude' in row?row.discovery_latitude:null,'discovery_longitude' in row?row.discovery_longitude:null);pins.set(row.id,{distance:p?distance(origin,p):null,approximate:!!('discovery_location_approximate' in row && row.discovery_location_approximate)})}
   if(!data || data.length<500)break
  }
- return rows.map(row=>({...row,distance:pins.get(row.id) ?? null}))
+ return rows.map(row=>({...row,distance:pins.get(row.id)?.distance ?? null,distanceApproximate:pins.get(row.id)?.approximate ?? false}))
 }
 type SearchRow={title?:string;description?:string|null;category?:string|null;kind?:string|null;location_area?:string|null;location_name?:string|null;distance?:number|null}
 export function publicResults<T extends SearchRow>(rows:T[],f:ReturnType<typeof browseFilters>,radius:number|null=null){

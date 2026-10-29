@@ -40,7 +40,7 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
   const meta = [
     locText,
     job.hide_exact_location ? 'exact address hidden' : null,
-    distanceKm != null ? `${distanceKm} km` : null,
+    distanceKm != null ? `About ${distanceKm} km${job.discovery_location_approximate ? " (town area)" : ""}` : null,
     postedAgo(job.created_at),
   ].filter(Boolean).join(' · ')
 
