@@ -186,6 +186,31 @@ export default function AccountTabScreen({ navigation, route }) {
       setOpeningFeedback(false)
     }
   }
+
+  // OTA update check — only meaningful in a real build with updates enabled.
+  const canCheckUpdates = !__DEV__ && Updates.isEnabled
+  async function handleCheckForUpdates() {
+    if (checkingUpdate) return
+    setCheckingUpdate(true)
+    try {
+      const result = await Updates.checkForUpdateAsync()
+      if (result.isAvailable) {
+        await Updates.fetchUpdateAsync()
+        Alert.alert('Update downloaded', 'A new version is ready to use.', [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Restart now', onPress: () => Updates.reloadAsync() },
+        ])
+      } else {
+        Alert.alert('Up to date', "You're on the latest version.")
+      }
+    } catch (e) {
+      Alert.alert('Could not check for updates', e?.message || 'Please try again.')
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [loading, setLoading]               = useState(true)
   const [saving, setSaving]                 = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -1004,9 +1029,15 @@ export default function AccountTabScreen({ navigation, route }) {
       <Text style={styles.sectionLabel}>Help</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="help-circle-outline" label="How it works" last
+          icon="help-circle-outline" label="How it works" last={!canCheckUpdates}
           onPress={() => navigation.navigate('HowItWorks')}
         />
+        {canCheckUpdates && (
+          <MenuRow
+            icon="cloud-download-outline" label="Check for updates" last
+            onPress={handleCheckForUpdates}
+          />
+        )}
       </View>
       <Text style={styles.sectionLabel}>Feedback</Text>
       <View style={[styles.card, { padding: 16 }]}>
