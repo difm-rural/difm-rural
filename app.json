@@ -12,7 +12,7 @@
     },
     "newArchEnabled": true,
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/8f162c89-3416-4f10-94a6-108bfc7b8c49"
