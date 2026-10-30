@@ -32,6 +32,11 @@ import {
   saveSessionTokens,
 } from '../lib/biometrics'
 
+// App Review demo account: Apple reviewers can't receive OTP emails, so this one
+// address signs in with a password instead. Not a secret — the password lives only
+// in Supabase + App Store Connect, never in code. Every other email keeps OTP.
+const REVIEW_EMAIL = 'review@ruralconnections.nz'
+
 function getBiometricLabel(type) {
   if (type === 'face') return 'Face ID'
   return 'Fingerprint or PIN'
@@ -42,8 +47,9 @@ export default function LoginScreen({ navigation, route }) {
   // and "Sign in" are the same screen — `intent` only adjusts the copy.
   const isRegister = route?.params?.intent === 'register'
   const insets = useSafeAreaInsets()
-  const [stage, setStage] = useState('email') // 'email' | 'verify'
+  const [stage, setStage] = useState('email') // 'email' | 'verify' | 'password'
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
@@ -139,6 +145,11 @@ export default function LoginScreen({ navigation, route }) {
       Alert.alert('Check your email address', 'Enter a complete email address, such as name@example.com.')
       return
     }
+    if (trimmed === REVIEW_EMAIL) {
+      // Reviewer demo account: password sign-in, no OTP email.
+      setStage('password')
+      return
+    }
     if ((cooldowns.current[trimmed] || 0) > Date.now()) {
       if (sentEmails.current.has(trimmed)) setStage('verify')
       else Alert.alert('Please wait', 'Please wait a minute before requesting another code.')
@@ -158,6 +169,34 @@ export default function LoginScreen({ navigation, route }) {
     } catch (error) {
       if (error?.status === 429 || ['over_email_send_rate_limit', 'over_request_rate_limit'].includes(error?.code)) startCooldown(trimmed)
       Alert.alert('Code not sent', signInError(error))
+    } finally {
+      requestBusy.current = false
+      setLoading(false)
+    }
+  }
+
+  // ─── Review demo account: password sign-in ─────────────────────────────────────
+
+  async function handlePasswordSignIn() {
+    if (requestBusy.current || verified.current) return
+    if (!password) {
+      Alert.alert('Enter your password', 'Please enter the account password to sign in.')
+      return
+    }
+    requestBusy.current = true
+    setLoading(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: REVIEW_EMAIL,
+        password,
+      })
+      if (error) throw error
+      if (!data?.session) throw new Error('Missing session')
+      verified.current = true
+      // Skip the biometric-token step for this account; AppNavigator handles the
+      // redirect via onAuthStateChange, same as the OTP path.
+    } catch (error) {
+      Alert.alert('Sign-in failed', signInError(error))
     } finally {
       requestBusy.current = false
       setLoading(false)
@@ -272,6 +311,78 @@ export default function LoginScreen({ navigation, route }) {
       requestBusy.current = false
       setResending(false)
     }
+  }
+
+  // ─── Password stage (review demo account only) ─────────────────────────────────
+
+  if (stage === 'password') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
+        <View style={[styles.topBar, { paddingTop: insets.top }]}>
+          <View style={styles.topBarInner}>
+            <TouchableOpacity
+              onPress={() => { setStage('email'); setPassword('') }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              disabled={loading}
+              accessibilityLabel="Back to email entry">
+              <Icon name="chevron-back" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.wordmark}>RURAL CONNECTIONS</Text>
+            <View style={{ width: 32 }} />
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.formArea, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
+          showsVerticalScrollIndicator={false}>
+
+          <Text style={styles.title} accessibilityRole="header">Enter your password</Text>
+          <Text style={styles.subtitle}>
+            Sign in to{'\n'}
+            <Text style={styles.emailHighlight}>{REVIEW_EMAIL}</Text>
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={colors.textMuted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="password"
+            textContentType="password"
+            returnKeyType="done"
+            onSubmitEditing={handlePasswordSignIn}
+            editable={!loading}
+            accessibilityLabel="Password"
+          />
+
+          <Button
+            title="Sign in"
+            icon="arrow-forward"
+            onPress={handlePasswordSignIn}
+            loading={loading}
+            accessibilityLabel="Sign in with password"
+          />
+
+          <TouchableOpacity
+            style={styles.resendBtn}
+            onPress={() => { setStage('email'); setPassword('') }}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Use a different email">
+            <Text style={styles.resendText}>Use a different email</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    )
   }
 
   // ─── Verify stage ─────────────────────────────────────────────────────────────
