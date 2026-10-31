@@ -651,6 +651,13 @@ export default function AccountTabScreen({ navigation, route }) {
       </View>
 
       <View style={styles.hubButtons}>
+        {canCheckUpdates && (
+          <HubButton
+            icon="cloud-download-outline" label="Check for updates"
+            sub={checkingUpdate ? 'Checking for updates…' : 'Get the latest version of Rural Connections'}
+            onPress={handleCheckForUpdates}
+          />
+        )}
         <HubButton
           icon="bookmark-outline" label="Saved interests" sub="Searches, follows and alert frequency"
           onPress={() => navigation.navigate('SavedInterests')}
@@ -1029,15 +1036,9 @@ export default function AccountTabScreen({ navigation, route }) {
       <Text style={styles.sectionLabel}>Help</Text>
       <View style={styles.card}>
         <MenuRow
-          icon="help-circle-outline" label="How it works" last={!canCheckUpdates}
+          icon="help-circle-outline" label="How it works" last
           onPress={() => navigation.navigate('HowItWorks')}
         />
-        {canCheckUpdates && (
-          <MenuRow
-            icon="cloud-download-outline" label="Check for updates" last
-            onPress={handleCheckForUpdates}
-          />
-        )}
       </View>
       <Text style={styles.sectionLabel}>Feedback</Text>
       <View style={[styles.card, { padding: 16 }]}>
