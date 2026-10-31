@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import {ArrowRight, Search, CircleHelp} from 'lucide-react'
+import {ArrowRight, Search} from 'lucide-react'
 import {MarketplaceShell} from '@/components/marketplace-shell'
 import {GuestCard} from '@/components/guest-card'
 import {GuestRefresh} from '@/components/guest-refresh'
@@ -24,7 +24,7 @@ export default async function Home({searchParams}:{searchParams:Promise<Record<s
  const {q}=browseFilters(await searchParams),location=await guestLocation(),radius=location.point?location.radius:null,origin=radius!==null?location.point:null
  const results=await Promise.allSettled([Promise.resolve().then(()=>publicRows(publicClient(),'jobs',origin)),Promise.resolve().then(()=>publicRows(publicClient(),'listings',origin))])
  return <MarketplaceShell home>
-  <header className="guest-intro"><p className="eyebrow">Local help. Rural know-how.</p><div className="guest-intro-title"><h1>Find rural help</h1><Link href="/how-it-works" className="guest-how-link"><CircleHelp size={20} aria-hidden="true"/>How it works</Link></div><p>Find nearby people with the practical skills your property needs — or turn your rural know-how into work in your community.</p><p className="guest-signin-hint">Browse freely. <a href={consoleLink()}>Sign in or sign up</a> to get in touch and manage your work.</p>
+  <header className="guest-intro"><p className="eyebrow">Local help. Rural know-how.</p><div className="guest-intro-title"><h1>Find rural help</h1><Link href="/how-it-works" className="guest-how-link">How it works</Link></div><p>Find nearby people with the practical skills your property needs — or turn your rural know-how into work in your community.</p><p className="guest-signin-hint">Browse freely. <a href={consoleLink()}>Sign in or sign up</a> to get in touch and manage your work.</p>
    <form className="guest-search" action="/" role="search"><label className="guest-sr-only" htmlFor="guest-search">Search jobs and listings</label><Search size={21} aria-hidden="true"/><input id="guest-search" name="q" defaultValue={q} maxLength={120} placeholder="Search water, fencing, tractor…"/><button className="button primary">Search</button></form>
    {q&&<p className="guest-search-context">Results for “{q}” <Link href="/">Clear search</Link></p>}
   </header>

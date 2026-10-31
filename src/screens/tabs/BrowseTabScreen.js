@@ -150,15 +150,16 @@ export default function BrowseTabScreen({ navigation }) {
     <View style={styles.screen}>
 
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity
-          style={[styles.helpBtn, { top: insets.top + 12 }]}
-          onPress={() => navigation.navigate('HowItWorks')}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="How it works">
-          <Icon name="help-circle-outline" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
+        <View style={styles.brandRow}>
+          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
+          <TouchableOpacity
+            style={styles.helpBtn}
+            onPress={() => navigation.navigate('HowItWorks')}
+            accessibilityRole="button"
+            accessibilityLabel="How it works">
+            <Text style={styles.helpText}>How it works</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.title}>Listings</Text>
         <Text style={styles.subtitle}>Services, grazing, hire and local goods</Text>
         <TextInput
@@ -238,7 +239,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 18,
   },
-  helpBtn: { position: 'absolute', right: 20, zIndex: 2, minHeight: 36, justifyContent: 'center' },
+  brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12 },
+  helpBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  helpText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   brandLabel: {
     fontSize: 12,
     fontWeight: '700',
