@@ -1059,17 +1059,17 @@ export default function AccountTabScreen({ navigation, route }) {
     <View style={styles.screen}>
       {/* ── Fixed header ────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        {section === 'hub' ? (
-          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
-        ) : (
-          <TouchableOpacity
-            onPress={() => setSection('hub')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Back to account">
-            <Text style={styles.headerBack}><Icon name="chevron-back" size={14} color={colors.primary} /> Account</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => {
+            if (section !== 'hub') { setSection('hub'); return }
+            if (navigation.canGoBack()) navigation.goBack()
+            else navigation.getParent()?.navigate('Home', { screen: 'Dashboard' })
+          }}
+          style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}
+          accessibilityRole="button"
+          accessibilityLabel={section === 'hub' ? 'Back' : 'Back to account'}>
+          <Text style={styles.headerBack}><Icon name="chevron-back" size={14} color={colors.primary} /> {section === 'hub' ? 'Back' : 'Back to Account'}</Text>
+        </TouchableOpacity>
         <Text style={styles.headerLabel} accessibilityRole="header">{SECTION_TITLES[section]}</Text>
       </View>
 

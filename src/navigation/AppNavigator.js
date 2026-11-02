@@ -95,6 +95,8 @@ function HomeStackNav() {
       <HomeNav.Screen name="ManageTask"         component={ManageTaskScreen}     />
       <HomeNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <HomeNav.Screen name="Chat"          component={ChatScreen}          />
+      <HomeNav.Screen name="CreateService"       component={CreateServiceScreen}      />
+      <HomeNav.Screen name="MyServices"          component={MyServicesScreen}         />
       <HomeNav.Screen name="ServiceDetail"       component={ServiceDetailScreen}      />
       <HomeNav.Screen name="ServiceBookingDetail" component={ServiceBookingDetailScreen} />
       <HomeNav.Screen name="BookingConfirm"      component={BookingConfirmScreen}     />
@@ -355,6 +357,7 @@ const tabStyles = StyleSheet.create({
 function AuthenticatedApp({ activityBadge, jobsBadge, servicesBadge, clearJobsBadge, clearServicesBadge }) {
   return (
     <Tab.Navigator
+      backBehavior="history"
       tabBar={(props) => (
         <CustomTabBar
           {...props}
