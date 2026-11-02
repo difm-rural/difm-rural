@@ -1,4 +1,5 @@
 'use client'
+import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -88,6 +89,8 @@ export function ListingForm({
   listing?: EditListing
 }) {
   const router = useRouter()
+  const locationWarning=usePublishingLocationWarning(userId)
+  const savingLocationRef=useRef(false)
   const [step, setStep] = useState(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
@@ -265,8 +268,14 @@ export function ListingForm({
   const canSave = !!kind && !!title.trim() && !!category && !!locationName.trim()
 
   async function onSave() {
-    if (!canSave || !cfg) return
+    if (!canSave || !cfg || savingLocationRef.current) return
+    savingLocationRef.current=true
+    try { await saveListing() } finally { savingLocationRef.current=false }
+  }
+  async function saveListing() {
+    if (!cfg) return
     setBusy(true); setError('')
+    if(!await locationWarning.check({area:locationName,kind:'listing'})){setBusy(false);goToStep(3);return}
 
     // --- Non-pricing (B1) ---
     const trimmedTravel = travelRange.trim()
@@ -427,6 +436,7 @@ export function ListingForm({
 
   return (
     <div className="lform">
+      {locationWarning.prompt}
       <nav className="lform-progress" aria-label="Listing progress">
         {STEPS.map((label, index) => <span key={label} aria-current={index === step ? 'step' : undefined} className={index === step ? 'active' : index < step ? 'complete' : ''}>
           <span>{index < step ? '✓' : index + 1}</span>{label}

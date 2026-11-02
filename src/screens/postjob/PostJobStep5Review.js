@@ -1,3 +1,4 @@
+import {confirmPublishingLocation} from '../../lib/publishingLocation'
 import React, { useRef, useState, useEffect } from 'react'
 import {
   Alert, Animated, Dimensions, Image, Modal,
@@ -218,6 +219,8 @@ export default function PostJobStep5Review({ navigation, route }) {
 
   async function submitJob() {
     const { data: { user } } = await supabase.auth.getUser()
+
+    if (!await confirmPublishingLocation({ latitude, longitude, area: locationArea || jobAddress, kind: 'job' }, user?.id, () => handleEditRow(3))) { setUploadStatus(''); return }
 
     // Category is auto-detected from the title + details (keep any existing one
     // on edit). Falls back to 'General Rural Help' if the AI call is unavailable.

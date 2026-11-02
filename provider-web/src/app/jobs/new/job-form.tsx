@@ -1,4 +1,6 @@
 'use client'
+import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
+import type {FormEvent} from 'react'
 import { useState, useRef, useEffect, useActionState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -13,6 +15,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
  const [draft,setDraft]=useState(initial),[step,setStep]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[jobId,setJobId]=useState(mode==='edit'?seed!.id:''),[saved,setSaved]=useState<{draft:Draft;id:string}|null>(null),[ready,setReady]=useState(false)
  const [state,action,pending]=useActionState(mode==='edit'?editJob:postJob,{error:''})
  const heading=useRef<HTMLHeadingElement>(null),router=useRouter(),key='rural-job:'+userId+':'+mode+':'+(seed?.id || 'new')+':'+(inviteProvider?.id || 'public')
+ const locationWarning=usePublishingLocationWarning(userId),checkingLocation=useRef(false),locationApproved=useRef(false)
  const steps=['The job','Location','Details & photos','Budget','Review']
  useEffect(()=>{let active=true;Promise.resolve().then(()=>{if(!active)return;setJobId(id=>id || crypto.randomUUID());try{const raw=sessionStorage.getItem(key);if(raw){const value=JSON.parse(raw);if(value?.draft&&value?.id)setSaved(value)}}catch{}setReady(true)});return ()=>{active=false}},[key])
  useEffect(()=>{if(!ready||saved||!jobId)return;try{sessionStorage.setItem(key,JSON.stringify({draft,id:jobId}))}catch{}},[draft,jobId,key,ready,saved])
@@ -45,7 +48,22 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   setBusy(true);setError('');navigator.geolocation.getCurrentPosition(p=>{setDraft(d=>({...d,latitude:String(p.coords.latitude),longitude:String(p.coords.longitude)}));setBusy(false)},()=>{setError('Could not read your location. Allow location access or enter the address manually.');setBusy(false)},{timeout:15000,enableHighAccuracy:true})
  }
  const scheduleLabel=draft.schedule_type==='specific'?draft.scheduled_date:draft.schedule_type==='range'?draft.date_from+' – '+draft.date_to:SCHEDULES[draft.schedule_type as keyof typeof SCHEDULES]
- return <form action={action} className="lform" onSubmit={e=>{if(step<4){e.preventDefault();next()}else{for(let i=0;i<4;i++){const issue=validStep(i);if(issue){e.preventDefault();setError(issue);setStep(i);break}}}}}>
+ async function reviewSubmit(e:FormEvent<HTMLFormElement>){
+  if(step<4){e.preventDefault();next();return}
+  if(locationApproved.current){locationApproved.current=false;return}
+  e.preventDefault()
+  if(checkingLocation.current||pending||busy)return
+  for(let i=0;i<4;i++){const issue=validStep(i);if(issue){setError(issue);setStep(i);return}}
+  const form=e.currentTarget
+  checkingLocation.current=true;setBusy(true)
+  try{
+   if(await locationWarning.check({latitude:draft.latitude,longitude:draft.longitude,area:draft.area,kind:'job'})){
+    locationApproved.current=true;form.requestSubmit()
+   }else setStep(1)
+  }finally{checkingLocation.current=false;setBusy(false)}
+ }
+ return <form action={action} className="lform" onSubmit={reviewSubmit}>
+  {locationWarning.prompt}
   {saved&&<div className="card"><h2>Resume your draft?</h2><p>A draft is saved in this browser tab. It has not been published.</p><div className="lform-actions"><button type="button" className="lform-save" onClick={()=>{setDraft({...initial,...saved.draft});setJobId(mode==='edit'?seed!.id:saved.id);setSaved(null)}}>Resume draft</button><button type="button" className="lform-cancel" onClick={()=>{setSaved(null);try{sessionStorage.removeItem(key)}catch{}}}>Discard saved draft</button></div></div>}
   {inviteProvider&&<section className="card work-detail"><h2>Invite {inviteProvider.name}</h2><p>This job will be visible only to you and this provider unless you choose the public board.</p><label className="account-setting"><input type="checkbox" disabled={pending||busy} checked={draft.also_public} onChange={e=>set('also_public',e.target.checked)}/>Also put this job on the public Jobs board</label></section>}
   {mode==='repeat'&&<p className="account-current">This is a new copy. Choose fresh dates before posting. The original job, offers, messages and reviews stay unchanged.</p>}

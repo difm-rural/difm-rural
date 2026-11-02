@@ -1,3 +1,4 @@
+import {confirmPublishingLocation} from '../lib/publishingLocation'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Alert,
@@ -153,6 +154,7 @@ async function edgeFunctionErrorMessage(error, fallback) {
 }
 
 export default function CreateServiceScreen({ navigation, route }) {
+  const publishingRef = useRef(false)
   const insets = useSafeAreaInsets()
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const formScrollRef = useRef(null)
@@ -808,7 +810,11 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   async function handlePublish() {
-    if (locationSelecting) return
+    if (locationSelecting || publishingRef.current) return
+    publishingRef.current = true
+    try { await publishListing() } finally { publishingRef.current = false }
+  }
+  async function publishListing() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to publish a listing.')
@@ -816,6 +822,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     setSubmitting(true)
+    if (!await confirmPublishingLocation({ ...locationPin, area: locationName, kind: 'listing' }, user.id, () => setStep(4))) { setSubmitting(false); return }
     const publishRate = pricingType === 'quote_required' ? 0 : parseFloat(rate)
     const supportsMinimum = pricingType !== 'quote_required' && pricingType !== 'fixed'
     const parsedMin = parseFloat(minimumUnits)

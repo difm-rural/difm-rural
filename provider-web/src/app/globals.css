@@ -507,3 +507,7 @@ a.row:hover { background: var(--sage); }
 .seasonal-body .eyebrow { font-size: 10px; }
 .seasonal-body .seasonal-suggestion { font-size: 12px; }
 .seasonal-body .lform-save { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; }
+
+.publishing-location-dialog { max-width: min(480px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 14px; padding: 24px; color: var(--ink); background: var(--paper); }
+.publishing-location-dialog::backdrop { background: #0008; }
+.publishing-location-dialog p { line-height: 1.6; }
