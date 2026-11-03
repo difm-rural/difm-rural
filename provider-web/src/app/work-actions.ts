@@ -114,7 +114,7 @@ export async function sendOffer(_: ActionState, data: FormData): Promise<ActionS
   const existing = await supabase.from('bids').select('id').eq('job_id',id).eq('provider_id',user.id).in('status',['pending','accepted'])
   if (existing.error) return failed()
   if (existing.data?.length) return {error:'You already have an offer on this job. You can track it in Activity.'}
-  const { error } = await supabase.from('bids').insert({...input.value,category:await resolveCategory(),job_id:id,provider_id:user.id,status:'pending'})
+  const { error } = await supabase.from('bids').insert({...input.value,job_id:id,provider_id:user.id,status:'pending'})
   if (error) return failed()
   revalidatePath('/')
   redirect('/activity')
