@@ -115,7 +115,6 @@ export function ListingForm({
       if(!title.trim())issues.title='Enter a listing title.'
       else if(postingTextError(title,'title'))issues.title=postingTextError(title,'title')
       if(postingTextError(description,'description'))issues.desc=postingTextError(description,'description')
-      if(!category)issues.category='Choose a listing category.'
     }
     if(index===1){
       if(!pricingType)issues.pricing='Choose a pricing type.'
@@ -148,7 +147,7 @@ export function ListingForm({
     mode === 'edit' ? ((listing?.kind as ListingKind) ?? '') : '',
   )
   const [title, setTitle] = useState(listing?.title ?? '')
-  const [category, setCategory] = useState(listing?.category ?? '')
+  const category = listing?.category || (kind === 'service' ? 'General Rural Help' : kind ? LISTING_CATEGORIES[kind][0] : '')
   const [description, setDescription] = useState(listing?.description ?? '')
   const [locationName, setLocationName] = useState(listing?.location_name ?? '')
   const [travelRange, setTravelRange] = useState(
@@ -249,14 +248,12 @@ export function ListingForm({
   const removePhoto = (i: number) => setPhotos(ps => ps.filter((_, idx) => idx !== i))
 
   const cfg = kind ? KIND_PRICING[kind] : null
-  const categoryOptions = kind ? LISTING_CATEGORIES[kind] : []
 
-  // Mirror RN selectKind: changing kind (NEW only) clears a now-invalid category and
+  // Mirror RN selectKind: changing kind (NEW only) resets
   // applies the per-kind pricing defaults, resetting the rest of the pricing inputs.
   function selectKind(k: ListingKind) {
     if (mode === 'edit') return // kind is locked on an existing listing
     setKind(k)
-    setCategory('')
     const d = KIND_PRICING_DEFAULTS[k] ?? { pricingType: '', unitLabel: '' }
     setPricingType(d.pricingType)
     setUnitLabel(d.unitLabel)
@@ -543,22 +540,6 @@ export function ListingForm({
           onChange={e => setTitle(e.target.value)}
           placeholder="e.g. Tractor topping with operator"
         />{issue('title')}<small className="muted">{title.length} / {POSTING_TITLE_MAX} characters</small>
-      </div>
-
-      {/* Category */}
-      <div className="lform-field">
-        <label htmlFor="lf-category">Category <span className="req">*</span></label>
-        <select
-          {...field('category')}
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-          disabled={!kind}
-        >
-          <option value="">{kind ? 'Choose a category' : 'Pick a listing type first'}</option>
-          {categoryOptions.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>{issue('category')}
       </div>
 
       {/* Description */}
@@ -1081,7 +1062,7 @@ export function ListingForm({
       {step === 4 && <section className="lform-review">
         <section className="lform-pricing">
           <div className="lform-review-heading"><h3>Listing details</h3><button type="button" className="lform-review-edit" onClick={() => goToStep(0)}>Edit details</button></div>
-          <dl><dt>Type</dt><dd>{KIND_LABEL[kind]}</dd><dt>Title</dt><dd>{title}</dd><dt>Category</dt><dd>{category}</dd><dt>Description</dt><dd className="lform-review-description">{description || 'No description added'}</dd></dl>
+          <dl><dt>Type</dt><dd>{KIND_LABEL[kind]}</dd><dt>Title</dt><dd>{title}</dd><dt>Description</dt><dd className="lform-review-description">{description || 'No description added'}</dd></dl>
         </section>
         <section className="lform-pricing">
           <div className="lform-review-heading"><h3>Pricing</h3><button type="button" className="lform-review-edit" onClick={() => goToStep(1)}>Edit pricing</button></div>

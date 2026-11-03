@@ -52,14 +52,14 @@ test('valid edit wizard Pricing to Photos to Location is entirely local',()=>{
 })
 test('missing listing fields are individually highlighted and linked to specific errors',()=>{
  const h=harness({title:'',category:''});h.click('Next')
- for(const id of ['lf-title','lf-category']){
+ for(const id of ['lf-title']){
   const input=h.nodes().find(n=>n.props?.id===id)
   assert.equal(input.props['aria-invalid'],true)
   assert.equal(input.props['aria-describedby'],id+'-error')
  }
  assert.match(h.alert(),/listing title/)
  h.change('lf-title','Topping');assert.equal(h.nodes().find(n=>n.props?.id==='lf-title').props['aria-invalid'],undefined)
- h.click('Next');assert.match(h.alert(),/listing category/)
+ h.click('Next');assert.equal(h.heading(),'Pricing')
 })
 test('completed listing steps can be revisited, while untouched steps remain disabled',()=>{
  const h=harness();h.click('Next');h.click('Next');assert.equal(h.heading(),'Photos')
