@@ -14,7 +14,7 @@ export function jobInput(d:FormData,context:{userId:string;jobId:string;baseUrl:
  const title=text(d,'title'),description=text(d,'description'),location=text(d,'location'),area=text(d,'area'),note=text(d,'location_note')
  if(!title || postingTextError(title,'title'))return {ok:false as const,error:postingTextError(title,'title')||'Enter a job title.'}
  if(!description || postingTextError(description,'description'))return {ok:false as const,error:postingTextError(description,'description')||'Enter a job description.'}
- if(publicAreaError(area))return {ok:false as const,error:publicAreaError(area)}
+ if(publicAreaError(area,false))return {ok:false as const,error:publicAreaError(area,false)}
  if(location.length>300)return {ok:false as const,error:'Keep the exact property location to 300 characters or fewer.'}
  if(note.length>2000)return {ok:false as const,error:'Keep the location note to 2,000 characters or fewer.'}
  const priceType=text(d,'price_type'),price=Number(text(d,'price'))
@@ -31,6 +31,6 @@ export function jobInput(d:FormData,context:{userId:string;jobId:string;baseUrl:
  const photos=[...new Set(d.getAll('photos').map(String))]
  const root=context.baseUrl+'/storage/v1/object/public/job-photos/'+context.jobId+'/'+context.userId+'/'
  if(photos.length>6||photos.some(photo=>{if(context.existingPhotos?.includes(photo))return false;try{return !new URL(photo).href.startsWith(root)}catch{return true}}))return {ok:false as const,error:'Choose up to six job photos to upload again.'}
- return {ok:true as const,value:{title,description,price_type:priceType,price:priceType==='fixed'?price:null,location_name:location||null,location_area:area,location_note:note||null,hide_exact_location:d.get('hide_exact_location')==='on',latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,schedule_type:schedule,scheduled_date:schedule==='specific'?date:null,date_from:schedule==='range'?from:null,date_to:schedule==='range'?to:null,materials_type:materials,access_conditions:access,photos}}
+ return {ok:true as const,value:{title,description,price_type:priceType,price:priceType==='fixed'?price:null,location_name:location||null,location_area:area||null,location_note:note||null,hide_exact_location:d.get('hide_exact_location')==='on',latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,schedule_type:schedule,scheduled_date:schedule==='specific'?date:null,date_from:schedule==='range'?from:null,date_to:schedule==='range'?to:null,materials_type:materials,access_conditions:access,photos}}
 }
 export function jobOwnerActions(status:string,offerCount:number){return {edit:status==='open',repeat:['completed','cancelled'].includes(status),delete:(status==='open'&&offerCount===0)||status==='cancelled'}}

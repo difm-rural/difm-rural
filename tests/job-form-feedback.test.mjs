@@ -16,13 +16,14 @@ const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,m
 function harness(storage,seed){
  const state=[],refs=[],effects=[],dependencies=[];let index=0,refIndex=0,effectIndex=0,tree
  const jsx=(type,props)=>({type,props})
- const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>state[i]=typeof value==='function'?value(state[i]):value]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(fn,deps){if(!storage)return;const i=effectIndex++;if(!dependencies[i]||deps.some((value,n)=>value!==dependencies[i][n])){dependencies[i]=deps;effects.push(fn)}},useActionState:()=>[{error:''},()=>{},false]}
+ const react={useCallback:fn=>fn,useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>state[i]=typeof value==='function'?value(state[i]):value]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(fn,deps){if(!storage)return;const i=effectIndex++;if(!dependencies[i]||deps.some((value,n)=>value!==dependencies[i][n])){dependencies[i]=deps;effects.push(fn)}},useActionState:()=>[{error:''},()=>{},false]}
  const module={exports:{}}
  vm.runInNewContext(code,{exports:module.exports,require(name){
   if(name==='@shared/publicArea')return publicArea
  if(name==='@shared/postingText')return postingText
  if(name==='@shared/formatting')return formatting
  if(name==='@/components/date-input')return {DateInput:'input'}
+ if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx}
   if(name==='@shared/jobDraft')return jobDraft
@@ -60,7 +61,7 @@ test('job validation names and highlights every missing field, and clears correc
 test('date and area errors are associated with the relevant job controls',()=>{
  const h=harness();h.change('job-title','Repair fence');h.change('job-schedule_type','specific');h.click('Next')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-scheduled_date').props['aria-invalid'],true)
- h.change('job-schedule_type','flexible');h.click('Next');h.click('Next')
+ h.change('job-schedule_type','flexible');h.click('Next');h.change('job-area','<b>Waitoki</b>');h.click('Next')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-area').props['aria-invalid'],true)
 })
 test('job stepper can return to a previously reached step after going back',()=>{
