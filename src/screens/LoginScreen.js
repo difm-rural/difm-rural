@@ -35,7 +35,7 @@ import {
 // App Review demo account: Apple reviewers can't receive OTP emails, so this one
 // address signs in with a password instead. Not a secret — the password lives only
 // in Supabase + App Store Connect, never in code. Every other email keeps OTP.
-const REVIEW_EMAIL = 'review@ruralconnections.nz'
+import {REVIEW_EMAIL} from '../../shared/reviewAccount'
 
 function getBiometricLabel(type) {
   if (type === 'face') return 'Face ID'
