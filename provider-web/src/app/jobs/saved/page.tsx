@@ -1,5 +1,5 @@
 import {JobCardImage} from '@/components/job-card-image'
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import {AppShell} from '@/components/app-shell'
 import {requireProvider} from '@/lib/auth'
 import {ActionForm} from '@/components/action-form'

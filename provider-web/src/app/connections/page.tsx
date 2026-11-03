@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import {AppShell} from '@/components/app-shell'
 import {requireProvider} from '@/lib/auth'
 import {loadConnections,type Connection} from '@/lib/connections-data'

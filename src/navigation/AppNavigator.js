@@ -1,3 +1,7 @@
+import {publicAreaError} from '../../shared/publicArea'
+import {postingTextError} from '../../shared/postingText'
+import {moneyInputError} from '../../shared/postingMoney'
+import {jobScheduleError} from '../../shared/postingDates'
 import { NavigationContainer, useNavigationContainerRef, getFocusedRouteNameFromRoute } from '@react-navigation/native'
 import { tabRootAction } from '../../shared/stackNavigation'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
@@ -613,6 +617,14 @@ export default function AppNavigator() {
       const raw = await AsyncStorage.getItem('pendingJob')
       if (!raw) return
       const { _photos = [], ...job } = JSON.parse(raw)
+      const areaError=publicAreaError(job.location_area,false)
+      if(areaError){Alert.alert('Check your saved job',areaError);return}
+      const textError=postingTextError(job.title,'title')||postingTextError(job.description,'description')
+      if(textError){Alert.alert('Check your saved job',textError);return}
+      const moneyError=job.price_type==='fixed'?moneyInputError(job.price,'Budget'):''
+      if(moneyError){Alert.alert('Job not posted',moneyError+' Your draft is saved. Review its budget before posting.');return}
+      const dateError=jobScheduleError(job)
+      if(dateError){Alert.alert('Job not posted',dateError+' Your draft is saved. Review its dates before posting.');return}
 
       const { data: newJob, error } = await supabase
         .from('jobs')

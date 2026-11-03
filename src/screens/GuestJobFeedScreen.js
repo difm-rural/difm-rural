@@ -110,7 +110,7 @@ export default function GuestJobFeedScreen({ navigation }) {
   function handleGuestAction() {
     Alert.alert(
       'Sign in required',
-      'Sign in to save this to your watchlist.',
+      'Sign in to save this item.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign in', onPress: () => navigation.navigate('Login') },

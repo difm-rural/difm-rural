@@ -24,7 +24,7 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
     if(!jobOwnerActions(job.status,0)[editing?'edit':'repeat'])return {error:'This job has changed. Only open jobs can be edited, and closed jobs can be repeated.'}
     current=job as JobSeed & {area_polygon:unknown;area_hectares:number|null}
   }
-  const input=jobInput(data,{userId:user.id,jobId:id,baseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL || '',existingPhotos:current?.photos || [],existingAccess:current?.access_conditions || []})
+  const input=jobInput(data,{userId:user.id,jobId:id,baseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL || '',existingPhotos:current?.photos || [],existingAccess:current?.access_conditions || [],existingSchedule:editing?current:null})
   if(!input.ok)return {error:input.error}
   const moved=!!current && (input.value.location_name!==current.location_name || input.value.latitude!==current.latitude || input.value.longitude!==current.longitude)
   const areaPatch=moved?{area_polygon:null,area_hectares:null}:{}

@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from '../../../shared/formatting.js'
 import { resolvePublicJobLocations } from '../../lib/jobDiscovery'
 import React, { useCallback, useRef, useState } from 'react'
 import {
@@ -261,7 +262,7 @@ export default function JobsTabScreen({ navigation }) {
       })
       setSaveOpen(false)
       Alert.alert('Job alert created', saveFrequency === 'off'
-        ? 'You can find and manage it in Account → Saved interests.'
+        ? 'You can find and manage it in Account → Saved searches & alerts.'
         : `We’ll send ${saveFrequency === 'instant' ? 'an alert' : 'a daily summary'} when new jobs match.`)
     } catch (error) {
       Alert.alert('Could not create this job alert', error.message)
@@ -340,7 +341,7 @@ export default function JobsTabScreen({ navigation }) {
                   item={bid.jobs}
                   onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
                 />
-                <Text style={styles.bidLabel}>Offer sent: ${bid.amount}</Text>
+                <Text style={styles.bidLabel}>Offer sent: {nzMoney(bid.amount)}</Text>
               </View>
             )}
             showsHorizontalScrollIndicator={false}
@@ -482,7 +483,7 @@ export default function JobsTabScreen({ navigation }) {
             )}
             <Button title="Create job alert" icon="notifications-outline" onPress={confirmSaveSearch} loading={saving} disabled={!saveName.trim()} style={{ marginTop: 16 }} />
             <TouchableOpacity style={styles.manageLink} onPress={() => { setSaveOpen(false); navigation.navigate('SavedInterests') }}>
-              <Text style={styles.manageLinkText}>Manage saved interests</Text>
+              <Text style={styles.manageLinkText}>Manage saved searches & alerts</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import { useRouter } from 'next/navigation'
-import { LoaderCircle, Pencil, Trash2 } from 'lucide-react'
-import { KIND_ENQUIRY } from '@shared/listingPricing'
+import { Eye, LoaderCircle, Pencil, Trash2 } from 'lucide-react'
+import { KIND_ENQUIRY,formatRate } from '@shared/listingPricing'
 import { createClient } from '@/lib/supabase/client'
 import { ListingCard, type CardStyle } from './listing-card'
 
@@ -15,6 +15,7 @@ export type Listing = {
   pricing_type: string | null
   rate: number | null
   unit_label: string | null
+  min_charge?: number | null
   is_active: boolean | null
   closed_at: string | null
   close_reason: string | null
@@ -37,11 +38,8 @@ const CLOSE: Record<string, { label: string; reason: string }> = {
 }
 
 function priceSummary(s: Listing): string {
-  if (s.pricing_type === 'quote_required' || s.rate == null) return 'Quote'
-  if (s.pricing_type === 'hourly') return `$${s.rate}/hr`
-  if (s.pricing_type === 'day_rate') return `$${s.rate}/day`
-  if (s.pricing_type === 'per_unit') return `$${s.rate}/${s.unit_label || 'unit'}`
-  return `$${s.rate}`
+  if(s.rate==null)return 'Quote required'
+  return formatRate(s.pricing_type||'',s.rate,s.unit_label,s.min_charge)
 }
 
 export function ManageCard({ s }: { s: Listing }) {
@@ -89,6 +87,7 @@ export function ManageCard({ s }: { s: Listing }) {
 
   return (
     <ListingCard
+      href={`/listings/${s.id}`}
       data={{
         title: s.title,
         photoUrl: s.photos?.[0] ?? null,
@@ -104,12 +103,13 @@ export function ManageCard({ s }: { s: Listing }) {
         <div className={closed ? 'manage-actions closed' : 'manage-actions'}>
           {error && <span className="row-err">{error}</span>}
           <div className="manage-actions-row">
-            {busy && <LoaderCircle className="spin" size={15} />}
-            <button onClick={pauseResume} disabled={busy}>{s.is_active ? 'Pause' : 'Resume'}</button>
-            {canClose && <button onClick={markClosed} disabled={busy}>{CLOSE[s.kind as string].label}</button>}
-            {closed && <button onClick={reopen} disabled={busy}>Reopen</button>}
-            <Link href={`/listings/${s.id}/edit`} className="icon-btn" aria-label="Edit"><Pencil size={15} /></Link>
-            <button onClick={onDelete} disabled={busy} className="icon-btn danger" aria-label="Delete"><Trash2 size={15} /></button>
+            <Link href={`/listings/${s.id}`} className="manage-view" aria-label={'View listing: '+(s.title||'Untitled listing')}><Eye size={15} aria-hidden="true"/> View listing</Link>
+            {busy && <LoaderCircle className="spin" size={15} aria-hidden="true"/>}
+            <button type="button" onClick={pauseResume} disabled={busy} aria-label={(s.is_active?'Pause':'Resume')+' listing: '+(s.title||'Untitled listing')}>{s.is_active ? 'Pause' : 'Resume'}</button>
+            {canClose && <button type="button" onClick={markClosed} disabled={busy} aria-label={CLOSE[s.kind as string].label+': '+(s.title||'Untitled listing')}>{CLOSE[s.kind as string].label}</button>}
+            {closed && <button type="button" onClick={reopen} disabled={busy} aria-label={'Reopen listing: '+(s.title||'Untitled listing')}>Reopen</button>}
+            <Link href={`/listings/${s.id}/edit`} className="manage-view" aria-label={'Edit listing: '+(s.title||'Untitled listing')}><Pencil size={15} aria-hidden="true"/> Edit</Link>
+            <button type="button" onClick={onDelete} disabled={busy} className="manage-delete" aria-label={'Delete listing: '+(s.title||'Untitled listing')}><Trash2 size={15} aria-hidden="true"/> Delete</button>
           </div>
         </div>
       }

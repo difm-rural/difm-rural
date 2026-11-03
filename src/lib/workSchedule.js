@@ -1,3 +1,4 @@
+import {formatDate} from '../../shared/formatting.js'
 import { Alert, Platform } from 'react-native'
 import { supabase } from './supabase'
 
@@ -48,11 +49,9 @@ export function formatArrivalWindow(schedule) {
   if (!schedule?.arrival_start_at || !schedule?.arrival_end_at) return ''
   const start = new Date(schedule.arrival_start_at)
   const end = new Date(schedule.arrival_end_at)
-  const date = start.toLocaleDateString('en-NZ', {
-    weekday: 'short', day: 'numeric', month: 'short',
-  })
+  const date = formatDate(start)
   const time = value => value.toLocaleTimeString('en-NZ', {
-    hour: 'numeric', minute: '2-digit',
+    hour: 'numeric', minute: '2-digit', timeZone:'Pacific/Auckland',
   })
   return `${date}, ${time(start)}–${time(end)}`
 }

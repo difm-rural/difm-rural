@@ -98,3 +98,8 @@ test('app and web requests use the saved pricing type rather than a later live r
  assert.equal(bookingPricingType({services:{pricing_type:'fixed'}}),'fixed')
  assert.equal(bookingPricingType({pricing_snapshot:{version:2,pricing_type:'hourly'},services:{pricing_type:'quote_required'}}),'quote_required')
 })
+
+test('materials payment wording applies to services rather than goods, hire or grazing',()=>{
+ assert.match(paymentCopy({kind:'service',materials:'estimate'}),/Materials are estimated/)
+ for(const kind of ['for_sale','hire','lease','grazing'])assert.doesNotMatch(paymentCopy({kind,materials:'estimate'}),/Materials/)
+})

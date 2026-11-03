@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import {formatDate as nzDate} from '@shared/formatting'
+import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
@@ -19,7 +20,7 @@ export default async function PublicReviewsPage({params,searchParams}:{params:Pr
   const base='/people/'+id+'/reviews'+(role?'?role='+role:'?role=all')
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href={'/people/'+id} className="card-link">Back to profile</Link><header className="home-heading"><div><p className="eyebrow">Reviews</p><h1>{p.full_name || p.display_name || 'Member'}&apos;s reviews</h1></div><LiveRefresh/></header>
     <nav className="activity-segments" aria-label="Review type">{[{label:'All',value:null},{label:'As provider',value:'provider'},{label:'As requester',value:'requester'}].map(r=><Link key={r.label} href={'/people/'+id+'/reviews'+(r.value?'?role='+r.value:'')} aria-current={role===r.value?'page':undefined}>{r.label}</Link>)}</nav>
-    {error?<p role="alert">Could not load reviews. Refresh to try again.</p>:!reviews?.length?<div className="home-empty"><h2>{count?'No reviews on this page':'No reviews yet'}</h2><p>Reviews appear after completed work.</p>{page>1 && <Link href={base}>First page</Link>}</div>:reviews.map(r=><article className="card" key={r.id}><div className="card-head"><h2>{names.get(r.reviewer_id) || 'Member'}</h2><strong>{r.rating} / 5 ★</strong></div><p className="muted">{new Date(r.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'})} · As {r.reviewee_role==='provider'?'provider':'requester'}</p><p className="work-description">{r.comment || 'No written comment.'}</p></article>)}
+    {error?<p role="alert">Could not load reviews. Refresh to try again.</p>:!reviews?.length?<div className="home-empty"><h2>{count?'No reviews on this page':'No reviews yet'}</h2><p>Reviews appear after completed work.</p>{page>1 && <Link href={base}>First page</Link>}</div>:reviews.map(r=><article className="card" key={r.id}><div className="card-head"><h2>{names.get(r.reviewer_id) || 'Member'}</h2><strong>{r.rating} / 5 ★</strong></div><p className="muted">{nzDate(new Date(r.created_at))} · As {r.reviewee_role==='provider'?'provider':'requester'}</p><p className="work-description">{r.comment || 'No written comment.'}</p></article>)}
     {!error && <nav className="notification-pagination" aria-label="Review pages">{page>1 && <Link href={base+'&page='+(page-1)} className="lform-cancel">Previous</Link>}<span>Page {page}</span>{count!==null && page*20<count && <Link href={base+'&page='+(page+1)} className="lform-cancel">Next</Link>}</nav>}
   </section></AppShell>
 }

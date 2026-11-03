@@ -1,3 +1,4 @@
+import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
 import React, { useEffect, useState } from 'react'
 import {
   Alert, Image, Keyboard, KeyboardAvoidingView, Platform,
@@ -58,14 +59,16 @@ export default function PostJobStep3Details({ navigation, route }) {
     updateJobData({ description, photos, accessConditions, locationNote })
   }, [description, photos, accessConditions, locationNote])
 
+  const [attempted,setAttempted]=useState(false)
   function canProceed() {
-    return description.trim().length >= 8
+    return description.trim().length >= 8 && !postingTextError(description,'description')
   }
 
   function handleBack() { navigation.goBack() }
 
   function handleNext() {
     Keyboard.dismiss()
+    setAttempted(true)
     if (!canProceed()) return
     navigation.navigate('PostJobStep4Budget', { ...route.params })
   }
@@ -116,9 +119,10 @@ export default function PostJobStep3Details({ navigation, route }) {
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Describe the job</Text>
             <TextInput
-              style={styles.textarea}
+              style={[styles.textarea, attempted && !canProceed() && {borderColor:colors.danger,borderWidth:2}]}
               placeholder="What needs doing? Include any special requirements..."
               placeholderTextColor={colors.textMuted}
+              maxLength={POSTING_DESCRIPTION_MAX}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -127,6 +131,9 @@ export default function PostJobStep3Details({ navigation, route }) {
               autoCapitalize="sentences"
               accessibilityLabel="Job description"
             />
+            <Text style={styles.hintText}>{description.length} / {POSTING_DESCRIPTION_MAX} characters</Text>
+            {!!postingTextError(description,'description') && <Text accessibilityRole="alert" style={{color:colors.danger}}>{postingTextError(description,'description')}</Text>}
+            {attempted && description.trim().length < 8 && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter a job description with at least 8 characters.</Text>}
             {description.trim().length > 0 && charsLeft > 0 && (
               <Text style={styles.hintText}>
                 {charsLeft} more character{charsLeft !== 1 ? 's' : ''} needed to continue
@@ -219,7 +226,7 @@ export default function PostJobStep3Details({ navigation, route }) {
               title="Next — Budget"
               icon="arrow-forward"
               onPress={handleNext}
-              disabled={!canProceed()}
+
               style={{ flex: 1 }}
               accessibilityLabel="Next step"
             />

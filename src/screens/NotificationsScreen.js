@@ -1,3 +1,4 @@
+import {notificationBody} from '../../shared/notificationBody'
 import React, { useCallback, useRef, useState } from 'react'
 import {
   FlatList,
@@ -32,6 +33,8 @@ export default function NotificationsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const autoOpenedRef = useRef(null)
+  const openingRef = useRef(false)
+  const [openingId, setOpeningId] = useState(null)
 
   useFocusEffect(useCallback(() => {
     let active = true
@@ -77,13 +80,26 @@ export default function NotificationsScreen({ navigation, route }) {
       autoOpenedRef.current = openId
       navigation.setParams({ openNotificationId: undefined })
       const target = list.find(n => n.id === openId)
-      if (target) await openNotificationTarget(navigation, user.id, target)
+      if (target) await handleOpen(target, user.id)
     }
   }
 
   function onRefresh() {
     setRefreshing(true)
     load()
+  }
+
+  async function handleOpen(item, viewerId = userId) {
+    if (openingRef.current) return
+    openingRef.current = true
+    setOpeningId(item.id)
+    try {
+      const resolved = await openNotificationTarget(navigation, viewerId, item)
+      if (resolved) setItems(prev => prev.map(n => n.id === item.id ? { ...n, read: true, _wasUnread: false } : n))
+    } finally {
+      openingRef.current = false
+      setOpeningId(null)
+    }
   }
 
   async function handleMarkAllRead() {
@@ -117,18 +133,15 @@ export default function NotificationsScreen({ navigation, route }) {
     return (
       <TouchableOpacity
         style={[styles.row, item._wasUnread && styles.rowUnread]}
-        onPress={async () => {
-          const resolved = await openNotificationTarget(navigation, userId, item)
-          if (resolved) {
-            setItems(prev => prev.map(n => (n.id === item.id ? { ...n, read: true, _wasUnread: false } : n)))
-          }
-        }}
+        disabled={openingId !== null}
+        onPress={() => handleOpen(item)}
         activeOpacity={0.75}
         accessibilityRole="button"
-        accessibilityLabel={item.body}>
+        accessibilityLabel={notificationBody(item)}>
         <Icon name={NOTIFICATION_ICONS[item.type] || 'notifications-outline'} size={20} color={colors.primary} />
         <View style={styles.rowContent}>
-          <Text style={styles.rowBody}>{item.body}</Text>
+          <Text style={styles.rowBody}>{notificationBody(item)}</Text>
+          {openingId === item.id && <Text accessibilityRole="text" style={styles.rowTime}>Opening…</Text>}
           {item.type === 'availability_check' && !item._availabilityAnswered && (
             <View style={styles.quickActions}>
               <TouchableOpacity
@@ -143,7 +156,7 @@ export default function NotificationsScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.quickActionSecondary}
-                onPress={() => openNotificationTarget(navigation, userId, item)}>
+                onPress={() => handleOpen(item)}>
                 <Text style={styles.quickActionSecondaryText}>Other</Text>
               </TouchableOpacity>
             </View>

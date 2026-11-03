@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
 import React, { useEffect, useState } from 'react'
 import { CommonActions } from '@react-navigation/native'
 import {
@@ -26,7 +27,7 @@ import { bookingRequestCopy } from '../lib/bookingRequestCopy'
 import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
 
 function formatDisplayDate(d) {
-  return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return nzDate(d)
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -113,7 +114,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
     : service?.payment_timing === 'upfront'
     ? 'This provider asks for payment upfront. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
     : 'You arrange payment directly with the provider once the work is complete — Rural Connections doesn\'t handle payments.'
-  const paymentExplanation = service?.materials === 'estimate'
+  const paymentExplanation = (service?.kind||'service')==='service' && service?.materials === 'estimate'
     ? `${basePaymentExplanation} Materials are estimated and settled at actual cost on completion.`
     : basePaymentExplanation
 
@@ -291,14 +292,14 @@ export default function BookingConfirmScreen({ route, navigation }) {
           {effectivePricingType !== 'fixed' && !isQuoteRequired && (
             <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
           )}
-          <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `$${total}`} />
+          <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `${nzMoney(total)}`} />
           {isGrazing && !isQuoteRequired && /\/(week|month)$/.test(unitLabel) && (
             <SummaryRow label="Estimate period" value={`One ${unitLabel.endsWith('/week') ? 'week' : 'month'}; agree the full duration with the provider`} />
           )}
           {!isQuoteRequired && estimate.minimumCharge > 0 && (
-            <SummaryRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)}`} />
+            <SummaryRow label="Minimum charge included" value={`${nzMoney(estimate.minimumCharge.toFixed(2))}`} />
           )}
-          {service.materials ? (
+          {(service.kind||'service')==='service' && service.materials ? (
             <SummaryRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
           ) : null}
           <SummaryRow
@@ -442,7 +443,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : 'Base estimate'}</Text>
-            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `$${total}`}</Text>
+            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `${nzMoney(total)}`}</Text>
           </View>
           <View style={styles.paymentInfoBox}>
             <Text style={[styles.paymentInfoText, { marginBottom: 8 }]}>{requestCopy.nextStep}</Text>

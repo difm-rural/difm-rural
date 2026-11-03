@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import {formatDate as nzDate} from '@shared/formatting'
+import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
@@ -66,7 +67,7 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     </section>}
     {work.status==='completed' && <section className="card"><h2>Reviews</h2>
       {reviewError?<p role="alert">Could not load reviews. Refresh before adding or editing your review.</p>:<>
-        {received && <article className="activity-received"><h3>{person?.full_name || 'Their'} review of you</h3><p>{'★'.repeat(received.rating)} · {new Date(received.created_at).toLocaleDateString('en-NZ')}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
+        {received && <article className="activity-received"><h3>{person?.full_name || 'Their'} review of you</h3><p>{'★'.repeat(received.rating)} · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
         {!received && <p className="muted">The other person has not left a review yet.</p>}
         {actions.includes('review') && <ActionForm key={ownReview?.id || 'new'} action={reviewArrangement} label={ownReview?'Save review changes':'Submit review'}>
           <h3>{ownReview?'Edit your review':'Review '+(person?.full_name || 'the other person')}</h3>

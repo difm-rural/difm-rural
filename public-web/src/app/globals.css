@@ -569,3 +569,18 @@ footer > p { margin: 26px 0; color: #9eb4a7; font-family: var(--serif); font-siz
 @media(max-width:640px){.nearby-controls.nearby-compact{padding:8px 10px}.nearby-compact .nearby-summary{gap:7px}.nearby-compact .nearby-summary strong{font-size:12px}.nearby-compact .nearby-summary select{max-width:135px;padding:7px 5px;font-size:11px}.nearby-compact .nearby-change{font-size:11px}}
 
 .development-badge { display: inline-block !important; flex: 0 0 auto; vertical-align: middle; padding: 3px 7px; border: 1px solid #e6c879; border-radius: 5px; background: #fff0c2; color: #744b08 !important; font-family: var(--sans); font-size: 10px !important; font-weight: 750; line-height: 1.3; letter-spacing: .04em; text-transform: none; white-space: nowrap; }
+
+/* Consistent browse-card rows; detail pages retain the full text. */
+.public-grid { align-items:stretch; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.guest-card { min-width:0; height:100%; }
+.guest-card h3,.guest-card-description { word-break:normal; overflow-wrap:break-word; }
+.guest-card h3 { min-height:2.7em; }
+.guest-card-description { min-height:3em; }
+.guest-card-category { min-height:2.6em; }
+.guest-card-location { min-height:3em; }
+@media(max-width:900px){.public-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:640px){.public-grid{grid-template-columns:minmax(0,1fr);}}
+
+.guest-card-category { line-height:1.4; min-height:2.8em; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.guest-card-location { line-height:1.5; }
+.guest-card-place { min-width:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }

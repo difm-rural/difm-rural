@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import { Plus } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
@@ -21,16 +21,16 @@ export default async function ListingsPage() {
   rows.sort((a, b) => rank(a) - rank(b))
 
   return (
-    <AppShell providerName={(profile?.full_name as string) ?? 'Provider'}>
+    <AppShell providerName={(profile?.full_name as string) ?? 'Member'}>
       <section className="page listings">
         <header className="dash-head">
           <div>
-            <p className="eyebrow">Provider console</p>
-            <h1>Listings</h1>
+            <p className="eyebrow">Your listings</p>
+            <h1>My listings</h1>
           </div>
           <div className="dash-head-aside">
             <p className="muted dash-sub">{rows.length} listing{rows.length === 1 ? '' : 's'}</p>
-            <Link href="/listings/new" className="lform-save as-link"><Plus size={15} /> New listing</Link>
+            <Link href="/listings/new" className="lform-save as-link"><Plus size={15} /> Create a listing</Link>
           </div>
         </header>
 

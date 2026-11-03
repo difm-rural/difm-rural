@@ -1,3 +1,4 @@
+import {publicAreaError} from '../../../shared/publicArea'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert, Keyboard,
@@ -187,12 +188,15 @@ export default function PostJobStep2Location({ navigation, route }) {
     navigation.goBack()
   }
 
+  const areaError=publicAreaError(locationArea,false)
   function handleSkip() {
+    if(areaError){Alert.alert('Check public town or area',areaError);return}
     navigation.navigate('PostJobStep3Details', { ...route.params })
   }
 
   function handleNext() {
     Keyboard.dismiss()
+    if(areaError){Alert.alert('Check public town or area',areaError);return}
     if (!latitude && areaPolygon.length === 0) {
       Alert.alert(
         'No location set',
@@ -354,6 +358,7 @@ export default function PostJobStep2Location({ navigation, route }) {
           showsVerticalScrollIndicator={false}>
 
           <SummaryBar category={jobData.category} />
+          {!!areaError && <Text accessibilityRole="alert" style={{color:colors.danger}}>{areaError}</Text>}
 
         </ScrollView>
 

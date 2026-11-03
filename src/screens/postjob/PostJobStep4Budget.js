@@ -1,3 +1,5 @@
+import {formatDate as nzDate} from '../../../shared/formatting.js'
+import {moneyInputError} from '../../../shared/postingMoney'
 import React, { useEffect, useState } from 'react'
 import {
   Keyboard, KeyboardAvoidingView, Platform, ScrollView,
@@ -29,7 +31,7 @@ const SCHEDULE_LABELS = {
 
 function formatDate(iso) {
   if (!iso) return null
-  return new Date(iso).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return nzDate(new Date(iso))
 }
 
 function SummaryBar({ items }) {
@@ -71,11 +73,12 @@ export default function PostJobStep4Budget({ navigation, route }) {
     updateJobData({ priceType, price, materialsType })
   }, [priceType, price, materialsType])
 
+  const [attempted,setAttempted]=useState(false)
   function canProceed() {
     if (!materialsType) return false
     if (!priceType) return false
     if (priceType === 'open') return true
-    return !!(price.trim() && parseFloat(price) > 0)
+    return !moneyInputError(price,'Budget')
   }
 
   function handleBack() {
@@ -84,6 +87,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
   function handleNext() {
     Keyboard.dismiss()
+    setAttempted(true)
     if (!canProceed()) return
     navigation.navigate('PostJobStep5Review', { ...route.params })
   }
@@ -112,7 +116,8 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>How do you want to set the budget?</Text>
-            <View style={styles.priceOptions}>
+            {attempted && !priceType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose how to set the budget.</Text>}
+            <View style={[styles.priceOptions, attempted && !priceType && {borderColor:colors.danger,borderWidth:2}]}>
               {PRICE_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt.id}
@@ -132,7 +137,8 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
-            <View style={styles.tilesRow}>
+            {attempted && !materialsType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose who supplies the materials.</Text>}
+            <View style={[styles.tilesRow, attempted && !materialsType && {borderColor:colors.danger,borderWidth:2}]}>
               {MATERIALS_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt.id}
@@ -157,17 +163,18 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   <Text style={styles.currencyText}>$</Text>
                 </View>
                 <TextInput
-                  style={styles.amountInput}
+                  style={[styles.amountInput, attempted && !!moneyInputError(price,'Budget') && {borderColor:colors.danger,borderWidth:2}]}
                   placeholder="e.g. 250"
                   placeholderTextColor={colors.textMuted}
                   value={price}
                   onChangeText={setPrice}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   returnKeyType="done"
                   onSubmitEditing={Keyboard.dismiss}
                   accessibilityLabel="Price in dollars"
                 />
               </View>
+              {(attempted||!!String(price??'').trim()) && !!moneyInputError(price,'Budget') && <Text accessibilityRole="alert" style={{ color: colors.danger, marginTop: 10 }}>{moneyInputError(price,'Budget')}</Text>}
             </View>
           )}
 
@@ -192,7 +199,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
               title="Review"
               icon="arrow-forward"
               onPress={handleNext}
-              disabled={!canProceed()}
+
               style={{ flex: 1 }}
               accessibilityLabel="Review job"
             />

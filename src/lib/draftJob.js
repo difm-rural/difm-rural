@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 // AI job assistant — turn a natural spoken/typed description into a job draft.
 import { supabase } from './supabase'
 
@@ -43,8 +44,8 @@ export function draftToJobData(draft) {
 // Human-readable budget line for the draft preview.
 export function draftBudgetText(draft) {
   if (draft.budget_low && draft.budget_high && draft.budget_high !== draft.budget_low) {
-    return `$${draft.budget_low}–$${draft.budget_high}${draft.price_type === 'open' ? ' · open to offers' : ''}`
+    return `${nzMoney(draft.budget_low)}–${nzMoney(draft.budget_high)}${draft.price_type === 'open' ? ' · open to offers' : ''}`
   }
-  if (draft.budget_low) return `Around $${draft.budget_low}`
+  if (draft.budget_low) return `Around ${nzMoney(draft.budget_low)}`
   return 'Open to offers'
 }

@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -25,8 +26,8 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
   const isOpen     = job.status === 'open'
   const paidAmount = job.completedAmount ?? job.acceptedBidAmount
   const budgetText = job.status === 'completed' && paidAmount != null
-    ? `Paid · $${paidAmount}`
-    : job.price_type === 'fixed' ? `$${job.price}`
+    ? `Paid · ${nzMoney(paidAmount)}`
+    : job.price_type === 'fixed' ? `${nzMoney(job.price)}`
     : job.price_type === 'unpaid' ? 'Free'
     : 'Open to offers'
 
@@ -69,7 +70,7 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
           <Text style={styles.budget}>{budgetText}</Text>
           {offered ? (
             <View style={styles.offerPill}>
-              <Text style={styles.offerPillText}>Offer sent{offerAmount != null ? ` · $${offerAmount}` : ''}</Text>
+              <Text style={styles.offerPillText}>Offer sent{offerAmount != null ? ` · ${nzMoney(offerAmount)}` : ''}</Text>
             </View>
           ) : !isOpen ? (
             <View style={styles.statusPill}>
@@ -85,7 +86,7 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
           onPress={() => onWatchToggle(job.id, isWatched)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}>
+          accessibilityLabel={isWatched ? 'Remove saved job' : 'Save job'}>
           <Icon name={isWatched ? 'bookmark' : 'bookmark-outline'} size={18} color={isWatched ? colors.primary : colors.textMuted} />
         </TouchableOpacity>
       )}

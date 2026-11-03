@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from './formatting.js'
 // Web bundler mechanism: (a) LOCKED — widen turbopack.root to repo root + @shared/*
 // tsconfig alias; /shared authored in .ts so types flow to both web apps
 // (public-web allowJs:false satisfied, no .d.ts needed). (b) workspace package was
@@ -24,23 +25,25 @@ export const PRICING_TYPES: Option[] = [
   { id: 'hourly', label: 'Hourly rate' },
   { id: 'day_rate', label: 'Day rate' },
   { id: 'per_unit', label: 'Per load/unit' },
-  { id: 'quote_required', label: 'Estimate / quote' },
+  { id: 'quote_required', label: 'Quote required' },
 ]
 
 // Headline rate display for a single listing price. Pure counterpart of the old
 // component-state formatRate in CreateServiceScreen, so web and RN share one
 // rate-display rule. rate is whatever the form holds (string or number); it is
-// interpolated verbatim, matching prior behaviour exactly.
+// formatted with NZ thousands separators, matching mobile and web.
 export function formatRate(
   pricingType: string,
   rate: string | number | null | undefined,
   unitLabel?: string | null,
+  minimumCharge?: string | number | null,
 ): string {
   if (pricingType === 'quote_required') return 'Quote required'
-  if (pricingType === 'hourly') return `$${rate}/hr`
-  if (pricingType === 'day_rate') return `$${rate}/day`
-  if (pricingType === 'per_unit') return `$${rate}/${unitLabel || 'unit'}`
-  return `$${rate} fixed`
+  if (String(rate??'').trim()!=='' && Number(rate)===0) return Number(minimumCharge)>0?`Minimum ${nzMoney(minimumCharge)}`:'Free'
+  if (pricingType === 'hourly') return `${nzMoney(rate)}/hr`
+  if (pricingType === 'day_rate') return `${nzMoney(rate)}/day`
+  if (pricingType === 'per_unit') return `${nzMoney(rate)}/${unitLabel || 'unit'}`
+  return `${nzMoney(rate)} fixed`
 }
 
 export const PAYMENT_OPTIONS: Option[] = [
@@ -80,10 +83,10 @@ export function addOnDisplay(a: AddOnDraft): string {
   const amt = String(a.amount ?? '').trim()
   const label = String(a.label || '').trim()
   const price = a.basis === 'per_km'
-    ? `+$${amt}/km`
+    ? `+${nzMoney(amt)}/km`
     : a.basis === 'per_unit'
-    ? `+$${amt}/${(a.unit_label || 'unit').trim() || 'unit'}`
-    : `+$${amt}`
+    ? `+${nzMoney(amt)}/${(a.unit_label || 'unit').trim() || 'unit'}`
+    : `+${nzMoney(amt)}`
   return label ? `${price} ${label}` : price
 }
 
@@ -92,10 +95,10 @@ export const VARIANT_PRICING_TYPES: Option[] = PRICING_TYPES.filter(pt => pt.id 
 // defaults to "unit" so per_unit never renders a dangling "/".
 export function variantRateToken(v: VariantDraft): string {
   const amt = String(v.rate ?? '').trim()
-  if (v.pricing_type === 'hourly')   return `$${amt}/hr`
-  if (v.pricing_type === 'day_rate') return `$${amt}/day`
-  if (v.pricing_type === 'per_unit') return `$${amt}/${(v.unit_label || 'unit').trim() || 'unit'}`
-  return `$${amt}`
+  if (v.pricing_type === 'hourly')   return `${nzMoney(amt)}/hr`
+  if (v.pricing_type === 'day_rate') return `${nzMoney(amt)}/day`
+  if (v.pricing_type === 'per_unit') return `${nzMoney(amt)}/${(v.unit_label || 'unit').trim() || 'unit'}`
+  return `${nzMoney(amt)}`
 }
 export function variantDisplay(v: VariantDraft): string {
   const label = String(v.label || '').trim()
@@ -109,11 +112,11 @@ export function isValidVariant(v: VariantDraft): boolean {
 }
 
 export const LISTING_KINDS: Option[] = [
-  { id: 'service',  label: 'Offer a service' },
+  { id: 'service',  label: 'Service' },
   { id: 'grazing',  label: 'Grazing' },
-  { id: 'hire',     label: 'Gear for hire' },
-  { id: 'lease',    label: 'Space to lease' },
-  { id: 'for_sale', label: 'Something for sale' },
+  { id: 'hire',     label: 'Hire' },
+  { id: 'lease',    label: 'Lease' },
+  { id: 'for_sale', label: 'For sale' },
 ]
 export const KIND_IS_RESOURCE: Record<ListingKind, boolean> = {
   service: false, grazing: true, hire: true, lease: true, for_sale: true,

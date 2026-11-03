@@ -32,16 +32,16 @@ export async function saveSearch(_:ActionState,data:FormData):Promise<ActionStat
   const input=savedSearchInput(data,origin);if(!input.ok)return {error:input.error}
   const {error}=await supabase.from('saved_interests').upsert({user_id:user.id,...input.value},{onConflict:'user_id,filter_key'})
   if(error)throw error
-  revalidatePath('/account/interests');return {error:'',success:'Search saved. Manage it in Account → Saved interests.'}
+  revalidatePath('/account/interests');return {error:'',success:'Search saved. Manage it in Account → Saved searches & alerts.'}
  }catch{return {error:'Could not save the search. Your selections are still here. Check your connection and try again.'}}
 }
 export async function manageInterest(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=String(data.get('id') || ''),intent=String(data.get('intent') || '')
- if(!validId(id)||!['save','remove'].includes(intent))return {error:'Reopen this saved interest.'}
- if(intent==='remove'&&data.get('confirmed')!=='on')return {error:'Confirm that you want to remove this saved interest.'}
+ if(!validId(id)||!['save','remove'].includes(intent))return {error:'Reopen this saved item.'}
+ if(intent==='remove'&&data.get('confirmed')!=='on')return {error:'Confirm that you want to remove this saved item.'}
  const frequency=String(data.get('frequency') || '')
  if(intent==='save'&&!['off','daily','instant'].includes(frequency))return {error:'Choose a valid alert frequency.'}
  const result=intent==='remove'?await supabase.from('saved_interests').delete().eq('id',id).eq('user_id',user.id).select('id'):await supabase.from('saved_interests').update({frequency,push_enabled:frequency!=='off'&&data.get('push_enabled')==='on',email_enabled:frequency!=='off'&&data.get('email_enabled')==='on',active:data.get('active')==='on',auto_paused_at:null,last_engaged_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id).select('id')
- if(result.error||!result.data?.length)return {error:'Could not update this saved interest. Refresh and try again.'}
- revalidatePath('/account/interests');return {error:'',success:intent==='remove'?'Saved interest removed.':'Saved interest updated.'}
+ if(result.error||!result.data?.length)return {error:'Could not update this saved item. Refresh and try again.'}
+ revalidatePath('/account/interests');return {error:'',success:intent==='remove'?'Saved item removed.':'Saved item updated.'}
 }

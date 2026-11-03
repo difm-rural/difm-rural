@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useState } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -65,7 +66,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
         <View style={styles.badgeRow}>
           <Text style={styles.category}>{job.category}</Text>
           <Text style={styles.price}>
-            {job.price_type === 'fixed' ? `$${job.price}` : job.price_type === 'unpaid' ? 'Free / in-kind' : 'Open to Offers'}
+            {job.price_type === 'fixed' ? `${nzMoney(job.price)}` : job.price_type === 'unpaid' ? 'Free / in-kind' : 'Open to Offers'}
           </Text>
         </View>
 

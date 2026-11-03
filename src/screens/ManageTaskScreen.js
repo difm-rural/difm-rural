@@ -1,3 +1,4 @@
+import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
@@ -231,7 +232,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     const provName = bid.provider?.full_name || 'this provider'
     Alert.alert(
       'Accept offer?',
-      `Accept ${provName}'s offer of $${bid.amount}? All other offers will be declined.`,
+      `Accept ${provName}'s offer of ${nzMoney(bid.amount)}? All other offers will be declined.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -322,7 +323,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   )
 
   const badge = getBadge()
-  const budgetText = job.price_type === 'fixed' ? `$${job.price}` : 'Open to offers'
+  const budgetText = job.price_type === 'fixed' ? `${nzMoney(job.price)}` : 'Open to offers'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
   const isAwarded = isJobAwarded(job.status)
@@ -347,7 +348,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   async function handleShare() {
     try {
-      const priceStr = job.price_type === 'fixed' ? `$${job.price} fixed price` : 'Open to offers'
+      const priceStr = job.price_type === 'fixed' ? `${nzMoney(job.price)} fixed price` : 'Open to offers'
       await Share.share({
         message: `Check out this job on Rural Connections: ${job.title} in ${job.location_name}. ${priceStr}`,
       })
@@ -610,7 +611,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                 </TouchableOpacity>
                 <View style={styles.infoBox}>
                   <Text style={styles.infoBoxText}>
-                    Awarded · ${acceptedBid.bidAmount} · Use chat with {otherPartyFirstName} to confirm timing and details
+                    Awarded · {nzMoney(acceptedBid.bidAmount)} · Use chat with {otherPartyFirstName} to confirm timing and details
                   </Text>
                 </View>
               </>
@@ -883,7 +884,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                         {bid.line_items.map((li, i) => (
                           <View key={i} style={styles.breakdownRow}>
                             <Text style={styles.breakdownLabel}>{li.label}</Text>
-                            <Text style={styles.breakdownAmount}>${(li.amount || 0).toFixed(2)}</Text>
+                            <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
                           </View>
                         ))}
                       </View>
@@ -894,7 +895,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                     {!!bid.available_from && (
                       <View style={styles.bidMetaRow}>
                         <Icon name="calendar-outline" size={13} color={colors.textMuted} />
-                        <Text style={styles.bidMeta}>Available from: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                        <Text style={styles.bidMeta}>Available from: {nzDate(new Date(bid.available_from))}</Text>
                       </View>
                     )}
                     {!!bid.estimated_duration && (

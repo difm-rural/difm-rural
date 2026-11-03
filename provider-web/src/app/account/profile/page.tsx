@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { PRIVATE_PROFILE_COLUMNS } from '@/lib/profile-input'

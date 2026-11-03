@@ -1,3 +1,5 @@
+import {formatDateLabel} from '../../shared/formatting.js'
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import {
@@ -43,13 +45,13 @@ function formatPricingType(type) {
 
 // A single additional rate option (base rate is shown separately).
 function formatVariantValue(v) {
-  const token = v.pricing_type === 'hourly' ? `$${v.rate}/hr`
-    : v.pricing_type === 'day_rate' ? `$${v.rate}/day`
-    : v.pricing_type === 'per_unit' ? `$${v.rate}/${v.unit_label || 'unit'}`
-    : `$${v.rate}`
+  const token = String(v.rate??'').trim()!=='' && Number(v.rate)===0 && !(Number(v.min_charge)>0) ? 'Free' : v.pricing_type === 'hourly' ? `${nzMoney(v.rate)}/hr`
+    : v.pricing_type === 'day_rate' ? `${nzMoney(v.rate)}/day`
+    : v.pricing_type === 'per_unit' ? `${nzMoney(v.rate)}/${v.unit_label || 'unit'}`
+    : `${nzMoney(v.rate)}`
   const bits = []
   if (v.min_units != null)  bits.push(`min ${v.min_units}`)
-  if (v.min_charge != null) bits.push(`min $${v.min_charge}`)
+  if (v.min_charge != null) bits.push(`min ${nzMoney(v.min_charge)}`)
   return bits.length ? `${token} (${bits.join(', ')})` : token
 }
 
@@ -270,7 +272,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
     : (service.unit_label || 'unit')
 
   const availabilityText = service.availability?.length
-    ? service.availability.join(', ')
+    ? service.availability.map(formatDateLabel).join(', ')
     : 'Flexible'
   const photos = Array.isArray(service.photos) ? service.photos : []
   const isOwnService = !!currentUserId && currentUserId === service.provider_id
@@ -406,12 +408,12 @@ export default function ServiceDetailScreen({ route, navigation }) {
               value={service.pricing_type === 'quote_required'
               ? 'Quote required'
               : service.pricing_type === 'hourly'
-              ? `$${rate}/hr`
+              ? `${nzMoney(rate)}/hr`
               : service.pricing_type === 'day_rate'
-              ? `$${rate}/day`
+              ? `${nzMoney(rate)}/day`
               : service.pricing_type === 'per_unit'
-              ? `$${rate}/${service.unit_label || 'unit'}`
-              : `$${rate} fixed`}
+              ? `${nzMoney(rate)}/${service.unit_label || 'unit'}`
+              : `${nzMoney(rate)} fixed`}
           />
           {service.max_units != null && (
             <DetailRow label="Capacity" value={`Grazing for up to ${service.max_units} head`} />
@@ -423,12 +425,12 @@ export default function ServiceDetailScreen({ route, navigation }) {
             />
           )}
           {service.min_charge != null && (
-            <DetailRow label="Minimum charge" value={`$${service.min_charge}`} />
+            <DetailRow label="Minimum charge" value={`${nzMoney(service.min_charge)}`} />
           )}
           {Array.isArray(service.pricing_variants) && service.pricing_variants.map((v, i) => (
             <DetailRow key={`variant-${i}`} label={v.label || 'Option'} value={formatVariantValue(v)} />
           ))}
-          {service.materials ? (
+          {(service.kind||'service')==='service' && service.materials ? (
             <DetailRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
           ) : null}
           {service.travel_range_km ? (
@@ -537,10 +539,10 @@ export default function ServiceDetailScreen({ route, navigation }) {
             </View>}
             <View style={styles.estimateResult}>
               <Text style={styles.estimateLabel}>Base estimate</Text>
-              <Text style={styles.estimateTotal}>${total}</Text>
+              <Text style={styles.estimateTotal}>{nzMoney(total)}</Text>
             </View>
             {estimate.minimumCharge > 0 && (
-              <DetailRow label="Minimum charge included" value={`$${estimate.minimumCharge.toFixed(2)}`} last />
+              <DetailRow label="Minimum charge included" value={`${nzMoney(estimate.minimumCharge.toFixed(2))}`} last />
             )}
             <Text style={styles.descText}>{BASE_ESTIMATE_EXPLANATION}</Text>
             {service.kind === 'grazing' && /\/(week|month)$/.test(effectiveUnitLabel || '') && (

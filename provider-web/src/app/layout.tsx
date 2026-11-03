@@ -1,3 +1,4 @@
+import {NavigationFeedback} from '@/components/navigation-feedback'
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
@@ -21,7 +22,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-NZ">
-      <body>{children}</body>
+      <body><NavigationFeedback>{children}</NavigationFeedback></body>
     </html>
   );
 }

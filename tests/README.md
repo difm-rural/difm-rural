@@ -395,3 +395,285 @@ The public-web project serves `/jobs`, `/jobs/[id]`, `/listings` and `/listings/
 - The shared resolver may use only `location_area` for fallback lookup. It must never use a hidden street address, location note, polygon or base-table job coordinates. Preserve masked `latitude` / `longitude`; keep separate `discovery_*` town-centre metadata and label the distance as a town-area estimate.
 - Verify mobile guest/signed-in feeds, public website and console return the same nearby result. Existing public exact pins take precedence. Jobs without a usable public area remain unlocated and available under All New Zealand.
 - Town lookups are deduplicated and cached for 24 hours, with at most four simultaneous lookups; failed requests can be retried. No job/profile records are updated by discovery.
+
+
+### Posting dates (jobs and listings)
+
+New or changed dates must be today or later in `Pacific/Auckland`. Today is allowed;
+range ends must be on or after the start. Existing historical dates may remain when
+editing unrelated details, and Available now / ASAP / Flexible remain supported.
+Mobile review and guest-draft publishing recheck dates; mobile date serialisation
+preserves the NZ calendar day instead of taking the UTC date prefix.
+
+Run `node --test tests/posting-dates.test.mjs tests/web-job-editor.test.mjs`.
+The additional SQL regression test must run only in a disposable PostgreSQL database:
+`psql -v ON_ERROR_STOP=1 -f tests/posting-dates.sql`. It creates fixture tables, applies
+the migration, checks rejected/accepted writes, and rolls back all changes.
+Deploy `20261103090000_validate_posting_dates.sql` for database enforcement; web and
+mobile UI checks alone cannot protect older clients or direct API writes.
+
+
+### Posting currency (jobs and listings)
+
+Fixed job budgets must be positive; primary listing rates may be zero. All posted
+currency fields use the existing $10,000,000 ceiling and at most two decimal places.
+Extras, minimum charges and alternate rates are checked as well. Neither form
+silently rounds malformed values. Both step progression and final publishing validate.
+Run `node --test tests/posting-money.test.mjs tests/web-job-editor.test.mjs`.
+For database enforcement deploy `20261103091000_validate_posting_amounts.sql`.
+The SQL regression test is disposable-database only:
+`psql -v ON_ERROR_STOP=1 -f tests/posting-money.sql`.
+No historical prices are rewritten; unchanged pricing does not block unrelated
+status updates, but new/changed prices must satisfy the limits.
+
+
+### Listing travel range
+
+Optional; when entered, a whole number from 0 to 2,000 km. Both app and web block
+invalid values at the location step and at publishing, without `parseFloat`
+truncation or silently replacing invalid input with null. Run
+`node --test tests/travel-range.test.mjs`. Deploy
+`20261103092000_validate_listing_travel_range.sql` for database enforcement.
+Run `tests/travel-range.sql` only in a disposable database. Historical records
+are not rewritten; unchanged travel range does not block unrelated updates.
+
+
+### Publish/save feedback and repeat taps
+
+Jobs and listings on web and mobile share a synchronous submission lock. Busy
+feedback starts before authentication, location checks or network writes, stays
+active through successful navigation/confirmation, and releases on errors or
+cancelled checks so drafts remain editable. Web listings also show photo-upload
+and navigation phases. Run `node --test tests/submission.test.mjs`.
+Manual regression: with a slow connection, tap Publish/Save twice quickly;
+confirm immediate feedback, one request, disabled action during navigation, and
+an actionable error plus enabled retry after a failed request.
+
+
+### Navigation/loading feedback
+
+Internal console page links retain Next.js prefetch/link behaviour and immediately
+show a loading panel while preserving the sidebar/mobile navigation. Direct loads
+use the same shell; login uses its own branded loading card. Hash jumps, same-page
+links, modifier clicks, downloads and external URLs keep normal browser behaviour.
+Slow loads offer Try again. Route completion, redirects and error pages settle the
+indicator. Mobile Home/Account retain a labelled header during initial data loads.
+Run `node --test tests/navigation-feedback.test.mjs`.
+Browser regression: click an uncached slow destination, open it directly, use a
+hash link and browser Back, and confirm navigation remains visible and loading
+clears when the next page or error arrives. Test with authenticated navigation as
+well before release; local UI fixtures must never be shipped.
+
+
+### View your own listing
+
+My listings cards have a clickable photo/title and an explicit View listing action
+on app and web. Web `/listings/[id]` uses the same authorised detail component as
+`/browse/[id]`, including owners' paused/closed previews and existing non-owner
+visibility restrictions. Owners return to My listings; management buttons remain
+separate from the view link. Run `node --test tests/own-listing-view.test.mjs`.
+Manual: view a live, paused and closed own listing, return to My listings, then
+confirm other users still cannot view paused/closed listings.
+
+
+### Listing wizard network interruption / generic error screen
+
+Wizard step changes are local state updates. New/edit job and listing pages keep
+notification badge polling but opt out of automatic RSC page refreshes while the
+form is open. This avoids a background refresh interrupting unsaved edits. Other
+screens retain live page refresh. Global errors offer Retry and Home, not a Sign
+in button for users who may already be signed in; actual expiry is handled by the
+auth guard. The reported intermittent ERR_CONNECTION_CLOSED was not reproduced,
+so this is interruption hardening rather than a confirmed network root-cause fix.
+Run `node --test tests/listing-wizard.test.mjs tests/web-alerts-refresh.test.mjs`.
+
+### Notification action navigation (#8)
+
+`notification-actions.test.mjs` exercises delayed web action results and mobile
+lookups: staying opens once, while Back/leaving prevents a late destination.
+Web actions return an authorised destination instead of a server redirect;
+read updates already sent can finish after leaving. Immediate pending labels
+and duplicate-submit locks replace ambiguous Saving feedback. Mobile lookups
+cancel on blur and row taps have a busy state. Phone/browser integration
+testing with signed-in accounts remains manual; no live notifications sent.
+
+### Field-specific posting feedback (#9)
+
+Job and listing wizards now associate inline messages with each invalid control
+using aria-invalid and aria-describedby, focus the first error on web, and clear
+corrected field highlights as the user types. Previously reached web steps are
+clickable; final submission validates every required step again. Listing advanced
+pricing errors identify individual extra-charge and alternate-rate rows.
+
+`job-form-feedback.test.mjs` and `listing-wizard.test.mjs` exercise missing fields,
+dates, clearing corrected fields and revisiting steps without database writes.
+Mobile job/listing forms show explicit missing-field feedback on Next and allow
+returning to earlier steps. Phone keyboard/screen-reader checks remain manual.
+
+### Empty job draft recovery (#10)
+
+The web job form saves only changes from its starting values. Empty legacy
+records, whitespace-only fields, unchanged edit/repeat seeds and malformed
+records do not trigger a resume prompt. Real edits (including clearing seeded
+content or changing privacy/timing) remain recoverable. Discarding or reverting
+to the starting values removes the tab-local draft rather than recreating it.
+
+`job-draft.test.mjs` covers draft classification; `job-form-feedback.test.mjs`
+executes the actual form effects with simulated session storage to check first
+visit, revisit, enabled fields, Resume and Discard. Mobile uses in-memory
+PostJobContext with no resume prompt, so no mobile behavior change is needed.
+
+### Posting text lengths (#11)
+
+Shared limits are 160 characters for titles and 2,000 for descriptions, for jobs
+and listings on mobile and web. Controls show counters and maximum lengths;
+step/final checks also reject overlong AI/restored drafts without truncation.
+Pending guest job submissions and web job server input validate lengths too.
+Migration 20261103093000 enforces lengths on INSERT/changed text in both tables,
+while permitting unrelated updates to historical rows. It is not applied live.
+`posting-text.test.mjs`, the form harness tests and disposable-database
+`posting-text.sql` verify limits and preserved historical content.
+
+### Public area formatting (#12)
+
+`shared/publicArea.ts` accepts place-name letters (including Māori macrons),
+numbers and normal regional punctuation, and rejects markup, emoji, double
+quotes and internal control characters. It validates rather than silently
+rewriting names. This is a format check, not proof of a real or nearby town.
+Web shows an inline area error; server posting validates independently. Mobile
+checks its derived public area at Location, final review and guest handoff,
+while retaining the existing option to skip location entirely. No existing
+records are rewritten and no database migration is needed for this copy rule.
+Tests cover accepted names, bad text, web step blocking and server enforcement.
+
+### Match alert distance snapshots (#13)
+
+Home renders match-notification text, which formerly embedded a rounded distance
+from the saved profile to the exact job pin when matched. Jobs calculates a
+current browsing distance and may use a public town centre for private jobs.
+Those values can legitimately differ; this is not a rounding-only discrepancy.
+Shared notificationBody removes legacy match snapshot distances from Home and
+Notifications on mobile/web. Migration 20261103094000 omits the snapshot in new
+instant match bodies/metadata, without rewriting existing notifications.
+The specific tester record has not been inspected; this is the confirmed code
+path that can produce the reported discrepancy. Current Jobs distances remain
+labelled About/town area. No need to send the requested screenshot unless the
+discrepancy appears somewhere other than a match notification.
+
+### NZ date and money display (#14)
+
+`shared/formatting.js` is used by mobile, console and public-site cards, details,
+reviews, booking summaries, offers, listing rates and extra charges. Dates show
+1 Dec 2026; date-only values retain their day and timestamps use Auckland time.
+Money uses thousands separators, no NZD suffix, and two decimal places when
+cents are present. Numeric input/storage/calculations remain unformatted.
+Relative times and Member since month/year summaries remain concise.
+Web DateInput preserves the native calendar picker and echoes the selected date
+in unambiguous NZ words. Native picker order still follows browser/OS regional
+settings; the input value remains ISO for validation/submission.
+
+### Public name save feedback (#15)
+
+Web profile names are controlled and validated before submission. Empty or
+whitespace-only names show an inline associated error and focus the name field;
+valid input retains its value after server failures. General server errors are
+shown at the top and focused. The ordinary hint uses neutral wording and stale
+results clear when fields change. Server validation uses the same shared name
+rule. Mobile Account and legacy Profile editors show inline name errors, keep
+the modal open and save trimmed full_name/display_name together.
+`profile-name.test.mjs` tests the actual web form and both mobile save functions
+without changing live profiles.
+
+### Saved-item naming and route aliases (#17)
+
+Account, Jobs, management screens and save confirmations use Saved searches &
+alerts for searches/follows/alert settings; individual bookmarks use Saved jobs.
+Mobile mirrors the display wording; technical identifiers and persisted data
+are unchanged. Next config redirects /saved-searches to /account/interests and
+/saved-jobs to /jobs/saved. Local HTTP checks returned 307 and confirmed query
+strings are preserved. Destination pages retain their existing auth checks.
+
+### Listing card presentation (#18)
+
+Shared listingCardCopy suppresses headline/supporting overlays that duplicate a
+title or description while retaining distinct custom copy. Both native card
+styles use this rule; mobile titles explicitly use tail ellipses and reserve
+two lines. Console/public cards reserve title/description space, use line clamps
+and normal word wrapping, and stretch within each row. Console discovery cards
+now include the listing description. Full content remains available on detail
+pages; uploaded photographs are not edited.
+Render/unit tests check overlay deduplication and retained taglines. A temporary
+local development fixture was visually checked in the browser with short and
+long cards; rows aligned and ellipses rendered. Fixture/tab removed afterwards.
+Actual phone layout and text baked into uploaded photos require manual review.
+
+### Console desktop and zoom layout (#19)
+
+Console work pages use available width up to 1,280 px; their forms no longer
+inherit the old 620 px cap. Sidebar is sticky, viewport-height and independently
+scrollable. At 1,024 CSS px or less it becomes the compact menu/tab layout; the
+expanded menu can scroll on short/zoomed viewports. Button/link labels are
+centred, redundant detail-header spacing is removed, and a lone job photo stays
+a compact thumbnail instead of expanding across the entire detail card.
+
+A temporary local AppShell fixture (no authentication or live writes) was checked
+at 1280x800 and 640x400 CSS px. Desktop form measured 932 px with no horizontal
+overflow; sidebar top stayed 0 after scrolling 1,565 px. At 640 px, Menu/tabs
+appeared and expanded navigation scrolled to Account. This checks the layout
+equivalent of 200% zoom on a 1280-wide window, not literal browser zoom controls.
+Fixture removed and viewport reset afterwards.
+
+### Listing and discovery copy (#20)
+
+Listing types use Service/Grazing/Hire/Lease/For sale on both platforms. Photo
+instructions say Add up to 4 photos; main wizard steps use Next, Review listing,
+then Publish listing (Save changes for edits). Duplicate pricing headings were
+removed, pricing choices say Pricing type and Quote required, browsing-origin
+labels form grammatical sentences, and management is titled My listings rather
+than Provider console. Materials copy is shown only for service listings.
+
+Zero base rates are intentionally supported by the existing pricing rules.
+Forms now explain them, and rate displays say Free, or Minimum $… when a positive
+minimum charge exists. Extra charges remain separately disclosed. Shared display
+and booking-payment tests cover free/quote/minimum distinctions and service-only
+materials wording. No validation or database pricing policy was changed.
+
+### Listing control names (#21)
+
+Listing management actions now have visible Edit/Delete text, listing-specific
+accessible names, and decorative SVGs hidden from assistive technology. Sign out
+has visible text as well as its existing accessible name. Mobile View/Edit/Delete
+labels identify the target listing. Browser AX inspection of live, paused and
+closed fixture cards confirmed named controls and Sign out; no business action
+was clicked. The temporary local fixture/tab were removed. The old empty-name
+report was not reproduced: generic Edit/Delete/Sign out labels already existed
+in current source. Actual screen-reader/device testing remains manual.
+
+### Job Maps and saved timing (#22)
+
+jobMapTarget requires a usable visible pin and distinguishes address-shaped
+property locations from town-only text. Town-only/masked records do not receive
+a property-navigation action. Pins without an address, plus codes and mapped
+areas retain a pin-specific label; this is not address-existence verification.
+The helper is shared by web job detail and mobile navigation/thumbnail actions.
+
+Web timing now uses the actual named select while that step is visible and a
+single hidden value on later steps. Editor initialisation normalises saved type
+case/whitespace, infers Specific/Range only when the legacy type is absent, and
+shows unsupported saved choices for review instead of defaulting to Flexible.
+Mobile edit initialisation uses the same rule and retains saved range choices.
+Browser verification of a local specific-date fixture confirmed option, date
+and Next/Previous preservation. Fixture removed. Original tester record was not
+identified, so its mismatch was not reproduced or attributed conclusively.
+
+### Stable email-step action (#23)
+
+Web and mobile use Continue throughout email entry instead of relabelling the
+button when the review address is detected. Shared method hints explain email
+codes for ordinary accounts and the password step for the review account.
+Web cooldown feedback is separate from the stable action label. Password and
+verification stages retain their action-specific Sign in / Verify labels.
+The component regression test verifies a stable button while typing either
+address, accessible hint association and a password handoff without an OTP call.
+Existing mocked-auth tests still verify ordinary OTP and review password login;
+no live sign-in requests or credential changes were made.

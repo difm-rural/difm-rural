@@ -13,7 +13,7 @@ export function browseHref(path:string,f:ReturnType<typeof browseFilters>){const
 export function publicJobsQuery(client:SupabaseClient){return client.from('jobs_public').select(JOB_COLUMNS).eq('status','open').eq('visibility','public')}
 export function publicListingsQuery(client:SupabaseClient){return client.from('services').select(LISTING_COLUMNS).eq('is_active',true).is('closed_at',null)}
 export function publicQuery(client:SupabaseClient,kind:'jobs'|'listings'){return kind==='jobs'?publicJobsQuery(client):publicListingsQuery(client)}
-export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;distance?:number|null;distanceApproximate?:boolean}
+export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;min_charge?:number|null;distance?:number|null;distanceApproximate?:boolean}
 export async function publicRows(client:SupabaseClient,kind:'jobs'|'listings',origin:Point|null=null){
  const rows:PublicRow[]=[]
  for(let offset=0;;offset+=500){const {data,error}=await publicQuery(client,kind).order('created_at',{ascending:false}).order('id').range(offset,offset+499);if(error)throw error;rows.push(...(data as unknown as PublicRow[] || []));if(!data || data.length<500)break}

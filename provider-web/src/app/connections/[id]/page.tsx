@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import {notFound} from 'next/navigation'
 import {AppShell} from '@/components/app-shell'
 import {requireProvider} from '@/lib/auth'

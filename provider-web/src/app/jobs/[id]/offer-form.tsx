@@ -1,4 +1,5 @@
 'use client'
+import {DateInput} from '@/components/date-input'
 import {useState} from 'react'
 import {ActionForm} from '@/components/action-form'
 import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,formatOfferAmount} from '@shared/offers'
@@ -15,7 +16,7 @@ export function OfferForm({jobId,offer,providerMaterials}:{jobId:string;offer?:O
   <strong>Offer: {formatOfferAmount(total,pricing)}</strong><p className="muted">For hourly or per-unit pricing, these lines add up to the rate for one hour or unit. Agree the quantity and final amount directly.</p>
   {providerMaterials&&<label className="lform-field">Materials pricing<select name="materials" defaultValue={offer?.materials || 'included'}>{OFFER_MATERIALS_OPTIONS.map(m=><option value={m.id} key={m.id}>{m.label}</option>)}</select></label>}
   <label className="lform-field">Message (optional)<textarea name="message" maxLength={5000} rows={4} defaultValue={offer?.message || ''} placeholder="Explain how you can help and what your price includes."/></label>
-  <label className="lform-field">Available from (optional)<input type="date" name="available_from" defaultValue={offer?.available_from || ''}/></label><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} defaultValue={offer?.estimated_duration || ''} placeholder="e.g. Half a day"/></label>
+  <label className="lform-field">Available from (optional)<DateInput type="date" name="available_from" defaultValue={offer?.available_from || ''}/></label><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} defaultValue={offer?.estimated_duration || ''} placeholder="e.g. Half a day"/></label>
   <p className="muted">The requester will review your offer. Work is agreed when they accept.</p>
  </ActionForm>
 }

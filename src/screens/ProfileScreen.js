@@ -1,3 +1,4 @@
+import {publicNameError,PUBLIC_NAME_MAX} from '../../shared/profileName'
 /*
  * SUPABASE SETUP REQUIRED
  *
@@ -148,22 +149,29 @@ export default function ProfileScreen({ navigation }) {
     }
   }
 
+  const [editError,setEditError]=useState('')
   function openEdit(field, label, value, keyboardType = 'default') {
+    setEditError('')
     setEditModal({ visible: true, field, label, value: value || '', keyboardType })
   }
 
   async function saveEdit() {
-    const { field, value } = editModal
+    if(saving)return
+    const {field,value}=editModal
+    const nameIssue=field==='full_name'?publicNameError(value):''
+    if(nameIssue){setEditError(nameIssue);return}
+    setEditError('')
+    const patch=field==='full_name'?{full_name:value.trim(),display_name:value.trim()}:{[field]:value}
     setSaving(true)
     const { error } = await supabase
       .from('profiles')
-      .update({ [field]: value })
+      .update(patch)
       .eq('id', userId)
     setSaving(false)
     if (error) {
       Alert.alert('Error', 'Could not save changes. Please try again.')
     } else {
-      setProfile(p => ({ ...p, [field]: value }))
+      setProfile(p => ({ ...p, ...patch }))
       setEditModal(m => ({ ...m, visible: false }))
     }
   }
@@ -540,9 +548,10 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>{editModal.label}</Text>
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, !!editError && {borderColor:colors.danger,borderWidth:2}]}
+              maxLength={editModal.field==='full_name'?PUBLIC_NAME_MAX:undefined}
               value={editModal.value}
-              onChangeText={v => setEditModal(m => ({ ...m, value: v }))}
+              onChangeText={v => {setEditError('');setEditModal(m => ({ ...m, value: v }))}}
               keyboardType={editModal.keyboardType}
               autoFocus
               returnKeyType="done"
@@ -551,6 +560,7 @@ export default function ProfileScreen({ navigation }) {
               placeholderTextColor={colors.textMuted}
               accessibilityLabel={editModal.label}
             />
+            {!!editError && <Text accessibilityRole="alert" style={{color:colors.danger,marginBottom:12}}>{editError}</Text>}
             <View style={styles.modalActions}>
               <Button
                 variant="secondary"

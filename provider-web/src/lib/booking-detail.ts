@@ -24,7 +24,7 @@ export function readPricingSnapshot(value:unknown):PricingSnapshot|null{
 export function unitName(s:{pricing_type?:string;unit_label?:string|null}){return s.pricing_type==='hourly'?'hours':s.pricing_type==='day_rate'?'days':s.unit_label || 'units'}
 export function paymentCopy(s:{kind?:string|null;unit_label?:string|null;payment_timing?:string|null;materials?:string|null}){
  const base=s.kind==='for_sale'?'Agree payment directly with the seller.':s.kind==='grazing'||s.kind==='lease'?'Agree the duration and payment schedule directly with the provider.':s.payment_timing==='upfront'?'The provider asks for payment upfront. Agree the arrangements directly.':'Arrange payment directly with the provider when the work is complete.'
- return base+(s.materials==='estimate'?' Materials are estimated and billed separately at actual cost.':'')+' Rural Connections does not handle payments.'
+ return base+((s.kind||'service')==='service'&&s.materials==='estimate'?' Materials are estimated and billed separately at actual cost.':'')+' Rural Connections does not handle payments.'
 }
 export type BookingResponse={id:string;status:string;requester_id:string;provider_id:string;quote_amount:number|null;quote_notes?:string|null;quote_sent_at:string|null;pricing_snapshot?:unknown}
 export function bookingResponseActions(b:BookingResponse,userId:string,pricingType:string){

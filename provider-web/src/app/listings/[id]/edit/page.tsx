@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
@@ -22,7 +22,7 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   if (!listing) notFound()
 
   return (
-    <AppShell providerName={(profile?.full_name as string) ?? 'Provider'}>
+    <AppShell refreshOnAlerts={false} providerName={(profile?.full_name as string) ?? 'Provider'}>
       <section className="page">
         <Link href="/listings" className="card-link"><ArrowLeft size={14} /> Back to listings</Link>
         <h1 style={{ marginTop: 12 }}>Edit listing</h1>

@@ -1,5 +1,6 @@
 import { ALL_CAPABILITIES, CATEGORIES } from '@shared/categories'
 import { PROVIDER_AVAILABILITY_OPTIONS } from '@shared/providerAvailability'
+import {publicNameError} from '@shared/profileName'
 
 export const PUBLIC_PROFILE_COLUMNS='id,full_name,display_name,avatar_url,bio,skills,qualifications,region,created_at,availability_status,availability_until,availability_updated_at'
 export const PRIVATE_PROFILE_COLUMNS=PUBLIC_PROFILE_COLUMNS+',phone,address,latitude,longitude'
@@ -7,7 +8,7 @@ type Validation<T>={ok:true;value:T}|{ok:false;error:string}
 const text=(data:FormData,key:string)=>typeof data.get(key)==='string'?String(data.get(key)).trim():''
 export function profileInput(data:FormData,current:{avatar_url?:string|null;skills?:string[]|null},userId:string,baseUrl:string){
   const name=text(data,'full_name'),region=text(data,'region'),phone=text(data,'phone'),bio=text(data,'bio'),address=text(data,'address'),avatar=text(data,'avatar_url')
-  if(!name || name.length>80)return {ok:false as const,error:'Add a public name of up to 80 characters.'}
+  if(publicNameError(name))return {ok:false as const,error:publicNameError(name)}
   if(!region || region.length>120)return {ok:false as const,error:'Add your public town or region (up to 120 characters).'}
   if(bio.length>1500 || address.length>300)return {ok:false as const,error:'Keep your bio to 1,500 characters and your address to 300 characters.'}
   if(phone && (!/^[+\d\s().-]+$/.test(phone) || phone.replace(/\D/g,'').length<7 || phone.replace(/\D/g,'').length>15))return {ok:false as const,error:'Enter a valid phone number, including area code, or leave it blank.'}
@@ -33,8 +34,10 @@ export function availabilityInput(data:FormData,now=new Date()):Validation<{avai
   const status=text(data,'availability_status'),until=text(data,'availability_until')
   if(status!=='unknown' && !PROVIDER_AVAILABILITY_OPTIONS.some(o=>o.value===status))return {ok:false,error:'Choose an availability option.'}
   if(status==='unavailable_until'){
+    if(!until)return {ok:false,error:'Choose a date.'}
     const date=new Date(until+'T12:00:00Z')
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(until) || Number.isNaN(date.getTime()) || date.toISOString().slice(0,10)!==until || until<nzToday(now))return {ok:false,error:'Choose today or a future date for your unavailable-until date.'}
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(until) || Number.isNaN(date.getTime()) || date.toISOString().slice(0,10)!==until)return {ok:false,error:'Choose a valid date.'}
+    if(until<nzToday(now))return {ok:false,error:'Choose today or a future date.'}
   }
   return {ok:true,value:{availability_status:status,availability_until:status==='unavailable_until'?until:null,availability_updated_at:now.toISOString()}}
 }

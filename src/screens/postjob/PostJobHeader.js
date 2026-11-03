@@ -1,4 +1,5 @@
 import React from 'react'
+import {useNavigation} from '@react-navigation/native'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../theme/tokens'
@@ -11,6 +12,8 @@ const STEPS = ['Basics', 'Location', 'Details', 'Budget', 'Review']
 
 export default function PostJobHeader({ currentStep, title, onBack }) {
   const insets = useSafeAreaInsets()
+  const navigation=useNavigation()
+  const routes=[navigation.getState().routeNames.includes('GuestPostJob')?'GuestPostJob':'PostJob','PostJobStep2Location','PostJobStep3Details','PostJobStep4Budget','PostJobStep5Review']
   return (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <View style={styles.titleRow}>
@@ -33,7 +36,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
           const done   = n < currentStep
           const active = n === currentStep
           return (
-            <View key={n} style={styles.stepItem}>
+            <TouchableOpacity key={n} style={styles.stepItem} disabled={!done} accessibilityRole="button" accessibilityLabel={'Go to '+label} onPress={()=>navigation.popTo(routes[i])}>
               <View style={[styles.dot, done && styles.dotDone, active && styles.dotActive]}>
                 <Text style={[styles.dotNum, (done || active) && styles.dotNumLight]}>
                   {done ? <Icon name="checkmark" size={13} color={colors.primary} /> : String(n)}
@@ -42,7 +45,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
               <Text style={[styles.stepLabel, active && styles.stepLabelActive]} numberOfLines={1}>
                 {label}
               </Text>
-            </View>
+            </TouchableOpacity>
           )
         })}
       </View>

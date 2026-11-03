@@ -1,5 +1,6 @@
 'use client'
-import Link from 'next/link'
+import {formatDateTime as nzDateTime} from '@shared/formatting'
+import Link from '@/components/navigation-link'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ImagePlus, MapPin, Send, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -87,7 +88,7 @@ export function Conversation({context}:{context:ConversationContext}){
         {body.type==='photo'?<><a href={body.url} target="_blank" rel="noopener noreferrer"><img className="message-photo" src={body.url} alt={body.caption || 'Shared photo'} loading="lazy"/></a>{body.caption && <p>{body.caption}</p>}</>
         :body.type==='location'?<><p>{body.text}</p>{body.latitude!==null && body.longitude!==null && <a className="message-map" target="_blank" rel="noopener noreferrer" href={'https://www.google.com/maps/search/?api=1&query='+body.latitude+','+body.longitude}>Open shared location in Maps ↗</a>}</>
         :<p>{body.text}</p>}
-        <time className="bubble-time" dateTime={m.created_at}>{new Date(m.created_at).toLocaleString('en-NZ',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</time>
+        <time className="bubble-time" dateTime={m.created_at}>{nzDateTime(new Date(m.created_at))}</time>
       </article>})}<div ref={endRef}/>
     </div>
     {context.closed?<p className="message-closed">This arrangement has ended. You can still read its messages.</p>:<form className="reply message-compose" onSubmit={send}>

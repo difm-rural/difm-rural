@@ -1,3 +1,9 @@
+import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
+import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../shared/postingText'
+import {runSubmission} from '../../shared/submission'
+import {travelRangeError,travelRangeValue} from '../../shared/travelRange'
+import {listingMoneyError} from '../../shared/postingMoney'
+import {listingDateError,nzCalendarDay} from '../../shared/postingDates'
 import {confirmPublishingLocation} from '../lib/publishingLocation'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -84,12 +90,12 @@ function toDateValue(value) {
 function formatDisplayDate(value) {
   const date = toDateValue(value)
   if (!date) return ''
-  return date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return nzDate(date)
 }
 
 function formatAvailabilityPayload(value) {
   const date = toDateValue(value)
-  return date ? [date.toISOString().split('T')[0]] : null
+  return date ? [nzCalendarDay(date)] : null
 }
 
 function formatMissingField(field) {
@@ -320,20 +326,29 @@ export default function CreateServiceScreen({ navigation, route }) {
     })
   }
 
+  const [attempted,setAttempted]=useState(false)
+  const moneyError=listingMoneyError({pricingType,rate,minCharge,addOns:pricingAddOns,variants:pricingVariants})
   function canProceed() {
     if (locationSelecting) return false
-    if (step === 1) return !!(title.trim() && category)
-    if (step === 2) return true
-    if (step === 3) return !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
-    if (step === 4) return !!locationName.trim()
-    if (step === 5) return !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
+    if (step === 1) return !postingTextError(title,'title') && !!(title.trim() && category)
+    if (step === 2) return !postingTextError(description,'description')
+    if (step === 3) return !moneyError && !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
+    if (step === 4) return !travelRangeError(travelRange) && !listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && !!locationName.trim()
+    if (step === 5) return !travelRangeError(travelRange) && !moneyError && !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
     return true
+  }
+
+  function nextWithValidation(){
+    setAttempted(true)
+    if(!canProceed()){formScrollRef.current?.scrollTo({y:0,animated:true});return}
+    setAttempted(false)
+    animateStep(step+1,'forward')
   }
 
   // Thin wrapper over the shared pure formatRate — passes this component's state
   // so web and RN share one rate-display rule (see /shared/listingPricing.ts).
   function formatRate() {
-    return formatRateShared(pricingType, rate, unitLabel)
+    return formatRateShared(pricingType, rate, unitLabel,minCharge)
   }
 
   function normalizeCategory(value) {
@@ -811,10 +826,21 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   async function handlePublish() {
     if (locationSelecting || publishingRef.current) return
-    publishingRef.current = true
-    try { await publishListing() } finally { publishingRef.current = false }
+    await runSubmission(publishingRef,publishListing,()=>setSubmitting(true),()=>setSubmitting(false),()=>Alert.alert('Could not save listing','Your changes are kept. Check your connection and try again.'))
   }
   async function publishListing() {
+    const textError=postingTextError(title,'title')||postingTextError(description,'description')
+    if(textError){Alert.alert('Check listing text',textError);setStep(postingTextError(title,'title')?1:2);return}
+    setAttempted(true)
+    if(!title.trim()||!category){setStep(1);return}
+    if(!locationName.trim()){setStep(4);return}
+
+    const rangeError=travelRangeError(travelRange)
+    if(rangeError){Alert.alert('Check travel range',rangeError);setStep(4);return}
+    const pricingError=listingMoneyError({pricingType,rate,minCharge,addOns:pricingAddOns,variants:pricingVariants})
+    if(pricingError){Alert.alert('Check pricing',pricingError);setStep(3);return}
+    const dateError=listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null)
+    if(dateError){Alert.alert('Check availability',dateError);setStep(4);return}
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to publish a listing.')
@@ -872,7 +898,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       category,
       location_name: locationName.trim(),
       ...listingLocationFields(locationPin),
-      travel_range_km: travelRange ? parseFloat(travelRange) : null,
+      travel_range_km: travelRangeValue(travelRange),
       kind,
       direction: 'offering',
       pricing_type: pricingType,
@@ -952,10 +978,10 @@ export default function CreateServiceScreen({ navigation, route }) {
       })
     }
 
-    setSubmitting(false)
     Alert.alert(isEditing ? 'Listing updated!' : 'Listing published!', isEditing ? 'Your listing has been updated.' : 'Your listing is now live.', [
       { text: 'OK', onPress: leavePublishScreen },
     ])
+    return true
   }
 
   async function handleDeleteService() {
@@ -1019,7 +1045,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <View style={styles.progressWrap}>
         {STEP_LABELS.map((_, index) => index + 1).map(s => (
-          <View key={s} style={[styles.progressPill, s <= step && styles.progressPillActive]} />
+          <TouchableOpacity key={s} accessibilityRole="button" accessibilityLabel={'Go to '+STEP_LABELS[s-1]} disabled={s>=step||submitting} onPress={()=>{setAttempted(false);animateStep(s,'backward')}} style={{flex:1,minHeight:32,justifyContent:'center'}}><View style={[styles.progressPill, {flex:0}, s <= step && styles.progressPillActive]}/></TouchableOpacity>
         ))}
       </View>
     )
@@ -1039,9 +1065,10 @@ export default function CreateServiceScreen({ navigation, route }) {
 
         <Text style={styles.fieldLabel}>Listing title</Text>
         <TextInput
-          style={[styles.input, styles.titleInput]}
+          style={[styles.input, styles.titleInput, (attempted && !title.trim() || !!postingTextError(title,'title')) && {borderColor:colors.danger,borderWidth:2}]}
           placeholder={KIND_COPY[kind]?.titlePlaceholder || 'e.g. Tractor topping with operator'}
           placeholderTextColor={colors.textMuted}
+          maxLength={POSTING_TITLE_MAX}
           value={title}
           onChangeText={setTitle}
           multiline
@@ -1050,9 +1077,13 @@ export default function CreateServiceScreen({ navigation, route }) {
           autoCapitalize="sentences"
           accessibilityLabel="Listing title"
         />
+        <Text style={styles.locationHelp}>{title.length} / {POSTING_TITLE_MAX} characters</Text>
+        {!!postingTextError(title,'title') && <Text accessibilityRole="alert" style={{color:colors.danger}}>{postingTextError(title,'title')}</Text>}
 
+        {attempted && !title.trim() && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter a listing title.</Text>}
         <Text style={styles.fieldLabel}>Category</Text>
-        <View style={styles.chipWrap}>
+        {attempted && !category && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose a listing category.</Text>}
+        <View style={[styles.chipWrap, attempted && !category && {borderColor:colors.danger,borderWidth:2}]}>
           {(LISTING_CATEGORIES[kind] || CATEGORIES).map(cat => (
             <TouchableOpacity
               key={cat}
@@ -1081,9 +1112,10 @@ export default function CreateServiceScreen({ navigation, route }) {
 
         <Text style={styles.fieldLabel}>Description <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
-          style={[styles.input, styles.descriptionInput]}
+          style={[styles.input, styles.descriptionInput, !!postingTextError(description,'description') && {borderColor:colors.danger,borderWidth:2}]}
           placeholder="What is included, what gear you use, and what area you cover..."
           placeholderTextColor={colors.textMuted}
+          maxLength={POSTING_DESCRIPTION_MAX}
           value={description}
           onChangeText={setDescription}
           multiline
@@ -1096,6 +1128,8 @@ export default function CreateServiceScreen({ navigation, route }) {
           onFocus={() => { descriptionFocusedRef.current = true }}
           onBlur={() => { descriptionFocusedRef.current = false }}
         />
+        <Text style={styles.locationHelp}>{description.length} / {POSTING_DESCRIPTION_MAX} characters</Text>
+        {!!postingTextError(description,'description') && <Text accessibilityRole="alert" style={{color:colors.danger}}>{postingTextError(description,'description')}</Text>}
 
         <Text style={styles.fieldLabel}>Listing photo <Text style={styles.optional}>(optional)</Text></Text>
         <Text style={styles.fieldHelp}>Add a photo to make your card more recognisable. You can take one now or choose one from your phone.</Text>
@@ -1265,8 +1299,9 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <>
         <Text style={styles.stepHeading}>How is it priced?</Text>
+        {!!moneyError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: 12 }}>{moneyError}</Text>}
 
-        <Text style={styles.fieldLabel}>Pricing</Text>
+        <Text style={styles.fieldLabel}>Pricing type</Text>
         <View style={styles.segmentGrid}>
           {cfg.types.map(id => (
             <TouchableOpacity
@@ -1291,7 +1326,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.fieldLabel}>Rate</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, !!moneyError && moneyError.startsWith('Rate') && {borderColor:colors.danger,borderWidth:2}]}
                   placeholder="120"
                   placeholderTextColor={colors.textMuted}
                   value={rate}
@@ -1299,6 +1334,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                   keyboardType="numeric"
                   accessibilityLabel="Rate in dollars"
                 />
+                <Text style={styles.locationHelp}>Enter 0 if there is no base rate. Any minimum or extra charges still apply. Choose Quote required if the price needs to be agreed.</Text>
               </View>
               {pricingType === 'per_unit' && cfg.unit === 'free' && (
                 <View style={{ flex: 1 }}>
@@ -1590,6 +1626,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         <Text style={styles.stepHeading}>Where is it available?</Text>
 
         <Text style={styles.fieldLabel}>Location</Text>
+        <View style={attempted && !locationName.trim() ? {borderColor:colors.danger,borderWidth:2,borderRadius:8} : undefined}>
         <AddressAutocomplete
           inline
           placeholder="Search for a town or address..."
@@ -1598,22 +1635,26 @@ export default function CreateServiceScreen({ navigation, route }) {
           onSelect={selected => { setLocationName(selected.address); setLocationPin(existingListingPin(selected)) }}
           onSelectingChange={setLocationSelecting}
         />
+        </View>
+        {attempted && !locationName.trim() && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter the listing location.</Text>}
         <Text style={styles.locationHelp}>{locationPin ? 'Map location selected — this listing can appear in nearby searches.' : 'Choose a suggestion to add a map location for nearby searches. You can also enter the location manually.'} This listing location is public; choose a town if you prefer not to show an exact address.</Text>
 
         <Text style={styles.fieldLabel}>Travel range <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput
-          style={styles.input}
-          placeholder="e.g. 50 km"
+          style={[styles.input, !!travelRangeError(travelRange) && {borderColor:colors.danger,borderWidth:2}]}
+          placeholder="e.g. 50"
           placeholderTextColor={colors.textMuted}
           value={travelRange}
           onChangeText={setTravelRange}
           keyboardType="numeric"
           accessibilityLabel="Travel range in kilometres"
         />
+        <Text style={styles.locationHelp}>Optional. Enter a whole number from 0 to 2,000 km.</Text>
+        {!!travelRangeError(travelRange) && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{travelRangeError(travelRange)}</Text>}
 
         <Text style={styles.fieldLabel}>Available from <Text style={styles.optional}>(optional)</Text></Text>
         <TouchableOpacity
-          style={styles.datePickerBtn}
+          style={[styles.datePickerBtn, !!listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && {borderColor:colors.danger,borderWidth:2}]}
           onPress={() => setShowDatePicker(true)}
           accessibilityRole="button"
           accessibilityLabel="Select available from date">
@@ -1622,6 +1663,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           </Text>
           <Icon name="calendar-outline" size={18} color={colors.textMuted} />
         </TouchableOpacity>
+        {!!listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null)}</Text>}
         {availableFrom && (
           <TouchableOpacity onPress={() => setAvailableFrom(null)} style={styles.clearDateBtn}>
             <Text style={styles.clearDateText}>Clear date</Text>
@@ -1762,7 +1804,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               </View>
             )}
             {!!minCharge.trim() && pricingType !== 'quote_required' && pricingType !== 'fixed' && (
-              <Text style={styles.finalCardMinCharge}>Minimum charge ${minCharge.trim()}</Text>
+              <Text style={styles.finalCardMinCharge}>Minimum charge {nzMoney(minCharge.trim())}</Text>
             )}
             {reviewAddOns.length > 0 && (
               <View style={styles.finalCardAddOns}>
@@ -1828,8 +1870,8 @@ export default function CreateServiceScreen({ navigation, route }) {
         {step === 1 ? (
           <Button
             title="Next"
-            onPress={() => animateStep(2, 'forward')}
-            disabled={!canProceed()}
+            onPress={nextWithValidation}
+            disabled={locationSelecting||submitting}
             accessibilityLabel="Next step"
           />
         ) : (
@@ -1842,20 +1884,20 @@ export default function CreateServiceScreen({ navigation, route }) {
             />
             {step < 5 ? (
               <Button
-                title="Next"
-                onPress={() => animateStep(step + 1, 'forward')}
-                disabled={!canProceed()}
+                title={step === 4 ? 'Review listing' : 'Next'}
+                onPress={nextWithValidation}
+                disabled={locationSelecting||submitting}
                 style={{ flex: 1 }}
-                accessibilityLabel="Next step"
+                accessibilityLabel={step === 4 ? 'Review listing' : 'Next step'}
               />
             ) : (
               <Button
-                title={isEditing ? 'Save' : 'Publish'}
+                title={submitting ? (isEditing ? 'Saving…' : 'Publishing…') : isEditing ? 'Save changes' : 'Publish listing'}
                 onPress={handlePublish}
                 loading={submitting}
-                disabled={!canProceed()}
+                disabled={locationSelecting||submitting}
                 style={{ flex: 1 }}
-                accessibilityLabel="Publish listing"
+                accessibilityLabel={isEditing?'Save changes':'Publish listing'}
               />
             )}
           </View>

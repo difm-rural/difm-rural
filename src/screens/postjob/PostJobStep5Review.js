@@ -1,3 +1,9 @@
+import {formatMoney as nzMoney,formatDate as nzDate} from '../../../shared/formatting.js'
+import {publicAreaError} from '../../../shared/publicArea'
+import {postingTextError} from '../../../shared/postingText'
+import {runSubmission} from '../../../shared/submission'
+import {moneyInputError} from '../../../shared/postingMoney'
+import {jobScheduleError,nzCalendarDay} from '../../../shared/postingDates'
 import {confirmPublishingLocation} from '../../lib/publishingLocation'
 import React, { useRef, useState, useEffect } from 'react'
 import {
@@ -29,7 +35,7 @@ const SCHEDULE_LABELS = {
 }
 
 function fmtDay(v) {
-  return typeof v === 'string' ? v.split('T')[0] : new Date(v).toISOString().split('T')[0]
+  return nzCalendarDay(v)
 }
 
 const MATERIALS_LABELS = {
@@ -48,7 +54,7 @@ const ACCESS_LABELS = {
 
 function formatDate(iso) {
   if (!iso) return null
-  return new Date(iso).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return nzDate(new Date(iso))
 }
 
 function AuthSheet({ onDismiss, onLogin }) {
@@ -144,7 +150,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     : scheduleType === 'range' && dateFrom && dateTo
     ? `${formatDate(dateFrom)} – ${formatDate(dateTo)}`
     : scheduleLabel
-  const budgetDisplay   = priceType === 'fixed' ? `$${price} (fixed price)` : 'Open to offers'
+  const budgetDisplay   = priceType === 'fixed' ? `${nzMoney(price)} (fixed price)` : 'Open to offers'
 
   const mapImgUri = areaPolygon.length > 0
     ? staticMapPolygonUrl(areaPolygon)
@@ -203,21 +209,20 @@ export default function PostJobStep5Review({ navigation, route }) {
     // Claim the submit synchronously, before any await, so a second tap during
     // the auth + category-inference pause can't start a second insert.
     if (submittingRef.current) return
-    submittingRef.current = true
-    // Show the busy state immediately rather than after the awaits below.
-    setUploadStatus(isEditMode ? 'Saving...' : 'Posting...')
-
-    try {
-      await submitJob()
-    } catch (e) {
-      setUploadStatus('')
-      Alert.alert('Something went wrong', e?.message || 'Please try again.')
-    } finally {
-      submittingRef.current = false
-    }
+    await runSubmission(submittingRef,submitJob,
+      ()=>setUploadStatus(isEditMode?'Saving…':'Posting…'),()=>setUploadStatus(''),
+      ()=>Alert.alert('Could not save job','Your changes are kept. Check your connection and try again.'))
   }
 
   async function submitJob() {
+    const areaError=publicAreaError(locationArea,false)
+    if(areaError){Alert.alert('Check public town or area',areaError);return}
+    const textError=postingTextError(title,'title')||postingTextError(description,'description')
+    if(textError){Alert.alert('Check job text',textError);return}
+    const moneyError=priceType==='fixed'?moneyInputError(price,'Budget'):''
+    if(moneyError){setUploadStatus('');Alert.alert('Check the budget',moneyError);return}
+    const dateError=jobScheduleError({schedule_type:scheduleType,scheduled_date:scheduledDate,date_from:dateFrom,date_to:dateTo},isEditMode?editJob:null)
+    if(dateError){setUploadStatus('');Alert.alert('Check the job dates',dateError);return}
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!await confirmPublishingLocation({ latitude, longitude, area: locationArea || jobAddress, kind: 'job' }, user?.id, () => handleEditRow(3))) { setUploadStatus(''); return }
@@ -244,7 +249,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       area_hectares:     areaHectares || null,
       schedule_type:     scheduleType,
       scheduled_date:    scheduleType === 'specific' && scheduledDate
-        ? (typeof scheduledDate === 'string' ? scheduledDate.split('T')[0] : new Date(scheduledDate).toISOString().split('T')[0])
+        ? nzCalendarDay(scheduledDate)
         : null,
       date_from:         scheduleType === 'range' && dateFrom ? fmtDay(dateFrom) : null,
       date_to:           scheduleType === 'range' && dateTo   ? fmtDay(dateTo)   : null,
@@ -274,12 +279,12 @@ export default function PostJobStep5Review({ navigation, route }) {
       const finalUrls = await uploadJobPhotos(editJob.id, photos)
       await supabase.from('jobs').update({ photos: finalUrls }).eq('id', editJob.id)
 
-      setUploadStatus('')
+      setUploadStatus('Saved')
       resetJobData()
       Alert.alert('Job updated', 'Your job has been updated.', [
         { text: 'OK', onPress: goToStackRoot },
       ])
-      return
+      return true
     }
 
     const visibility = isInvite ? (alsoPublic ? 'public' : 'invite_only') : 'public'
@@ -310,7 +315,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress, invited: isInvite, repeated: isRepeatMode })
     if (isRepeatMode) trackEvent('job_repeated', { source_job_id: repeatedFromJobId, category: resolvedCategory })
     trackCategoryInterest(resolvedCategory)
-    setUploadStatus('')
+    setUploadStatus('Posted')
     resetJobData()
 
     const who = inviteProviderName || 'your provider'
@@ -325,6 +330,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     Alert.alert(successTitle, successBody, [
       { text: 'OK', onPress: returnAfterPost },
     ])
+    return true
   }
 
   const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : (isInvite ? 'Send offer' : isRepeatMode ? 'Post repeated job' : 'Post job'))

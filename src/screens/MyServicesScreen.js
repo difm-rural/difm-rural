@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
@@ -22,11 +23,11 @@ function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
   switch (pricing_type) {
     case 'quote_required': return 'Quote required'
-    case 'hourly':   return `$${rate}/hr`
-    case 'day_rate': return `$${rate}/day`
-    case 'per_unit': return `$${rate}/${unit_label || 'unit'}`
-    case 'fixed':    return `$${rate} fixed`
-    default:         return `$${rate}`
+    case 'hourly':   return `${nzMoney(rate)}/hr`
+    case 'day_rate': return `${nzMoney(rate)}/day`
+    case 'per_unit': return `${nzMoney(rate)}/${unit_label || 'unit'}`
+    case 'fixed':    return `${nzMoney(rate)} fixed`
+    default:         return `${nzMoney(rate)}`
   }
 }
 
@@ -42,13 +43,13 @@ function listedAgo(createdAt) {
   return months === 1 ? 'Listed 1 month ago' : `Listed ${months} months ago`
 }
 
-function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
+function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView }) {
   const photoUrl = Array.isArray(service.photos) && service.photos.length > 0 ? service.photos[0] : null
 
   return (
     <View style={[styles.row, !service.is_active && styles.rowInactive]}>
       {photoUrl && (
-        <View style={styles.rowPhotoWrap}>
+        <TouchableOpacity style={styles.rowPhotoWrap} onPress={() => onView(service)} accessibilityRole="button" accessibilityLabel={`View listing: ${service.title}`}>
           <Image source={{ uri: photoUrl }} style={styles.rowPhoto} resizeMode="cover" />
           {!!service.card_headline && (
             <View style={[
@@ -66,18 +67,18 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
               )}
             </View>
           )}
-        </View>
+        </TouchableOpacity>
       )}
 
       <View style={styles.rowTop}>
-        <View style={styles.rowTitleWrap}>
+        <TouchableOpacity style={styles.rowTitleWrap} onPress={() => onView(service)} accessibilityRole="button" accessibilityLabel={`View listing: ${service.title}`}>
           <Text style={styles.rowTitle} numberOfLines={2}>{service.title}</Text>
           <View style={[styles.pricingBadge, !service.is_active && styles.pricingBadgeInactive]}>
             <Text style={[styles.pricingBadgeText, !service.is_active && styles.pricingBadgeTextInactive]}>
               {formatRate(service)}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.toggleSwitch, service.is_active && styles.toggleSwitchOn]}
           onPress={() => onToggleActive(service)}
@@ -102,6 +103,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
         </View>
       )}
 
+      <Button title="View listing" accessibilityLabel={`View listing: ${service.title || 'Untitled listing'}`} icon="eye-outline" variant="secondary" onPress={() => onView(service)} style={{ marginTop: 12 }} />
       <View style={styles.rowActions}>
         <Button
           variant="secondary"
@@ -109,7 +111,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           title="Edit"
           onPress={() => onEdit(service)}
           style={{ flex: 1 }}
-          accessibilityLabel="Edit listing"
+          accessibilityLabel={`Edit listing: ${service.title || 'Untitled listing'}`}
         />
         <Button
           variant="destructive"
@@ -117,7 +119,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete }) {
           title="Delete"
           onPress={() => onDelete(service)}
           style={{ flex: 1 }}
-          accessibilityLabel="Delete listing"
+          accessibilityLabel={`Delete listing: ${service.title || 'Untitled listing'}`}
         />
       </View>
     </View>
@@ -308,6 +310,7 @@ export default function MyServicesScreen({ navigation, route }) {
               service={item}
               onToggleActive={handleToggleActive}
               onEdit={handleEdit}
+              onView={service => navigation.navigate('ServiceDetail', { service })}
               onDelete={handleDelete}
             />
           )}

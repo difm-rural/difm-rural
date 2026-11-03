@@ -1,5 +1,4 @@
 'use server'
-import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireProvider } from '@/lib/auth'
 import type { ActionState } from '@/components/action-form'
@@ -21,7 +20,7 @@ export async function updateNotification(_:ActionState,data:FormData):Promise<Ac
   revalidatePath('/notifications');revalidatePath('/');revalidatePath('/messages')
   return {error:'',success:all?'Notifications marked read.':'Marked read.'}
 }
-export async function visitNotification(_:ActionState,data:FormData):Promise<ActionState>{
+export async function visitNotification(_:ActionState,data:FormData):Promise<ActionState & {href?:string}>{
   const {supabase,user}=await requireProvider(),id=String(data.get('id') || '')
   const {data:n,error}=await supabase.from('notifications').select('id,type,body,metadata').eq('id',id).eq('user_id',user.id).maybeSingle()
   if(error)return {error:'Could not open this notification. Try again.'}
@@ -39,5 +38,5 @@ export async function visitNotification(_:ActionState,data:FormData):Promise<Act
     if(readError)return {error:'Could not update the read status. Please try again.'}
     revalidatePath('/')
   }
-  redirect(notificationHref(n))
+  return {error:'',href:notificationHref(n)}
 }

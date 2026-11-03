@@ -1,3 +1,4 @@
+import {formatDate as nzDate} from '../../shared/formatting.js'
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Icon from './Icon'
@@ -33,10 +34,10 @@ export default function WorkScheduleCard({
     if (!schedule?.expected_complete_at) return null
     const arrival = new Date(schedule.arrival_start_at)
     const finish = new Date(schedule.expected_complete_at)
-    const time = finish.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })
+    const time = finish.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone:'Pacific/Auckland' })
     return arrival.toDateString() === finish.toDateString()
       ? time
-      : `${finish.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}, ${time}`
+      : `${nzDate(finish)}, ${time}`
   })()
   return (
     <View style={styles.card}>

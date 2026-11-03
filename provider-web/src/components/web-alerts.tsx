@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export function useWebAlerts(){
+export function useWebAlerts(enabled=true,refreshPage=true){
   const router=useRouter()
   const [counts,setCounts]=useState<{messages:number;notifications:number}|null>(null)
   useEffect(()=>{
+    if(!enabled)return
     const client=createClient();let alive=true;let channel:ReturnType<typeof client.channel>|undefined
     let timer:ReturnType<typeof setTimeout>|undefined;let busy=false
     async function refreshCounts(){
@@ -25,7 +26,7 @@ export function useWebAlerts(){
     const changed=()=>{
       if(document.visibilityState!=='visible')return
       clearTimeout(timer)
-      timer=setTimeout(()=>{if(alive){void refreshCounts().catch(()=>{});router.refresh()}},250)
+      timer=setTimeout(()=>{if(alive){void refreshCounts().catch(()=>{});if(refreshPage)router.refresh()}},250)
     }
     async function start(){
       const {data:{user}}=await client.auth.getUser();if(!alive || !user)return
@@ -43,6 +44,6 @@ export function useWebAlerts(){
     const fallback=setInterval(changed,15000)
     window.addEventListener('focus',changed);window.addEventListener('rural-read-change',changed);document.addEventListener('visibilitychange',changed)
     return ()=>{alive=false;clearTimeout(timer);clearInterval(fallback);window.removeEventListener('focus',changed);window.removeEventListener('rural-read-change',changed);document.removeEventListener('visibilitychange',changed);if(channel)void client.removeChannel(channel)}
-  },[router])
+  },[router,enabled,refreshPage])
   return counts
 }

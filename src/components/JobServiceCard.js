@@ -1,3 +1,6 @@
+import {LISTING_KINDS} from '../../shared/listingPricing'
+import {listingCardCopy} from '../../shared/listingCardCopy'
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -42,19 +45,20 @@ export function categoryVisual(category) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatPrice(item) {
   if (item._type === 'job' || item.itemType === 'task') {
-    if (item.price_type === 'fixed') return `$${item.price}`
+    if (item.price_type === 'fixed') return `${nzMoney(item.price)}`
     if (item.price_type === 'unpaid') return 'Free'
     return 'Open'
   }
   const { pricing_type, rate, unit_label } = item
+  if(pricing_type!=='quote_required' && String(rate??'').trim()!=='' && Number(rate)===0)return applyVariantHeadline(item,Number(item.min_charge)>0?`Minimum ${nzMoney(item.min_charge)}`:'Free')
   let baseLabel
   switch (pricing_type) {
     case 'quote_required': baseLabel = 'Quote required'; break
-    case 'hourly':   baseLabel = `$${rate}/hr`; break
-    case 'day_rate': baseLabel = `$${rate}/day`; break
-    case 'per_unit': baseLabel = `$${rate}/${unit_label || 'unit'}`; break
-    case 'fixed':    baseLabel = `$${rate}`; break
-    default:         baseLabel = rate ? `$${rate}` : 'POA'
+    case 'hourly':   baseLabel = `${nzMoney(rate)}/hr`; break
+    case 'day_rate': baseLabel = `${nzMoney(rate)}/day`; break
+    case 'per_unit': baseLabel = `${nzMoney(rate)}/${unit_label || 'unit'}`; break
+    case 'fixed':    baseLabel = `${nzMoney(rate)}`; break
+    default:         baseLabel = rate ? `${nzMoney(rate)}` : 'POA'
   }
   return applyVariantHeadline(item, baseLabel)
 }
@@ -75,7 +79,7 @@ export function applyVariantHeadline(item, baseLabel) {
       : item.pricing_type === 'day_rate' ? '/day'
       : item.pricing_type === 'per_unit' ? `/${min.unit_label || 'unit'}`
       : ''
-    return `from $${min.rate}${unit}`
+    return Number(min.rate)===0 ? `${baseLabel} · more options` : `from ${nzMoney(min.rate)}${unit}`
   }
   return `${baseLabel} · more options`
 }
@@ -128,6 +132,7 @@ export default function JobServiceCard({
     ? availabilityDisplay(profile.availability_status, profile.availability_until, profile.availability_updated_at)
     : null
   const photoUrl  = Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0] : null
+  const copy=listingCardCopy(item.title,item.card_headline,item.card_supporting_text,item.description)
   const category  = item.category || 'Other'
   const cat       = categoryVisual(category)
   const catImg    = categoryImage(category)
@@ -148,7 +153,7 @@ export default function JobServiceCard({
       if (onGuestAction) {
         onGuestAction('watchlist')
       } else {
-        Alert.alert('Sign in required', 'Sign in to save this to your watchlist.', [{ text: 'OK' }])
+        Alert.alert('Sign in required', 'Sign in to save this item.', [{ text: 'OK' }])
       }
     } else {
       onWatchlistToggle(item.id, isWatched)
@@ -175,14 +180,14 @@ export default function JobServiceCard({
           </View>
         )}
 
-        {isService && photoUrl && !!item.card_headline && (
+        {isService && photoUrl && !!copy.headline && (
           <View style={[
             styles.cardMessage,
             item.card_style === 'bold' && styles.cardMessageBold,
             item.card_style === 'clean' && styles.cardMessageClean,
           ]}>
             <Text style={[styles.cardMessageText, item.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={3}>
-              {item.card_headline}
+              {copy.headline}
             </Text>
           </View>
         )}
@@ -194,7 +199,7 @@ export default function JobServiceCard({
             onPress={handleHeartPress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={isWatched ? 'Remove from watchlist' : 'Save'}>
+            accessibilityLabel={isWatched ? 'Remove saved job' : 'Save'}>
             <Text style={[styles.heartIcon, isWatched && styles.heartActive]}>
               <Icon name={isWatched ? 'heart' : 'heart-outline'} size={14} color={isWatched ? '#e53935' : colors.textMuted} />
             </Text>
@@ -236,7 +241,7 @@ export default function JobServiceCard({
         {isService && (
           <View style={styles.serviceMetaRow}>
             <View style={styles.servicePill}>
-              <Text style={styles.servicePillText}>SERVICE</Text>
+              <Text style={styles.servicePillText}>{LISTING_KINDS.find(kind=>kind.id===(item.kind||'service'))?.label||'Service'}</Text>
             </View>
             {availability && !availability.stale && (
               <View style={[styles.availabilityPill, availability.tone === 'limited' && styles.availabilityPillLimited]}>
@@ -250,7 +255,7 @@ export default function JobServiceCard({
         )}
 
         {/* Row 3: title */}
-        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
 
         {/* Row 4: location + distance */}
         <Text style={styles.location} numberOfLines={1}>
@@ -423,6 +428,8 @@ const styles = StyleSheet.create({
   // Row 3: title
   title: {
     fontSize: 13,
+    lineHeight: 18,
+    minHeight: 36,
     fontWeight: '700',
     color: colors.textPrimary,
     lineHeight: 17,

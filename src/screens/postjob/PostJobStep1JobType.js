@@ -1,3 +1,6 @@
+import {formatDate as nzDate} from '../../../shared/formatting.js'
+import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
+import {editorScheduleType,jobScheduleError} from '../../../shared/postingDates'
 import React, { useEffect, useState } from 'react'
 import {
   Keyboard, KeyboardAvoidingView, Platform, ScrollView,
@@ -22,11 +25,11 @@ const SCHEDULE_OPTIONS = [
 ]
 
 function formatDate(d) {
-  return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return nzDate(d)
 }
 
 function formatShort(d) {
-  return d ? d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : ''
+  return d ? nzDate(d) : ''
 }
 
 export default function PostJobStep1JobType({ navigation, route }) {
@@ -40,7 +43,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
   const isRepeatMode = route.params?.mode === 'repeat' && !!repeatJob
 
   const [title,          setTitle]          = useState(editJob?.title           || jobData.title || prefill?.title || '')
-  const [scheduleType,   setScheduleType]   = useState(editJob?.schedule_type   || jobData.scheduleType)
+  const [scheduleType,   setScheduleType]   = useState(editJob ? editorScheduleType(editJob) : jobData.scheduleType)
   const [scheduledDate,  setScheduledDate]  = useState(() => {
     if (editJob?.scheduled_date) return new Date(editJob.scheduled_date)
     if (jobData.scheduledDate)   return new Date(jobData.scheduledDate)
@@ -66,7 +69,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
       updateJobData({
         category:     editJob.category        || '',
         title:        editJob.title           || '',
-        scheduleType: editJob.schedule_type   || '',
+        scheduleType: editorScheduleType(editJob),
         scheduledDate: editJob.scheduled_date || null,
         dateFrom:     editJob.date_from        || null,
         dateTo:       editJob.date_to          || null,
@@ -142,7 +145,11 @@ export default function PostJobStep1JobType({ navigation, route }) {
     })
   }, [title, scheduleType, scheduledDate, dateFrom, dateTo])
 
+  const scheduleError=jobScheduleError({schedule_type:scheduleType,scheduled_date:scheduledDate,date_from:dateFrom,date_to:dateTo},isRepeatMode?null:editJob)
+
+  const [attempted,setAttempted]=useState(false)
   function canProceed() {
+    if (scheduleError || postingTextError(title,'title')) return false
     if (title.trim().length < 3 || !scheduleType) return false
     if (scheduleType === 'specific') return !!scheduledDate
     if (scheduleType === 'range') return !!(dateFrom && dateTo)
@@ -159,6 +166,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
   function handleNext() {
     Keyboard.dismiss()
+    setAttempted(true)
     if (!canProceed()) return
     navigation.navigate('PostJobStep2Location', { ...route.params })
   }
@@ -178,13 +186,15 @@ export default function PostJobStep1JobType({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
+          {!!scheduleType && !!scheduleError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: 12 }}>{scheduleError}</Text>}
 
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Give the job a title</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, attempted && (title.trim().length < 3 || !!postingTextError(title,'title')) && { borderColor: colors.danger, borderWidth: 2 }]}
               placeholder="e.g. Fix fence on north paddock"
               placeholderTextColor={colors.textMuted}
+              maxLength={POSTING_TITLE_MAX}
               value={title}
               onChangeText={setTitle}
               autoCapitalize="sentences"
@@ -192,6 +202,9 @@ export default function PostJobStep1JobType({ navigation, route }) {
               onSubmitEditing={Keyboard.dismiss}
               accessibilityLabel="Job title"
             />
+            <Text style={styles.hintText}>{title.length} / {POSTING_TITLE_MAX} characters</Text>
+            {!!postingTextError(title,'title') && <Text accessibilityRole="alert" style={{color:colors.danger}}>{postingTextError(title,'title')}</Text>}
+            {attempted && title.trim().length < 3 && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter a job title with at least 3 characters.</Text>}
             {title.trim().length > 0 && title.trim().length < 3 && (
               <Text style={styles.hintText}>Keep going…</Text>
             )}
@@ -199,8 +212,9 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>When do you need it done?</Text>
-            <View style={styles.scheduleList}>
-              {SCHEDULE_OPTIONS.filter(opt => opt.id !== 'range' || isHouseSitting(title)).map(opt => (
+            {attempted && !scheduleType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose when you need the job done.</Text>}
+            <View style={[styles.scheduleList, attempted && (!scheduleType||!!scheduleError) && {borderColor:colors.danger,borderWidth:2}]}>
+              {SCHEDULE_OPTIONS.filter(opt => opt.id !== 'range' || isHouseSitting(title) || scheduleType==='range').map(opt => (
                 <React.Fragment key={opt.id}>
                   <TouchableOpacity
                     style={[styles.scheduleTile, scheduleType === opt.id && styles.scheduleTileActive]}
@@ -325,7 +339,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
             title="Next — Location"
             icon="arrow-forward"
             onPress={handleNext}
-            disabled={!canProceed()}
+
             accessibilityLabel="Next step"
           />
         </View>

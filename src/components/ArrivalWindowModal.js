@@ -1,3 +1,4 @@
+import {formatDate as nzDate} from '../../shared/formatting.js'
 import React, { useEffect, useState } from 'react'
 import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -17,7 +18,7 @@ function initialStart(schedule, suggestedDate) {
 }
 
 function timeLabel(date) {
-  return date.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })
+  return date.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone:'Pacific/Auckland' })
 }
 
 export default function ArrivalWindowModal({
@@ -103,9 +104,7 @@ export default function ArrivalWindowModal({
 
           <TouchableOpacity style={styles.field} onPress={() => setPicker('date')}>
             <Text style={styles.fieldLabel}>Date</Text>
-            <Text style={styles.fieldValue}>{start.toLocaleDateString('en-NZ', {
-              weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-            })}</Text>
+            <Text style={styles.fieldValue}>{nzDate(start)}</Text>
           </TouchableOpacity>
           <View style={styles.timeRow}>
             <TouchableOpacity style={[styles.field, styles.timeField]} onPress={() => setPicker('start')}>

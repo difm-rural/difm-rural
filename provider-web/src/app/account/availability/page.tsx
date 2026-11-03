@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import {DateInput} from '@/components/date-input'
+import Link from '@/components/navigation-link'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { ActionForm } from '@/components/action-form'
@@ -13,7 +14,7 @@ export default async function AvailabilityPage(){
     {error?<p role="alert">Could not load availability. Refresh before making changes.</p>:<ActionForm action={saveAvailability} label="Save availability"><p className="account-current">Currently: {current.label}</p>
       <p className="muted">Your declared availability appears on your public profile and helps match suitable work. Available now expires after 7 days, limited availability after 14 days, and this week at the end of the week. Update it when your plans change.</p>
       <div className="account-radio-options">{[...PROVIDER_AVAILABILITY_OPTIONS,{value:'unknown',label:'Not sharing availability',description:'Do not show an active availability claim.'}].map(o=><label key={o.value}><input name="availability_status" type="radio" value={o.value} defaultChecked={p?.availability_status===o.value}/><span><strong>{o.label}</strong><small>{o.description}</small></span></label>)}</div>
-      <label className="lform-field">Unavailable until date<input type="date" name="availability_until" min={nzToday()} defaultValue={p?.availability_until || ''}/></label><p className="muted">Only needed when you choose Unavailable until.</p>
+      <label className="lform-field">Unavailable until date<DateInput type="date" name="availability_until" min={nzToday()} defaultValue={p?.availability_until || ''}/></label><p className="muted">Only needed when you choose Unavailable until.</p>
     </ActionForm>}
   </section></AppShell>
 }

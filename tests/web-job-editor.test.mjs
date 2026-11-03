@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {readFile} from 'node:fs/promises'
 import {stripTypeScriptTypes} from 'node:module'
-let source=(await readFile(new URL('../provider-web/src/lib/job-input.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(new URL('../shared/categories.ts',import.meta.url).href))
+let source=(await readFile(new URL('../provider-web/src/lib/job-input.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(new URL('../shared/categories.ts',import.meta.url).href)).replace("'@shared/postingDates'",JSON.stringify(new URL('../shared/postingDates.ts',import.meta.url).href)).replace("'@shared/publicArea'",JSON.stringify(new URL('../shared/publicArea.ts',import.meta.url).href)).replace("'@shared/postingText'",JSON.stringify(new URL('../shared/postingText.ts',import.meta.url).href)).replace("'@shared/postingMoney'",JSON.stringify(new URL('../shared/postingMoney.ts',import.meta.url).href))
 const helperUrl='data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64')
 const {jobInput,repeatSeed,jobOwnerActions}=await import(helperUrl)
 const me='00000000-0000-0000-0000-000000000001',id='00000000-0000-0000-0000-000000000002'
@@ -11,7 +11,7 @@ const form=values=>{const f=new FormData();for(const [k,v] of Object.entries(val
 const valid={title:'Fence repair',description:'Repair damaged posts',category:'Fencing & Gates',area:'Waikato',price_type:'open',schedule_type:'flexible',materials_type:'none',hide_exact_location:'on'}
 // Use the actual taxonomy, rather than making the validation test depend on one display label.
 const {CATEGORIES}=await import(new URL('../shared/categories.ts',import.meta.url).href);valid.category=CATEGORIES[0]
-const context={userId:me,jobId:id,baseUrl:'https://example.com'}
+const context={userId:me,jobId:id,baseUrl:'https://example.com',now:new Date('2026-10-19T12:00:00Z')}
 test('job payload whitelists authored fields and makes private location explicit',()=>{
  const r=jobInput(form({...valid,requester_id:'other',status:'completed',visibility:'invite_only',location:'Private address',latitude:'-37.4',longitude:'175.3'}),context)
  assert.equal(r.ok,true);assert.equal(r.value.hide_exact_location,true);assert.equal(r.value.location_name,'Private address');assert.equal(r.value.latitude,-37.4)
@@ -88,4 +88,25 @@ test('invited posting uses one atomic RPC with private visibility by default',as
  assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
  supabase.rpc=async()=>({error:new Error('Unavailable')})
  assert.ok((await postJob({error:''},form({...valid,job_id:id,invite_provider_id:invite}))).error)
+})
+
+test('job server input rejects past dates independently of browser date controls',()=>{
+ const old={...valid,schedule_type:'specific',scheduled_date:'2020-01-01'}
+ assert.equal(jobInput(form(old),context).ok,false)
+ assert.equal(jobInput(form({...old,scheduled_date:'2026-10-20'}),context).ok,true)
+ assert.equal(jobInput(form(old),{...context,existingSchedule:old}).ok,true)
+ assert.equal(jobInput(form({...old,scheduled_date:'2020-01-02'}),{...context,existingSchedule:old}).ok,false)
+})
+
+test('job server rejects oversized budgets and fractions of a cent',()=>{
+ for(const price of ['999999999999','12.345','1e3','12abc','0'])assert.equal(jobInput(form({...valid,price_type:'fixed',price}),context).ok,false,price)
+ for(const price of ['0.01','12.34','10000000'])assert.equal(jobInput(form({...valid,price_type:'fixed',price}),context).ok,true,price)
+})
+
+test('job server rejects invalid public area text independently of form controls',()=>{
+ for(const area of ['<b>Waitoki</b> & "quotes" 😀','Waitoki 😀','"Waitoki"']){
+  const result=jobInput(form({...valid,area}),context)
+  assert.equal(result.ok,false);assert.match(result.error,/town or area/)
+ }
+ assert.equal(jobInput(form({...valid,area:'Te Kūiti'}),context).ok,true)
 })

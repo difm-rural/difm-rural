@@ -35,7 +35,7 @@ import {
 // App Review demo account: Apple reviewers can't receive OTP emails, so this one
 // address signs in with a password instead. Not a secret — the password lives only
 // in Supabase + App Store Connect, never in code. Every other email keeps OTP.
-import {REVIEW_EMAIL} from '../../shared/reviewAccount'
+import {REVIEW_EMAIL,EMAIL_STEP_ACTION,signInMethodHint} from '../../shared/reviewAccount'
 
 function getBiometricLabel(type) {
   if (type === 'face') return 'Face ID'
@@ -504,8 +504,8 @@ export default function LoginScreen({ navigation, route }) {
         </Text>
         <Text style={styles.subtitle}>
           {isRegister
-            ? "Enter your email — we'll send a code and set up your account."
-            : 'Enter your email to receive a sign in code'}
+            ? 'Enter your email to continue and create your account.'
+            : 'Enter your email to continue.'}
         </Text>
 
         <TextInput
@@ -525,12 +525,14 @@ export default function LoginScreen({ navigation, route }) {
           accessibilityLabel="Email address"
         />
 
+        <Text style={styles.subtitle} accessibilityLiveRegion="polite">{signInMethodHint(email)}</Text>
+
         <Button
-          title="Send code"
+          title={EMAIL_STEP_ACTION}
           icon="arrow-forward"
           onPress={handleSendCode}
           loading={loading}
-          accessibilityLabel="Send sign in code"
+          accessibilityLabel={EMAIL_STEP_ACTION}
         />
 
         {biometricReady && (

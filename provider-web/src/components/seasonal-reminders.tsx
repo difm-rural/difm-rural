@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- Artwork shared with the mobile app. */
 import {useEffect,useRef,useState} from 'react'
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import {ArrowRight,Leaf,X} from 'lucide-react'
 import {categoryArtwork} from '@shared/categoryArtwork'
 import {createClient} from '@/lib/supabase/client'

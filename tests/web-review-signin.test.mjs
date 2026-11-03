@@ -40,3 +40,16 @@ test('normal accounts still request and verify email codes',async()=>{
  h.field('token','123456');await h.submit();assert.equal(h.calls[1][0],'verify')
  assert.deepEqual(h.redirects,['/jobs/example'])
 })
+
+test('typing the review address keeps the email action stable and explains the password handoff',async()=>{
+ const h=harness()
+ const primary=()=>h.nodes().find(n=>n.type==='button'&&!n.props.type)
+ assert.equal(primary().props.children,'Continue')
+ h.field('email','tester@example.test');assert.equal(primary().props.children,'Continue')
+ h.field('email',review.REVIEW_EMAIL);assert.equal(primary().props.children,'Continue')
+ assert.match(h.nodes().find(n=>n.props?.id==='sign-in-method').props.children,/uses a password/)
+ assert.equal(h.nodes().find(n=>n.props?.id==='email').props['aria-describedby'],'sign-in-method')
+ assert.equal(h.calls.length,0)
+ await h.submit();assert.ok(h.nodes().some(n=>n.props?.id==='password'))
+ assert.equal(primary().props.children,'Sign in');assert.equal(h.calls.length,0)
+})

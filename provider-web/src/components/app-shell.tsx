@@ -1,9 +1,11 @@
 'use client'
 
+import {useNavigationFeedback} from './navigation-feedback'
+import {ConsolePageLoading} from './console-page-loading'
 import {DevelopmentBadge} from '@/components/development-badge'
 
 
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import Image from 'next/image'
 import {useId,useRef,useState} from 'react'
 import { usePathname } from 'next/navigation'
@@ -24,9 +26,12 @@ const navigation = [
   { href: '/account', label: 'Account', icon: UserRound },
 ]
 
-export function AppShell({ children, providerName, setupMode=false }: { children: React.ReactNode; providerName: string; setupMode?:boolean }) {
+export function AppShell({ children, providerName, setupMode=false, loading=false, refreshOnAlerts=true }: { children: React.ReactNode; providerName: string; setupMode?:boolean;loading?:boolean;refreshOnAlerts?:boolean }) {
   const pathname = usePathname()
-  const counts = useWebAlerts()
+  const feedback=useNavigationFeedback()
+  const counts = useWebAlerts(!loading&&!feedback.pending,refreshOnAlerts)
+  const pending=!loading?feedback.pending:null
+  const displayPath=pending?.href.split('?')[0]||pathname
   const [menuPath,setMenuPath]=useState<string|null>(null)
   const menuOpen=menuPath===pathname,menuId=useId(),menuButton=useRef<HTMLButtonElement>(null)
   const primary=navigation.filter(item=>['/','/jobs','/browse','/activity','/account'].includes(item.href))
@@ -41,7 +46,7 @@ export function AppShell({ children, providerName, setupMode=false }: { children
         <nav id={menuId} className={'sidebar-nav'+(menuOpen?' mobile-open':'')} aria-label="Main navigation">
           <p className="nav-label">Workspace</p>
           {setupMode?<SetupNavigation items={navigation}/>:navigation.map(item => {
-            const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+            const active = item.href === '/' ? displayPath === '/' : displayPath.startsWith(item.href)
             const Icon = item.icon
             return (
               <Link key={item.href} href={item.href} aria-current={active?'page':undefined} onClick={()=>setMenuPath(null)} className={active ? 'nav-item active' : 'nav-item'}>
@@ -54,12 +59,12 @@ export function AppShell({ children, providerName, setupMode=false }: { children
         <div className={'sidebar-user'+(menuOpen?' mobile-open':'')}>
           <div className="user-avatar">{(providerName || '?').slice(0, 1).toUpperCase()}</div>
           <div><strong>{providerName || 'Member'}</strong><span>Your account</span></div>
-          <a href="/auth/signout" aria-label="Sign out"><LogOut size={17} /></a>
+          <a href="/auth/signout" className="sidebar-signout" aria-label="Sign out"><LogOut size={17} aria-hidden="true"/><span>Sign out</span></a>
         </div>
       </aside>
-      <main className="main-content">{children}</main>
+      <main className="main-content"><div hidden={!!pending}>{children}</div>{pending&&<ConsolePageLoading destination={pending.href} slow={feedback.slow} retry={()=>window.location.assign(pending.href)}/>}</main>
       {!setupMode&&<nav className="mobile-tabbar" aria-label="Quick navigation">{primary.map(item=>{
-        const active=item.href==='/'?pathname==='/':pathname.startsWith(item.href),Icon=item.icon
+        const active=item.href==='/'?displayPath==='/':displayPath.startsWith(item.href),Icon=item.icon
         const unread=item.href==='/activity'&&counts?Math.max(counts.messages,counts.notifications):0
         return <Link href={item.href} key={item.href} aria-current={active?'page':undefined} onClick={()=>setMenuPath(null)}><span className="mobile-tab-icon"><Icon size={21}/>{unread>0&&<span className="mobile-unread" aria-label={unread+' unread updates'}>{unread>99?'99+':unread}</span>}</span><span>{item.label}</span></Link>
       })}</nav>}

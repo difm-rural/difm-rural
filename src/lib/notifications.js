@@ -1,3 +1,4 @@
+import {formatDate} from '../../shared/formatting.js'
 import { Alert } from 'react-native'
 import { supabase } from './supabase'
 import { requestBadgeRefresh } from './badgeEvents'
@@ -95,6 +96,10 @@ export async function markAllNotificationsRead() {
 // nothing to route to) — never up front — so a notification can't disappear
 // from the Needs-attention feed while taking the user nowhere.
 export async function openNotificationTarget(navigation, userId, notification) {
+  // A slow lookup must not pull the user back after they leave this screen.
+  let cancelled = false
+  const unsubscribe = navigation.addListener?.('blur', () => { cancelled = true })
+  const isCurrent = () => !cancelled
   const meta = notification?.metadata || {}
 
   const markRead = () => {
@@ -127,10 +132,12 @@ export async function openNotificationTarget(navigation, userId, notification) {
     if (notification.type === 'new_message' && meta.sender_id) {
       const { data: sender } = await supabase
         .from('profiles_public').select('full_name').eq('id', meta.sender_id).maybeSingle()
+      if (!isCurrent()) return false
       const otherUserName = sender?.full_name || 'Chat'
       if (meta.booking_id) {
         const { data: booking } = await supabase
           .from('bookings').select('service:service_id(title)').eq('id', meta.booking_id).maybeSingle()
+      if (!isCurrent()) return false
         navigation.navigate('Chat', {
           bookingId:     meta.booking_id,
           jobTitle:      booking?.service?.title || 'Service booking',
@@ -142,7 +149,8 @@ export async function openNotificationTarget(navigation, userId, notification) {
       }
       if (meta.job_id) {
         const { data: job } = await supabase
-          .from('jobs').select('title').eq('id', meta.job_id).maybeSingle()
+          .from('jobs_public').select('title').eq('id', meta.job_id).maybeSingle()
+      if (!isCurrent()) return false
         navigation.navigate('Chat', {
           jobId:         meta.job_id,
           jobTitle:      job?.title || 'Job',
@@ -155,6 +163,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
       if (meta.service_id) {
         const { data: svc } = await supabase
           .from('services').select('title').eq('id', meta.service_id).maybeSingle()
+      if (!isCurrent()) return false
         navigation.navigate('Chat', {
           serviceId:     meta.service_id,
           jobTitle:      svc?.title || 'Listing',
@@ -172,6 +181,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
         .select('*, service:service_id(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
         .eq('id', meta.booking_id)
         .maybeSingle()
+      if (!isCurrent()) return false
       if (error) return false           // transient — keep unread, allow retry
       if (!booking) return targetGone('booking')
       const viewerRole = booking.provider_id === userId ? 'provider' : 'requester'
@@ -186,6 +196,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
         .select('*')
         .eq('id', meta.job_id)
         .maybeSingle()
+      if (!isCurrent()) return false
       if (error) return false           // transient — keep unread, allow retry
       if (!job) return targetGone('job')
       // Q&A lives on JobDetail (incl. the owner's answer UI), so route question
@@ -203,6 +214,8 @@ export async function openNotificationTarget(navigation, userId, notification) {
   } catch {
     // Unexpected/transient failure — keep it unread so the user can retry.
     return false
+  } finally {
+    unsubscribe?.()
   }
 }
 
@@ -216,5 +229,5 @@ export function notificationTimeAgo(isoString) {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
-  return new Date(isoString).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
+  return formatDate(isoString)
 }

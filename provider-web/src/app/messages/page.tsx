@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import {formatDateTime as nzDateTime} from '@shared/formatting'
+import Link from '@/components/navigation-link'
 import { MessageSquare, Inbox } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
@@ -26,7 +27,7 @@ export default async function MessagesPage({searchParams}:{searchParams:Promise<
         :<ul>{threads.map(t=><li key={t.key}><Link href={conversationHref(t)} prefetch={false} className={'enq-item '+(selected && t.key===conversationKey(ref)?'active':'')} aria-current={selected && t.key===conversationKey(ref)?'page':undefined}>
           <span className="enq-item-top"><strong>{t.name}</strong>{t.unread>0 && <span className="web-badge" aria-label={t.unread+' unread messages'}>{t.unread}</span>}</span>
           <span className="enq-listing">{t.kind==='listing'?'Listing enquiry':t.kind==='job'?'Job':'Booking'} · {t.title}</span>
-          <span className="enq-snippet">{t.preview}</span><time className="enq-time" dateTime={t.updatedAt}>{new Date(t.updatedAt).toLocaleString('en-NZ',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</time>
+          <span className="enq-snippet">{t.preview}</span><time className="enq-time" dateTime={t.updatedAt}>{nzDateTime(new Date(t.updatedAt))}</time>
         </Link></li>)}</ul>}
       </aside>
       <div className="enq-thread">

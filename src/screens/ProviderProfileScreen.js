@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useEffect, useState } from 'react'
 import {
   ScrollView,
@@ -61,11 +62,11 @@ function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
   switch (pricing_type) {
     case 'quote_required': return 'Quote required'
-    case 'hourly':   return `$${rate} / hour`
-    case 'day_rate': return `$${rate} / day`
-    case 'per_unit': return `$${rate} / ${unit_label || 'unit'}`
-    case 'fixed':    return `$${rate} fixed`
-    default:         return rate ? `$${rate}` : 'POA'
+    case 'hourly':   return `${nzMoney(rate)} / hour`
+    case 'day_rate': return `${nzMoney(rate)} / day`
+    case 'per_unit': return `${nzMoney(rate)} / ${unit_label || 'unit'}`
+    case 'fixed':    return `${nzMoney(rate)} fixed`
+    default:         return rate ? `${nzMoney(rate)}` : 'POA'
   }
 }
 

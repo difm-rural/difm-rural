@@ -92,10 +92,10 @@ export default function JobFeedScreen({ navigation }) {
 
     if (currentlyWatched) {
       await removeFromWatchlist(userIdRef.current, jobId)
-      Alert.alert('Removed from watchlist')
+      Alert.alert('Removed from saved jobs')
     } else {
       await addToWatchlist(userIdRef.current, jobId)
-      Alert.alert('Added to watchlist')
+      Alert.alert('Job saved')
     }
   }
 

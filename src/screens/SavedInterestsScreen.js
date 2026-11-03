@@ -35,7 +35,7 @@ export default function SavedInterestsScreen({ navigation }) {
       const { data: { user } } = await supabase.auth.getUser()
       setItems(await fetchSavedInterests(user?.id))
     } catch (error) {
-      Alert.alert('Could not load saved interests', error.message)
+      Alert.alert('Could not load saved searches & alerts', error.message)
     } finally {
       setLoading(false)
     }
@@ -49,12 +49,12 @@ export default function SavedInterestsScreen({ navigation }) {
       setItems(current => current.map(item => item.id === id ? updated : item))
     } catch (error) {
       setItems(previous)
-      Alert.alert('Could not update this interest', error.message)
+      Alert.alert('Could not update this saved item', error.message)
     }
   }
 
   function remove(item) {
-    Alert.alert('Delete saved interest?', item.name, [
+    Alert.alert('Delete saved item?', item.name, [
       { text: 'Keep', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
@@ -62,7 +62,7 @@ export default function SavedInterestsScreen({ navigation }) {
             await deleteSavedInterest(item.id)
             setItems(current => current.filter(row => row.id !== item.id))
           } catch (error) {
-            Alert.alert('Could not delete this interest', error.message)
+            Alert.alert('Could not delete this saved item', error.message)
           }
         },
       },
@@ -146,11 +146,11 @@ export default function SavedInterestsScreen({ navigation }) {
           <Icon name="chevron-back" size={17} color={colors.primary} />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Interests</Text>
-        <Text style={styles.title}>Saved interests</Text>
+        <Text style={styles.kicker}>Saved</Text>
+        <Text style={styles.title}>Saved searches & alerts</Text>
         <Text style={styles.subtitle}>You decide what to follow and how often we contact you.</Text>
       </View>
-      {loading ? <Loading label="Loading saved interests…" /> : (
+      {loading ? <Loading label="Loading saved searches & alerts…" /> : (
         <FlatList
           data={items}
           renderItem={renderItem}

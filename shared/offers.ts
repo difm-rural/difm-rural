@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from './formatting.js'
 // Shared vocabulary + formatting for provider offers (bids), so the offer form
 // and every place that displays an offer read the same. Mirrors the service
 // pricing model (see CreateServiceScreen / lib pricing).
@@ -39,9 +40,9 @@ export function offerStatusLabel(status:string|null|undefined) {
 // Formats an offer amount according to its pricing basis (for display).
 export function formatOfferAmount(amount:number, pricingType:string|null|undefined) {
   switch (pricingType) {
-    case 'hourly':   return `$${amount}/hr`
-    case 'per_unit': return `$${amount}/unit`
-    case 'quote':    return `$${amount} est.`
-    default:         return `$${amount}`
+    case 'hourly':   return `${nzMoney(amount)}/hr`
+    case 'per_unit': return `${nzMoney(amount)}/unit`
+    case 'quote':    return `${nzMoney(amount)} est.`
+    default:         return `${nzMoney(amount)}`
   }
 }

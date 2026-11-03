@@ -1,3 +1,5 @@
+import {formatDateLabel} from '../../shared/formatting.js'
+import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useEffect, useState } from 'react'
 import {
   Alert,
@@ -43,10 +45,10 @@ import {
 } from '../lib/workSchedule'
 
 function formatMoney(amount, service) {
-  if (amount != null) return `$${amount}`
+  if (amount != null) return `${nzMoney(amount)}`
   if (service?.pricing_type === 'quote_required') return 'Quote to be confirmed'
   if (amount == null) return 'Not set'
-  return `$${amount}`
+  return `${nzMoney(amount)}`
 }
 
 function DetailRow({ label, value }) {
@@ -496,7 +498,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <DetailRow label="Service" value={service.title} />
           <DetailRow label="Category" value={service.category} />
           <DetailRow label="Selected rate" value={booking.pricing_snapshot?.option_label} />
-          <DetailRow label="Timing" value={booking.scheduled_date} />
+          <DetailRow label="Timing" value={formatDateLabel(booking.scheduled_date)} />
           <DetailRow label="Quantity" value={String(booking.quantity ?? 1)} />
           <DetailRow label={booking.quote_amount != null ? 'Quote' : 'Base estimate'} value={isQuoteRequired && booking.quote_amount == null ? 'Quote required' : formatMoney(booking.quote_amount ?? booking.total_amount, service)} />
           <DetailRow label="Quote note" value={booking.quote_notes} />

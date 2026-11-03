@@ -1,3 +1,4 @@
+import {notificationBody} from '../../../shared/notificationBody'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
 import React, { useCallback, useState } from 'react'
 import {
@@ -210,7 +211,11 @@ export default function HomeTabScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <Loading />
+        <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
+          <Text style={styles.kicker}>Rural Connections</Text>
+          <Text style={styles.title} accessibilityRole="header">Home</Text>
+        </View>
+        <Loading label="Loading home…" />
       </View>
     )
   }
@@ -324,7 +329,7 @@ export default function HomeTabScreen({ navigation }) {
                 onPress={() => openAttentionItem(item)}
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel={item._kind === 'nextMove' ? `${item.nextMove.label}. ${item.nextMove.detail}` : item.body}>
+                accessibilityLabel={item._kind === 'nextMove' ? `${item.nextMove.label}. ${item.nextMove.detail}` : notificationBody(item)}>
                 <Icon
                   name={item._kind === 'nextMove'
                     ? item.nextMove.icon
@@ -340,7 +345,7 @@ export default function HomeTabScreen({ navigation }) {
                   </View>
                 ) : (
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
+                    <Text style={styles.notifBody} numberOfLines={2}>{notificationBody(item)}</Text>
                     <Text style={styles.notifTime}>{notificationTimeAgo(item.created_at)}</Text>
                   </View>
                 )}

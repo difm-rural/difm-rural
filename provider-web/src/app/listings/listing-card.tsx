@@ -1,3 +1,5 @@
+import Link from '@/components/navigation-link'
+import {listingCardCopy} from '@shared/listingCardCopy'
 // Reusable listing card — a CSS reproduction of the RN JobServiceCard browse card
 // (src/components/JobServiceCard.js). Literal rgba/positions are copied from RN for
 // fidelity; the surrounding chrome uses provider-web's own tokens. Pure/presentational
@@ -37,7 +39,7 @@ export function CardImage({
     <div className="lcard-img">
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt={head || category || 'Listing photo'} />
+        <img src={photoUrl} alt={category ? category+' photo' : 'Listing photo'} />
       ) : (
         <div className="lcard-placeholder">
           <ImageIcon size={22} />
@@ -58,6 +60,7 @@ export function CardImage({
 
 export type ListingCardData = {
   title?: string | null
+  description?: string | null
   photoUrl?: string | null
   category?: string | null
   cardHeadline?: string | null
@@ -70,18 +73,19 @@ export type ListingCardData = {
 
 // `footer` lets a composing client card (e.g. the provider ManageCard) attach action
 // controls inside the same card; omitted, the card is the plain browse visual.
-export function ListingCard({ data, footer }: { data: ListingCardData; footer?: ReactNode }) {
-  return (
-    <div className="lcard">
+export function ListingCard({ data, footer, href }: { data: ListingCardData; footer?: ReactNode; href?:string }) {
+  const copy=listingCardCopy(data.title,data.cardHeadline,data.cardSupporting,data.description)
+  const content = <>
       <CardImage
         photoUrl={data.photoUrl}
         category={data.category}
-        headline={data.cardHeadline}
-        supporting={data.cardSupporting}
+        headline={copy.headline}
+        supporting={copy.supporting}
         cardStyle={data.cardStyle}
       />
       <div className="lcard-body">
-        <div className="lcard-title">{data.title || 'Untitled listing'}</div>
+        <div className="lcard-title" title={data.title || 'Untitled listing'}>{data.title || 'Untitled listing'}</div>
+        {data.description!==undefined && <p className="lcard-description">{data.description}</p>}
         <div className="lcard-meta">
           {data.priceLabel && <span className="lcard-price">{data.priceLabel}</span>}
           {data.kindLabel && <span className="kind-tag">{data.kindLabel}</span>}
@@ -90,7 +94,6 @@ export function ListingCard({ data, footer }: { data: ListingCardData; footer?: 
           <span className={`badge ${data.badge.tone}`}>{data.badge.label}</span>
         )}
       </div>
-      {footer}
-    </div>
-  )
+  </>
+  return <div className="lcard">{href?<Link href={href} className="lcard-view" aria-label={'View listing: '+(data.title || 'Untitled listing')}>{content}</Link>:content}{footer}</div>
 }

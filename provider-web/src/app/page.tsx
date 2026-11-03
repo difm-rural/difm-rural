@@ -1,6 +1,8 @@
+import {formatDate as nzDate} from '@shared/formatting'
+import {notificationBody} from '@shared/notificationBody'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
-import Link from 'next/link'
+import Link from '@/components/navigation-link'
 import { ArrowRight, CheckCircle2, Plus, Search, Leaf, MessageSquare, Bell, ListChecks, UsersRound } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
@@ -44,7 +46,7 @@ export default async function HomePage() {
       <section className="card home-attention"><div className="card-head"><h2>Needs attention</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link><Link href="/notifications" className="card-link">All notifications</Link></div>
         {!notifications.error && !bookings.error && !pending.length && !notifications.data?.length ? <p className="home-clear"><CheckCircle2 size={20}/> All caught up — nothing waiting on you.</p> : <ul className="list">
           {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><Bell size={20}/><span className="row-main"><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">Waiting on you</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
-          {(notifications.data || []).filter(n => n.type === 'new_message' || !pending.some(b => b.id === n.metadata?.booking_id)).slice(0,5).map(n => <li key={n.id}><Link className="row" href={notificationHref(n)}><MessageSquare size={20}/><span className="row-main"><strong>{n.body}</strong><span className="row-sub">{new Date(n.created_at).toLocaleDateString('en-NZ',{day:'numeric',month:'short'})}</span></span><ArrowRight size={16}/></Link></li>)}
+          {(notifications.data || []).filter(n => n.type === 'new_message' || !pending.some(b => b.id === n.metadata?.booking_id)).slice(0,5).map(n => <li key={n.id}><Link className="row" href={notificationHref(n)}><MessageSquare size={20}/><span className="row-main"><strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>)}
         </ul>}
       </section>
       <section className="home-activity"><h2>Your activity</h2><div className="home-stats">{[{label:'Active jobs posted',count:jobs.error ? null : jobs.data?.length || 0},{label:'Offers on open jobs',count:offers.error || offerJobs.error ? null : pendingOffers},{label:'Work & requests',count:bookings.error || offerJobs.error ? null : workCount}].map(t => <Link href="/activity" className="home-stat" key={t.label}><strong>{t.count ?? '—'}</strong><span>{t.label}</span></Link>)}</div>

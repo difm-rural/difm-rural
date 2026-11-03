@@ -1,4 +1,13 @@
 'use client'
+import {DateInput} from '@/components/date-input'
+import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
+import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '@shared/postingText'
+import {FieldFeedback,invalidField} from '@/components/field-feedback'
+import {moneyInputError} from '@shared/postingMoney'
+import {runSubmission} from '@shared/submission'
+import {travelRangeError,travelRangeValue} from '@shared/travelRange'
+import {listingMoneyError} from '@shared/postingMoney'
+import {listingDateError,nzToday} from '@shared/postingDates'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
@@ -92,21 +101,45 @@ export function ListingForm({
   const locationWarning=usePublishingLocationWarning(userId)
   const savingLocationRef=useRef(false)
   const [step, setStep] = useState(0)
+  const [furthest,setFurthest]=useState(0),[attempted,setAttempted]=useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true })
     headingRef.current?.scrollIntoView({ block: 'start' })
   }, [step])
-  function goToStep(next: number) { setError(''); setStep(next) }
+  function goToStep(next: number) { setError(''); setAttempted(false); setFurthest(value=>Math.max(value,next)); setStep(next) }
+  function stepIssues(index:number):Record<string,string>{
+    const issues:Record<string,string>={}
+    if(index===0){
+      if(!kind)issues.kind='Choose a listing type.'
+      if(!title.trim())issues.title='Enter a listing title.'
+      else if(postingTextError(title,'title'))issues.title=postingTextError(title,'title')
+      if(postingTextError(description,'description'))issues.desc=postingTextError(description,'description')
+      if(!category)issues.category='Choose a listing category.'
+    }
+    if(index===1){
+      if(!pricingType)issues.pricing='Choose a pricing type.'
+      if(pricingType!=='quote_required'){const message=moneyInputError(rate,'Rate',true);if(message)issues.rate=message}
+      const minimum=moneyInputError(minCharge,'Minimum charge',true,true);if(minimum)issues.mincharge=minimum
+      pricingAddOns.forEach((row,i)=>{if(row.label.trim()||row.amount.trim()){const message=moneyInputError(row.amount,`Extra charge ${i+1}`,true);if(message)issues['extra-'+i]=message}})
+      pricingVariants.forEach((row,i)=>{if(row.label.trim()||row.rate.trim()||row.min_charge.trim()){
+        const rateIssue=moneyInputError(row.rate,`Alternate rate ${i+1}`),minIssue=moneyInputError(row.min_charge,`Alternate minimum charge ${i+1}`,true,true)
+        if(rateIssue)issues['variant-'+i]=rateIssue
+        if(minIssue)issues['variant-min-'+i]=minIssue
+      }})
+    }
+    if(index===3){
+      if(!locationName.trim())issues.location='Enter the listing location.'
+      const travel=travelRangeError(travelRange);if(travel)issues.travel=travel
+      if(availMode==='from'){const date=!availableFrom?'Choose an available-from date.':listingDateError(availableFrom,mode==='edit'?initialAvailFrom:null);if(date)issues.available=date}
+    }
+    return issues
+  }
   function nextStep() {
-    const message = step === 0 && (!kind || !title.trim() || !category)
-      ? 'Choose a listing type, add a title and select a category.'
-      : step === 1 && (!pricingType || (pricingType !== 'quote_required' && (!rate.trim() || !Number.isFinite(Number(rate)) || Number(rate) < 0)))
-      ? 'Choose a pricing type and enter a valid rate of zero or more.'
-      : step === 3 && !locationName.trim() ? 'Add the listing location.'
-      : step === 3 && availMode === 'from' && !availableFrom ? 'Choose when the listing is available.' : ''
-    if (message) { setError(message); return }
-    goToStep(step + 1)
+    setAttempted(true)
+    const message=Object.values(stepIssues(step))[0]
+    if(message){setError(message);return}
+    goToStep(step+1)
   }
   const [supabase] = useState(() => createClient())
 
@@ -189,6 +222,7 @@ export function ListingForm({
   )
 
   const [busy, setBusy] = useState(false)
+  const [saveStatus,setSaveStatus]=useState('')
   const [error, setError] = useState('')
   // Once a NEW listing's row exists (created below), hold its id so a re-save (e.g. after
   // a partial photo-upload failure keeps us on the form) UPDATEs it rather than inserting
@@ -265,21 +299,30 @@ export function ListingForm({
   const isGrazingHa = !!cfg?.capacity && unitLabel === 'ha'
   const isOtherUnit = !!cfg?.unitAllowOther && Array.isArray(cfg?.unitOptions) && !cfg.unitOptions.includes(unitLabel)
 
-  const canSave = !!kind && !!title.trim() && !!category && !!locationName.trim()
 
   async function onSave() {
-    if (!canSave || !cfg || savingLocationRef.current) return
-    savingLocationRef.current=true
-    try { await saveListing() } finally { savingLocationRef.current=false }
+    if (savingLocationRef.current) return
+    await runSubmission(savingLocationRef,saveListing,
+      ()=>{setBusy(true);setSaveStatus(mode==='edit'||savedId?'Saving changes…':'Publishing listing…');setError('')},
+      ()=>{setBusy(false);setSaveStatus('')},
+      ()=>setError('Could not save the listing. Your changes are kept. Check your connection and try again.'))
   }
   async function saveListing() {
+    for(const index of [0,1,3]){
+      const message=Object.values(stepIssues(index))[0]
+      if(message){setAttempted(true);setError(message);setStep(index);return}
+    }
     if (!cfg) return
-    setBusy(true); setError('')
+    const rangeError=travelRangeError(travelRange)
+    if(rangeError){setError(rangeError);setStep(3);return}
+    const moneyError=listingMoneyError({pricingType,rate,minCharge,addOns:pricingAddOns,variants:pricingVariants})
+    if(moneyError){setError(moneyError);setStep(1);return}
+    const dateError=availMode==='from'?(!availableFrom?'Choose when the listing is available.':listingDateError(availableFrom,mode==='edit'?initialAvailFrom:null)):''
+    if(dateError){setError(dateError);setStep(3);return}
     if(!await locationWarning.check({area:locationName,kind:'listing'})){setBusy(false);goToStep(3);return}
 
     // --- Non-pricing (B1) ---
-    const trimmedTravel = travelRange.trim()
-    const parsedTravel = trimmedTravel ? parseFloat(trimmedTravel) : null
+    const parsedTravel = travelRangeValue(travelRange)
 
     // --- Pricing (B2a), matching RN handlePublish rules exactly ---
     const supportsMinimum = pricingType !== 'quote_required' && pricingType !== 'fixed'
@@ -332,7 +375,7 @@ export function ListingForm({
       category,
       description: description.trim() || null,
       location_name: locationName.trim(),
-      travel_range_km: Number.isFinite(parsedTravel as number) ? parsedTravel : null,
+      travel_range_km: parsedTravel,
       // B2a default-view pricing
       pricing_type: pricingType,
       rate: publishRate,
@@ -367,7 +410,7 @@ export function ListingForm({
         .update(fields)
         .eq('id', savedId)
         .eq('provider_id', userId)
-      if (e) { setBusy(false); setError('Couldn’t save — retry.'); return }
+      if (e) { setError('Couldn’t save — retry.'); return }
       serviceId = savedId
     } else {
       // Create mirrors an RN create: payment_timing/materials always written (control
@@ -383,7 +426,7 @@ export function ListingForm({
         payment_timing: cfg.showPayment ? paymentTiming : 'on_completion',
         materials: cfg.showMaterials ? materials : 'included',
       }).select('id').single()
-      if (e || !data) { setBusy(false); setError('Couldn’t create — retry.'); return }
+      if (e || !data) { setError('Couldn’t create — retry.'); return }
       serviceId = data.id as string
       setSavedId(serviceId) // so a re-save (e.g. after partial photo failure) updates, not re-inserts
     }
@@ -391,6 +434,7 @@ export function ListingForm({
     // 2. Photos (mirror RN uploadPhotos): iterate in order — existing URL strings pass
     // through unchanged; new Files upload to `${serviceId}/${Date.now()}_${i}.${ext}`.
     // Failed uploads are skipped (surfaced below), never block the save.
+    if(photos.some(p=>typeof p!=='string'))setSaveStatus('Uploading photos…')
     const finalUrls: string[] = []
     let failed = 0
     for (let i = 0; i < photos.length; i++) {
@@ -416,10 +460,9 @@ export function ListingForm({
         .update({ photos: finalUrls })
         .eq('id', serviceId)
         .eq('provider_id', userId)
-      if (pErr) { setBusy(false); setError('Saved, but couldn’t update photos — retry.'); return }
+      if (pErr) { setError('Saved, but couldn’t update photos — retry.'); return }
     }
 
-    setBusy(false)
 
     // Partial photo failure: the listing + successful photos are saved. Reflect the saved
     // set in state (so a retry re-uploads only what's re-added, not the already-saved ones)
@@ -430,17 +473,29 @@ export function ListingForm({
       return
     }
 
+    setSaveStatus('Saved. Opening My listings…')
     router.push('/listings')
     router.refresh()
+    return true
   }
 
+  const issues=attempted?stepIssues(step):{}
+  const field=(name:string)=>invalidField('lf-'+name,issues[name])
+  const issue=(name:string)=><FieldFeedback name={'lf-'+name} message={issues[name]}/>
+  useEffect(()=>{
+    if(!error)return
+    const target=document.querySelector<HTMLElement>('[aria-invalid="true"]')
+    const details=target?.closest('details');if(details)details.open=true
+    target?.focus()
+  },[error,step])
   return (
-    <div className="lform">
+    <div className="lform" aria-busy={busy}>
       {locationWarning.prompt}
+      <fieldset disabled={busy} className="listing-form-fields" aria-label="Listing editor">
       <nav className="lform-progress" aria-label="Listing progress">
-        {STEPS.map((label, index) => <span key={label} aria-current={index === step ? 'step' : undefined} className={index === step ? 'active' : index < step ? 'complete' : ''}>
+        {STEPS.map((label, index) => <button type="button" disabled={busy||index>furthest} onClick={()=>goToStep(index)} key={label} aria-current={index === step ? 'step' : undefined} className={index === step ? 'active' : index < step ? 'complete' : ''}>
           <span>{index < step ? '✓' : index + 1}</span>{label}
-        </span>)}
+        </button>)}
       </nav>
       <header className="lform-step-heading">
         <p className="muted">Step {step + 1} of {STEPS.length}</p>
@@ -463,7 +518,7 @@ export function ListingForm({
             <span className="muted lform-fixed-note">Type can’t be changed on an existing listing.</span>
           </p>
         ) : (
-          <div className="lform-kinds">
+          <div className="lform-kinds" role="group" aria-label="Listing type" tabIndex={-1} {...field('kind')}>
             {LISTING_KINDS.map(k => (
               <button
                 type="button"
@@ -478,22 +533,23 @@ export function ListingForm({
         )}
       </div>
 
+      {issue('kind')}
       {/* Title */}
       <div className="lform-field">
         <label htmlFor="lf-title">Title <span className="req">*</span></label>
         <input
-          id="lf-title"
+          maxLength={POSTING_TITLE_MAX} {...field('title')}
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="e.g. Tractor topping with operator"
-        />
+        />{issue('title')}<small className="muted">{title.length} / {POSTING_TITLE_MAX} characters</small>
       </div>
 
       {/* Category */}
       <div className="lform-field">
         <label htmlFor="lf-category">Category <span className="req">*</span></label>
         <select
-          id="lf-category"
+          {...field('category')}
           value={category}
           onChange={e => setCategory(e.target.value)}
           disabled={!kind}
@@ -502,19 +558,19 @@ export function ListingForm({
           {categoryOptions.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
-        </select>
+        </select>{issue('category')}
       </div>
 
       {/* Description */}
       <div className="lform-field">
         <label htmlFor="lf-desc">Description</label>
         <textarea
-          id="lf-desc"
+          maxLength={POSTING_DESCRIPTION_MAX} {...field('desc')}
           value={description}
           onChange={e => setDescription(e.target.value)}
           rows={4}
           placeholder="What you’re offering, condition, terms, anything a buyer should know."
-        />
+        />{issue('desc')}<small className="muted">{description.length} / {POSTING_DESCRIPTION_MAX} characters</small>
       </div>
 
       </div>
@@ -522,12 +578,12 @@ export function ListingForm({
       {/* Pricing — default view, driven by KIND_PRICING[kind] */}
       {cfg ? (
         <section className="lform-pricing">
-          <h2>How is it priced?</h2>
+
 
           {/* Pricing type */}
           <div className="lform-field">
-            <label>Pricing</label>
-            <div className="lseg">
+            <label>Pricing type</label>
+            <div className="lseg" role="group" aria-label="Pricing type" tabIndex={-1} {...field('pricing')}>
               {cfg.types.map(id => (
                 <button
                   type="button"
@@ -541,6 +597,7 @@ export function ListingForm({
             </div>
           </div>
 
+          {issue('pricing')}
           {pricingType === 'quote_required' ? (
             <div className="lform-note">
               <strong>Priced on enquiry</strong>
@@ -552,12 +609,12 @@ export function ListingForm({
                 <div className="lform-field">
                   <label htmlFor="lf-rate">Rate</label>
                   <input
-                    id="lf-rate"
-                    inputMode="numeric"
+                    {...field('rate')}
+                    inputMode="decimal"
                     value={rate}
                     onChange={e => setRate(e.target.value)}
                     placeholder="120"
-                  />
+                  />{issue('rate')}<p className="lform-help">Enter 0 if there is no base rate. Any minimum or extra charges still apply. Choose Quote required if the price needs to be agreed.</p>
                 </div>
                 {pricingType === 'per_unit' && cfg.unit === 'free' && (
                   <div className="lform-field">
@@ -683,7 +740,7 @@ export function ListingForm({
           {pricingType && (
             <div className="lform-preview">
               <span className="lform-preview-label">Displays as</span>
-              <span className="lform-preview-val">{formatRate(pricingType, rate, unitLabel)}</span>
+              <span className="lform-preview-val">{formatRate(pricingType, rate, unitLabel,minCharge)}</span>
             </div>
           )}
 
@@ -705,12 +762,12 @@ export function ListingForm({
                 <div className="lform-field">
                   <label htmlFor="lf-mincharge">Minimum charge <span className="optional">(optional)</span></label>
                   <input
-                    id="lf-mincharge"
+                    {...field('mincharge')}
                     inputMode="numeric"
                     value={minCharge}
                     onChange={e => setMinCharge(e.target.value)}
                     placeholder="e.g. 80"
-                  />
+                  />{issue('mincharge')}
                   <p className="lform-help">A floor regardless of quantity. Not stored on quote or fixed-price listings.</p>
                 </div>
 
@@ -731,9 +788,9 @@ export function ListingForm({
                         <input
                           inputMode="numeric"
                           placeholder="Amount"
-                          value={a.amount}
+                          {...field('extra-'+i)} value={a.amount}
                           onChange={e => updateAddOn(i, { amount: e.target.value })}
-                        />
+                        />{issue('extra-'+i)}
                       </div>
                       <div className="lseg">
                         {ADDON_BASES.map(b => (
@@ -800,9 +857,9 @@ export function ListingForm({
                         <input
                           inputMode="numeric"
                           placeholder="Rate"
-                          value={v.rate}
+                          {...field('variant-'+i)} value={v.rate}
                           onChange={e => updateVariant(i, { rate: e.target.value })}
-                        />
+                        />{issue('variant-'+i)}
                         {v.pricing_type === 'per_unit' && (
                           <input
                             placeholder="Unit (e.g. bale)"
@@ -821,9 +878,9 @@ export function ListingForm({
                         <input
                           inputMode="numeric"
                           placeholder="Min charge (optional)"
-                          value={v.min_charge}
+                          {...field('variant-min-'+i)} value={v.min_charge}
                           onChange={e => updateVariant(i, { min_charge: e.target.value })}
-                        />
+                        />{issue('variant-min-'+i)}
                       </div>
                       <div className="lform-repeat-foot">
                         <span className="lform-repeat-preview">{variantDisplay(v)}</span>
@@ -851,7 +908,7 @@ export function ListingForm({
         </section>
       ) : (
         <section className="lform-pricing-placeholder">
-          <h2>Pricing</h2>
+
           <p className="muted">Pick a listing type to set pricing.</p>
         </section>
       )}
@@ -861,7 +918,7 @@ export function ListingForm({
       {/* Photos (C1) — optional, up to 4 */}
       <section className="lform-pricing">
         <h2>Photos <span className="optional">(optional, up to {MAX_PHOTOS})</span></h2>
-        <p className="muted">The first photo is the card image. Drag-free: add up to {MAX_PHOTOS}.</p>
+        <p className="muted">Add up to {MAX_PHOTOS} photos. The first photo appears on your listing card.</p>
 
         {photos.length > 0 && (
           <div className="lform-photos">
@@ -968,23 +1025,24 @@ export function ListingForm({
       <div className="lform-field">
         <label htmlFor="lf-location">Service area / location <span className="req">*</span></label>
         <input
-          id="lf-location"
+          {...field('location')}
           value={locationName}
           onChange={e => setLocationName(e.target.value)}
           placeholder="e.g. Waikato, around Cambridge"
-        />
+        />{issue('location')}
       </div>
 
       {/* Travel range */}
       <div className="lform-field">
         <label htmlFor="lf-travel">Travel range (km)</label>
         <input
-          id="lf-travel"
+          {...field('travel')}
           inputMode="numeric"
           value={travelRange}
           onChange={e => setTravelRange(e.target.value)}
           placeholder="Optional — how far you’ll travel"
-        />
+        />{issue('travel')}
+        <p className="muted">Optional. Enter a whole number from 0 to 2,000 km.</p>
       </div>
 
       {/* Availability (B3) — optional */}
@@ -1007,13 +1065,14 @@ export function ListingForm({
               From a date
             </button>
           </div>
-          {availMode === 'from' && (
-            <input
+          {availMode === 'from' && (<>
+            <DateInput
               type="date"
-              value={availableFrom}
+              min={mode==='edit'&&availableFrom===initialAvailFrom?undefined:nzToday()}
+              {...field('available')} value={availableFrom}
               onChange={e => setAvailableFrom(e.target.value)}
               style={{ marginTop: 10, maxWidth: 220 }}
-            />
+            />{issue('available')}</>
           )}
         </div>
       </section>
@@ -1026,10 +1085,10 @@ export function ListingForm({
         </section>
         <section className="lform-pricing">
           <div className="lform-review-heading"><h3>Pricing</h3><button type="button" className="lform-review-edit" onClick={() => goToStep(1)}>Edit pricing</button></div>
-          <dl><dt>Main rate</dt><dd>{pricingType === 'quote_required' ? 'Quote required' : '$' + rate + ' · ' + (cfg ? pricingTypeLabel(cfg, pricingType) : pricingType) + (unitLabel ? ' · ' + unitLabel : '')}</dd>
+          <dl><dt>Main rate</dt><dd>{pricingType === 'quote_required' ? 'Quote required' : formatRate(pricingType,rate,unitLabel,minCharge)}</dd>
           {minimumUnits && <><dt>Minimum quantity</dt><dd>{minimumUnits}</dd></>}
           {maxUnits && <><dt>Capacity</dt><dd>{maxUnits} head</dd></>}
-          {minCharge && <><dt>Minimum charge</dt><dd>{'$' + minCharge}</dd></>}
+          {minCharge && <><dt>Minimum charge</dt><dd>{""+nzMoney(minCharge)}</dd></>}
           {cfg?.showPayment && <><dt>Payment</dt><dd>{paymentTiming === 'upfront' ? 'Upfront' : 'On completion'}</dd></>}
           {cfg?.showMaterials && <><dt>Materials</dt><dd>{MATERIALS_OPTIONS.find(option => option.id === materials)?.label || materials}</dd></>}
           {pricingAddOns.some(a => a.label.trim() && a.amount.trim()) && <><dt>Extra charges</dt><dd>{pricingAddOns.filter(a => a.label.trim() && a.amount.trim()).map((a,i) => <p key={i}>{a.label}: {addOnDisplay(a)}</p>)}</dd></>}
@@ -1045,18 +1104,20 @@ export function ListingForm({
         </section>
         <section className="lform-pricing">
           <div className="lform-review-heading"><h3>Location & availability</h3><button type="button" className="lform-review-edit" onClick={() => goToStep(3)}>Edit location</button></div>
-          <dl><dt>Location</dt><dd>{locationName}</dd>{travelRange && <><dt>Travel range</dt><dd>{travelRange} km</dd></>}<dt>Available</dt><dd>{availMode === 'now' ? 'Now' : new Date(availableFrom + 'T12:00:00').toLocaleDateString('en-NZ')}</dd></dl>
+          <dl><dt>Location</dt><dd>{locationName}</dd>{travelRange && <><dt>Travel range</dt><dd>{travelRange} km</dd></>}<dt>Available</dt><dd>{availMode === 'now' ? 'Now' : nzDate(new Date(availableFrom + 'T12:00:00'))}</dd></dl>
         </section>
       </section>}
+      {busy && <p className="muted" role="status">{saveStatus}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <div className="lform-actions lform-wizard-actions">
         <button type="button" className="lform-cancel" onClick={() => step > 0 ? goToStep(step - 1) : router.push('/listings')} disabled={busy}>{step > 0 ? 'Back' : 'Cancel'}</button>
-        {step < 4 ? <button type="button" className="lform-save" onClick={nextStep}>{step === 2 ? 'Continue' : step === 3 ? 'Review listing' : 'Next'}</button>
-        : <button type="button" className="lform-save" onClick={onSave} disabled={!canSave || busy}>
-          {busy && <LoaderCircle className="spin" size={15} />}{mode === 'edit' || savedId ? 'Save changes' : 'Publish listing'}
+        {step < 4 ? <button type="button" className="lform-save" onClick={nextStep} disabled={busy}>{step === 3 ? 'Review listing' : 'Next'}</button>
+        : <button type="button" className="lform-save" onClick={onSave} disabled={busy}>
+          {busy && <LoaderCircle className="spin" size={15} />}{busy?saveStatus:mode === 'edit' || savedId ? 'Save changes' : 'Publish listing'}
         </button>}
       </div>
+      </fieldset>
     </div>
   )
 }

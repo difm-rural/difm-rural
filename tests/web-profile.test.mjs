@@ -3,7 +3,7 @@ import test from 'node:test'
 import {readFile} from 'node:fs/promises'
 import {stripTypeScriptTypes} from 'node:module'
 let source=await readFile(new URL('../provider-web/src/lib/profile-input.ts',import.meta.url),'utf8')
-for(const name of ['categories','providerAvailability'])source=source.replace(`'@shared/${name}'`,`'${new URL('../shared/'+name+'.ts',import.meta.url).href}'`)
+for(const name of ['categories','providerAvailability','profileName'])source=source.replace(`'@shared/${name}'`,`'${new URL('../shared/'+name+'.ts',import.meta.url).href}'`)
 const inputUrl='data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64')
 const {profileInput,availabilityInput,preferencesInput,nzToday,PUBLIC_PROFILE_COLUMNS}=await import(inputUrl)
 const form=values=>{const f=new FormData();for(const [k,v] of Object.entries(values))for(const value of Array.isArray(v)?v:[v])f.append(k,value);return f}
@@ -29,6 +29,14 @@ test('availability dates use the NZ day and reject impossible or past dates',()=
  assert.equal(availabilityInput(form({availability_status:'unavailable_until',availability_until:'2026-10-20'}),now).ok,true)
  assert.equal(availabilityInput(form({availability_status:'available_now',availability_until:'bad'}),now).value.availability_until,null)
  assert.equal(availabilityInput(form({availability_status:'invented'}),now).ok,false)
+})
+test('availability feedback distinguishes missing, invalid and past dates',()=>{
+ const now=new Date('2026-11-03T00:00:00Z')
+ const check=value=>availabilityInput(form({availability_status:'unavailable_until',availability_until:value}),now)
+ for(const value of ['', '    '])assert.equal(check(value).error,'Choose a date.')
+ assert.equal(check('2026-02-30').error,'Choose a valid date.')
+ assert.equal(check('2026-11-02').error,'Choose today or a future date.')
+ assert.equal(check('2026-11-03').ok,true)
 })
 test('preferences patch is limited to supported switches and matching settings',()=>{
  const r=preferencesInput(form({opportunity_alert_mode:'daily',opportunity_radius_km:'30',email_messages:'on',user_id:'other',notifications_enabled:'off'}))

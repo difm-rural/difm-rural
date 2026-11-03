@@ -1,3 +1,4 @@
+import {formatDate} from './formatting.js'
 export const PROVIDER_AVAILABILITY_OPTIONS = [
   {
     value: 'available_now',
@@ -56,7 +57,7 @@ export function availabilityDisplay(status: string | null | undefined, until: st
   }
   if (status === 'unavailable_until' && unavailableUntil && now <= unavailableUntil) {
     return {
-      label: `Unavailable until ${unavailableUntil.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`,
+      label: `Unavailable until ${formatDate(unavailableUntil)}`,
       tone: 'muted',
       active: false,
     }

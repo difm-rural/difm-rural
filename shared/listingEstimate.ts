@@ -1,3 +1,4 @@
+import {formatMoney as nzMoney} from './formatting.js'
 export const BASE_ESTIMATE_EXPLANATION = 'Extra charges may apply — agree the final price with the provider.'
 export const EXTRA_CHARGES_EXPLANATION = 'These charges are not included in the base estimate. Agree which apply with the provider.'
 
@@ -36,7 +37,7 @@ export function listingEstimate(service:EstimateListing|null|undefined, selected
 
 export function formatExtraCharge(charge:{amount?:number|string;basis?:string;unit_label?:string}) {
   const amount = Number(charge.amount).toFixed(2)
-  if (charge.basis === 'per_km') return `+$${amount}/km`
-  if (charge.basis === 'per_unit') return `+$${amount}/${charge.unit_label || 'unit'}`
-  return `+$${amount}`
+  if (charge.basis === 'per_km') return `+${nzMoney(amount)}/km`
+  if (charge.basis === 'per_unit') return `+${nzMoney(amount)}/${charge.unit_label || 'unit'}`
+  return `+${nzMoney(amount)}`
 }

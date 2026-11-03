@@ -1,3 +1,5 @@
+import {jobMapTarget} from '../../shared/jobMapTarget'
+import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -53,7 +55,7 @@ function jobStaticMapUrl(job) {
 }
 
 function jobBudget(job) {
-  return job.price_type === 'fixed' ? `$${job.price}`
+  return job.price_type === 'fixed' ? `${nzMoney(job.price)}`
     : job.price_type === 'unpaid' ? 'Free / in-kind'
     : 'Open to offers'
 }
@@ -65,8 +67,7 @@ function jobLocation(job) {
 function jobDates(job) {
   if (!job.date_from || !job.date_to) return null
   try {
-    const opt = { day: 'numeric', month: 'short', year: 'numeric' }
-    return `${new Date(job.date_from).toLocaleDateString('en-NZ', opt)} – ${new Date(job.date_to).toLocaleDateString('en-NZ', opt)}`
+    return `${nzDate(new Date(job.date_from))} – ${nzDate(new Date(job.date_to))}`
   } catch { return null }
 }
 
@@ -288,11 +289,11 @@ export default function JobDetailScreen({ route, navigation }) {
     if (isWatched) {
       setIsWatched(false)
       await removeFromWatchlist(currentUser.id, job.id)
-      Alert.alert('Removed from watchlist')
+      Alert.alert('Removed from saved jobs')
     } else {
       setIsWatched(true)
       await addToWatchlist(currentUser.id, job.id)
-      Alert.alert('Added to watchlist')
+      Alert.alert('Job saved')
     }
   }
 
@@ -435,7 +436,7 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   async function handleAcceptBid(bid) {
-    Alert.alert('Accept Offer', `Accept offer of $${bid.amount} from ${bid.profiles?.full_name}?`, [
+    Alert.alert('Accept Offer', `Accept offer of ${nzMoney(bid.amount)} from ${bid.profiles?.full_name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Accept',
@@ -518,7 +519,7 @@ export default function JobDetailScreen({ route, navigation }) {
             onPress={handleWatchToggle}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="button"
-            accessibilityLabel={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}>
+            accessibilityLabel={isWatched ? 'Remove saved job' : 'Save job'}>
             <Icon name={isWatched ? 'bookmark' : 'bookmark-outline'} size={18} color={isWatched ? colors.primary : colors.textMuted} />
           </TouchableOpacity>
         )}
@@ -633,7 +634,7 @@ export default function JobDetailScreen({ route, navigation }) {
                     ? `This job is complete. You can now review ${requesterFirstName}.`
                     : isAwaitingCompletion
                       ? 'Completion recorded. Refresh to see the completed job.'
-                      : `This job has been awarded to you for $${myBid.amount}. Use chat to confirm timing and details with ${requesterFirstName}.`}
+                      : `This job has been awarded to you for ${nzMoney(myBid.amount)}. Use chat to confirm timing and details with ${requesterFirstName}.`}
                 </Text>
               </View>
             )}
@@ -689,7 +690,7 @@ export default function JobDetailScreen({ route, navigation }) {
             {job.scheduled_date ? (
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Schedule</Text>
-                <Text style={styles.detailValue}>{new Date(job.scheduled_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                <Text style={styles.detailValue}>{nzDate(new Date(job.scheduled_date))}</Text>
               </View>
             ) : null}
             {job.description ? (
@@ -702,10 +703,10 @@ export default function JobDetailScreen({ route, navigation }) {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
-            {job.latitude && job.longitude && (
+            {jobMapTarget(job) && (
               <Button
                 icon="navigate-outline"
-                title="Navigate to job"
+                title={jobMapTarget(job)?.kind==='address'?'Navigate to job':'View job pin'}
                 onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
                 style={{ marginBottom: 10 }}
               />
@@ -746,8 +747,8 @@ export default function JobDetailScreen({ route, navigation }) {
             <View style={styles.infoBoxBlue}>
               <Text style={styles.infoBoxBlueText}>
                 {otherBidCount > 0
-                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer of $${myBid.amount} was the winning offer.`
-                  : `Your offer of $${myBid.amount} was the only offer — you got it!`}
+                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer of ${nzMoney(myBid.amount)} was the winning offer.`
+                  : `Your offer of ${nzMoney(myBid.amount)} was the only offer — you got it!`}
               </Text>
             </View>
           )}
@@ -836,7 +837,7 @@ export default function JobDetailScreen({ route, navigation }) {
       {lineItems.length > 1 && (
         <View style={styles.bidTotalRow}>
           <Text style={styles.bidTotalLabel}>Offer total</Text>
-          <Text style={styles.bidTotalAmount}>${bidTotal.toFixed(2)}</Text>
+          <Text style={styles.bidTotalAmount}>{nzMoney(bidTotal.toFixed(2))}</Text>
         </View>
       )}
 
@@ -875,7 +876,7 @@ export default function JobDetailScreen({ route, navigation }) {
         accessibilityRole="button" accessibilityLabel="Set availability date">
         <Text style={styles.availabilityBtnText}>
           <Icon name="calendar-outline" size={14} color={colors.textSecondary} /> {availableFrom
-            ? `Available from ${availableFrom.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`
+            ? `Available from ${nzDate(availableFrom)}`
             : 'Set availability date (optional)'}
         </Text>
         {availableFrom && (
@@ -985,10 +986,10 @@ export default function JobDetailScreen({ route, navigation }) {
             </ScrollView>
           )}
 
-          {!!(job.latitude && job.longitude) && !discreetHouseSit && (
+          {!!jobMapTarget(job) && !discreetHouseSit && (
             <TouchableOpacity style={styles.mapThumbWrap}
               onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
-              activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="View job on map">
+              activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="View job location pin on map">
               <Image source={{ uri: jobStaticMapUrl(job) }} style={styles.mapThumbImg} resizeMode="cover" />
               {job.area_hectares ? (
                 <View style={styles.mapAreaBadge}>
@@ -1051,7 +1052,7 @@ export default function JobDetailScreen({ route, navigation }) {
                 <View style={styles.questionRow}>
                   <Text style={styles.questionAsker}>{q.askerName}</Text>
                   <Text style={styles.questionDate}>
-                    {new Date(q.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                    {nzDate(new Date(q.created_at))}
                   </Text>
                 </View>
                 <Text style={styles.questionText}>{q.question}</Text>
@@ -1148,14 +1149,14 @@ export default function JobDetailScreen({ route, navigation }) {
                       {myBid.line_items.map((li, i) => (
                         <View key={i} style={styles.breakdownRow}>
                           <Text style={styles.breakdownLabel}>{li.label}</Text>
-                          <Text style={styles.breakdownAmount}>${(li.amount || 0).toFixed(2)}</Text>
+                          <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
                         </View>
                       ))}
                     </View>
                   )}
                   {myBid?.message ? <Text style={styles.myBidMessage}>{myBid.message}</Text> : null}
                   {myBid?.available_from && (
-                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {new Date(myBid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {nzDate(new Date(myBid.available_from))}</Text>
                   )}
                   {myBid?.estimated_duration && (
                     <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
@@ -1253,14 +1254,14 @@ export default function JobDetailScreen({ route, navigation }) {
                     {bid.line_items.map((li, i) => (
                       <View key={i} style={styles.breakdownRow}>
                         <Text style={styles.breakdownLabel}>{li.label}</Text>
-                        <Text style={styles.breakdownAmount}>${(li.amount || 0).toFixed(2)}</Text>
+                        <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
                       </View>
                     ))}
                   </View>
                 )}
                 {bid.message ? <Text style={styles.bidMessage}>{bid.message}</Text> : null}
                 {bid.available_from && (
-                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {new Date(bid.available_from).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {nzDate(new Date(bid.available_from))}</Text>
                 )}
                 {bid.estimated_duration && (
                   <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>

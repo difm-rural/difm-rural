@@ -1,6 +1,7 @@
 'use client'
-import { useActionState, useState } from 'react'
-import Link from 'next/link'
+import { useActionState, useState, useEffect, useRef } from 'react'
+import {publicNameError,PUBLIC_NAME_MAX} from '@shared/profileName'
+import Link from '@/components/navigation-link'
 import { CATEGORY_CAPABILITIES, ALL_CAPABILITIES } from '@shared/categories'
 import { createClient } from '@/lib/supabase/client'
 import { saveProfile } from '../actions'
@@ -11,6 +12,11 @@ export function ProfileForm({profile,userId}:{profile:OwnProfile;userId:string})
   const [avatar,setAvatar]=useState(profile.avatar_url || ''),[uploading,setUploading]=useState(false),[error,setError]=useState('')
   const [latitude,setLatitude]=useState(profile.latitude===null?'':String(profile.latitude)),[longitude,setLongitude]=useState(profile.longitude===null?'':String(profile.longitude))
   const [locating,setLocating]=useState(false)
+  const [name,setName]=useState(profile.full_name || profile.display_name || '')
+  const [attempted,setAttempted]=useState(false),[showResult,setShowResult]=useState(false)
+  const nameInput=useRef<HTMLInputElement>(null),feedback=useRef<HTMLParagraphElement>(null)
+  const nameIssue=attempted?publicNameError(name):''
+  useEffect(()=>{if(showResult&&!pending&&state.error)feedback.current?.focus()},[state.error,pending,showResult])
   const otherSkills=(profile.skills || []).filter(s=>!ALL_CAPABILITIES.includes(s))
   async function uploadPhoto(file:File|null){
     if(!file)return
@@ -34,12 +40,20 @@ export function ProfileForm({profile,userId}:{profile:OwnProfile;userId:string})
     setLocating(true);setError('')
     navigator.geolocation.getCurrentPosition(p=>{setLatitude(String(p.coords.latitude));setLongitude(String(p.coords.longitude));setLocating(false)},()=>{setLocating(false);setError('Could not read your location. Allow location access or enter your address. GPS is optional.')},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})
   }
-  return <form action={action} className="lform"><fieldset className="work-fieldset" disabled={pending || uploading}>
+  return <form action={action} className="lform" onChange={()=>setShowResult(false)} onSubmit={event=>{
+    setAttempted(true);setShowResult(false)
+    if(publicNameError(name)){event.preventDefault();nameInput.current?.focus();return}
+    setShowResult(true);setError('')
+  }}>
+    {(error || (!pending&&showResult&&state.error)) && <p ref={feedback} tabIndex={-1} role="alert" className="form-error">{error || state.error}</p>}
+    <fieldset className="work-fieldset" disabled={pending || uploading}>
     <section className="card account-form-section"><h2>Your public profile</h2><p className="muted">Other members can see these details. Your public name is used on jobs, listings, messages and reviews.</p>
       <div className="account-summary">{avatar?<img src={avatar} className="account-avatar" alt="Profile photo preview"/>:<span className="account-avatar account-initial">{profile.full_name?.slice(0,1) || '?'}</span>}
         <label className="lform-cancel account-upload">{uploading?'Uploading…':'Choose photo'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{void uploadPhoto(e.target.files?.[0] || null);e.target.value=''}}/></label>{avatar && <button type="button" className="lform-cancel" onClick={()=>setAvatar('')}>Remove photo</button>}
       </div><input type="hidden" name="avatar_url" value={avatar}/><p className="muted">Photo changes are applied when you save this form.</p>
-      <label className="lform-field">Public name *<input name="full_name" defaultValue={profile.full_name || profile.display_name || ''} required maxLength={80} autoComplete="name"/></label>
+      <label className="lform-field">Public name *<input ref={nameInput} name="full_name" value={name} onChange={event=>setName(event.target.value)} maxLength={PUBLIC_NAME_MAX} autoComplete="name" aria-required="true" aria-invalid={!!nameIssue} aria-describedby={nameIssue?'profile-name-error':'profile-name-hint'}/>
+        {nameIssue?<span id="profile-name-error" className="field-error" role="alert">{nameIssue}</span>:<small id="profile-name-hint" className="muted">The name other members see. Up to 80 characters.</small>}
+      </label>
       <label className="lform-field">Public town or region *<input name="region" defaultValue={profile.region || ''} required maxLength={120} placeholder="e.g. Cambridge, Waikato"/></label>
       <label className="lform-field">About you (optional)<textarea name="bio" rows={5} defaultValue={profile.bio || ''} maxLength={1500} placeholder="Tell people about your experience and the help you can offer."/></label>
     </section>
@@ -58,7 +72,7 @@ export function ProfileForm({profile,userId}:{profile:OwnProfile;userId:string})
       <div className="lform-actions"><button type="button" className="lform-cancel" onClick={useLocation} disabled={locating}>{locating?'Finding location…':'Use my current location'}</button>{latitude && <button type="button" className="lform-cancel" onClick={()=>{setLatitude('');setLongitude('')}}>Clear GPS location</button>}</div>
     </section>
   </fieldset>
-    {(error || state.error) && <p role="alert" className="form-error">{error || state.error}</p>}{state.success && <p role="status" className="home-clear">{state.success}</p>}
+    {showResult&&!pending&&!nameIssue&&state.success && <p role="status" className="home-clear">{state.success}</p>}
     <div className="lform-actions lform-wizard-actions"><Link href="/account" className="lform-cancel">Back to Account</Link><button className="lform-save" disabled={pending || uploading || locating}>{pending?'Saving…':uploading?'Uploading photo…':'Save profile'}</button></div>
   </form>
 }

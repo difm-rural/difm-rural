@@ -6,6 +6,12 @@ import path from "path";
 // tsconfig alias. See the note atop /shared/listingPricing.ts for why (b) (a
 // workspace package) was rejected. Trade-off: `next dev` watches the repo root.
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {source:'/saved-searches',destination:'/account/interests',permanent:false},
+      {source:'/saved-jobs',destination:'/jobs/saved',permanent:false},
+    ]
+  },
   turbopack: {
     root: path.resolve(process.cwd(), ".."),
   },
