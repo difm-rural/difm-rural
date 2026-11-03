@@ -3,7 +3,7 @@ import {DateInput} from '@/components/date-input'
 import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '@shared/postingText'
 import {FieldFeedback,invalidField} from '@/components/field-feedback'
-import {moneyInputError} from '@shared/postingMoney'
+import {listingAmountError} from '@shared/postingMoney'
 import {runSubmission} from '@shared/submission'
 import {travelRangeError,travelRangeValue} from '@shared/travelRange'
 import {listingMoneyError} from '@shared/postingMoney'
@@ -119,11 +119,11 @@ export function ListingForm({
     }
     if(index===1){
       if(!pricingType)issues.pricing='Choose a pricing type.'
-      if(pricingType!=='quote_required'){const message=moneyInputError(rate,'Rate',true);if(message)issues.rate=message}
-      const minimum=moneyInputError(minCharge,'Minimum charge',true,true);if(minimum)issues.mincharge=minimum
-      pricingAddOns.forEach((row,i)=>{if(row.label.trim()||row.amount.trim()){const message=moneyInputError(row.amount,`Extra charge ${i+1}`,true);if(message)issues['extra-'+i]=message}})
+      if(pricingType!=='quote_required'){const message=listingAmountError(rate,'Rate',true);if(message)issues.rate=message}
+      const minimum=listingAmountError(minCharge,'Minimum charge',true,true);if(minimum)issues.mincharge=minimum
+      pricingAddOns.forEach((row,i)=>{if(row.label.trim()||row.amount.trim()){const message=listingAmountError(row.amount,`Extra charge ${i+1}`,true);if(message)issues['extra-'+i]=message}})
       pricingVariants.forEach((row,i)=>{if(row.label.trim()||row.rate.trim()||row.min_charge.trim()){
-        const rateIssue=moneyInputError(row.rate,`Alternate rate ${i+1}`),minIssue=moneyInputError(row.min_charge,`Alternate minimum charge ${i+1}`,true,true)
+        const rateIssue=listingAmountError(row.rate,`Alternate rate ${i+1}`),minIssue=listingAmountError(row.min_charge,`Alternate minimum charge ${i+1}`,true,true)
         if(rateIssue)issues['variant-'+i]=rateIssue
         if(minIssue)issues['variant-min-'+i]=minIssue
       }})
@@ -737,7 +737,7 @@ export function ListingForm({
           )}
 
           {/* Live preview — same formatRate as RN, so web and app render identically */}
-          {pricingType && (
+          {pricingType && (pricingType==='quote_required' || !listingAmountError(rate,'Rate',true)) && !listingAmountError(minCharge,'Minimum charge',true,true) && (
             <div className="lform-preview">
               <span className="lform-preview-label">Displays as</span>
               <span className="lform-preview-val">{formatRate(pricingType, rate, unitLabel,minCharge)}</span>
@@ -1111,7 +1111,8 @@ export function ListingForm({
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <div className="lform-actions lform-wizard-actions">
-        <button type="button" className="lform-cancel" onClick={() => step > 0 ? goToStep(step - 1) : router.push('/listings')} disabled={busy}>{step > 0 ? 'Back' : 'Cancel'}</button>
+        <button type="button" className="lform-cancel" onClick={() => router.push('/listings')} disabled={busy}>Cancel</button>
+        {step > 0 && <button type="button" className="lform-cancel" onClick={() => goToStep(step - 1)} disabled={busy}>Back</button>}
         {step < 4 ? <button type="button" className="lform-save" onClick={nextStep} disabled={busy}>{step === 3 ? 'Review listing' : 'Next'}</button>
         : <button type="button" className="lform-save" onClick={onSave} disabled={busy}>
           {busy && <LoaderCircle className="spin" size={15} />}{busy?saveStatus:mode === 'edit' || savedId ? 'Save changes' : 'Publish listing'}

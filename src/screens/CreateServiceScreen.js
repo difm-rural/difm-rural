@@ -2,7 +2,7 @@ import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatti
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../shared/postingText'
 import {runSubmission} from '../../shared/submission'
 import {travelRangeError,travelRangeValue} from '../../shared/travelRange'
-import {listingMoneyError} from '../../shared/postingMoney'
+import {listingAmountError,listingMoneyError} from '../../shared/postingMoney'
 import {listingDateError,nzCalendarDay} from '../../shared/postingDates'
 import {confirmPublishingLocation} from '../lib/publishingLocation'
 import React, { useEffect, useRef, useState } from 'react'
@@ -327,7 +327,10 @@ export default function CreateServiceScreen({ navigation, route }) {
   }
 
   const [attempted,setAttempted]=useState(false)
-  const moneyError=listingMoneyError({pricingType,rate,minCharge,addOns:pricingAddOns,variants:pricingVariants})
+  const mainRateError=pricingType==='quote_required'?'':listingAmountError(rate,'Rate',true)
+  const rateError=attempted || rate.trim() ? mainRateError : ''
+  const advancedMoneyError=listingMoneyError({pricingType:'quote_required',minCharge,addOns:pricingAddOns,variants:pricingVariants})
+  const moneyError=mainRateError || advancedMoneyError
   function canProceed() {
     if (locationSelecting) return false
     if (step === 1) return !postingTextError(title,'title') && !!(title.trim() && category)
@@ -1299,7 +1302,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     return (
       <>
         <Text style={styles.stepHeading}>How is it priced?</Text>
-        {!!moneyError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: 12 }}>{moneyError}</Text>}
+        {!!advancedMoneyError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: 12 }}>{advancedMoneyError}</Text>}
 
         <Text style={styles.fieldLabel}>Pricing type</Text>
         <View style={styles.segmentGrid}>
@@ -1326,7 +1329,7 @@ export default function CreateServiceScreen({ navigation, route }) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.fieldLabel}>Rate</Text>
                 <TextInput
-                  style={[styles.input, !!moneyError && moneyError.startsWith('Rate') && {borderColor:colors.danger,borderWidth:2}]}
+                  style={[styles.input, !!rateError && {borderColor:colors.danger,borderWidth:2}]}
                   placeholder="120"
                   placeholderTextColor={colors.textMuted}
                   value={rate}
@@ -1334,6 +1337,7 @@ export default function CreateServiceScreen({ navigation, route }) {
                   keyboardType="numeric"
                   accessibilityLabel="Rate in dollars"
                 />
+                {!!rateError && <Text accessibilityRole="alert" style={{color:colors.danger,marginTop:6}}>{rateError}</Text>}
                 <Text style={styles.locationHelp}>Enter 0 if there is no base rate. Any minimum or extra charges still apply. Choose Quote required if the price needs to be agreed.</Text>
               </View>
               {pricingType === 'per_unit' && cfg.unit === 'free' && (

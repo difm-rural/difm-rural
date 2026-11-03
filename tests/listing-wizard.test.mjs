@@ -81,3 +81,12 @@ test('overlong listing descriptions must be corrected without silently truncatin
  assert.match(h.alert(),/Description must be 2,000/)
  assert.equal(h.nodes().find(n=>n.props?.id==='lf-desc').props.value.length,3000)
 })
+
+test('rate preview only renders valid prices, including the new exact limit',()=>{
+ const h=harness();h.click('Next')
+ const preview=()=>h.nodes().find(n=>n.props?.className==='lform-preview')
+ for(const rate of ['', '999999999999', '1000000.01', '12.345', '-1']){
+  h.rate(rate);assert.equal(preview(),undefined)
+ }
+ h.rate('1000000.00');assert.ok(preview());h.click('Next');assert.equal(h.heading(),'Photos')
+})

@@ -1,4 +1,5 @@
 'use server'
+import { CATEGORIES } from '@shared/categories'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireProvider } from '@/lib/auth'
@@ -26,20 +27,35 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   }
   const input=jobInput(data,{userId:user.id,jobId:id,baseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL || '',existingPhotos:current?.photos || [],existingAccess:current?.access_conditions || [],existingSchedule:editing?current:null})
   if(!input.ok)return {error:input.error}
+  const job = input.value
+  async function resolveCategory() {
+    const { title, description } = job
+    if (/house.?sit/i.test(title)) return 'Property & House Sitting'
+    if (current?.category?.trim()) return current.category
+    try {
+      const { data, error } = await supabase.functions.invoke('categorize-job', {
+        body: { title, description },
+      })
+      if (!error && CATEGORIES.includes(data?.category)) return data.category
+    } catch {
+      // Classification should never prevent posting.
+    }
+    return 'General Rural Help'
+  }
   const moved=!!current && (input.value.location_name!==current.location_name || input.value.latitude!==current.latitude || input.value.longitude!==current.longitude)
   const areaPatch=moved?{area_polygon:null,area_hectares:null}:{}
   if(editing){
-    const {data:rows,error}=await supabase.from('jobs').update({...input.value,...areaPatch}).eq('id',id).eq('requester_id',user.id).eq('status','open').select('id')
+    const {data:rows,error}=await supabase.from('jobs').update({...input.value,category:await resolveCategory(),...areaPatch}).eq('id',id).eq('requester_id',user.id).eq('status','open').select('id')
     if(error || !rows?.length)return {error:'Could not save. The job may have changed or been accepted. Your changes remain in the form; refresh its status before retrying.'}
   }else if(invite){
-    const result=await supabase.rpc('create_invited_job',{p_job_id:id,p_details:{...input.value,area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,repeated_from_job_id:source || null},p_provider_id:invite,p_public:data.get('also_public')==='on'})
+    const result=await supabase.rpc('create_invited_job',{p_job_id:id,p_details:{...input.value,category:await resolveCategory(),area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,repeated_from_job_id:source || null},p_provider_id:invite,p_public:data.get('also_public')==='on'})
     if(result.error)return {error:'Could not create the job and invitation. Your draft is kept. Check that this person is a previous provider and try again.'}
   }else{
     // A retry uses the same draft id, so a lost response cannot create a second job.
     const {data:existing,error:lookupError}=await supabase.from('jobs').select('id').eq('id',id).eq('requester_id',user.id).maybeSingle()
     if(lookupError)return failed()
     if(!existing){
-      const {error}=await supabase.from('jobs').insert({...input.value,area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,id,requester_id:user.id,status:'open',visibility:'public',recurrence_frequency:'one_time',repeated_from_job_id:source || null})
+      const {error}=await supabase.from('jobs').insert({...input.value,category:await resolveCategory(),area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,id,requester_id:user.id,status:'open',visibility:'public',recurrence_frequency:'one_time',repeated_from_job_id:source || null})
       if(error)return failed()
     }
   }
@@ -98,7 +114,7 @@ export async function sendOffer(_: ActionState, data: FormData): Promise<ActionS
   const existing = await supabase.from('bids').select('id').eq('job_id',id).eq('provider_id',user.id).in('status',['pending','accepted'])
   if (existing.error) return failed()
   if (existing.data?.length) return {error:'You already have an offer on this job. You can track it in Activity.'}
-  const { error } = await supabase.from('bids').insert({...input.value,job_id:id,provider_id:user.id,status:'pending'})
+  const { error } = await supabase.from('bids').insert({...input.value,category:await resolveCategory(),job_id:id,provider_id:user.id,status:'pending'})
   if (error) return failed()
   revalidatePath('/')
   redirect('/activity')

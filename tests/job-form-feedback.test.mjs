@@ -48,7 +48,7 @@ function harness(storage,seed){
 }
 test('job validation names and highlights every missing field, and clears corrected fields',()=>{
  const h=harness();h.click('Next')
- for(const name of ['title','category']){
+ for(const name of ['title']){
   const input=h.nodes().find(n=>n.props?.id==='job-'+name)
   assert.equal(input.props['aria-invalid'],true)
   assert.equal(input.props['aria-describedby'],'job-'+name+'-error')
@@ -58,13 +58,13 @@ test('job validation names and highlights every missing field, and clears correc
  assert.equal(h.nodes().find(n=>n.props?.id==='job-title').props['aria-invalid'],undefined)
 })
 test('date and area errors are associated with the relevant job controls',()=>{
- const h=harness();h.change('job-title','Repair fence');h.change('job-category',categories.CATEGORIES[0]);h.change('job-schedule_type','specific');h.click('Next')
+ const h=harness();h.change('job-title','Repair fence');h.change('job-schedule_type','specific');h.click('Next')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-scheduled_date').props['aria-invalid'],true)
  h.change('job-schedule_type','flexible');h.click('Next');h.click('Next')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-area').props['aria-invalid'],true)
 })
 test('job stepper can return to a previously reached step after going back',()=>{
- const h=harness();h.change('job-title','Repair fence');h.change('job-category',categories.CATEGORIES[0]);h.click('Next');h.click('1. The job')
+ const h=harness();h.change('job-title','Repair fence');h.click('Next');h.click('1. The job')
  const button=h.nodes().find(n=>n.type==='button'&&n.props.children?.[2]==='Location')
  assert.equal(button.props.disabled,false)
 })
@@ -109,14 +109,14 @@ test('job controls expose counters and length limits, and validate overlong rest
  const title=h.nodes().find(n=>n.props?.id==='job-title')
  assert.equal(title.props.maxLength,160);assert.equal(title.props['aria-invalid'],true)
  assert.ok(h.nodes().some(n=>n.type==='small'&&n.props.children?.[0]===161))
- h.change('job-title','Repair fence');h.change('job-category',categories.CATEGORIES[0]);h.click('Next')
+ h.change('job-title','Repair fence');h.click('Next')
  h.change('job-area','Waitoki');h.click('Next');h.change('job-description','x'.repeat(3000));h.click('Next')
  const description=h.nodes().find(n=>n.props?.id==='job-description')
  assert.equal(description.props.maxLength,2000);assert.equal(description.props['aria-invalid'],true)
 })
 
 test('invalid public area is highlighted and cannot advance to Details',()=>{
- const h=harness();h.change('job-title','Repair fence');h.change('job-category',categories.CATEGORIES[0]);h.click('Next')
+ const h=harness();h.change('job-title','Repair fence');h.click('Next')
  h.change('job-area','<b>Waitoki</b> & "quotes" 😀');h.click('Next')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-area').props['aria-invalid'],true)
  h.change('job-area','Te Kūiti');h.click('Next')

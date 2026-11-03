@@ -43,4 +43,16 @@ begin
  raise notice 'Posting amount database checks passed';
 end;
 $$;
+\ir ../supabase/migrations/20261104120000_cap_listing_amounts.sql
+do $$
+begin
+ insert into public.services(id,title,pricing_type,rate) values(5,'New maximum','fixed',1000000.00);
+ begin
+  insert into public.services(id,title,pricing_type,rate) values(6,'Above new maximum','fixed',1000000.01);
+  raise exception 'Above-cap listing rate accepted';
+ exception when sqlstate '22003' then null;end;
+ insert into public.jobs values(4,'Unchanged job budget limit','fixed',10000000);
+ update public.services set title='Existing rate retained' where id=1;
+end;
+$$;
 rollback;

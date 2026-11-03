@@ -2,7 +2,6 @@ import {publicAreaError} from '@shared/publicArea'
 import {postingTextError} from '@shared/postingText'
 import {moneyInputError} from '@shared/postingMoney'
 import {jobScheduleError,type JobSchedule} from '@shared/postingDates'
-import { CATEGORIES } from '@shared/categories'
 export const SCHEDULES={asap:'As soon as possible',specific:'On a specific date',range:'Over a date range',flexible:'Flexible timing'}
 export const MATERIALS={none:'No materials needed',requester:'I supply materials',provider:'Provider to supply'}
 export const ACCESS={park_and_walk:'Park and walk in','4wd_required':'4WD required',dogs_on_property:'Dogs on property',livestock_nearby:'Livestock nearby',electric_fences:'Electric fences',contact_before_arrival:'Contact before arrival'}
@@ -12,10 +11,9 @@ export type JobSeed={id:string;status:string;title:string;description:string;cat
 export function repeatSeed(job:JobSeed):JobSeed{return {...job,schedule_type:'flexible',scheduled_date:null,date_from:null,date_to:null}}
 const text=(d:FormData,k:string)=>String(d.get(k) || '').trim()
 export function jobInput(d:FormData,context:{userId:string;jobId:string;baseUrl:string;existingPhotos?:string[];existingAccess?:string[];existingSchedule?:JobSchedule|null;now?:Date}){
- const title=text(d,'title'),description=text(d,'description'),category=text(d,'category'),location=text(d,'location'),area=text(d,'area'),note=text(d,'location_note')
+ const title=text(d,'title'),description=text(d,'description'),location=text(d,'location'),area=text(d,'area'),note=text(d,'location_note')
  if(!title || postingTextError(title,'title'))return {ok:false as const,error:postingTextError(title,'title')||'Enter a job title.'}
  if(!description || postingTextError(description,'description'))return {ok:false as const,error:postingTextError(description,'description')||'Enter a job description.'}
- if(!CATEGORIES.includes(category))return {ok:false as const,error:'Choose a job category from the list.'}
  if(publicAreaError(area))return {ok:false as const,error:publicAreaError(area)}
  if(location.length>300)return {ok:false as const,error:'Keep the exact property location to 300 characters or fewer.'}
  if(note.length>2000)return {ok:false as const,error:'Keep the location note to 2,000 characters or fewer.'}
