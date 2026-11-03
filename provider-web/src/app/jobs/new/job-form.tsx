@@ -1,4 +1,5 @@
 'use client'
+import {JobAddressInput} from '@/components/job-address-input'
 import {JobLocationMap} from '@/components/job-location-map'
 import {DateInput} from '@/components/date-input'
 import {formatMoney as nzMoney,formatDate as nzDate} from '@shared/formatting'
@@ -97,6 +98,9 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   if(!navigator.geolocation){setError('Your browser does not support GPS. Enter the location manually.');return}
   setBusy(true);setError('');navigator.geolocation.getCurrentPosition(p=>{setDraft(d=>({...d,latitude:String(p.coords.latitude),longitude:String(p.coords.longitude)}));setBusy(false)},()=>{setError('Could not read your location. Allow location access or enter the address manually.');setBusy(false)},{timeout:15000,enableHighAccuracy:true})
  }
+ const changeJobAddress = useCallback((location: string, latitude?: number, longitude?: number) => {
+  setDraft(current => ({...current, location, latitude: latitude?.toString() ?? '', longitude: longitude?.toString() ?? ''}))
+ }, [])
  const pickJobLocation = useCallback(({lat,lng}:{lat:number;lng:number}) => {
   setDraft(current => ({...current,latitude:String(lat),longitude:String(lng)}))
  }, [])
@@ -132,7 +136,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
    {draft.schedule_type==='specific'&&<label className="lform-field">Preferred date *<DateInput type="date" min={mode==='edit'&&draft.scheduled_date===seed?.scheduled_date?undefined:nzToday()} {...field('scheduled_date')} value={draft.scheduled_date} onChange={e=>set('scheduled_date',e.target.value)}/>{issue('scheduled_date')}</label>}
    {draft.schedule_type==='range'&&<div className="lform-repeat-grid"><label className="lform-field">From *<DateInput type="date" min={mode==='edit'&&draft.date_from===seed?.date_from?undefined:nzToday()} {...field('date_from')} value={draft.date_from} onChange={e=>set('date_from',e.target.value)}/>{issue('date_from')}</label><label className="lform-field">To *<DateInput type="date" min={mode==='edit'&&draft.date_to===seed?.date_to?undefined:draft.date_from>nzToday()?draft.date_from:nzToday()} value={draft.date_to} {...field('date_to')} onChange={e=>set('date_to',e.target.value)}/>{issue('date_to')}</label></div>}
   </div>}
-  {step===1&&<div className="lform-step"><label className="lform-field">Exact property location (optional)<input maxLength={300} value={draft.location} onChange={e=>setDraft(d=>({...d,location:e.target.value,latitude:'',longitude:''}))} placeholder="Street address or property location"/></label><label className="lform-field">Public town or area (optional)<input {...field('area')} value={draft.area} maxLength={150} onChange={e=>set('area',e.target.value)} placeholder="e.g. Cambridge, Waikato"/>{issue('area')}<small className="muted">Town or area only, e.g. Waitoki or Te Kūiti.</small></label>
+  {step===1&&<div className="lform-step"><JobAddressInput value={draft.location} onChange={changeJobAddress}/><label className="lform-field">Public town or area (optional)<input {...field('area')} value={draft.area} maxLength={150} onChange={e=>set('area',e.target.value)} placeholder="e.g. Cambridge, Waikato"/>{issue('area')}<small className="muted">Town or area only, e.g. Waitoki or Te Kūiti.</small></label>
    <label className="account-setting"><input type="checkbox" checked={draft.hide_exact_location} onChange={e=>set('hide_exact_location',e.target.checked)}/><span><strong>Hide exact address until I accept</strong><small>{draft.hide_exact_location?'Only the public area is shown before you accept an offer. The accepted provider can see the property location, GPS and location note.':'The property location, GPS and location note will be visible to people viewing this job.'}</small></span></label>
    <JobLocationMap latitude={draft.latitude} longitude={draft.longitude} onPick={pickJobLocation}/>
    <div className="lform-actions"><button type="button" className="lform-cancel" onClick={useLocation}>Use my location</button>{draft.latitude&&<button type="button" className="lform-cancel" onClick={()=>{set('latitude','');set('longitude','')}}>Clear GPS</button>}</div><p className="muted">Use GPS only when you are at the job site. This adds coordinates without changing the address above.</p>
