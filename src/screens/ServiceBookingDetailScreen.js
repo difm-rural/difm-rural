@@ -296,12 +296,12 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
   function markReady() {
     Alert.alert(
-      'Mark as complete?',
-      'This closes the booking and invites the requester to leave a review.',
+      'Before you mark this complete',
+      'Check the work is finished and payment has been sorted or agreed with the requester. This closes the booking and invites them to leave a review.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Not yet', style: 'cancel' },
         {
-          text: 'Mark complete',
+          text: 'Yes, mark complete',
           onPress: () => updateStatus('completed', BOOKING_UNDERWAY_STATUSES, 'The booking is complete. The requester can now leave a review.'),
         },
       ]
@@ -327,7 +327,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
   function finishGrazing() {
     Alert.alert('Complete grazing arrangement?',
-      'When the arrangement has finished, mark it complete and close this listing. If grazing is available again, choose relist to keep it advertised. Other bookings are unchanged.', [
+      'Make sure grazing payment has been sorted or agreed. When the arrangement has finished, mark it complete and close this listing. If grazing is available again, choose relist to keep it advertised. Other bookings are unchanged.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Complete & close listing', onPress: () => completeGrazing(false) },
         { text: 'Complete & relist', onPress: () => completeGrazing(true) },

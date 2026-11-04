@@ -38,6 +38,7 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
   if(other){try{const received= (await allPublicReviews(supabase,other)).filter(r=>r.reviewee_role===(role==='provider'?'requester':'provider'));ratingCount=received.length;average=ratingCount?received.reduce((sum,r)=>sum+r.rating,0)/ratingCount:0}catch{ratingError=true}}
   const ownReview=reviews?.find(r=>r.reviewer_id===user.id && r.reviewer_role===role)
   const received=reviews?.find(r=>r.reviewer_id===other && r.reviewer_role!==role)
+  const otherFirst=person?.full_name?.trim().split(/\s+/)[0] || 'the other person'
   const history=!['open','pending','quote_sent','confirmed','accepted','in_progress','awaiting_completion','cancellation_requested'].includes(work.status)
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
     <Link href={'/activity'+(history?'?view=history':'')} className="card-link">Back to {history?'History':'Activity'}</Link>
@@ -55,13 +56,17 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     </article>
     {work.booking && <BookingDetails booking={work.booking} userId={user.id}/>}
     {work.booking && work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
-    {actions.filter(a=>a!=='review').length>0 && <section className="card"><h2>Manage this arrangement</h2><p className="muted">Choose an action to see what will happen before confirming.</p>
+    {actions.filter(a=>a!=='review').length>0 && <section className="card"><h2>{kind==='job'?'Manage this job':'Manage this booking'}</h2><p className="muted">Choose an action to see what will happen before confirming.</p>
       {actions.filter((a):a is Exclude<WorkAction,'review'>=>a!=='review').map(intent=><details className="activity-action" key={intent}><summary>{ACTIONS[intent].label}</summary>
         <ActionForm action={manageArrangement} label={ACTIONS[intent].label}>
           <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/><input type="hidden" name="intent" value={intent}/>
-          <p>{ACTIONS[intent].detail}</p>
+          <p>{intent==='complete'
+            ? `Before you mark this complete, check the work is finished and you've sorted payment with ${otherFirst} — cash, bank transfer or invoice, whatever you agreed. Marking complete closes this and invites them to leave a review.`
+            : (intent==='close_grazing'||intent==='relist_grazing')
+            ? `Before completing, make sure grazing payment has been sorted or agreed. ${ACTIONS[intent].detail}`
+            : ACTIONS[intent].detail}</p>
           {['cancel','withdraw','request_cancel'].includes(intent) && <><label className="lform-field">Reason *<select name="reason" required defaultValue=""><option value="" disabled>Choose a reason</option>{['No longer needed','Found someone else','Budget has changed','Posted by mistake','Provider not responding','Other'].map(r=><option key={r}>{r}</option>)}</select></label><label className="lform-field">Additional details (optional)<textarea name="note" rows={3}/></label></>}
-          <label className="activity-confirm"><input type="checkbox" required/> I confirm I want to {ACTIONS[intent].label.toLowerCase()}.</label>
+          <label className="activity-confirm"><input type="checkbox" required/> {(intent==='complete'||intent==='close_grazing'||intent==='relist_grazing')?'The work is finished and payment has been sorted or agreed.':`I confirm I want to ${ACTIONS[intent].label.toLowerCase()}.`}</label>
         </ActionForm>
       </details>)}
     </section>}

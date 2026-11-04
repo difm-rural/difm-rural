@@ -487,12 +487,12 @@ export default function ActivityTabScreen({ navigation }) {
 
   function completeBooking(bookingId) {
     Alert.alert(
-      'Mark as complete?',
-      'This closes the booking and invites the requester to leave a review.',
+      'Before you mark this complete',
+      'Check the work is finished and payment has been sorted or agreed with the requester. This closes the booking and invites them to leave a review.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Not yet', style: 'cancel' },
         {
-          text: 'Mark complete',
+          text: 'Yes, mark complete',
           onPress: async () => {
             const { error } = await apiMarkBookingReady(bookingId)
             if (error) Alert.alert('Could not mark complete', error.message)

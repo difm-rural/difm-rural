@@ -548,12 +548,12 @@ export default function JobDetailScreen({ route, navigation }) {
 
     function handleMarkComplete() {
       Alert.alert(
-        'Mark as completed',
-        `Mark the work complete? This closes the job and invites ${requesterFirstName} to leave a review.`,
+        'Before you mark this complete',
+        `Check the work is finished and you've sorted payment with ${requesterFirstName} — cash, bank transfer or invoice, whatever you agreed. This closes the job and invites them to leave a review.`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: 'Not yet', style: 'cancel' },
           {
-            text: 'Mark completed',
+            text: 'Yes, mark complete',
             onPress: async () => {
               const { error } = await markJobComplete(job.id)
               if (error) {
