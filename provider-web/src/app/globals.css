@@ -633,18 +633,3 @@ a.row:hover { background: var(--sage); }
 .sidebar-user strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sidebar-user .sidebar-signout { display:flex; flex:0 0 100%; align-items:center; justify-content:center; gap:8px; min-height:44px; margin-left:0; border:1px solid #ffffff40; border-radius:8px; }
 .sidebar-signout span { color:inherit; font-size:12px; font-weight:650; }
-
-.job-wizard-overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 270px);
-  align-items: start;
-  gap: 24px;
-}
-.job-wizard-preview .work-result { overflow-wrap: anywhere; }
-.job-wizard-preview .work-result > * { margin: 0; }
-.job-wizard-preview .kind-tag { justify-self: start; }
-.job-wizard-preview h3 { font-size: 19px; }
-@media (max-width: 680px) {
-  .job-wizard-overview { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .job-wizard-preview { max-width: 270px; width: 100%; }
-}
