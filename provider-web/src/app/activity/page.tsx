@@ -17,14 +17,21 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
   ])
   const jobIds=[...new Set((offers.data || []).map(o=>o.job_id))]
   const offerJobs=jobIds.length?await supabase.from('jobs_public').select('id,title,status').in('id',jobIds):{data:[],error:null}
-  const nameIds=[...new Set((bookings.data || []).flatMap(b=>[b.provider_id,b.requester_id]))]
+  const shownJobs=(jobs.data || []).filter(j=>activityIsActive('job',j.status)!==history)
+  const jobsById=new Map(shownJobs.map(job=>[job.id,job]))
+  const questions=shownJobs.length ? await supabase.from('job_questions')
+    .select('id,job_id,asker_id,question,answer').in('job_id',shownJobs.map(job=>job.id))
+    .order('created_at',{ascending:false}) : {data:[],error:null}
+  const nameIds=[...new Set([
+    ...(bookings.data || []).flatMap(b=>[b.provider_id,b.requester_id]),
+    ...(questions.data || []).map(question=>question.asker_id),
+  ])]
   const people=nameIds.length?await supabase.from('profiles_public').select('id,full_name').in('id',nameIds):{data:[]}
   const names=new Map((people.data || []).map(p=>[p.id,p.full_name]))
   const hasError=[jobs,offers,bookings,offerJobs].some(r=>r.error)
   const activeJobs=(jobs.data || []).filter(j=>activityIsActive('job',j.status))
   const activeOffers=(offers.data || []).filter(o=>activityIsActive('offer',o.status,offerJobs.data?.find(j=>j.id===o.job_id)?.status))
   const activeBookings=(bookings.data || []).filter(b=>activityIsActive('booking',b.status))
-  const shownJobs=(jobs.data || []).filter(j=>activityIsActive('job',j.status)!==history)
   const shownOffers=(offers.data || []).filter(o=>activityIsActive('offer',o.status,offerJobs.data?.find(j=>j.id===o.job_id)?.status)!==history)
   const shownBookings=(bookings.data || []).filter(b=>activityIsActive('booking',b.status)!==history)
   const activeCount=activeJobs.length+activeOffers.length+activeBookings.length
@@ -34,6 +41,23 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
     <p className="muted">{history?'Completed and closed arrangements, with your reviews.':'Track your jobs, offers, booking requests and agreed work.'}</p>
     <Link href="/messages" className="card home-quick">Messages — enquiries, jobs and bookings →</Link>
     {hasError && <p className="home-load-error" role="alert">Some activity could not be loaded. Refresh to try again.</p>}
+    {(questions.error || !!questions.data?.length) && <section>
+      <h2>Questions from providers</h2>
+      {questions.error && <p role="alert">Could not load provider questions. Refresh to try again.</p>}
+      <div className="work-grid">{questions.data?.map(question => {
+        const job=jobsById.get(question.job_id)
+        if(!job)return null
+        return <article key={question.id} className="card work-detail">
+          <h3>{job.title}</h3>
+          <p className="muted">{names.get(question.asker_id) || 'Provider'} · {question.answer ? 'Answered' : 'Awaiting reply'}</p>
+          <p className="work-description">{question.question}</p>
+          {question.answer && <p className="work-description"><strong>Your reply</strong><br/>{question.answer}</p>}
+          <Link className="card-link" href={'/jobs/'+job.id+'#question-'+question.id}>
+            {job.status==='open'&&!question.answer ? 'Reply to question' : 'View question'} →
+          </Link>
+        </article>
+      })}</div>
+    </section>}
     <section><h2>Your jobs</h2>{!jobs.error && !shownJobs.length && <p className="muted">{history?'No closed jobs yet.':'No active jobs posted.'} <Link className="card-link" href="/jobs/new">Post a job</Link></p>}<div className="work-grid">{shownJobs.map(j=><Link className="card" key={j.id} href={'/activity/job/'+j.id+'/manage'}><h3>{j.title}</h3><p>{statusLabel(j.status)}</p><span className="card-link">View details & actions →</span></Link>)}</div></section>
     <section><h2>Your offers</h2>{!offers.error && !shownOffers.length && <p className="muted">{history?'No past offers yet.':'No active offers yet.'} <Link className="card-link" href="/jobs">Find jobs</Link></p>}<div className="work-grid">{shownOffers.map(o=>{const job=offerJobs.data?.find(j=>j.id===o.job_id);return <article className="card" key={o.id}><h3><Link href={o.status==='accepted'?'/activity/job/'+o.job_id+'/manage':'/jobs/'+o.job_id}>{job?.title || 'Job'}</Link></h3><p>{nzMoney(o.amount)} · {o.status==='pending'?'Awaiting response':statusLabel(o.status)}</p>{o.status==='accepted' && <Link className="card-link" href={'/activity/job/'+o.job_id}>Open conversation →</Link>}</article>})}</div></section>
     <section><h2>Bookings & requests</h2>{!bookings.error && !shownBookings.length && <p className="muted">{history?'No past bookings or requests yet.':'No active bookings or requests yet.'} <Link className="card-link" href="/browse">Browse listings</Link></p>}

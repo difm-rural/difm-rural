@@ -1168,9 +1168,9 @@ const styles = StyleSheet.create({
   bidMeta:    { fontSize: 13, color: colors.textMuted },
   bidMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   lineItemsBreakdown: { marginVertical: 6, paddingVertical: 6, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#e8e8e8', marginBottom: 8 },
-  breakdownRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  breakdownLabel:  { fontSize: 13, color: colors.textSecondary },
-  breakdownAmount: { fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
+  breakdownRow:    { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 3 },
+  breakdownLabel:  { flex: 1, marginRight: 12, fontSize: 13, color: colors.textSecondary },
+  breakdownAmount: { flexShrink: 0, fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
   acceptBidBtn: {
     backgroundColor: colors.primary,
     borderRadius: 10,
