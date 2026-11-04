@@ -22,6 +22,7 @@ function harness(storage,seed){
   if(name==='@shared/publicArea')return publicArea
  if(name==='@shared/postingText')return postingText
  if(name==='@shared/formatting')return formatting
+ if(name==='@/components/job-card-image')return {JobCardImage:'job-card-image'}
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='@/components/job-address-input')return {JobAddressInput:'job-address'}
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}

@@ -1,6 +1,7 @@
 'use client'
 import {JobAddressInput} from '@/components/job-address-input'
 import {JobLocationMap} from '@/components/job-location-map'
+import {JobCardImage} from '@/components/job-card-image'
 import {DateInput} from '@/components/date-input'
 import {formatMoney as nzMoney,formatDate as nzDate} from '@shared/formatting'
 import {publicAreaError} from '@shared/publicArea'
@@ -126,8 +127,25 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   {inviteProvider&&<section className="card work-detail"><h2>Invite {inviteProvider.name}</h2><p>This job will be visible only to you and this provider unless you choose the public board.</p><label className="account-setting"><input type="checkbox" disabled={pending||busy||submitting} checked={draft.also_public} onChange={e=>set('also_public',e.target.checked)}/>Also put this job on the public Jobs board</label></section>}
   {mode==='repeat'&&<p className="account-current">This is a new copy. Choose fresh dates before posting. The original job, offers, messages and reviews stay unchanged.</p>}
   {mode==='edit'&&offerCount>0&&<p className="home-load-error">This job has {offerCount} offer{offerCount===1?'':'s'}. Changes may affect those offers; discuss material changes before accepting.</p>}
+  <div className="job-wizard-overview">
+   <div>
   <nav className="job-steps" aria-label="Job posting steps">{steps.map((label,i)=><button type="button" key={label} aria-current={step===i?'step':undefined} disabled={pending||busy||submitting||i>furthest} onClick={()=>{setError('');setAttempted(false);setStep(i)}}>{i+1}. {label}</button>)}</nav>
   <p className="eyebrow">Step {step+1} of 5</p><h2 tabIndex={-1} ref={heading}>{steps[step]}</h2>
+   </div>
+   <aside className="job-wizard-preview" aria-label="Job card preview">
+    <p className="eyebrow">Job card preview</p>
+    <article className="card work-result">
+      <JobCardImage photos={draft.photos} category={seed?.category || null}/>
+      <span className="kind-tag">{seed?.category || 'Category assigned when posted'}</span>
+      <h3>{draft.title.trim() || 'Your job title'}</h3>
+      <p className="work-clamp">{draft.description.trim() || 'Your job description will appear here.'}</p>
+      <p className="muted">{draft.area.trim() || (!draft.hide_exact_location && draft.location.trim()) || 'Location to be arranged'}</p>
+      <strong>{draft.price_type==='fixed'
+        ? (draft.price.trim() && !moneyInputError(draft.price,'Budget') ? nzMoney(draft.price) : 'Budget to be set')
+        : 'Open to offers'}</strong>
+    </article>
+   </aside>
+  </div>
   <input type="hidden" name="job_id" value={jobId}/>{inviteProvider&&<input type="hidden" name="invite_provider_id" value={inviteProvider.id}/>}{mode==='repeat'&&<input type="hidden" name="repeated_from_job_id" value={seed?.id}/>}
   {Object.entries(draft).map(([name,value])=>name==='schedule_type'&&step===0?null:Array.isArray(value)?value.map((v,i)=><input type="hidden" name={name} value={v} key={name+i}/>):typeof value==='boolean'?<input type="hidden" key={name} name={name} value={value?'on':'off'}/>:<input type="hidden" key={name} name={name} value={value}/>)}
   <fieldset disabled={pending||busy||submitting||!ready||!!saved} className="work-fieldset">
