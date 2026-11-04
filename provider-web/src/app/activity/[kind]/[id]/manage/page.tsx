@@ -12,6 +12,7 @@ import { BookingDetails } from '../../../booking-details'
 import { allPublicReviews } from '@/lib/profile-data'
 import { BookingSchedule } from '../../../booking-schedule'
 import { manageArrangement, reviewArrangement } from '../../../actions'
+import { StarRatingInput } from '@/components/star-rating-input'
 
 const ACTIONS: Record<Exclude<WorkAction,'review'>,{label:string;detail:string}>={
   complete:{label:'Mark complete',detail:'Mark this work complete when it has finished. Both people can then leave a review.'},
@@ -72,12 +73,12 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     </section>}
     {work.status==='completed' && <section className="card"><h2>Reviews</h2>
       {reviewError?<p role="alert">Could not load reviews. Refresh before adding or editing your review.</p>:<>
-        {received && <article className="activity-received"><h3>{person?.full_name || 'Their'} review of you</h3><p>{'★'.repeat(received.rating)} · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
+        {received && <article className="activity-received"><h3>{person?.full_name || 'Their'} review of you</h3><p><span aria-label={received.rating+' out of 5'}>{'★'.repeat(received.rating)+'☆'.repeat(5-received.rating)}</span> · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
         {!received && <p className="muted">The other person has not left a review yet.</p>}
         {actions.includes('review') && <ActionForm key={ownReview?.id || 'new'} action={reviewArrangement} label={ownReview?'Save review changes':'Submit review'}>
           <h3>{ownReview?'Edit your review':'Review '+(person?.full_name || 'the other person')}</h3>
           <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/>
-          <label className="lform-field">Rating *<select name="rating" required defaultValue={ownReview?.rating || ''}><option value="" disabled>Choose a rating</option>{[5,4,3,2,1].map(n=><option value={n} key={n}>{n} {n===1?'star':'stars'}</option>)}</select></label>
+          <StarRatingInput initial={ownReview?.rating}/>
           <label className="lform-field">Comments (optional)<textarea name="comment" rows={4} defaultValue={ownReview?.comment || ''} placeholder="Share your experience working with this person."/></label>
           <p className="muted">Your rating and comments are public.</p>
         </ActionForm>}
