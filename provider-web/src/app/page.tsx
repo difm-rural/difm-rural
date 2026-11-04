@@ -32,9 +32,9 @@ export default async function HomePage() {
   const name = profile?.full_name?.trim().split(/\s+/)[0] || 'there'
   const actions = [
     {title:'Post a job',text:'Describe the work and get local help',href:'/jobs/new',primary:true,icon:Plus},
-    {title:'Browse listings',text:'Find rural listings near you',href:'/browse',primary:false,icon:Search},
-    {title:'Find jobs',text:'Browse open rural work nearby',href:'/jobs',primary:true,icon:Search},
     {title:'Create a listing',text:'Advertise a service, grazing, gear, space or goods',href:'/listings/new',primary:false,icon:Plus},
+    {title:'Find jobs',text:'Browse open rural work nearby',href:'/jobs',primary:true,icon:Search},
+    {title:'Browse listings',text:'Find rural listings near you',href:'/browse',primary:false,icon:Search},
   ]
   const pending = (bookings.data || []).filter(b => (b.provider_id === user.id && ['pending','cancellation_requested'].includes(b.status)) || (b.requester_id === user.id && b.status === 'quote_sent'))
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page">
