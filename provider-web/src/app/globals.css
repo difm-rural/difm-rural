@@ -131,6 +131,9 @@ a.row:hover { background: var(--sage); }
 .message-conversation.compact { height: clamp(360px, 60vh, 560px); border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; }
 .message-conversation.compact .enq-messages { padding: 14px; }
 .message-conversation.compact .message-compose { padding: 0 14px 14px; }
+.conversation-compact-head { flex: none; padding: 14px 14px 10px; border-bottom: 1px solid var(--line); }
+.conversation-compact-head h2 { margin: 0; font-size: 16px; }
+.conversation-compact-head p { margin: 3px 0 0; font-size: 12px; }
 .message-conversation .enq-thread-head { flex: none; display: grid; align-items: start; gap: 6px; }
 .message-conversation h2 { margin: 0; font-size: 19px; }
 .message-scroll { min-height: 160px; overscroll-behavior: contain; }

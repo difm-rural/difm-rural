@@ -39,6 +39,8 @@ export default async function BookingWorkspace({params}:{params:Promise<{id:stri
   let conversation=null
   if(other){try{conversation=await loadConversation(supabase,user.id,{kind:'booking',id,person:other})}catch{}}
   const twoCol=!!conversation
+  const chatFirst=conversation&&conversation.name&&conversation.name!=='Community member'?conversation.name.trim().split(/\s+/)[0]:''
+  const chatHeading=chatFirst?'Messages with '+chatFirst:'Messages'
 
   const b=work.booking!
   const timeline:string[]=['Requested '+nzDate(b.created_at)]
@@ -71,6 +73,6 @@ export default async function BookingWorkspace({params}:{params:Promise<{id:stri
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
     <Link href={'/activity'+(history?'?view=history':'')} className="card-link">Back to {history?'History':'Activity'}</Link>
     <header className="home-heading"><div><p className="eyebrow">{statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
-    {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!}/></aside></div>:mainColumn}
+    {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
   </section></AppShell>
 }

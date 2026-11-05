@@ -9,7 +9,7 @@ import { attachment, canReadConversation, workManageHref, type ChatMessage, type
 import type { ConversationContext } from '@/lib/messaging-data'
 import { readConversation, sendChatMessage } from './actions'
 
-export function Conversation({context,compact=false}:{context:ConversationContext;compact?:boolean}){
+export function Conversation({context,compact=false,heading}:{context:ConversationContext;compact?:boolean;heading?:string}){
   const router=useRouter(),[text,setText]=useState(''),[sending,setSending]=useState(false),[error,setError]=useState(''),[readError,setReadError]=useState('')
   const [local,setLocal]=useState<ChatMessage[]>([]),[file,setFile]=useState<File|null>(null)
   const [location,setLocation]=useState<{latitude:number;longitude:number}|null>(null),[locating,setLocating]=useState(false)
@@ -75,7 +75,9 @@ export function Conversation({context,compact=false}:{context:ConversationContex
     setLocating(true);setError('')
     navigator.geolocation.getCurrentPosition(p=>{setLocation({latitude:p.coords.latitude,longitude:p.coords.longitude});setFile(null);setLocating(false)},e=>{setLocating(false);setError(e.code===1?'Location permission was denied. Allow it in your browser settings or type the location in a message.':'Could not get your location. Try again or type the location in a message.')},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})
   }
+  const counterpartFirst=context.name && context.name!=='Community member'?context.name.trim().split(/\s+/)[0]:'the other person'
   return <section className={'message-conversation'+(compact?' compact':'')} aria-label={'Conversation with '+context.name}>
+    {compact && heading && <header className="conversation-compact-head"><h2>{heading}</h2><p className="muted">Only you and {counterpartFirst} can see these messages.</p></header>}
     {!compact && <header className="enq-thread-head"><Link href="/activity" className="card-link">← Activity</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
       <Link href={'/people/'+context.person} className="card-link">Profile & reviews →</Link>
       {context.kind!=='listing' && <Link className="card-link" href={workManageHref(context.kind,context.id)}>Arrangement details & reviews →</Link>}

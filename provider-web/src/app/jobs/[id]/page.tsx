@@ -75,6 +75,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  let conversation=null
  if(convPerson){try{conversation=await loadConversation(supabase,user.id,{kind:'job',id,person:convPerson})}catch{}}
  const twoCol=convPlacement==='side'&&!!conversation
+ const chatFirst=conversation&&conversation.name&&conversation.name!=='Community member'?conversation.name.trim().split(/\s+/)[0]:''
+ const chatHeading=chatFirst?'Messages with '+chatFirst:'Messages'
 
  // Compact timeline — only steps with real data; no invented timestamps.
  const timeline:string[]=['Posted '+nzDate(job.created_at)]
@@ -105,7 +107,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
     {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary>Accept this offer</summary><ActionForm action={acceptOffer} label="Accept offer"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p><label className="account-setting"><input type="checkbox" required/>I agree to accept this offer.</label></ActionForm></details>:<>
      <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'}/></details>
      <details className="activity-action"><summary>Withdraw offer</summary><ActionForm action={changeOffer} label="Withdraw offer"><input type="hidden" name="offer_id" value={b.id}/><input type="hidden" name="intent" value="withdraw"/><p>This removes your pending offer. You can send a new offer while the job is open.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to withdraw this offer.</label></ActionForm></details></>)}
-    {convPlacement==='inline'&&conversation&&convPerson===b.provider_id&&<div className="work-inline-chat"><Conversation compact context={conversation}/></div>}
+    {convPlacement==='inline'&&conversation&&convPerson===b.provider_id&&<div className="work-inline-chat"><Conversation compact context={conversation} heading={chatHeading}/></div>}
    </article>)}
    {!own&&!myOffer&&job.status==='open'&&<OfferForm jobId={id} providerMaterials={job.materials_type==='provider'}/>}
    {!own&&!myOffer&&job.status!=='open'&&<p>This job is no longer accepting offers.</p>}
@@ -120,7 +122,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {own&&job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider from Connections →</Link>}
   {detailsCard}
   {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
-  <div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{actions.filter(a=>a!=='review').length>0&&<a className="lform-cancel" href="#manage">Manage this job</a>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>
+  {((own&&(ownerActions.edit||ownerActions.repeat))||canAskQuestion||job.status==='open')&&<div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>}
   {job.status==='open'?<>{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
   {job.status==='completed'&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} received={received} ownReview={ownReview} reviewError={reviewError}/>}
@@ -129,6 +131,6 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  </>
 
  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/jobs" className="card-link">Back to Jobs</Link><header className="home-heading"><div><p className="eyebrow">{statusLabel(job.status)}</p><h1>{job.title}</h1></div><LiveRefresh/></header>
-  {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!}/></aside></div>:mainColumn}
+  {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
  </section></AppShell>
 }
