@@ -4,7 +4,7 @@ import { requireProvider } from '@/lib/auth'
 import { profileInput, availabilityInput, preferencesInput } from '@/lib/profile-input'
 import type { ActionState } from '@/components/action-form'
 function refreshed(id:string){
-  for(const path of ['/account','/account/profile','/account/availability','/','/people/'+id,'/people/'+id+'/reviews','/messages'])revalidatePath(path)
+  for(const path of ['/account','/account/profile','/account/availability','/','/people/'+id,'/people/'+id+'/reviews','/activity'])revalidatePath(path)
 }
 export async function saveProfile(_:ActionState,data:FormData):Promise<ActionState>{
   const {supabase,user}=await requireProvider()

@@ -76,7 +76,7 @@ export function Conversation({context,compact=false}:{context:ConversationContex
     navigator.geolocation.getCurrentPosition(p=>{setLocation({latitude:p.coords.latitude,longitude:p.coords.longitude});setFile(null);setLocating(false)},e=>{setLocating(false);setError(e.code===1?'Location permission was denied. Allow it in your browser settings or type the location in a message.':'Could not get your location. Try again or type the location in a message.')},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})
   }
   return <section className={'message-conversation'+(compact?' compact':'')} aria-label={'Conversation with '+context.name}>
-    {!compact && <header className="enq-thread-head"><Link href="/messages" className="card-link">← All messages</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
+    {!compact && <header className="enq-thread-head"><Link href="/activity" className="card-link">← Activity</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
       <Link href={'/people/'+context.person} className="card-link">Profile & reviews →</Link>
       {context.kind!=='listing' && <Link className="card-link" href={workManageHref(context.kind,context.id)}>Arrangement details & reviews →</Link>}
     </header>}

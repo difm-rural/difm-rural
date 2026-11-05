@@ -55,7 +55,6 @@ export default async function HomePage() {
       <SeasonalReminders campaigns={seasonal}/>
     </div><aside className="home-aside">
       <Link href="/connections" className="card home-quick"><UsersRound size={22}/><span><strong>Connections</strong><small>People you’ve worked with · Job invitations</small></span><ArrowRight size={17}/></Link>
-      <Link href="/messages" className="card home-quick"><MessageSquare size={22}/><span><strong>Messages</strong><small>Enquiries, jobs and bookings</small></span><ArrowRight size={17}/></Link>
       <Link href="/listings" className="card home-quick"><ListChecks size={22}/><span><strong>My listings</strong><small>{listings.error ? 'Manage your listings' : (listings.data || []).filter(s => s.is_active && !s.closed_at).length + ' live · Manage live, paused and closed listings'}</small></span><ArrowRight size={17}/></Link>
       <div className="home-explainer"><h3>Jobs & listings</h3><p><strong>Jobs</strong> are work you need done. Local people can send you an offer.</p><p><strong>Listings</strong> advertise services, grazing, hire and local goods.</p></div>
     </aside></div>

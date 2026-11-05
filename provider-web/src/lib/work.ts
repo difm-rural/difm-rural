@@ -19,7 +19,7 @@ export function notificationHref(notification: {type:string;metadata?:Record<str
     // Job conversations live on the job workspace; listings/bookings stay in Messages.
     if(kind==='job' && id)return '/jobs/'+encodeURIComponent(String(id))+'?thread='+encodeURIComponent(String(m.sender_id))+'#conversation'
     if(kind==='booking' && id)return '/bookings/'+encodeURIComponent(String(id))+'#conversation'
-    if(kind && id)return '/messages?kind='+kind+'&id='+encodeURIComponent(String(id))+'&person='+encodeURIComponent(String(m.sender_id))
+    if(kind==='listing' && id)return '/listings/'+encodeURIComponent(String(id))+'?thread='+encodeURIComponent(String(m.sender_id))+'#enquiries'
   }
   if(notification.type==='new_message' && m.booking_id)return '/bookings/'+encodeURIComponent(String(m.booking_id))+'#conversation'
   if(notification.type==='new_message' && m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))+'#conversation'

@@ -17,7 +17,7 @@ export async function updateNotification(_:ActionState,data:FormData):Promise<Ac
   q=all?q.lte('created_at',cutoff):q.eq('id',id)
   const {error}=await q
   if(error)return {error:'Could not update notifications. Check your connection and try again.'}
-  revalidatePath('/notifications');revalidatePath('/');revalidatePath('/messages')
+  revalidatePath('/notifications');revalidatePath('/');revalidatePath('/activity')
   return {error:'',success:all?'Notifications marked read.':'Marked read.'}
 }
 export async function visitNotification(_:ActionState,data:FormData):Promise<ActionState & {href?:string}>{
