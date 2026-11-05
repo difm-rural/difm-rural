@@ -10,8 +10,11 @@ import {allPublicReviews} from '@/lib/profile-data'
 import {paymentCopy} from '@/lib/booking-detail'
 import {statusLabel} from '@/lib/work'
 import {ListingRequestPanel} from './request-panel'
-export default async function ListingPage({params}:{params:Promise<{id:string}>}){
+import {loadConversation,loadInbox,unreadNotices} from '@/lib/messaging-data'
+import {Conversation} from '@/components/conversation/conversation'
+export default async function ListingPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[]}>}){
  const {id}=await params,{supabase,user,profile}=await requireProvider('/browse/'+id)
+ const {thread}=await searchParams;const threadParam=Array.isArray(thread)?thread[0]:thread
  const {data:s,error}=await supabase.from('services').select('*').eq('id',id).maybeSingle()
  if(error)throw new Error('Could not load this listing.');if(!s||((!s.is_active||s.closed_at)&&s.provider_id!==user.id))notFound()
  const own=s.provider_id===user.id
@@ -20,6 +23,16 @@ export default async function ListingPage({params}:{params:Promise<{id:string}>}
  try{reviews=(await allPublicReviews(supabase,s.provider_id)).filter(r=>r.reviewee_role==='provider')}catch{reviewError=true}
  const average=reviews.length?reviews.reduce((sum,r)=>sum+r.rating,0)/reviews.length:0
  const active=bookings.data?.filter(b=>['pending','quote_sent','confirmed','in_progress','cancellation_requested'].includes(b.status)) || []
+ // Listing enquiry conversations: owner sees a thread list (load only the selected
+ // one); a visitor sees their own thread with the provider. Load only what is shown.
+ let listingThreads:Awaited<ReturnType<typeof loadInbox>>=[]
+ let enquiry:Awaited<ReturnType<typeof loadConversation>>=null
+ if(own){
+   try{listingThreads=(await loadInbox(supabase,user.id,await unreadNotices(supabase,user.id))).filter(t=>t.kind==='listing'&&t.id===id)}catch{}
+   if(threadParam){try{enquiry=await loadConversation(supabase,user.id,{kind:'listing',id,person:threadParam})}catch{}}
+ }else{
+   try{enquiry=await loadConversation(supabase,user.id,{kind:'listing',id,person:s.provider_id})}catch{}
+ }
  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href={own?'/listings':'/browse'} className="card-link">{own?'Back to My listings':'Back to listings'}</Link><p className="eyebrow">{({service:'Service',grazing:'Grazing',hire:'Gear for hire',lease:'Space to lease',for_sale:'For sale'} as Record<string,string>)[s.kind] || 'Listing'}{own?' · Your listing':''}</p><h1>{s.title}</h1>
  {s.photos?.length?<PhotoGallery photos={s.photos} title={s.title}/>:<div className="card"><p className="muted">No photos provided.</p></div>}
  {own&&<p className="account-current">{s.closed_at?'Closed listing — visible only to you here':s.is_active?'Live listing':'Paused listing — visible only to you here'} · Manage your listing from My listings.</p>}
@@ -32,6 +45,9 @@ export default async function ListingPage({params}:{params:Promise<{id:string}>}
  {s.pricing_terms&&<section><h3>Pricing terms</h3><p className="work-description">{s.pricing_terms}</p></section>}<p>{paymentCopy(s)}</p></article>
  <article className="card"><h2>{ownerError?'Provider profile unavailable':<Link href={'/people/'+s.provider_id}>{owner?.full_name || 'Listing provider'}</Link>}</h2>{owner?.created_at&&<p className="muted">Member since {new Date(owner.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}<Link href={'/people/'+s.provider_id+'/reviews?role=provider'} className="card-link">{reviewError?'Read reviews and comments':reviews.length?'★ '+average.toFixed(1)+' · '+reviews.length+' reviews — read comments':'No reviews yet — view profile'}</Link></article>
  {bookings.error?<p role="alert" className="card">Could not check your existing requests. Refresh before sending another request.</p>:bookings.data?.length? <section className="card"><h2>{own?'Bookings for this listing':'Your requests for this listing'}</h2>{bookings.data.map(b=><p key={b.id}><Link href={'/bookings/'+b.id} className="card-link">{statusLabel(b.status)} · {nzDate(new Date(b.created_at))} — View details</Link></p>)}</section>:null}
- {own?<div className="lform-actions"><Link className="lform-save" href={'/listings/'+id+'/edit'}>Edit listing</Link><Link className="lform-cancel" href="/listings">Manage My listings</Link></div>:<><Link className="lform-cancel" href={'/messages?kind=listing&id='+id+'&person='+s.provider_id}>Enquire about this listing</Link>{!['for_sale','lease'].includes(s.kind)&&!active.length&&!bookings.error&&<ListingRequestPanel listing={s}/>}</>}
+ {own?<div className="lform-actions"><Link className="lform-save" href={'/listings/'+id+'/edit'}>Edit listing</Link><Link className="lform-cancel" href="/listings">Manage My listings</Link></div>:!['for_sale','lease'].includes(s.kind)&&!active.length&&!bookings.error?<ListingRequestPanel listing={s}/>:null}
+ {own
+   ? <section className="card" id="enquiries"><h2>Enquiries</h2>{!listingThreads.length?<p className="muted">No enquiries yet.</p>:listingThreads.map(t=><div key={t.person} id={'enquiry-'+t.person} style={{scrollMarginTop:96,marginBottom:12}}><Link className="card-link" href={'?thread='+t.person+'#enquiry-'+t.person}><strong>{t.name}</strong> · {t.preview} · {nzDate(new Date(t.updatedAt))}{t.unread>0&&<span className="web-badge" aria-label={t.unread+' unread'}> {t.unread}</span>}</Link>{threadParam===t.person&&enquiry&&<div className="work-inline-chat"><Conversation compact context={enquiry}/></div>}</div>)}</section>
+   : <section className="card" id="enquiry"><h2>Ask about this listing</h2>{enquiry?<Conversation compact context={enquiry}/>:<p className="muted">Messaging isn’t available for this listing right now.</p>}</section>}
  </section></AppShell>
 }

@@ -12,7 +12,7 @@ export function conversationHref(ref: ConversationRef) {
   // Jobs and bookings live on their own workspaces; listings on the listing page.
   if (ref.kind==='job') return '/jobs/'+encodeURIComponent(ref.id)+'?thread='+encodeURIComponent(ref.person)+'#conversation'
   if (ref.kind==='booking') return '/bookings/'+encodeURIComponent(ref.id)+'#conversation'
-  return '/messages?kind='+ref.kind+'&id='+encodeURIComponent(ref.id)+'&person='+encodeURIComponent(ref.person)
+  return '/listings/'+encodeURIComponent(ref.id)+'?thread='+encodeURIComponent(ref.person)+'#enquiries'
 }
 // Where to manage a job or booking, each on its own workspace. Listings have no manage page.
 export function workManageHref(kind: ConversationKind, id: string) {
