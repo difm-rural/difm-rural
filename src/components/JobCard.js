@@ -1,4 +1,4 @@
-import {formatMoney as nzMoney} from '../../shared/formatting.js'
+import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -41,7 +41,7 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
   const meta = [
     locText,
     job.hide_exact_location ? 'exact address hidden' : null,
-    distanceKm != null ? `About ${distanceKm} km${job.discovery_location_approximate ? " (town area)" : ""}` : null,
+    distanceKm != null ? `About ${formatDistance(distanceKm)}${job.discovery_location_approximate ? " (town area)" : ""}` : null,
     postedAgo(job.created_at),
   ].filter(Boolean).join(' · ')
 

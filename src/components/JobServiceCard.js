@@ -1,6 +1,6 @@
 import {LISTING_KINDS} from '../../shared/listingPricing'
 import {listingCardCopy} from '../../shared/listingCardCopy'
-import {formatMoney as nzMoney} from '../../shared/formatting.js'
+import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
 import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -260,7 +260,7 @@ export default function JobServiceCard({
         {/* Row 4: location + distance */}
         <Text style={styles.location} numberOfLines={1}>
           {item._distanceKm != null
-            ? `About ${item._distanceKm} km${item.discovery_location_approximate ? " · town area" : " away"}`
+            ? `About ${formatDistance(item._distanceKm)}${item.discovery_location_approximate ? " · town area" : " away"}`
             : (stripPlusCode(item.location_name) || item.location_area || 'Location TBC')}
         </Text>
 

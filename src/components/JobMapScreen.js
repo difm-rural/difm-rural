@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from './Icon'
 import { reverseGeocode, getCurrentLocation, haversineDistance } from '../lib/location'
+import { formatDistance } from '../../shared/formatting.js'
 
 export default function JobMapScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
@@ -55,11 +56,11 @@ export default function JobMapScreen({ route, navigation }) {
   }, [providerLocation])
 
   const distanceKm = providerLocation
-    ? haversineDistance(providerLocation.latitude, providerLocation.longitude, jobLat, jobLng).toFixed(1)
+    ? haversineDistance(providerLocation.latitude, providerLocation.longitude, jobLat, jobLng)
     : null
 
-  const driveMinutes = distanceKm
-    ? Math.round(parseFloat(distanceKm) / 60 * 60)
+  const driveMinutes = distanceKm != null
+    ? Math.round(distanceKm / 60 * 60)
     : null
 
   async function handleCheckIn() {
@@ -183,7 +184,7 @@ export default function JobMapScreen({ route, navigation }) {
         {distanceKm != null && (
           <View style={styles.distanceCard}>
             <Text style={styles.distanceLabel}>DISTANCE TO JOB</Text>
-            <Text style={styles.distanceValue}>{distanceKm} km</Text>
+            <Text style={styles.distanceValue}>{formatDistance(distanceKm)}</Text>
             {driveMinutes != null && (
               <Text style={styles.driveTime}>~{driveMinutes} min drive</Text>
             )}

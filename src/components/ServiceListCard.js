@@ -1,5 +1,5 @@
 import {listingCardCopy} from '../../shared/listingCardCopy'
-import {formatMoney as nzMoney} from '../../shared/formatting.js'
+import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -65,7 +65,7 @@ export default function ServiceListCard({ item, onPress }) {
         <Text style={[styles.provider, !!copy.headline && styles.cardHeadlineCompact]} numberOfLines={1}>
           {copy.headline || providerName}
         </Text>
-        {(item._distanceKm != null || item.location_name) && <Text style={styles.location} numberOfLines={1}>{item._distanceKm != null ? `About ${item._distanceKm} km away` : item.location_name}</Text>}
+        {(item._distanceKm != null || item.location_name) && <Text style={styles.location} numberOfLines={1}>{item._distanceKm != null ? `About ${formatDistance(item._distanceKm)} away` : item.location_name}</Text>}
         <View style={styles.bottomRow}>
           <Text style={styles.rating}>{ratingText}</Text>
           <Text style={styles.price}>{price}</Text>

@@ -24,3 +24,11 @@ export function formatDateTime(value) {
 export function formatDateLabel(value) {
   return typeof value==='string' && /^\d{4}-\d{2}-\d{2}(?:T|$)/.test(value) ? formatDate(value) : String(value??'')
 }
+// A distance in km for display: under 10 km keeps one decimal ("2.8 km");
+// 10 km and over rounds to a whole number with thousands separators ("514 km").
+export function formatDistance(km) {
+  if (km === null || km === undefined || String(km).trim() === '') return '—'
+  const n = Number(km)
+  if (!Number.isFinite(n)) return '—'
+  return (n < 10 ? n.toFixed(1) : Math.round(n).toLocaleString('en-NZ')) + ' km'
+}

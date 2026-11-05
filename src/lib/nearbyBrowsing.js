@@ -35,7 +35,7 @@ export function filterNearby(items, preference, sort = 'nearest') {
   const visible = measured.filter(row => !active || (row.distance !== null && row.distance <= preference.radius))
   const newest = (a, b) => (Date.parse(b.item.created_at) || 0) - (Date.parse(a.item.created_at) || 0)
   visible.sort((a, b) => origin && sort === 'nearest' ? (a.distance ?? Infinity) - (b.distance ?? Infinity) || newest(a, b) : newest(a, b))
-  return { items: visible.map(({ item, distance }) => ({ ...item, _distanceKm: distance === null ? null : Number(distance.toFixed(1)) })), unlocated, active }
+  return { items: visible.map(({ item, distance }) => ({ ...item, _distanceKm: distance === null ? null : distance })), unlocated, active }
 }
 export function createNearbyStore(storage, now = Date.now) {
   const listeners = new Map()
