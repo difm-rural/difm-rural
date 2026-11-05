@@ -225,6 +225,8 @@ a.row:hover { background: var(--sage); }
 .work-fieldset:empty { display: none; }
 .work-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 18px; margin: 18px 0 26px; }
 .work-result { display: grid; gap: 12px; }
+.work-result-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.work-result-foot .card-link { white-space: nowrap; }
 .work-result h2 { margin: 0; font-size: 19px; }
 .work-search { margin: 24px 0; display: grid; gap: 10px; }
 .work-search label { font-size: 13px; font-weight: 700; }
