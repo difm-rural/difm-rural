@@ -50,7 +50,7 @@ export async function reviewArrangement(_:ActionState,data:FormData):Promise<Act
     const result=existing?await supabase.from('reviews').update(payload).eq('id',existing.id).eq('reviewer_id',user.id).select('id'):await supabase.from('reviews').insert(payload).select('id')
     if(result.error)throw result.error
     if(!result.data?.length)return {error:'Your review could not be saved. Refresh and try again.'}
-    revalidatePath('/activity');revalidatePath('/activity/'+kind+'/'+id+'/manage')
+    revalidatePath('/activity');revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath('/jobs/'+id)
     return {error:'',success:'Your review has been saved.'}
   }catch{return {error:'Could not save your review. Your existing review is unchanged. Refresh and try again.'}}
 }

@@ -1,5 +1,5 @@
 import Link from '@/components/navigation-link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
@@ -14,6 +14,8 @@ import { ReviewsSection } from '@/components/work/reviews-section'
 
 export default async function ManageArrangementPage({params}:{params:Promise<{kind:string;id:string}>}){
   const {supabase,user,profile}=await requireProvider();const {kind,id}=await params
+  // Jobs are managed on the job workspace now; bookings keep this page (Phase 2).
+  if(kind==='job')redirect('/jobs/'+id+'#manage')
   if(kind!=='job' && kind!=='booking')notFound()
   const work=await loadActivityWork(supabase,kind,id)
   if(!work || !workRole(work,user.id))notFound()

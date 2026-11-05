@@ -9,6 +9,8 @@ export function validConversation(ref: ConversationRef) {
 }
 export function conversationKey(ref: ConversationRef) { return `${ref.kind}:${ref.id}:${ref.person}` }
 export function conversationHref(ref: ConversationRef) {
+  // Jobs live on the job workspace: open the thread in its conversation panel.
+  if (ref.kind==='job') return '/jobs/'+encodeURIComponent(ref.id)+'?thread='+encodeURIComponent(ref.person)+'#conversation'
   return '/messages?kind='+ref.kind+'&id='+encodeURIComponent(ref.id)+'&person='+encodeURIComponent(ref.person)
 }
 // Where to manage a job or booking. Jobs live on the job workspace (/jobs/[id]);

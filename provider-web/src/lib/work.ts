@@ -16,10 +16,12 @@ export function notificationHref(notification: {type:string;metadata?:Record<str
   if(notification.type==='new_message' && m.sender_id){
     const kind=m.booking_id?'booking':m.job_id?'job':m.service_id?'listing':null
     const id=m.booking_id || m.job_id || m.service_id
+    // Job conversations live on the job workspace; listings/bookings stay in Messages.
+    if(kind==='job' && id)return '/jobs/'+encodeURIComponent(String(id))+'?thread='+encodeURIComponent(String(m.sender_id))+'#conversation'
     if(kind && id)return '/messages?kind='+kind+'&id='+encodeURIComponent(String(id))+'&person='+encodeURIComponent(String(m.sender_id))
   }
   if(notification.type==='new_message' && m.booking_id)return '/activity/booking/'+encodeURIComponent(String(m.booking_id))
-  if(notification.type==='new_message' && m.job_id)return '/activity/job/'+encodeURIComponent(String(m.job_id))
+  if(notification.type==='new_message' && m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))+'#conversation'
   if(notification.type==='new_message' && m.service_id && m.sender_id)return '/enquiries?s='+encodeURIComponent(String(m.service_id))+'&c='+encodeURIComponent(String(m.sender_id))
   if(m.booking_id)return '/activity/booking/'+encodeURIComponent(String(m.booking_id))+'/manage'
   if(m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))

@@ -7,6 +7,7 @@ import {ActionForm} from '@/components/action-form'
 import {inviteConnection} from '../actions'
 import {ConnectionListings} from '../connection-listings'
 import {validId} from '@/lib/job-input'
+import {workManageHref} from '@/lib/messaging'
 export default async function ConnectionPage({params}:{params:Promise<{id:string}>}){
  const {id}=await params,{supabase,user,profile}=await requireProvider('/connections/'+id)
  if(!validId(id))notFound()
@@ -19,6 +20,6 @@ export default async function ConnectionPage({params}:{params:Promise<{id:string
  {connection.canInvite&&connection.person&&<section className="card work-detail"><h2>Work together again</h2><Link href={'/jobs/new?invite='+id} className="lform-save">Create a job for {name}</Link><p className="muted">A new invited job is private to you and this provider unless you choose to put it on the public board.</p>{jobsError||inviteError?<p role="alert">Could not check your open jobs and invitations. Refresh before inviting.</p>:jobs?.length?<details className="activity-action"><summary>Invite to an existing open job</summary><ActionForm action={inviteConnection} label="Send invitation"><input name="person_id" type="hidden" value={id}/><label className="lform-field">Your open job<select name="job_id" required defaultValue=""><option value="" disabled>Choose a job</option>{jobs.map(j=><option value={j.id} key={j.id} disabled={invites?.some(i=>i.job_id===j.id)}>{j.title}{invites?.some(i=>i.job_id===j.id)?' — already invited':''}</option>)}</select></label><label className="account-setting"><input name="confirmed" type="checkbox" required/>Invite {name} to view this job and send an offer.</label></ActionForm></details>:<p className="muted">You have no open jobs to invite them to.</p>}</section>}
  {!connection.canInvite&&<p className="muted">This person previously requested your help. Their profile shows any live listings they now offer.</p>}
  <ConnectionListings providerId={id}/>
- <section className="card"><h2>Completed work</h2>{historyError?<p role="alert">Could not load shared work. Refresh to try again.</p>:history.map(w=><p key={w.kind+w.id}><Link href={'/activity/'+w.kind+'/'+w.id+'/manage'} className="card-link">{w.title} · {w.kind==='job'?'Job':'Booking'} · {month(w.created_at)} →</Link></p>)}{!historyError&&!history.length&&<p className="muted">The shared work records are no longer available.</p>}</section>
+ <section className="card"><h2>Completed work</h2>{historyError?<p role="alert">Could not load shared work. Refresh to try again.</p>:history.map(w=><p key={w.kind+w.id}><Link href={workManageHref(w.kind,w.id)} className="card-link">{w.title} · {w.kind==='job'?'Job':'Booking'} · {month(w.created_at)} →</Link></p>)}{!historyError&&!history.length&&<p className="muted">The shared work records are no longer available.</p>}</section>
  </section></AppShell>
 }
