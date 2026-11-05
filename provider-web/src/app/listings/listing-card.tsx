@@ -73,7 +73,7 @@ export type ListingCardData = {
 
 // `footer` lets a composing client card (e.g. the provider ManageCard) attach action
 // controls inside the same card; omitted, the card is the plain browse visual.
-export function ListingCard({ data, footer, href }: { data: ListingCardData; footer?: ReactNode; href?:string }) {
+export function ListingCard({ data, footer, href, ariaLabel }: { data: ListingCardData; footer?: ReactNode; href?:string; ariaLabel?:string }) {
   const copy=listingCardCopy(data.title,data.cardHeadline,data.cardSupporting,data.description)
   const content = <>
       <CardImage
@@ -95,5 +95,5 @@ export function ListingCard({ data, footer, href }: { data: ListingCardData; foo
         )}
       </div>
   </>
-  return <div className="lcard">{href?<Link href={href} className="lcard-view" aria-label={'View listing: '+(data.title || 'Untitled listing')}>{content}</Link>:content}{footer}</div>
+  return <div className="lcard">{href?<Link href={href} className="lcard-view" aria-label={ariaLabel || ('View listing: '+(data.title || 'Untitled listing'))}>{content}</Link>:content}{footer}</div>
 }

@@ -227,6 +227,14 @@ a.row:hover { background: var(--sage); }
 .work-result { display: grid; gap: 12px; }
 .work-result-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .work-result-foot .card-link { white-space: nowrap; }
+/* Job cards reuse the listing card; a bookmark toggle overlays the image top-right. */
+.job-card { position: relative; }
+.job-bookmark-form { position: absolute; top: 8px; right: 8px; z-index: 2; margin: 0; }
+.job-bookmark { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,253,248,.92); border: 1px solid var(--line); color: var(--forest-deep); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.job-bookmark:hover { background: var(--paper); }
+.job-bookmark.saved { color: var(--forest); background: var(--sage); }
+.job-bookmark:disabled { opacity: .6; cursor: default; }
+.job-bookmark:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
 .work-result h2 { margin: 0; font-size: 19px; }
 .work-search { margin: 24px 0; display: grid; gap: 10px; }
 .work-search label { font-size: 13px; font-weight: 700; }

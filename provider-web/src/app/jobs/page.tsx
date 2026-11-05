@@ -1,13 +1,12 @@
 import {formatMoney as nzMoney,formatDistance} from '@shared/formatting'
-import {JobCardImage} from '@/components/job-card-image'
+import {ListingCard} from '../listings/listing-card'
+import {SaveJobButton} from '@/components/save-job-button'
 import Link from '@/components/navigation-link'
 import {redirect} from 'next/navigation'
 import {AppShell} from '@/components/app-shell'
 import {requireProvider} from '@/lib/auth'
 import {DiscoverySearch} from '@/components/discovery-search'
 import {SaveSearch} from '@/components/save-search'
-import {ActionForm} from '@/components/action-form'
-import {saveWatchedJob} from '../discovery-actions'
 import {discoveryFilters,discover,discoveryHref,coordinates} from '@/lib/discovery'
 import {loadDiscoveryJobs,watchedJobs,ownedInterest} from '@/lib/discovery-data'
 import {browsingOrigin} from '@/lib/browsing-origin'
@@ -28,7 +27,7 @@ export default async function JobsPage({searchParams}:{searchParams:Promise<Reco
  <DiscoverySearch filters={f} locationLabel={locationLabel} hasLocation={!!origin}/>{f.interest&&<p className="account-current">Viewing a saved search. Changing the search options starts a new search; your saved search stays unchanged.</p>}
  {watchError&&<p role="alert">Could not load saved-job status. Refresh before saving or removing jobs.</p>}
  {error?<div className="card" role="alert"><h2>Couldn&apos;t load jobs or the saved search</h2><p>Check your connection and try again.</p><Link href={href(f.page)} className="card-link">Retry</Link></div>:needsLocation?<div className="card"><h2>{locationError?'Could not load your location':'Choose a browsing location'}</h2><p>Use current location in Search options, add a private GPS location to your profile, or search Any distance with Newest first.</p><Link href="/account/profile" className="card-link">Open Profile</Link></div>:<>
- <p className="muted">{result.count} matching job{result.count===1?'':'s'}</p>{!result.count?<div className="home-empty"><h2>{f.q?'No jobs match “'+f.q+'”':f.category||f.radius?'No jobs match these options':'No open jobs yet'}</h2><p>Try another word or clear the search options.</p><Link href="/jobs" className="card-link">Clear search & options</Link></div>:<div className="work-grid">{result.rows.map(j=><article className="card work-result" key={j.id}><Link href={'/jobs/'+j.id}><JobCardImage photos={j.photos} category={j.category}/><span className="kind-tag">{j.category}</span><h2>{j.title}</h2><p className="work-clamp">{j.description}</p><p className="muted">{j.location_area || j.location_name || 'Location to be arranged'}{j.distance!==null?' · About '+formatDistance(j.distance)+(j.discovery_location_approximate?' · town area':''):''}</p><div className="work-result-foot"><strong>{j.price_type==='fixed'?""+nzMoney(j.price)+'':'Open to offers'}</strong><span className="card-link">View job →</span></div></Link>{!watchError&&<ActionForm action={saveWatchedJob} label={watch.has(j.id)?'Remove saved job':'Save job'}><input name="job_id" type="hidden" value={j.id}/><input name="intent" type="hidden" value={watch.has(j.id)?'remove':'save'}/></ActionForm>}</article>)}</div>}
+ <p className="muted">{result.count} matching job{result.count===1?'':'s'}</p>{!result.count?<div className="home-empty"><h2>{f.q?'No jobs match “'+f.q+'”':f.category||f.radius?'No jobs match these options':'No open jobs yet'}</h2><p>Try another word or clear the search options.</p><Link href="/jobs" className="card-link">Clear search & options</Link></div>:<div className="work-grid">{result.rows.map(j=><div className="job-card" key={j.id}><ListingCard href={'/jobs/'+j.id} ariaLabel={'View job: '+j.title} data={{title:j.title,description:j.description,photoUrl:j.photos?.[0],category:j.category,priceLabel:j.price_type==='fixed'?nzMoney(j.price):'Open to offers',kindLabel:j.category}} footer={<p className="work-card-location">{j.location_area || j.location_name || 'Location to be arranged'}{j.distance!==null?' · About '+formatDistance(j.distance)+(j.discovery_location_approximate?' · town area':''):''}</p>}/>{!watchError&&j.requester_id!==user.id&&<SaveJobButton jobId={j.id} saved={watch.has(j.id)}/>}</div>)}</div>}
  {result.pages>1&&<nav className="lform-actions" aria-label="Job result pages">{result.page>1&&<Link href={href(result.page-1)} className="lform-cancel">Previous</Link>}<span>Page {result.page} of {result.pages}</span>{result.page<result.pages&&<Link href={href(result.page+1)} className="lform-cancel">Next</Link>}</nav>}
  <SaveSearch key={JSON.stringify(f)} filters={f} locationName={locationLabel}/>
  </>}
