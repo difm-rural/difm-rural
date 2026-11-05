@@ -198,6 +198,20 @@ a.row:hover { background: var(--sage); }
 .home-empty h3 { font-size: 16px; color: var(--ink); }
 .home-load-error { border: 1px solid #dfbc70; background: #fff6de; padding: 16px; border-radius: 10px; margin: 18px 0; line-height: 1.6; }
 .work-page { display: grid; align-content:start; gap: 20px; width:100%; max-width:1280px; margin-inline:auto; }
+/* Job workspace: single column until an accepted counterpart exists, then a
+   sticky conversation panel on the right (>=1024px). */
+.work-workspace { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+.work-main { display: grid; align-content: start; gap: 20px; min-width: 0; }
+@media(min-width:1024px){ .work-workspace { grid-template-columns: minmax(0,1.6fr) minmax(320px,1fr); } .work-conversation { position: sticky; top: 16px; } }
+.work-nextstep { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--sage); }
+.work-nextstep strong { color: var(--forest-deep); font-size: 15px; }
+.work-nextstep span { color: var(--muted); font-size: 13px; }
+.work-nextstep.needs-action { background: #fff6e8; border-color: #f0c67a; }
+.work-nextstep.needs-action strong { color: #8a5a00; }
+.work-timeline { font-size: 12px; margin: -8px 0 0; }
+.work-inline-chat { margin-top: 12px; }
+.work-earlier > summary { font-weight: 800; color: var(--forest-deep); cursor: pointer; }
+.work-earlier[open] > summary { margin-bottom: 12px; }
 .work-page > .home-heading { margin-bottom:0; }
 .work-page .lform { width:100%; max-width:none; }
 .work-page h1, .work-page > h2 { margin: 0; }

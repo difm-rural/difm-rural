@@ -1,29 +1,17 @@
-import {formatDate as nzDate} from '@shared/formatting'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
-import { ActionForm } from '@/components/action-form'
 import { LiveRefresh } from '@/components/live-refresh'
 import { loadActivityWork } from '@/lib/activity-data'
-import { workActions, workRole, type WorkAction } from '@/lib/activity-policy'
+import { workActions, workRole } from '@/lib/activity-policy'
 import { statusLabel } from '@/lib/work'
 import { BookingDetails } from '../../../booking-details'
 import { allPublicReviews } from '@/lib/profile-data'
 import { BookingSchedule } from '../../../booking-schedule'
-import { manageArrangement, reviewArrangement } from '../../../actions'
-import { StarRatingInput } from '@/components/star-rating-input'
+import { ManageActions } from '@/components/work/manage-actions'
+import { ReviewsSection } from '@/components/work/reviews-section'
 
-const ACTIONS: Record<Exclude<WorkAction,'review'>,{label:string;detail:string}>={
-  complete:{label:'Mark complete',detail:'Mark this work complete when it has finished. Both people can then leave a review.'},
-  cancel:{label:'Cancel job',detail:'This closes the job. If an offer has been accepted, the provider will be notified.'},
-  withdraw:{label:'Withdraw request',detail:'This request has not been accepted. You can withdraw it now; the provider will be notified.'},
-  request_cancel:{label:'Request cancellation',detail:'The provider needs to confirm cancellation. The arrangement remains active until they do.'},
-  confirm_cancel:{label:'Confirm cancellation',detail:'The requester has asked to cancel. Confirming ends this arrangement.'},
-  close_grazing:{label:'Complete & close listing',detail:'Complete the finished arrangement and hide the grazing listing from discovery. Other bookings stay unchanged. You can relist later.'},
-  relist_grazing:{label:'Complete & relist',detail:'Complete this arrangement and advertise the grazing listing for new enquiries and requests. Other bookings stay unchanged.'},
-  relist:{label:'Relist grazing',detail:'Make this grazing listing available again. The completed arrangement and its reviews remain in History.'},
-}
 export default async function ManageArrangementPage({params}:{params:Promise<{kind:string;id:string}>}){
   const {supabase,user,profile}=await requireProvider();const {kind,id}=await params
   if(kind!=='job' && kind!=='booking')notFound()
@@ -57,33 +45,8 @@ export default async function ManageArrangementPage({params}:{params:Promise<{ki
     </article>
     {work.booking && <BookingDetails booking={work.booking} userId={user.id}/>}
     {work.booking && work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
-    {actions.filter(a=>a!=='review').length>0 && <section className="card"><h2>{kind==='job'?'Manage this job':'Manage this booking'}</h2><p className="muted">Choose an action to see what will happen before confirming.</p>
-      {actions.filter((a):a is Exclude<WorkAction,'review'>=>a!=='review').map(intent=><details className="activity-action" key={intent}><summary>{ACTIONS[intent].label}</summary>
-        <ActionForm action={manageArrangement} label={ACTIONS[intent].label}>
-          <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/><input type="hidden" name="intent" value={intent}/>
-          <p>{intent==='complete'
-            ? `Before you mark this complete, check the work is finished and you've sorted payment with ${otherFirst} — cash, bank transfer or invoice, whatever you agreed. Marking complete closes this and invites them to leave a review.`
-            : (intent==='close_grazing'||intent==='relist_grazing')
-            ? `Before completing, make sure grazing payment has been sorted or agreed. ${ACTIONS[intent].detail}`
-            : ACTIONS[intent].detail}</p>
-          {['cancel','withdraw','request_cancel'].includes(intent) && <><label className="lform-field">Reason *<select name="reason" required defaultValue=""><option value="" disabled>Choose a reason</option>{['No longer needed','Found someone else','Budget has changed','Posted by mistake','Provider not responding','Other'].map(r=><option key={r}>{r}</option>)}</select></label><label className="lform-field">Additional details (optional)<textarea name="note" rows={3}/></label></>}
-          <label className="activity-confirm"><input type="checkbox" required/> {(intent==='complete'||intent==='close_grazing'||intent==='relist_grazing')?'The work is finished and payment has been sorted or agreed.':`I confirm I want to ${ACTIONS[intent].label.toLowerCase()}.`}</label>
-        </ActionForm>
-      </details>)}
-    </section>}
-    {work.status==='completed' && <section className="card"><h2>Reviews</h2>
-      {reviewError?<p role="alert">Could not load reviews. Refresh before adding or editing your review.</p>:<>
-        {received && <article className="activity-received"><h3>{person?.full_name || 'Their'} review of you</h3><p><span aria-label={received.rating+' out of 5'}>{'★'.repeat(received.rating)+'☆'.repeat(5-received.rating)}</span> · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
-        {!received && <p className="muted">The other person has not left a review yet.</p>}
-        {actions.includes('review') && <ActionForm key={ownReview?.id || 'new'} action={reviewArrangement} label={ownReview?'Save review changes':'Submit review'}>
-          <h3>{ownReview?'Edit your review':'Review '+(person?.full_name || 'the other person')}</h3>
-          <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/>
-          <StarRatingInput initial={ownReview?.rating}/>
-          <label className="lform-field">Comments (optional)<textarea name="comment" rows={4} defaultValue={ownReview?.comment || ''} placeholder="Share your experience working with this person."/></label>
-          <p className="muted">Your rating and comments are public.</p>
-        </ActionForm>}
-      </>}
-    </section>}
+    <ManageActions kind={kind} id={id} actions={actions} otherFirst={otherFirst}/>
+    {work.status==='completed' && <ReviewsSection kind={kind} id={id} actions={actions} personName={person?.full_name || null} received={received} ownReview={ownReview} reviewError={!!reviewError}/>}
     {work.status==='completed' && <p className="home-clear">Arrangement complete. You can find it again in History.</p>}
   </section></AppShell>
 }
