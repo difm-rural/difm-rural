@@ -42,7 +42,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const schedule=job.schedule_type==='range'?nzDate(job.date_from)+' – '+nzDate(job.date_to):job.schedule_type==='specific'?nzDate(job.scheduled_date):SCHEDULES[job.schedule_type as keyof typeof SCHEDULES] || 'Flexible timing'
 
  // ─── Workspace state ────────────────────────────────────────────────────────
- const acceptedProviderId=offers?.find(b=>b.status==='accepted')?.provider_id || null
+ const acceptedOffer=offers?.find(b=>b.status==='accepted')
+ const acceptedProviderId=acceptedOffer?.provider_id || null
  const isAcceptedProvider=!!acceptedProviderId && acceptedProviderId===user.id
  const awarded=job.status!=='open'   // accepted/in_progress/awaiting/cancellation_requested/completed/cancelled
  // ActivityWork for the shared manage + review policy (reuses workActions/workRole).
@@ -83,7 +84,9 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  if(job.status==='completed')timeline.push('Completed')
  if(received||ownReview)timeline.push('Reviewed')
 
- const detailsCard=<article className="card work-detail"><p>{job.category} · {job.location_area || job.location_name || 'Location to be arranged'}</p><p className="work-description">{job.description}</p><strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong><p>{schedule}</p><p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
+ const detailsCard=<article className="card work-detail"><p>{job.category} · {job.location_area || job.location_name || 'Location to be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
+   ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'Budget '+nzMoney(job.price):'open to offers')}</p></>
+   : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}<p>{schedule}</p><p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
    {job.location_name&&<p>Property location: {job.location_name}</p>}{job.location_note&&<p className="work-description">Location note: {job.location_note}</p>}
    {mapTarget&&<a className="card-link" href={mapTarget.href} target="_blank" rel="noopener noreferrer">{mapTarget.label}</a>}
    {job.hide_exact_location&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}
@@ -113,11 +116,11 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const mainColumn=<>
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}><strong>{next.label}</strong><span>{next.detail}</span></div>}
   {job.visibility==='invite_only'&&<p className="account-current">Private invited job — visible to the requester and invited providers.</p>}
-  {watchError?<p role="alert">Could not check saved-job status. Refresh before saving.</p>:<ActionForm action={saveWatchedJob} label={watched?'Remove saved job':'Save job'}><input name="job_id" type="hidden" value={id}/><input name="intent" type="hidden" value={watched?'remove':'save'}/></ActionForm>}
+  {job.status==='open'&&!own&&(watchError?<p role="alert">Could not check saved-job status. Refresh before saving.</p>:<ActionForm action={saveWatchedJob} label={watched?'Remove saved job':'Save job'}><input name="job_id" type="hidden" value={id}/><input name="intent" type="hidden" value={watched?'remove':'save'}/></ActionForm>)}
   {own&&job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider from Connections →</Link>}
   {detailsCard}
   {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
-  <div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{actions.filter(a=>a!=='review').length>0&&<a className="lform-cancel" href="#manage">Manage this job</a>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/></div>
+  <div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{actions.filter(a=>a!=='review').length>0&&<a className="lform-cancel" href="#manage">Manage this job</a>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>
   {job.status==='open'?<>{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
   {job.status==='completed'&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} received={received} ownReview={ownReview} reviewError={reviewError}/>}
