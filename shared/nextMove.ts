@@ -27,7 +27,7 @@ type JobLike = Scheduleable & {
 type BookingLike = Scheduleable & {
   status?: string
   pricing_snapshot?: unknown
-  service?: { kind?: string; pricing_type?: string | null } | null
+  service?: { kind?: string | null; pricing_type?: string | null } | null
   services?: { pricing_type?: string | null } | null
 }
 

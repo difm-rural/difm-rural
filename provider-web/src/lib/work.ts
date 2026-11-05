@@ -18,12 +18,13 @@ export function notificationHref(notification: {type:string;metadata?:Record<str
     const id=m.booking_id || m.job_id || m.service_id
     // Job conversations live on the job workspace; listings/bookings stay in Messages.
     if(kind==='job' && id)return '/jobs/'+encodeURIComponent(String(id))+'?thread='+encodeURIComponent(String(m.sender_id))+'#conversation'
+    if(kind==='booking' && id)return '/bookings/'+encodeURIComponent(String(id))+'#conversation'
     if(kind && id)return '/messages?kind='+kind+'&id='+encodeURIComponent(String(id))+'&person='+encodeURIComponent(String(m.sender_id))
   }
-  if(notification.type==='new_message' && m.booking_id)return '/activity/booking/'+encodeURIComponent(String(m.booking_id))
+  if(notification.type==='new_message' && m.booking_id)return '/bookings/'+encodeURIComponent(String(m.booking_id))+'#conversation'
   if(notification.type==='new_message' && m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))+'#conversation'
   if(notification.type==='new_message' && m.service_id && m.sender_id)return '/enquiries?s='+encodeURIComponent(String(m.service_id))+'&c='+encodeURIComponent(String(m.sender_id))
-  if(m.booking_id)return '/activity/booking/'+encodeURIComponent(String(m.booking_id))+'/manage'
+  if(m.booking_id)return '/bookings/'+encodeURIComponent(String(m.booking_id))+'#manage'
   if(m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))
   if(m.saved_interest_id)return '/jobs?interest='+encodeURIComponent(String(m.saved_interest_id))
   if(m.service_id)return '/browse/'+encodeURIComponent(String(m.service_id))

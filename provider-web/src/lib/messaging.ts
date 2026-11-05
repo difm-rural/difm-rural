@@ -9,14 +9,16 @@ export function validConversation(ref: ConversationRef) {
 }
 export function conversationKey(ref: ConversationRef) { return `${ref.kind}:${ref.id}:${ref.person}` }
 export function conversationHref(ref: ConversationRef) {
-  // Jobs live on the job workspace: open the thread in its conversation panel.
+  // Jobs and bookings live on their own workspaces; listings on the listing page.
   if (ref.kind==='job') return '/jobs/'+encodeURIComponent(ref.id)+'?thread='+encodeURIComponent(ref.person)+'#conversation'
+  if (ref.kind==='booking') return '/bookings/'+encodeURIComponent(ref.id)+'#conversation'
   return '/messages?kind='+ref.kind+'&id='+encodeURIComponent(ref.id)+'&person='+encodeURIComponent(ref.person)
 }
-// Where to manage a job or booking. Jobs live on the job workspace (/jobs/[id]);
-// bookings keep their activity manage page until Phase 2. Listings have no manage page.
+// Where to manage a job or booking, each on its own workspace. Listings have no manage page.
 export function workManageHref(kind: ConversationKind, id: string) {
-  return kind==='job' ? '/jobs/'+encodeURIComponent(id)+'#manage' : '/activity/'+kind+'/'+encodeURIComponent(id)+'/manage'
+  if (kind==='job') return '/jobs/'+encodeURIComponent(id)+'#manage'
+  if (kind==='booking') return '/bookings/'+encodeURIComponent(id)+'#manage'
+  return '/activity/'+kind+'/'+encodeURIComponent(id)+'/manage'
 }
 export function matchesConversation(message: ChatMessage, ref: ConversationRef, userId: string) {
   const id=ref.kind==='booking'?message.booking_id:ref.kind==='listing'?message.service_id:message.job_id
