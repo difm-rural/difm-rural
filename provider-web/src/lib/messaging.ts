@@ -11,6 +11,11 @@ export function conversationKey(ref: ConversationRef) { return `${ref.kind}:${re
 export function conversationHref(ref: ConversationRef) {
   return '/messages?kind='+ref.kind+'&id='+encodeURIComponent(ref.id)+'&person='+encodeURIComponent(ref.person)
 }
+// Where to manage a job or booking. Jobs live on the job workspace (/jobs/[id]);
+// bookings keep their activity manage page until Phase 2. Listings have no manage page.
+export function workManageHref(kind: ConversationKind, id: string) {
+  return kind==='job' ? '/jobs/'+encodeURIComponent(id)+'#manage' : '/activity/'+kind+'/'+encodeURIComponent(id)+'/manage'
+}
 export function matchesConversation(message: ChatMessage, ref: ConversationRef, userId: string) {
   const id=ref.kind==='booking'?message.booking_id:ref.kind==='listing'?message.service_id:message.job_id
   return id===ref.id && ((message.sender_id===userId && message.receiver_id===ref.person) || (message.receiver_id===userId && message.sender_id===ref.person))

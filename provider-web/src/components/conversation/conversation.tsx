@@ -5,11 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ImagePlus, MapPin, Send, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { attachment, canReadConversation, type ChatMessage, type ConversationRef } from '@/lib/messaging'
+import { attachment, canReadConversation, workManageHref, type ChatMessage, type ConversationRef } from '@/lib/messaging'
 import type { ConversationContext } from '@/lib/messaging-data'
 import { readConversation, sendChatMessage } from './actions'
 
-export function Conversation({context}:{context:ConversationContext}){
+export function Conversation({context,compact=false}:{context:ConversationContext;compact?:boolean}){
   const router=useRouter(),[text,setText]=useState(''),[sending,setSending]=useState(false),[error,setError]=useState(''),[readError,setReadError]=useState('')
   const [local,setLocal]=useState<ChatMessage[]>([]),[file,setFile]=useState<File|null>(null)
   const [location,setLocation]=useState<{latitude:number;longitude:number}|null>(null),[locating,setLocating]=useState(false)
@@ -75,11 +75,11 @@ export function Conversation({context}:{context:ConversationContext}){
     setLocating(true);setError('')
     navigator.geolocation.getCurrentPosition(p=>{setLocation({latitude:p.coords.latitude,longitude:p.coords.longitude});setFile(null);setLocating(false)},e=>{setLocating(false);setError(e.code===1?'Location permission was denied. Allow it in your browser settings or type the location in a message.':'Could not get your location. Try again or type the location in a message.')},{enableHighAccuracy:true,timeout:15000,maximumAge:30000})
   }
-  return <section className="message-conversation" aria-label={'Conversation with '+context.name}>
-    <header className="enq-thread-head"><Link href="/messages" className="card-link">← All messages</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
+  return <section className={'message-conversation'+(compact?' compact':'')} aria-label={'Conversation with '+context.name}>
+    {!compact && <header className="enq-thread-head"><Link href="/messages" className="card-link">← All messages</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
       <Link href={'/people/'+context.person} className="card-link">Profile & reviews →</Link>
-      {context.kind!=='listing' && <Link className="card-link" href={'/activity/'+context.kind+'/'+context.id+'/manage'}>Arrangement details & reviews →</Link>}
-    </header>
+      {context.kind!=='listing' && <Link className="card-link" href={workManageHref(context.kind,context.id)}>Arrangement details & reviews →</Link>}
+    </header>}
     {readError && <p className="form-error" role="alert">{readError}</p>}
     <div className="enq-messages message-scroll" ref={scrollRef} onScroll={()=>{const el=scrollRef.current;if(el)nearBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<120}}>
       {!messages.length && <p className="empty">No messages yet. Send a message to get started.</p>}

@@ -6,7 +6,7 @@ import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
 import { loadInbox, loadConversation, unreadNotices, type ConversationContext } from '@/lib/messaging-data'
 import { conversationHref, conversationKey, validConversation, type ConversationRef, type InboxThread } from '@/lib/messaging'
-import { Conversation } from './conversation'
+import { Conversation } from '@/components/conversation/conversation'
 
 export const dynamic='force-dynamic'
 export default async function MessagesPage({searchParams}:{searchParams:Promise<{kind?:string;id?:string;person?:string}>}){

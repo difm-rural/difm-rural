@@ -123,6 +123,11 @@ a.row:hover { background: var(--sage); }
 .messages-page .enq-panes { flex: none; height: calc(100dvh - 210px); min-height: 520px; grid-template-columns: minmax(230px,320px) minmax(0,1fr); }
 .messages-page .enq-thread { overflow: hidden; min-width: 0; }
 .message-conversation { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+/* Embedded (compact) conversation: self-contained card with its own bounded height,
+   no page-level header. Used inline on the job workspace. */
+.message-conversation.compact { height: clamp(360px, 60vh, 560px); border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; }
+.message-conversation.compact .enq-messages { padding: 14px; }
+.message-conversation.compact .message-compose { padding: 0 14px 14px; }
 .message-conversation .enq-thread-head { flex: none; display: grid; align-items: start; gap: 6px; }
 .message-conversation h2 { margin: 0; font-size: 19px; }
 .message-scroll { min-height: 160px; overscroll-behavior: contain; }
