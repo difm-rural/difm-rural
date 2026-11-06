@@ -10,6 +10,18 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { ACTIVE_JOBS, ACTIVE_BOOKINGS, notificationHref } from '@/lib/work'
 export const dynamic = 'force-dynamic'
 
+// "Needs attention" lists only things the user should act on. These types are
+// purely informational (an outcome, not a to-do) — they stay in Notifications
+// but never surface here. Actionable types (shown): new_message, new_bid,
+// new_booking, new_question, service_quote_sent, booking_cancellation_requested,
+// booking_completed, job_completed, work_completion_due, availability_check.
+const INFORMATIONAL_NOTICES = new Set([
+  'review_received', 'job_cancelled', 'booking_confirmed', 'booking_declined',
+  'booking_cancelled', 'service_booking_withdrawn', 'service_quote_accepted',
+  'bid_accepted', 'bid_rejected', 'bid_placed', 'question_answered',
+  'opportunity_match', 'opportunity_digest', 'saved_interest_match', 'zero_matches',
+])
+
 export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
   const [jobs, bookings, offers, notifications, listings, seasonal] = await Promise.all([
@@ -37,6 +49,7 @@ export default async function HomePage() {
     {title:'Browse listings',text:'Find rural listings near you',href:'/browse',primary:false,icon:Search},
   ]
   const pending = (bookings.data || []).filter(b => (b.provider_id === user.id && ['pending','cancellation_requested'].includes(b.status)) || (b.requester_id === user.id && b.status === 'quote_sent'))
+  const attention = (notifications.data || []).filter(n => !INFORMATIONAL_NOTICES.has(n.type) && (n.type === 'new_message' || !pending.some(b => b.id === n.metadata?.booking_id)))
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page">
     <header className="home-heading"><div><p className="eyebrow">Rural Connections</p><h1>What needs doing?</h1><p className="muted">{hasError ? 'Good to see you, ' + name : total ? total + ' active item' + (total === 1 ? '' : 's') + ' on the go' : 'Good to see you, ' + name}</p></div><LiveRefresh /></header>
     {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Welcome to Rural Connections</h2><p>Add your public name and town or region so people know who they are arranging work with.</p><Link href="/setup" className="card-link">Finish your profile →</Link><p className="muted">You can explore first and return here later.</p></section>}
@@ -44,12 +57,12 @@ export default async function HomePage() {
     {hasError && <div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
     <div className="home-columns"><div>
       <section className="card home-attention"><div className="card-head"><h2>Needs attention</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link><Link href="/notifications" className="card-link">All notifications</Link></div>
-        {!notifications.error && !bookings.error && !pending.length && !notifications.data?.length ? <p className="home-clear"><CheckCircle2 size={20}/> All caught up — nothing waiting on you.</p> : <ul className="list">
+        {!notifications.error && !bookings.error && !pending.length && !attention.length ? <p className="home-clear"><CheckCircle2 size={20}/> All caught up — nothing waiting on you.</p> : <ul className="list">
           {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><Bell size={20}/><span className="row-main"><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">Waiting on you</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
-          {(notifications.data || []).filter(n => n.type === 'new_message' || !pending.some(b => b.id === n.metadata?.booking_id)).slice(0,5).map(n => <li key={n.id}><Link className="row" href={notificationHref(n)}><MessageSquare size={20}/><span className="row-main"><strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>)}
+          {attention.slice(0,5).map(n => <li key={n.id}><Link className="row" href={notificationHref(n)}><MessageSquare size={20}/><span className="row-main"><strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>)}
         </ul>}
       </section>
-      <section className="home-activity"><h2>Your activity</h2><div className="home-stats">{[{label:'Active jobs posted',count:jobs.error ? null : jobs.data?.length || 0},{label:'Offers on open jobs',count:offers.error || offerJobs.error ? null : pendingOffers},{label:'Work & requests',count:bookings.error || offerJobs.error ? null : workCount}].map(t => <Link href="/activity" className="home-stat" key={t.label}><strong>{t.count ?? '—'}</strong><span>{t.label}</span></Link>)}</div>
+      <section className="home-activity"><h2>Your activity</h2>{(hasError || total > 0) && <div className="home-stats">{[{label:'Active jobs posted',count:jobs.error ? null : jobs.data?.length || 0},{label:'Offers on open jobs',count:offers.error || offerJobs.error ? null : pendingOffers},{label:'Work & requests',count:bookings.error || offerJobs.error ? null : workCount}].map(t => <Link href="/activity" className="home-stat" key={t.label}><strong>{t.count ?? '—'}</strong><span>{t.label}</span></Link>)}</div>}
         {!hasError && total === 0 && <div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or browse listings to get started.</p></div>}
       </section>
       <SeasonalReminders campaigns={seasonal}/>
