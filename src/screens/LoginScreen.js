@@ -35,7 +35,7 @@ import {
 // App Review demo account: Apple reviewers can't receive OTP emails, so this one
 // address signs in with a password instead. Not a secret — the password lives only
 // in Supabase + App Store Connect, never in code. Every other email keeps OTP.
-import {REVIEW_EMAIL,EMAIL_STEP_ACTION,signInMethodHint} from '../../shared/reviewAccount'
+import {isPasswordAccount,EMAIL_STEP_ACTION,signInMethodHint} from '../../shared/reviewAccount'
 
 function getBiometricLabel(type) {
   if (type === 'face') return 'Face ID'
@@ -145,8 +145,9 @@ export default function LoginScreen({ navigation, route }) {
       Alert.alert('Check your email address', 'Enter a complete email address, such as name@example.com.')
       return
     }
-    if (trimmed === REVIEW_EMAIL) {
-      // Reviewer demo account: password sign-in, no OTP email.
+    if (isPasswordAccount(trimmed)) {
+      // Password accounts (App Review + test bots): password sign-in, no OTP email.
+      setEmail(trimmed)
       setStage('password')
       return
     }
@@ -187,7 +188,7 @@ export default function LoginScreen({ navigation, route }) {
     setLoading(true)
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: REVIEW_EMAIL,
+        email: email.trim().toLowerCase(),
         password,
       })
       if (error) throw error
@@ -344,7 +345,7 @@ export default function LoginScreen({ navigation, route }) {
           <Text style={styles.title} accessibilityRole="header">Enter your password</Text>
           <Text style={styles.subtitle}>
             Sign in to{'\n'}
-            <Text style={styles.emailHighlight}>{REVIEW_EMAIL}</Text>
+            <Text style={styles.emailHighlight}>{email.trim().toLowerCase()}</Text>
           </Text>
 
           <TextInput

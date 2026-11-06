@@ -4,15 +4,24 @@ import { FormEvent, useState } from 'react'
 import { ArrowLeft, ArrowRight, LoaderCircle, LockKeyhole } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+// Local copy of the shared password-login list (admin-web has no @shared alias).
+// Public identifiers only — passwords live only in Supabase. Admin access is still
+// gated by profiles.is_admin, so a non-admin bot signs in but can't reach the console.
+const PASSWORD_LOGIN_EMAILS = ['review@ruralconnections.nz', 'adminbot@ruralconnections.nz', 'requesterbot@ruralconnections.nz']
+const isPasswordAccount = (email: string) => PASSWORD_LOGIN_EMAILS.includes(email.trim().toLowerCase())
+
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [passwordStage, setPasswordStage] = useState(false)
+  const [password, setPassword] = useState('')
   const [token, setToken] = useState('')
   const [error, setError] = useState('')
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+    if (isPasswordAccount(email)) { setEmail(email.trim().toLowerCase()); setPasswordStage(true); setError('') ; return }
     setLoading(true)
     setError('')
     const supabase = createClient()
@@ -23,6 +32,18 @@ export function LoginForm() {
     setLoading(false)
     if (signInError) setError(signInError.message)
     else setSent(true)
+  }
+
+  async function signInWithPassword(event: FormEvent) {
+    event.preventDefault()
+    if (!password) { setError('Enter the account password to sign in.'); return }
+    setLoading(true)
+    setError('')
+    const supabase = createClient()
+    const { data, error: failure } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
+    setLoading(false)
+    if (failure || !data.session) setError('The email or password was not recognised. Check your details and try again.')
+    else { setPassword(''); window.location.assign('/') }
   }
 
   async function verify(event: FormEvent) {
@@ -38,6 +59,25 @@ export function LoginForm() {
     setLoading(false)
     if (verifyError) setError('That code is invalid or has expired. Request a new code and try again.')
     else window.location.assign('/')
+  }
+
+  if (passwordStage) {
+    return (
+      <form onSubmit={signInWithPassword} className="login-form otp-form">
+        <div className="otp-heading">
+          <button type="button" className="back-email" onClick={() => { setPasswordStage(false); setPassword(''); setError('') }} aria-label="Use a different email"><ArrowLeft size={16} /></button>
+          <div><h2>Enter your password</h2><p>Sign in as {email}.</p></div>
+        </div>
+        <label htmlFor="password">Password</label>
+        <input id="password" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" required autoFocus />
+        {error && <p className="form-error">{error}</p>}
+        <button type="submit" disabled={loading || !password}>
+          {loading ? <LoaderCircle className="spin" size={17} /> : <LockKeyhole size={17} />}
+          Sign in
+          {!loading && <ArrowRight size={17} />}
+        </button>
+      </form>
+    )
   }
 
   if (sent) {
@@ -66,7 +106,7 @@ export function LoginForm() {
       {error && <p className="form-error">{error}</p>}
       <button type="submit" disabled={loading}>
         {loading ? <LoaderCircle className="spin" size={17} /> : <LockKeyhole size={17} />}
-        Send sign-in code
+        Continue
         {!loading && <ArrowRight size={17} />}
       </button>
     </form>

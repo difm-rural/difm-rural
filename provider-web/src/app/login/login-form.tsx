@@ -1,12 +1,12 @@
 'use client'
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import {isReviewAccount,REVIEW_EMAIL,reviewSignInFailure,EMAIL_STEP_ACTION,signInMethodHint} from '@shared/reviewAccount'
+import {isPasswordAccount,reviewSignInFailure,EMAIL_STEP_ACTION,signInMethodHint} from '@shared/reviewAccount'
 import { createClient } from '@/lib/supabase/client'
 import { normaliseEmail, validEmail, signInFailure, signInRetrySeconds } from '@/lib/first-time'
 export function LoginForm({destination='/'}:{destination?:string}){
  const [email,setEmail]=useState(''),[token,setToken]=useState(''),[sent,setSent]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[remaining,setRemaining]=useState(0)
  const [passwordStage,setPasswordStage]=useState(false),[password,setPassword]=useState('')
- const reviewEmail=isReviewAccount(email)
+ const reviewEmail=isPasswordAccount(email)
  const busy=useRef(false),until=useRef(0)
  useEffect(()=>{const timer=setInterval(()=>setRemaining(Math.max(0,Math.ceil((until.current-Date.now())/1000))),1000);return ()=>clearInterval(timer)},[])
  async function send(event?:FormEvent){
@@ -14,7 +14,7 @@ export function LoginForm({destination='/'}:{destination?:string}){
   if(busy.current)return
   const address=normaliseEmail(email)
   if(!validEmail(address)){setError('Enter a valid email address, such as you@example.co.nz.');return}
-  if(isReviewAccount(address)){setEmail(address);setPasswordStage(true);setPassword('');setError('');setNotice('');return}
+  if(isPasswordAccount(address)){setEmail(address);setPasswordStage(true);setPassword('');setError('');setNotice('');return}
   if(Date.now()<until.current)return
   busy.current=true;setLoading(true);setError('');setNotice('')
   try{
@@ -37,7 +37,7 @@ export function LoginForm({destination='/'}:{destination?:string}){
   busy.current=true;setLoading(true);setError('');setNotice('')
   let signedIn=false
   try{
-   const {data,error:failure}=await createClient().auth.signInWithPassword({email:REVIEW_EMAIL,password})
+   const {data,error:failure}=await createClient().auth.signInWithPassword({email:email.trim().toLowerCase(),password})
    if(failure||!data.session)setError(reviewSignInFailure(failure))
    else{signedIn=true;setPassword('');window.location.assign(destination)}
   }catch{setError(reviewSignInFailure(null))}finally{if(!signedIn){busy.current=false;setLoading(false)}}
