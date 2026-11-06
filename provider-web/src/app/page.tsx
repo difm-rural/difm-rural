@@ -46,7 +46,7 @@ export default async function HomePage() {
     {title:'Post a job',text:'Describe the work and get local help',href:'/jobs/new',primary:true,icon:Plus},
     {title:'Create a listing',text:'Advertise a service, grazing, gear, space or goods',href:'/listings/new',primary:false,icon:Plus},
     {title:'Find jobs',text:'Browse open rural work nearby',href:'/jobs',primary:true,icon:Search},
-    {title:'Browse listings',text:'Find rural listings near you',href:'/browse',primary:false,icon:Search},
+    {title:'Find listings',text:'Services, grazing, gear and goods near you',href:'/browse',primary:false,icon:Search},
   ]
   const pending = (bookings.data || []).filter(b => (b.provider_id === user.id && ['pending','cancellation_requested'].includes(b.status)) || (b.requester_id === user.id && b.status === 'quote_sent'))
   const attention = (notifications.data || []).filter(n => !INFORMATIONAL_NOTICES.has(n.type) && (n.type === 'new_message' || !pending.some(b => b.id === n.metadata?.booking_id)))
