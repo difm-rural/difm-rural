@@ -20,7 +20,7 @@ export default async function NotificationsPage({searchParams}:{searchParams:Pro
   ])
   const base='/notifications?filter='+(unread?'unread':'all')
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
-    <header className="home-heading"><div><p className="eyebrow">Your updates</p><h1>Notifications</h1></div><LiveRefresh/></header>
+    <header className="home-heading"><div><h1>Notifications</h1></div><LiveRefresh/></header>
     <nav className="activity-segments" aria-label="Notification filter"><Link href="/notifications" aria-current={!unread?'page':undefined}>All</Link><Link href="/notifications?filter=unread" aria-current={unread?'page':undefined}>Unread</Link></nav>
     {!latestError && latest?.[0] && <ActionForm action={updateNotification} label="Mark all read"><input type="hidden" name="all" value="true"/><input type="hidden" name="cutoff" value={latest[0].created_at}/></ActionForm>}
     {error?<div className="card" role="alert"><h2>Couldn&apos;t load notifications</h2><p>Check your connection and use Refresh to retry.</p></div>:!data?.length?<div className="home-empty"><Bell size={28}/><h2>{count? 'No notifications on this page':unread?'All caught up':'No notifications here yet'}</h2><p>{count?'Return to the first page to see your notifications.':unread?'You have no unread notifications.':'Messages, offers and booking updates will appear here.'}</p>{page>1 && <Link href={base} className="card-link">First page</Link>}</div>

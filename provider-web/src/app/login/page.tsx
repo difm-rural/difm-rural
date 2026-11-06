@@ -15,7 +15,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
   return (
     <main className="login-page">
       <section className="login-brand">
-        <p className="eyebrow light">Rural Connections</p>
+        <p className="eyebrow light">Rural Connections <DevelopmentBadge/></p>
         <h1>Find help. Find work. Stay connected.</h1>
         <p>Post jobs, discover local listings and manage your arrangements from the web console.</p>
         <div className="login-rule" />
@@ -26,7 +26,6 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
           <div className="login-barn-mark" aria-hidden="true">
             <Image src="/brand/barn-badge-red.png" alt="" width={52} height={52} priority />
           </div>
-          <p className="eyebrow">Your account <DevelopmentBadge/></p>
           <h2>Welcome to Rural Connections</h2>
           <p className="muted">Sign in or create an account with your email.</p>
           {params.error==='link' && <p className="form-error" role="alert">That sign-in link could not be used. Request a new code below and enter it here.</p>}

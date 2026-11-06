@@ -25,7 +25,6 @@ export default async function ListingsPage() {
       <section className="page listings">
         <header className="dash-head">
           <div>
-            <p className="eyebrow">Your listings</p>
             <h1>My listings</h1>
           </div>
           <div className="dash-head-aside">

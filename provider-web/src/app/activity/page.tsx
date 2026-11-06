@@ -52,7 +52,7 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
   const someWorkEmpty=!shownJobs.length || !shownOffers.length || !shownBookings.length
   const anyItems=shownJobs.length>0 || shownOffers.length>0 || shownBookings.length>0 || !!questions.data?.length || ownerThreads.length>0 || yourEnquiries.length>0
   const ctaLinks=<><Link className="card-link" href="/jobs/new">Post a job</Link> · <Link className="card-link" href="/jobs">Find jobs</Link> · <Link className="card-link" href="/browse">Browse listings</Link></>
-  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><header className="home-heading"><div><p className="eyebrow">Your arrangements</p><h1>Activity</h1></div><LiveRefresh/></header>
+  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><header className="home-heading"><div><h1>Activity</h1></div><LiveRefresh/></header>
     <nav className="activity-segments" aria-label="Activity view"><Link href="/activity" aria-current={!history?'page':undefined}>Active {!hasError && <span>{activeCount}</span>}</Link><Link href="/activity?view=history" aria-current={history?'page':undefined}>History {!hasError && <span>{historyCount}</span>}</Link></nav>
     <p className="muted">{history?'Completed and closed arrangements, with your reviews.':'Track your jobs, offers, booking requests and agreed work.'}</p>
     {hasError && <p className="home-load-error" role="alert">Some activity could not be loaded. Refresh to try again.</p>}
