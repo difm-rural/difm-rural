@@ -12,6 +12,10 @@ import {discoveryFilters,discover,discoveryHref,coordinates} from '@/lib/discove
 import {loadDiscoveryJobs,watchedJobs,ownedInterest} from '@/lib/discovery-data'
 import {browsingOrigin} from '@/lib/browsing-origin'
 export const dynamic='force-dynamic'
+function filledAgo(iso:string){
+ const days=Math.floor((Date.now()-new Date(iso).getTime())/86400000)
+ return days<=0?'today':days===1?'yesterday':days+' days ago'
+}
 export default async function JobsPage({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
  const {supabase,user,profile}=await requireProvider('/jobs'),params=await searchParams
  let f={...discoveryFilters(params),kind:''},locationLabel='your private profile location',origin=null as ReturnType<typeof coordinates>,error=false,watchError=false,locationError=false,providerDestination=''
@@ -24,6 +28,9 @@ export default async function JobsPage({searchParams}:{searchParams:Promise<Reco
  if(providerDestination)redirect(providerDestination)
  if(!params.sort&&origin)f.sort='nearest'   // default to nearest-first when a browsing location is set
  const needsLocation=(f.sort==='nearest'||!!f.radius)&&!origin,result=discover(rows,f,origin),href=(page:number)=>discoveryHref('/jobs',{...f,page})
+ // Privacy-safe recent activity (coarse category + area only), near the browsing origin.
+ let filled:{category:string;area:string;filled_at:string}[]=[],filledCount=0
+ try{const geo=origin?{p_lat:origin.latitude,p_lng:origin.longitude,p_radius_km:50}:{};const [rf,fc]=await Promise.all([supabase.rpc('recently_filled_jobs',{...geo,p_limit:12}),supabase.rpc('filled_jobs_count',geo)]);if(!rf.error&&Array.isArray(rf.data))filled=rf.data as {category:string;area:string;filled_at:string}[];if(!fc.error&&typeof fc.data==='number')filledCount=fc.data}catch{}
  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><header className="home-heading"><div><h1>Find local work</h1><p className="muted">Open jobs from people in your community</p></div><Link href="/jobs/new" className="lform-save">Post a job</Link></header><nav className="activity-segments" aria-label="Jobs views"><Link href="/jobs" aria-current="page">All jobs</Link><Link href="/jobs/saved">Saved</Link><Link href="/account/interests">Alerts</Link></nav>
  <DiscoverySearch filters={f} locationLabel={locationLabel} hasLocation={!!origin}/>{f.interest&&<p className="account-current">Viewing a saved search. Changing the search options starts a new search; your saved search stays unchanged.</p>}
  {watchError&&<p role="alert">Could not load saved-job status. Refresh before saving or removing jobs.</p>}
@@ -31,6 +38,7 @@ export default async function JobsPage({searchParams}:{searchParams:Promise<Reco
  <p className="muted">{result.count} matching job{result.count===1?'':'s'}</p>{!result.count?<div className="home-empty"><h2>{f.q?'No jobs match “'+f.q+'”':f.category||f.radius?'No jobs match these options':'No open jobs yet'}</h2><p>Try another word or clear the search options.</p><Link href="/jobs" className="card-link">Clear search & options</Link></div>:<div className="work-grid">{result.rows.map(j=><div className="job-card" key={j.id}><ListingCard href={'/jobs/'+j.id} ariaLabel={'View job: '+j.title} data={{title:j.title,description:j.description,photoUrl:j.photos?.[0] || categoryArtwork(j.category),category:j.category,priceLabel:j.price_type==='fixed'?nzMoney(j.price):'Open to offers',kindLabel:j.category}} footer={<p className="work-card-location">{j.location_area || j.location_name || 'Location to be arranged'}{j.distance!==null?' · About '+formatDistance(j.distance)+(j.discovery_location_approximate?' · town area':''):''}</p>}/>{!watchError&&j.requester_id!==user.id&&<SaveJobButton jobId={j.id} saved={watch.has(j.id)}/>}</div>)}</div>}
  {result.pages>1&&<nav className="lform-actions" aria-label="Job result pages">{result.page>1&&<Link href={href(result.page-1)} className="lform-cancel">Previous</Link>}<span>Page {result.page} of {result.pages}</span>{result.page<result.pages&&<Link href={href(result.page+1)} className="lform-cancel">Next</Link>}</nav>}
  <SaveSearch key={JSON.stringify(f)} filters={f} locationName={locationLabel}/>
+ {filled.length>0&&<section className="filled-strip" aria-label="Recently filled jobs"><h3>{origin?'Recently filled near you':'Recently filled'}</h3><div className="filled-tiles">{filled.map((r,i)=><span className="filled-tile" key={i}>{r.category} · {r.area} · Filled {filledAgo(r.filled_at)}</span>)}</div>{filledCount>0&&<p className="muted">{filledCount} job{filledCount===1?'':'s'} filled {origin?'near you':'across New Zealand'} this month</p>}</section>}
  </>}
  </section></AppShell>
 }

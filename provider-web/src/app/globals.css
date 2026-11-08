@@ -235,6 +235,12 @@ a.row:hover { background: var(--sage); }
 .job-bookmark.saved { color: var(--forest); background: var(--sage); }
 .job-bookmark:disabled { opacity: .6; cursor: default; }
 .job-bookmark:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+/* Recently-filled activity strip (non-interactive, coarse signals only). */
+.filled-strip { margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+.filled-strip h3 { margin: 0 0 10px; font-size: 15px; color: var(--forest-deep); }
+.filled-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.filled-tile { font-size: 12px; color: var(--muted); background: var(--sage); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+.filled-strip > .muted { margin-top: 10px; font-size: 13px; }
 .work-result h2 { margin: 0; font-size: 19px; }
 .work-search { margin: 24px 0; display: grid; gap: 10px; }
 .work-search label { font-size: 13px; font-weight: 700; }
