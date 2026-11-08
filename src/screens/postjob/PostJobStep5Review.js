@@ -1,5 +1,6 @@
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../../shared/formatting.js'
 import {publicAreaError} from '../../../shared/publicArea'
+import {localityFromAddress} from '../../../shared/locality'
 import {postingTextError} from '../../../shared/postingText'
 import {runSubmission} from '../../../shared/submission'
 import {moneyInputError} from '../../../shared/postingMoney'
@@ -256,7 +257,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       materials_type:    materialsType || null,
       access_conditions: accessConditions.length > 0 ? accessConditions : null,
       hide_exact_location: !!hideExactLocation,
-      location_area:       locationArea || null,
+      location_area:       (locationArea || localityFromAddress(jobAddress)) || null,
       repeated_from_job_id: repeatedFromJobId || null,
       recurrence_frequency: recurrenceFrequency || 'one_time',
     }

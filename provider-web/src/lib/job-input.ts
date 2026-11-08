@@ -1,4 +1,5 @@
 import {publicAreaError} from '@shared/publicArea'
+import {localityFromAddress} from '@shared/locality'
 import {postingTextError} from '@shared/postingText'
 import {moneyInputError} from '@shared/postingMoney'
 import {jobScheduleError,type JobSchedule} from '@shared/postingDates'
@@ -31,6 +32,6 @@ export function jobInput(d:FormData,context:{userId:string;jobId:string;baseUrl:
  const photos=[...new Set(d.getAll('photos').map(String))]
  const root=context.baseUrl+'/storage/v1/object/public/job-photos/'+context.jobId+'/'+context.userId+'/'
  if(photos.length>6||photos.some(photo=>{if(context.existingPhotos?.includes(photo))return false;try{return !new URL(photo).href.startsWith(root)}catch{return true}}))return {ok:false as const,error:'Choose up to six job photos to upload again.'}
- return {ok:true as const,value:{title,description,price_type:priceType,price:priceType==='fixed'?price:null,location_name:location||null,location_area:area||null,location_note:note||null,hide_exact_location:d.get('hide_exact_location')==='on',latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,schedule_type:schedule,scheduled_date:schedule==='specific'?date:null,date_from:schedule==='range'?from:null,date_to:schedule==='range'?to:null,materials_type:materials,access_conditions:access,photos}}
+ return {ok:true as const,value:{title,description,price_type:priceType,price:priceType==='fixed'?price:null,location_name:location||null,location_area:(area||localityFromAddress(location))||null,location_note:note||null,hide_exact_location:d.get('hide_exact_location')==='on',latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,schedule_type:schedule,scheduled_date:schedule==='specific'?date:null,date_from:schedule==='range'?from:null,date_to:schedule==='range'?to:null,materials_type:materials,access_conditions:access,photos}}
 }
 export function jobOwnerActions(status:string,offerCount:number){return {edit:status==='open',repeat:['completed','cancelled'].includes(status),delete:(status==='open'&&offerCount===0)||status==='cancelled'}}
