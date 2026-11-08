@@ -1,5 +1,6 @@
 'use server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
 import { loadActivityWork } from '@/lib/activity-data'
 import { workActions, workRole, type WorkAction } from '@/lib/activity-policy'
@@ -50,7 +51,9 @@ export async function reviewArrangement(_:ActionState,data:FormData):Promise<Act
     const result=existing?await supabase.from('reviews').update(payload).eq('id',existing.id).eq('reviewer_id',user.id).select('id'):await supabase.from('reviews').insert(payload).select('id')
     if(result.error)throw result.error
     if(!result.data?.length)return {error:'Your review could not be saved. Refresh and try again.'}
-    revalidatePath('/activity');revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath('/jobs/'+id)
-    return {error:'',success:'Your review has been saved.'}
+    revalidatePath('/activity');revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath('/jobs/'+id);revalidatePath('/bookings/'+id)
+    if(other)revalidatePath('/people/'+other+'/reviews')
   }catch{return {error:'Could not save your review. Your existing review is unchanged. Refresh and try again.'}}
+  // redirect() throws, so it must sit outside the try/catch.
+  redirect((kind==='job'?'/jobs/':'/bookings/')+encodeURIComponent(id)+'?reviewed=1#reviews')
 }

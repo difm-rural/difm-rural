@@ -18,8 +18,9 @@ import { ReviewsSection } from '@/components/work/reviews-section'
 // The booking workspace — the single home for a service booking: details,
 // schedule, management, reviews and the conversation (sticky side panel). Mirrors
 // the job workspace; bookings always have both participants so it's two-column.
-export default async function BookingWorkspace({params}:{params:Promise<{id:string}>}){
+export default async function BookingWorkspace({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{reviewed?:string}>}){
   const {id}=await params
+  const {reviewed}=await searchParams
   const {supabase,user,profile}=await requireProvider('/bookings/'+id)
   const work=await loadActivityWork(supabase,'booking',id)
   if(!work)notFound()
@@ -66,7 +67,7 @@ export default async function BookingWorkspace({params}:{params:Promise<{id:stri
     <BookingDetails booking={work.booking!} userId={user.id}/>
     {work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
     <ManageActions kind="booking" id={id} actions={actions} otherFirst={otherFirst}/>
-    {work.status==='completed'&&<ReviewsSection kind="booking" id={id} actions={actions} personName={person?.full_name || null} received={received} ownReview={ownReview} reviewError={reviewError}/>}
+    {work.status==='completed'&&<ReviewsSection kind="booking" id={id} actions={actions} personName={person?.full_name || null} personId={other} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'}/>}
     {work.status==='completed'&&<p className="home-clear">Booking complete. You can find it again in History.</p>}
   </>
 

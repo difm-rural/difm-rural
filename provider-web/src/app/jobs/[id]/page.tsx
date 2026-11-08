@@ -20,9 +20,9 @@ import { ManageActions } from '@/components/work/manage-actions'
 import { ReviewsSection } from '@/components/work/reviews-section'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
-export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[]}>}){
+export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string}>}){
  const {id}=await params
- const {thread}=await searchParams
+ const {thread,reviewed}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
@@ -125,7 +125,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {((own&&(ownerActions.edit||ownerActions.repeat))||canAskQuestion||job.status==='open')&&<div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>}
   {job.status==='open'?<>{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
-  {job.status==='completed'&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} received={received} ownReview={ownReview} reviewError={reviewError}/>}
+  {job.status==='completed'&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'}/>}
   {job.status==='completed'&&<p className="home-clear">Job complete. You can find it again in History.</p>}
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}
  </>
