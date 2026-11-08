@@ -1,6 +1,6 @@
 import {formatMoney as nzMoney} from '../../../shared/formatting.js'
 import { resolvePublicJobLocations } from '../../lib/jobDiscovery'
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   FlatList,
@@ -45,6 +45,11 @@ function jobMatchesSearch(job, query) {
   return [job.title, job.description, job.category, job.location_area, job.location_name].some(
     v => String(v || '').toLowerCase().includes(q)
   )
+}
+
+function filledAgo(iso) {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  return days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`
 }
 
 // A compact pill that opens a small option sheet — used for sort + distance.
@@ -111,8 +116,25 @@ export default function JobsTabScreen({ navigation }) {
   const [saving, setSaving]           = useState(false)
   const userIdRef = useRef(null)
   const loadingRef = useRef(false)
+  const [filled, setFilled] = useState([])
+  const [filledCount, setFilledCount] = useState(0)
 
   useFocusEffect(useCallback(() => { load() }, []))
+
+  // Privacy-safe recent activity (coarse category + area only), near the device coords.
+  useEffect(() => {
+    let alive = true
+    const geo = coords ? { p_lat: coords.latitude, p_lng: coords.longitude, p_radius_km: 50 } : {}
+    Promise.all([
+      supabase.rpc('recently_filled_jobs', { ...geo, p_limit: 12 }),
+      supabase.rpc('filled_jobs_count', geo),
+    ]).then(([rf, fc]) => {
+      if (!alive) return
+      if (!rf.error && Array.isArray(rf.data)) setFilled(rf.data)
+      if (!fc.error && typeof fc.data === 'number') setFilledCount(fc.data)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [coords?.latitude, coords?.longitude])
 
   async function load() {
     if (loadingRef.current) return
@@ -544,6 +566,15 @@ export default function JobsTabScreen({ navigation }) {
           </View>
         )}
         ListEmptyComponent={renderEmpty()}
+        ListFooterComponent={filled.length > 0 ? (
+          <View style={styles.filledStrip}>
+            <Text style={styles.filledTitle}>{coords ? 'Recently filled near you' : 'Recently filled'}</Text>
+            <View style={styles.filledTiles}>
+              {filled.map((r, i) => <Text key={i} style={styles.filledTile}>{r.category} · {r.area} · Filled {filledAgo(r.filled_at)}</Text>)}
+            </View>
+            {filledCount > 0 && <Text style={styles.filledCount}>{filledCount} job{filledCount === 1 ? '' : 's'} filled {coords ? 'near you' : 'across New Zealand'} this month</Text>}
+          </View>
+        ) : null}
         contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
@@ -557,6 +588,12 @@ export default function JobsTabScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+
+  filledStrip: { paddingHorizontal: 16, paddingTop: 18, marginTop: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  filledTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 10 },
+  filledTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filledTile: { fontSize: 12, color: colors.textSecondary, backgroundColor: '#eef5ef', borderColor: colors.border, borderWidth: 1, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, overflow: 'hidden' },
+  filledCount: { fontSize: 13, color: colors.textMuted, marginTop: 10 },
 
   header: {
     backgroundColor: colors.background,
