@@ -18,11 +18,12 @@ import { loadConversation } from '@/lib/messaging-data'
 import { Conversation } from '@/components/conversation/conversation'
 import { ManageActions } from '@/components/work/manage-actions'
 import { ReviewsSection } from '@/components/work/reviews-section'
+import { PostFeedback } from '@/components/post-feedback'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
-export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string}>}){
+export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string}>}){
  const {id}=await params
- const {thread,reviewed}=await searchParams
+ const {thread,reviewed,posted}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
@@ -116,6 +117,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const invitedSection=own?<section className="card"><h2>Invited providers</h2>{sentInviteError?<p role="alert">Could not load invitations. Refresh to try again.</p>:sentInvites?.length?sentInvites.map(i=><p key={i.id}><Link href={'/people/'+i.provider_id} className="card-link">{names.get(i.provider_id) || 'Previous provider'}</Link> · {offers?.some(b=>b.provider_id===i.provider_id)?'Offer received':i.status==='declined'?'Invitation declined':i.status==='seen'?'Opened — awaiting an offer':'Invitation sent'}</p>):<p className="muted">No providers invited yet.</p>}{job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider →</Link>}</section>:null
 
  const mainColumn=<>
+  {posted==='1'&&own&&<PostFeedback jobId={id}/>}
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}><strong>{next.label}</strong><span>{next.detail}</span></div>}
   {job.visibility==='invite_only'&&<p className="account-current">Private invited job — visible to the requester and invited providers.</p>}
   {job.status==='open'&&!own&&(watchError?<p role="alert">Could not check saved-job status. Refresh before saving.</p>:<ActionForm action={saveWatchedJob} label={watched?'Remove saved job':'Save job'}><input name="job_id" type="hidden" value={id}/><input name="intent" type="hidden" value={watched?'remove':'save'}/></ActionForm>)}
