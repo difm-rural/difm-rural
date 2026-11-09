@@ -44,15 +44,30 @@ export default async function HomePage() {
   const total = (jobs.data || []).length + pendingOffers + workCount
   const name = profile?.full_name?.trim().split(/\s+/)[0] || 'there'
   const jobActions = [
-    {title:'Post a job',text:'Describe the work and get local help',href:'/jobs/new',primary:true,icon:Plus},
-    {title:'Find jobs',text:'Browse open rural work nearby',href:'/jobs',primary:false,icon:Search},
+    {title:'Post a job',text:'Get local help with a job',href:'/jobs/new',primary:true,icon:Plus},
+    {title:'Find jobs',text:'Open work nearby',href:'/jobs',primary:false,icon:Search},
   ]
   const listingActions = [
-    {title:'Find listings',text:'Services, grazing, gear and goods near you',href:'/browse',primary:false,icon:Search},
-    {title:'Create a listing',text:'Advertise a service, grazing, gear, space or goods',href:'/listings/new',primary:false,icon:Plus},
+    {title:'Find listings',text:'Listings near you',href:'/browse',primary:false,icon:Search},
+    {title:'Create a listing',text:'Advertise what you offer',href:'/listings/new',primary:false,icon:Plus},
   ]
   const pending = (bookings.data || []).filter(b => (b.provider_id === user.id && ['pending','cancellation_requested'].includes(b.status)) || (b.requester_id === user.id && b.status === 'quote_sent'))
   const attention = (notifications.data || []).filter(n => !INFORMATIONAL_NOTICES.has(n.type) && (n.type === 'new_message' || !pending.some(b => b.id === n.metadata?.booking_id)))
+  const caughtUp = !notifications.error && !bookings.error && !pending.length && !attention.length
+  // Nothing on the go at all → show only the "No active work yet" empty state.
+  const nothingAtAll = !hasError && total === 0 && !seasonal.length
+  const activityTiles = [
+    {label:'Active jobs posted',count:jobs.error ? null : jobs.data?.length || 0},
+    {label:'Offers on open jobs',count:offers.error || offerJobs.error ? null : pendingOffers},
+    {label:'Work & requests',count:bookings.error || offerJobs.error ? null : workCount},
+  ]
+  const visibleTiles = activityTiles.filter(t => (t.count ?? 0) > 0)
+  // One-line "all caught up" summary: first non-zero of posts / offers / work.
+  const statusSummary =
+    (!jobs.error && (jobs.data?.length || 0) > 0) ? `${jobs.data!.length} job${jobs.data!.length === 1 ? '' : 's'} posted` :
+    (!offers.error && !offerJobs.error && pendingOffers > 0) ? `${pendingOffers} offer${pendingOffers === 1 ? '' : 's'} waiting` :
+    (!bookings.error && !offerJobs.error && workCount > 0) ? `${workCount} in progress` :
+    null
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page">
     <header className="home-heading"><div><h1>What needs doing?</h1><p className="muted">{hasError ? 'Good to see you, ' + name : total ? total + ' active item' + (total === 1 ? '' : 's') + ' on the go' : 'Good to see you, ' + name}</p></div><LiveRefresh /></header>
     {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Welcome to Rural Connections</h2><p>Add your public name and town or region so people know who they are arranging work with.</p><Link href="/setup" className="card-link">Finish your profile →</Link><p className="muted">You can explore first and return here later.</p></section>}
@@ -68,15 +83,20 @@ export default async function HomePage() {
     </div>
     {hasError && <div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
     <div className="home-columns"><div>
-      <section className="card home-attention"><div className="card-head"><h2>Needs attention</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link><Link href="/notifications" className="card-link">All notifications</Link></div>
-        {!notifications.error && !bookings.error && !pending.length && !attention.length ? <p className="home-clear"><CheckCircle2 size={20}/> All caught up — nothing waiting on you.</p> : <ul className="list">
-          {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;const tag = b.provider_id === user.id ? 'YOUR LISTING' : 'LISTING';return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><span className="attention-icon listing"><Bell size={18}/></span><span className="row-main"><span className="side-tag listing">{tag}</span><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">Waiting on you</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
-          {attention.slice(0,5).map(n => { const side = notificationSide(n); const tag = sideTag(side, n);return <li key={n.id}><Link className="row" href={notificationHref(n)}>{side ? <span className={'attention-icon ' + side}><MessageSquare size={18}/></span> : <MessageSquare size={20}/>}<span className="row-main">{tag && <span className={'side-tag ' + side}>{tag}</span>}<strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>})}
-        </ul>}
-      </section>
-      <section className="home-activity"><h2>Your activity</h2>{(hasError || total > 0) && <div className="home-stats">{[{label:'Active jobs posted',count:jobs.error ? null : jobs.data?.length || 0},{label:'Offers on open jobs',count:offers.error || offerJobs.error ? null : pendingOffers},{label:'Work & requests',count:bookings.error || offerJobs.error ? null : workCount}].map(t => <Link href="/activity" className="home-stat" key={t.label}><strong>{t.count ?? '—'}</strong><span>{t.label}</span></Link>)}</div>}
-        {!hasError && total === 0 && <div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or browse listings to get started.</p></div>}
-      </section>
+      {caughtUp && !nothingAtAll
+        ? <Link href="/activity" className="card home-status"><CheckCircle2 size={20}/><span className="home-status-text"><strong>All caught up</strong>{statusSummary && <span className="muted"> · {statusSummary}</span>}</span><span className="home-status-link">Activity ›</span></Link>
+        : caughtUp
+        ? null
+        : <>
+          <section className="card home-attention"><div className="card-head"><h2>Needs attention</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link><Link href="/notifications" className="card-link">All notifications</Link></div>
+            <ul className="list">
+              {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;const tag = b.provider_id === user.id ? 'YOUR LISTING' : 'LISTING';return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><span className="attention-icon listing"><Bell size={18}/></span><span className="row-main"><span className="side-tag listing">{tag}</span><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">Waiting on you</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
+              {attention.slice(0,5).map(n => { const side = notificationSide(n); const tag = sideTag(side, n);return <li key={n.id}><Link className="row" href={notificationHref(n)}>{side ? <span className={'attention-icon ' + side}><MessageSquare size={18}/></span> : <MessageSquare size={20}/>}<span className="row-main">{tag && <span className={'side-tag ' + side}>{tag}</span>}<strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>})}
+            </ul>
+          </section>
+          {visibleTiles.length > 0 && <section className="home-activity"><h2>Your activity</h2><div className="home-stats">{visibleTiles.map(t => <Link href="/activity" className="home-stat" key={t.label}><strong>{t.count ?? '—'}</strong><span>{t.label}</span></Link>)}</div></section>}
+        </>}
+      {nothingAtAll && <div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or browse listings to get started.</p></div>}
       <SeasonalReminders campaigns={seasonal}/>
     </div><aside className="home-aside">
       <Link href="/connections" className="card home-quick"><UsersRound size={22}/><span><strong>Connections</strong><small>People you’ve worked with · Job invitations</small></span><ArrowRight size={17}/></Link>
