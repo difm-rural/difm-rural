@@ -23,6 +23,19 @@ export const colors = {
   success:        '#2d6a4f',
   successLight:   '#e8f5e9',
   amber:          '#FFD700',
+
+  // Marketplace side colours. Amber = jobs (work someone wants done),
+  // blue = listings (what locals are offering). Green stays for buttons and
+  // the selected tab. *Ink shades are for text only — never put jobIcon
+  // (#ba7517) or listingIcon (#1565c0) on small text (fails contrast).
+  jobFill:        '#fbefd9',
+  jobLine:        '#ecd3a3',
+  jobIcon:        '#ba7517',
+  jobInk:         '#7a4f00',
+  listingFill:    '#e6eef9',
+  listingLine:    '#bcd0ea',
+  listingIcon:    '#1565c0',
+  listingInk:     '#0f4c94',
 }
 
 export const spacing = {
