@@ -180,26 +180,11 @@ export default function PostJobStep5Review({ navigation, route }) {
     navigation.goBack()
   }
 
-  const TAB_ROOTS = { Home: 'Dashboard', Jobs: 'JobsBoard', Browse: 'BrowseMain', Activity: 'ActivityMain' }
-
   // Reset the current stack to its root screen, clearing the whole wizard so
   // Back never walks back through the steps. Used after an edit save.
   function goToStackRoot() {
     const rootName = navigation.getState()?.routes?.[0]?.name
     if (rootName) navigation.reset({ index: 0, routes: [{ name: rootName }] })
-  }
-
-  // After a successful post: wipe the wizard out of the Jobs stack and land on
-  // a real tab root — the launching tab, or Home by default. (A new-post wizard
-  // always lives in the Jobs stack, so JobsBoard is a safe explicit target;
-  // navigate(rootName) was unreliable because nested launches can leave the
-  // wizard screen itself as the stack root.)
-  function returnAfterPost() {
-    const origin = route.params?.origin
-    const parent = navigation.getParent()
-    navigation.reset({ index: 0, routes: [{ name: 'JobsBoard' }] })
-    const destTab = TAB_ROOTS[origin] ? origin : 'Home'
-    if (destTab !== 'Jobs') parent?.navigate(destTab, { screen: TAB_ROOTS[destTab] })
   }
 
   function handleEditRow(popCount) {
@@ -328,9 +313,14 @@ export default function PostJobStep5Review({ navigation, route }) {
             ? `${who} has been invited, and your job is also on the public board.`
             : `${who} has been invited. Only they can see this job.`)
         : 'Your job is live. Providers with matching capabilities and travel areas can now find it.'
-    Alert.alert(successTitle, successBody, [
-      { text: 'OK', onPress: returnAfterPost },
-    ])
+    // A new post lands on the "Job posted" screen (confirmation + ease rating),
+    // which ends in the same returnAfterPost behaviour via its returnTo param.
+    navigation.replace('JobPosted', {
+      jobId: newJob.id,
+      title: successTitle,
+      body: successBody,
+      returnTo: route.params?.origin,
+    })
     return true
   }
 
