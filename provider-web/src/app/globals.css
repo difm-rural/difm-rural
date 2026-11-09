@@ -202,9 +202,9 @@ a.row:hover { background: var(--sage); }
 /* Marketplace side colours — amber = jobs (wanted), blue = listings (offered).
    Green stays for the primary button; every colour comes with a word. */
 .home-groups { display: grid; gap: 14px; margin-bottom: 30px; }
-.home-group { border: 1px solid; border-radius: 14px; padding: 14px; }
-.home-group.job { background: var(--job-fill); border-color: var(--job-line); }
-.home-group.listing { background: var(--listing-fill); border-color: var(--listing-line); }
+.home-group { border-radius: 14px; padding: 14px; }
+.home-group.job { background: var(--job-fill); }
+.home-group.listing { background: var(--listing-fill); }
 .home-group-head { display: flex; align-items: center; gap: 9px; margin: 2px 2px 12px; }
 .home-group-icon { flex: none; width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; }
 .home-group.job .home-group-icon { background: var(--job-icon); }
@@ -213,8 +213,7 @@ a.row:hover { background: var(--sage); }
 .home-group.job .home-group-head h2 { color: var(--job-ink); }
 .home-group.listing .home-group-head h2 { color: var(--listing-ink); }
 .home-group .home-actions { margin-bottom: 0; }
-.home-group.job .home-action:not(.primary) { border-color: var(--job-line); }
-.home-group.listing .home-action:not(.primary) { border-color: var(--listing-line); }
+.home-group .home-action:not(.primary) { border: none; }
 
 /* Attention rows — tinted icon circle + YOUR JOB / YOUR LISTING tag */
 .attention-icon { flex: none; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; }
@@ -237,6 +236,12 @@ a.row:hover { background: var(--sage); }
 .home-attention .row-main { flex: 1; }
 .home-attention .row-snippet { white-space: normal; }
 .home-clear { display: flex; align-items: center; gap: 10px; color: var(--forest); font-size: 14px; line-height: 1.6; }
+/* Compact "all caught up" status row (replaces attention card + tiles) */
+.home-status { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 16px; }
+.home-status > svg:first-child { flex: none; color: var(--forest); }
+.home-status-text { flex: 1; min-width: 0; font-size: 14px; }
+.home-status-text strong { color: var(--ink); }
+.home-status-link { flex: none; color: var(--forest); font-size: 13px; font-weight: 800; }
 .home-activity { margin-top: 26px; }
 .home-activity h2 { font-size: 18px; }
 .home-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
@@ -626,19 +631,23 @@ a.row:hover { background: var(--sage); }
 
 .seasonal-section { margin: 24px 0; }
 .seasonal-section h2 { font-size: 20px; }
-.seasonal-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 16px; }
+.seasonal-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 16px; }
 .seasonal-card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white; }
-.seasonal-image { position: relative; height: 130px; background: var(--sage); }
-.seasonal-image img { width: 100%; height: 100%; object-fit: cover; }
+.seasonal-image { position: relative; height: 112px; background: var(--sage); display: grid; place-items: center; }
+.seasonal-art { color: var(--forest); opacity: .6; }
 .seasonal-label { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 20px; background: #fffffff0; color: var(--forest); font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: .07em; }
-.seasonal-dismiss { position: absolute; right: 8px; top: 8px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fffffff0; color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.seasonal-dismiss { position: absolute; right: 6px; top: 6px; width: 44px; height: 44px; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
+.seasonal-dismiss-circle { width: 28px; height: 28px; border-radius: 50%; background: #fff; display: grid; place-items: center; color: var(--ink); }
 .seasonal-dismiss:disabled { opacity: .6; cursor: wait; }
 .seasonal-body { padding: 16px; }
-.seasonal-body h3 { margin: 4px 0 8px; font-size: 18px; }
+.seasonal-body h3 { margin: 4px 0 8px; font-size: 16px; line-height: 1.3; font-weight: 700; }
 .seasonal-body p { font-size: 13px; line-height: 1.6; }
 .seasonal-body .eyebrow { font-size: 10px; }
-.seasonal-body .seasonal-suggestion { font-size: 12px; }
-.seasonal-body .lform-save { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; }
+.seasonal-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.seasonal-action { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 800; margin-top: 4px; }
+.seasonal-action.job { background: var(--job-fill); color: var(--job-ink); }
+.seasonal-action.listing { background: var(--listing-fill); color: var(--listing-ink); }
+.seasonal-action.neutral { background: var(--canvas); color: var(--ink); }
 
 .publishing-location-dialog { max-width: min(480px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 14px; padding: 24px; color: var(--ink); background: var(--paper); }
 .publishing-location-dialog::backdrop { background: #0008; }

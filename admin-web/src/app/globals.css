@@ -301,6 +301,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .campaign-form textarea { resize: vertical; line-height: 1.5; }
 .campaign-form input:focus, .campaign-form select:focus, .campaign-form textarea:focus { border-color: var(--forest); box-shadow: 0 0 0 3px rgba(36,92,69,.08); }
 .full-field { grid-column: 1 / -1; }
+.case-hint { margin: 7px 0 0; display: flex; align-items: center; gap: 6px; color: var(--amber); font-size: 11px; font-weight: 600; line-height: 1.4; }
 .campaign-form fieldset { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; margin: 24px 0 0; padding: 17px; border: 1px solid var(--line); border-radius: 10px; }
 .campaign-form legend { padding: 0 7px; color: var(--muted); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .campaign-form fieldset label { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; }

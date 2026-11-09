@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CATEGORIES, AUDIENCES, CAMPAIGN_ACTIONS } from '@/lib/categories'
 import { saveCampaign } from '@/app/campaigns/actions'
+import { CampaignTextField } from '@/components/campaign-text-field'
 
 type Campaign = Record<string, unknown> & { id?: string; title?: string; body?: string; category?: string; capability?: string; audience?: string; regions?: string[]; starts_on?: string; ends_on?: string; primary_action?: string; priority?: number; in_app_enabled?: boolean; email_enabled?: boolean; push_enabled?: boolean; is_active?: boolean }
 
@@ -12,8 +13,8 @@ export function CampaignForm({ campaign = {} }: { campaign?: Campaign }) {
     <form action={saveCampaign} className="campaign-form">
       <input type="hidden" name="id" value={campaign.id || ''} />
       <div className="form-grid">
-        <label className="full-field"><span>Campaign title</span><input name="title" defaultValue={campaign.title || ''} placeholder="Prepare your water system for summer" maxLength={100} required /></label>
-        <label className="full-field"><span>Message</span><textarea name="body" defaultValue={campaign.body || ''} placeholder="Explain why this reminder is useful now." maxLength={300} required rows={4} /></label>
+        <CampaignTextField name="title" label="Campaign title" defaultValue={campaign.title || ''} placeholder="Prepare your water system for summer" maxLength={100} required />
+        <CampaignTextField name="body" label="Message" defaultValue={campaign.body || ''} placeholder="Explain why this reminder is useful now." maxLength={300} required textarea rows={4} />
         <label><span>Category</span><select name="category" defaultValue={campaign.category || CATEGORIES[0]}>{CATEGORIES.map(category => <option key={category}>{category}</option>)}</select></label>
         <label><span>Suggested capability</span><input name="capability" defaultValue={campaign.capability || ''} placeholder="Optional" /></label>
         <label><span>Audience</span><select name="audience" defaultValue={campaign.audience || 'requester'}>{AUDIENCES.map(audience => <option key={audience} value={audience}>{audience}</option>)}</select></label>
