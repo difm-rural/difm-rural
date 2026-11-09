@@ -149,9 +149,15 @@ export default function BrowseTabScreen({ navigation }) {
   return (
     <View style={styles.screen}>
 
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
+        <View style={[styles.sideStrip, { backgroundColor: colors.listingIcon }]} />
+      </View>
+      <View style={[styles.header, { paddingTop: 12 }]}>
         <View style={styles.brandRow}>
-          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
+          <View style={styles.brandSide}>
+            <Icon name="pricetag" size={14} color={colors.listingInk} />
+            <Text style={[styles.brandLabel, styles.listingBrandLabel]}>LISTINGS · OFFERED</Text>
+          </View>
           <TouchableOpacity
             style={styles.helpBtn}
             onPress={() => navigation.navigate('HowItWorks')}
@@ -250,6 +256,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 6,
   },
+  sideStrip: { height: 5, width: '100%' },
+  brandSide: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  listingBrandLabel: { color: colors.listingInk, marginBottom: 0 },
   title: {
     fontSize: 28,
     fontWeight: '700',

@@ -64,6 +64,7 @@ All notifications are created by **database triggers** (`supabase/legacy-sql/not
 | `reviews` | per job OR booking; `reviewer_role`/`reviewee_role`, `rating`, `comment`; publicly readable |
 | `job_questions` | public Q&A on jobs | 
 | `notifications` | `user_id`, `type`, `body`, `metadata` jsonb, `read` |
+| `flow_feedback` | post-flow ease ratings (`flow`, `ease` 1–5, `comment`, `platform`, `app_version`, `subject_id`); users insert own rows only, admins read (RLS `current_user_is_admin()`), no client select/update/delete |
 | `watchlist`, `user_preferences`, `user_activity`, `job_checkins` | |
 
 Base tables (`jobs`, `profiles`, `bids`, `messages`, etc.) were created directly in Supabase and are captured in the baseline migration rather than individual ones.

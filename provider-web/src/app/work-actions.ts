@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireProvider } from '@/lib/auth'
 import { JOB_EDITOR_COLUMNS, jobInput, jobOwnerActions, validId, type JobSeed } from '@/lib/job-input'
+import { validateFlowFeedback } from '@shared/flowFeedback'
 import type { ActionState } from '@/components/action-form'
 import { offerInput } from '@/lib/offer-input'
 import { pricingRevision, pricingSnapshot, bookingResponseActions } from '@/lib/booking-detail'
@@ -61,6 +62,18 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   }
   for(const path of ['/','/jobs','/jobs/'+id,'/activity','/activity/job/'+id+'/manage'])revalidatePath(path)
   return {error:'',jobId:id}
+}
+
+// Records the post-job ease rating shown on the "Job posted" screen. Feedback is
+// optional and must never block the user, so this swallows every error and
+// returns nothing — the client dismisses the prompt regardless.
+export async function sendFlowFeedback(input:{subjectId:string;ease:number;comment:string}):Promise<void>{
+ try{
+  const {supabase,user}=await requireProvider()
+  const check=validateFlowFeedback({ease:input.ease,comment:input.comment})
+  if(!check.ok)return
+  await supabase.from('flow_feedback').insert({user_id:user.id,flow:'post_job',subject_id:validId(input.subjectId)?input.subjectId:null,ease:check.value.ease,comment:check.value.comment,platform:'web',app_version:null})
+ }catch{/* feedback must never block the user */}
 }
 
 export async function removeJob(_:ActionState,data:FormData):Promise<ActionState>{

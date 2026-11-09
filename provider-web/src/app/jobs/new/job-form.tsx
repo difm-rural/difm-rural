@@ -52,7 +52,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
    else sessionStorage.removeItem(key)
   }catch{}
  },[draft,jobId,key,ready,saved,baseline,state.jobId])
- useEffect(()=>{if(state.error){checkingLocation.current=false;Promise.resolve().then(()=>setSubmitting(false))}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId);router.refresh()}},[state,key,router])
+ useEffect(()=>{if(state.error){checkingLocation.current=false;Promise.resolve().then(()=>setSubmitting(false))}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'':'?posted=1'));router.refresh()}},[state,key,router,mode])
  useEffect(()=>{heading.current?.focus();heading.current?.scrollIntoView({block:'start'})},[step])
  const set=<K extends keyof Draft>(name:K,value:Draft[K])=>setDraft(d=>({...d,[name]:value}))
  function stepIssues(index:number):Record<string,string>{

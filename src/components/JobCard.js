@@ -64,6 +64,10 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
       )}
 
       <View style={styles.content}>
+        <View style={styles.tagRow}>
+          <View style={styles.sideTag}><Text style={styles.sideTagText}>Job</Text></View>
+          {!!job.category && <Text style={styles.tagCategory} numberOfLines={1}>{job.category}</Text>}
+        </View>
         <Text style={styles.title} numberOfLines={2}>{job.title}</Text>
         <Text style={styles.meta} numberOfLines={1}>{meta}</Text>
         <View style={styles.bottomRow}>
@@ -116,11 +120,15 @@ const styles = StyleSheet.create({
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
   content: { flex: 1, minWidth: 0 },
+  tagRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  sideTag: { backgroundColor: colors.jobFill, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  sideTagText: { fontSize: 11, fontWeight: '700', color: colors.jobInk },
+  tagCategory: { flexShrink: 1, fontSize: 11, color: colors.textMuted, textTransform: 'capitalize' },
   title:   { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
   meta:    { fontSize: 12, color: colors.textMuted, marginBottom: 8 },
 
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  budget:    { fontSize: 13, fontWeight: '700', color: colors.primary },
+  budget:    { fontSize: 13, fontWeight: '700', color: colors.jobInk },
 
   offerPill:     { backgroundColor: colors.primaryLight, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   offerPillText: { fontSize: 11, fontWeight: '700', color: colors.primary },

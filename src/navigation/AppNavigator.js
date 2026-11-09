@@ -37,6 +37,7 @@ import PostJobStep2Location from '../screens/postjob/PostJobStep2Location'
 import PostJobStep3Details  from '../screens/postjob/PostJobStep3Details'
 import PostJobStep4Budget   from '../screens/postjob/PostJobStep4Budget'
 import PostJobStep5Review   from '../screens/postjob/PostJobStep5Review'
+import JobPostedScreen      from '../screens/postjob/JobPostedScreen'
 import { PostJobProvider }  from '../context/PostJobContext'
 import { useUser }          from '../context/UserContext'
 
@@ -95,6 +96,7 @@ function HomeStackNav() {
       <HomeNav.Screen name="PostJobStep3Details"  component={PostJobStep3Details}  />
       <HomeNav.Screen name="PostJobStep4Budget"   component={PostJobStep4Budget}   />
       <HomeNav.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
+      <HomeNav.Screen name="JobPosted"            component={JobPostedScreen}      />
       <HomeNav.Screen name="JobFeed"             component={JobFeedScreen}        />
       <HomeNav.Screen name="ManageTask"         component={ManageTaskScreen}     />
       <HomeNav.Screen name="JobDetail"     component={JobDetailScreen}     />
@@ -127,6 +129,7 @@ function JobsStackNav() {
       <JobsNav.Screen name="PostJobStep3Details"  component={PostJobStep3Details}  />
       <JobsNav.Screen name="PostJobStep4Budget"   component={PostJobStep4Budget}   />
       <JobsNav.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
+      <JobsNav.Screen name="JobPosted"            component={JobPostedScreen}      />
       <JobsNav.Screen name="JobDetail"            component={JobDetailScreen}      />
       <JobsNav.Screen name="SavedInterests"        component={SavedInterestsScreen} />
       <JobsNav.Screen name="ManageTask"           component={ManageTaskScreen}     />
@@ -178,6 +181,7 @@ function ActivityStackNav() {
       <ActivityNav.Screen name="PostJobStep3Details"  component={PostJobStep3Details}  />
       <ActivityNav.Screen name="PostJobStep4Budget"   component={PostJobStep4Budget}   />
       <ActivityNav.Screen name="PostJobStep5Review"   component={PostJobStep5Review}   />
+      <ActivityNav.Screen name="JobPosted"            component={JobPostedScreen}      />
       <ActivityNav.Screen name="MyJobs"        component={MyJobsScreen}        />
       <ActivityNav.Screen name="JobDetail"     component={JobDetailScreen}     />
       <ActivityNav.Screen name="Chat"          component={ChatScreen}          />
@@ -264,7 +268,12 @@ function TabIcon({ name, active, avatarUrl }) {
     return <Icon name={active ? 'person-circle' : 'person-circle-outline'} size={26} color={c} />
   }
   const [outline, filled] = TAB_ICONS[name] || ['ellipse-outline', 'ellipse']
-  return <Icon name={active ? filled : outline} size={24} color={c} />
+  // The marketplace-side tabs are always colour-coded (amber = Jobs, blue =
+  // Listings), active or not; the label below keeps the grey/green active state.
+  const iconColor = name === 'Jobs' ? colors.jobIcon
+    : name === 'Browse' ? colors.listingIcon
+    : c
+  return <Icon name={active ? filled : outline} size={24} color={iconColor} />
 }
 
 function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBadge, clearJobsBadge, clearServicesBadge }) {

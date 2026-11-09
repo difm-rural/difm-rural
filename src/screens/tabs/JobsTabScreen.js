@@ -445,8 +445,14 @@ export default function JobsTabScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
+        <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
+          <View style={[styles.sideStrip, { backgroundColor: colors.jobIcon }]} />
+        </View>
+        <View style={[styles.header, { paddingTop: 12 }]}>
+          <View style={styles.brandSide}>
+            <Icon name="briefcase" size={14} color={colors.jobInk} />
+            <Text style={[styles.brandLabel, styles.jobBrandLabel]}>JOBS · WANTED</Text>
+          </View>
           <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         </View>
         <View style={{ padding: 16 }}>
@@ -510,9 +516,15 @@ export default function JobsTabScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
+        <View style={[styles.sideStrip, { backgroundColor: colors.jobIcon }]} />
+      </View>
+      <View style={[styles.header, { paddingTop: 12 }]}>
         <View style={styles.brandRow}>
-          <Text style={styles.brandLabel}>RURAL CONNECTIONS</Text>
+          <View style={styles.brandSide}>
+            <Icon name="briefcase" size={14} color={colors.jobInk} />
+            <Text style={[styles.brandLabel, styles.jobBrandLabel]}>JOBS · WANTED</Text>
+          </View>
           <TouchableOpacity
             style={styles.helpBtn}
             onPress={() => navigation.navigate('HowItWorks')}
@@ -601,6 +613,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   brandLabel:  { color: colors.accent, fontSize: 12, letterSpacing: 1.5, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6 },
+  sideStrip:   { height: 5, width: '100%' },
+  brandSide:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  jobBrandLabel: { color: colors.jobInk, marginBottom: 0 },
   brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12 },
   helpBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   helpText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
