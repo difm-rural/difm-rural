@@ -1,4 +1,5 @@
 import {notificationBody} from '../../../shared/notificationBody'
+import {notificationSide, sideTag} from '../../../shared/marketSide'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
 import React, { useCallback, useState } from 'react'
 import {
@@ -32,11 +33,15 @@ import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalR
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
 import { fetchActionableNextMoves } from '../../lib/nextMove'
 
-function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
+function PrimaryAction({ title, subtitle, onPress, variant = 'primary', borderColor }) {
   const isPrimary = variant === 'primary'
   return (
     <TouchableOpacity
-      style={[styles.actionCard, isPrimary ? styles.primaryAction : styles.secondaryAction]}
+      style={[
+        styles.actionCard,
+        isPrimary ? styles.primaryAction : styles.secondaryAction,
+        !isPrimary && borderColor ? { borderColor } : null,
+      ]}
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
@@ -246,37 +251,59 @@ export default function HomeTabScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
 
-        {/* Request — everyone can do this */}
-        <View style={styles.actionsGrid}>
-          <PrimaryAction
-            title="Post a job"
-            subtitle="Describe the work and get local help"
-            onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })}
-          />
-          <PrimaryAction
-            title="Browse listings"
-            subtitle="Find rural listings near you"
-            variant="secondary"
-            onPress={() => navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })}
-          />
+        {/* Jobs — work someone needs done (amber) */}
+        <View style={[styles.sidePanel, styles.jobPanel]}>
+          <View style={styles.sidePanelHead}>
+            <View style={[styles.sidePanelIcon, { backgroundColor: colors.jobIcon }]}>
+              <Icon name="briefcase" size={15} color={colors.white} />
+            </View>
+            <Text style={[styles.sidePanelLabel, { color: colors.jobInk }]}>Jobs · work someone needs done</Text>
+          </View>
+          <View style={[styles.actionsGrid, styles.panelGrid]}>
+            <PrimaryAction
+              title="Post a job"
+              subtitle="Describe the work and get local help"
+              onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })}
+            />
+            {isProvider && (
+              <PrimaryAction
+                title="Find jobs"
+                subtitle="Browse open rural work nearby"
+                variant="secondary"
+                borderColor={colors.jobLine}
+                onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'JobsBoard' })}
+              />
+            )}
+          </View>
         </View>
 
-        {/* Provide — only if the user offers services / does jobs */}
-        {isProvider && (
-          <View style={styles.actionsGrid}>
-            <PrimaryAction
-              title="Find jobs"
-              subtitle="Browse open rural work nearby"
-              onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'JobsBoard' })}
-            />
-            <PrimaryAction
-              title="Create a listing"
-              subtitle="Advertise a service, grazing, gear, space or goods"
-              variant="secondary"
-              onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
-            />
+        {/* Listings — what locals are offering (blue) */}
+        <View style={[styles.sidePanel, styles.listingPanel]}>
+          <View style={styles.sidePanelHead}>
+            <View style={[styles.sidePanelIcon, { backgroundColor: colors.listingIcon }]}>
+              <Icon name="pricetag" size={15} color={colors.white} />
+            </View>
+            <Text style={[styles.sidePanelLabel, { color: colors.listingInk }]}>Listings · what locals are offering</Text>
           </View>
-        )}
+          <View style={[styles.actionsGrid, styles.panelGrid]}>
+            <PrimaryAction
+              title="Browse listings"
+              subtitle="Find rural listings near you"
+              variant="secondary"
+              borderColor={colors.listingLine}
+              onPress={() => navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })}
+            />
+            {isProvider && (
+              <PrimaryAction
+                title="Create a listing"
+                subtitle="Advertise a service, grazing, gear, space or goods"
+                variant="secondary"
+                borderColor={colors.listingLine}
+                onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
+              />
+            )}
+          </View>
+        </View>
 
         {/* Invited to you — private job offers from past requesters */}
         {invitedJobs.length > 0 && (
@@ -322,36 +349,45 @@ export default function HomeTabScreen({ navigation }) {
               <Text style={styles.attentionClearText}>All caught up — nothing waiting on you.</Text>
             </View>
           ) : (
-            attention.map((item, i) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.notifRow, i < attention.length - 1 && styles.notifRowBorder]}
-                onPress={() => openAttentionItem(item)}
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityLabel={item._kind === 'nextMove' ? `${item.nextMove.label}. ${item.nextMove.detail}` : notificationBody(item)}>
-                <Icon
-                  name={item._kind === 'nextMove'
-                    ? item.nextMove.icon
-                    : NOTIFICATION_ICONS[item.type] || 'notifications-outline'}
-                  size={20}
-                  color={item._kind === 'nextMove' ? '#9a6700' : colors.primary}
-                />
-                {item._kind === 'nextMove' ? (
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.nextMoveTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.nextMoveLabel}>{item.nextMove.label}</Text>
-                    <Text style={styles.notifBody} numberOfLines={2}>{item.nextMove.detail}</Text>
-                  </View>
-                ) : (
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.notifBody} numberOfLines={2}>{notificationBody(item)}</Text>
-                    <Text style={styles.notifTime}>{notificationTimeAgo(item.created_at)}</Text>
-                  </View>
-                )}
-                <View style={styles.notifDot} />
-              </TouchableOpacity>
-            ))
+            attention.map((item, i) => {
+              const isNextMove = item._kind === 'nextMove'
+              const side = isNextMove ? null : notificationSide(item)
+              const tag  = side ? sideTag(side, item) : null
+              const iconName = isNextMove
+                ? item.nextMove.icon
+                : NOTIFICATION_ICONS[item.type] || 'notifications-outline'
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.notifRow, i < attention.length - 1 && styles.notifRowBorder]}
+                  onPress={() => openAttentionItem(item)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={isNextMove ? `${item.nextMove.label}. ${item.nextMove.detail}` : notificationBody(item)}>
+                  {side ? (
+                    <View style={[styles.notifIconCircle, { backgroundColor: side === 'job' ? colors.jobFill : colors.listingFill }]}>
+                      <Icon name={iconName} size={17} color={side === 'job' ? colors.jobIcon : colors.listingIcon} />
+                    </View>
+                  ) : (
+                    <Icon name={iconName} size={20} color={isNextMove ? '#9a6700' : colors.primary} />
+                  )}
+                  {isNextMove ? (
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.nextMoveTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.nextMoveLabel}>{item.nextMove.label}</Text>
+                      <Text style={styles.notifBody} numberOfLines={2}>{item.nextMove.detail}</Text>
+                    </View>
+                  ) : (
+                    <View style={{ flex: 1 }}>
+                      {tag && <Text style={[styles.sideTag, { color: side === 'job' ? colors.jobInk : colors.listingInk }]}>{tag}</Text>}
+                      <Text style={styles.notifBody} numberOfLines={2}>{notificationBody(item)}</Text>
+                      <Text style={styles.notifTime}>{notificationTimeAgo(item.created_at)}</Text>
+                    </View>
+                  )}
+                  <View style={styles.notifDot} />
+                </TouchableOpacity>
+              )
+            })
           )}
         </View>
 
@@ -443,7 +479,16 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 
   actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 15 },
+  panelGrid:   { marginBottom: 0 },
   actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 104 },
+
+  // Grouped jobs / listings panels (colour-coded, always with a word)
+  sidePanel:      { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 12 },
+  jobPanel:       { backgroundColor: colors.jobFill, borderColor: colors.jobLine },
+  listingPanel:   { backgroundColor: colors.listingFill, borderColor: colors.listingLine },
+  sidePanelHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  sidePanelIcon:  { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  sidePanelLabel: { flex: 1, fontSize: 13, fontWeight: '800' },
   primaryAction:   { backgroundColor: colors.primary },
   secondaryAction: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
   actionTitle:    { fontSize: 16, fontWeight: '700', marginBottom: 4 },
@@ -506,6 +551,8 @@ const styles = StyleSheet.create({
   },
   notifRowBorder: { borderBottomWidth: 0.5, borderBottomColor: colors.border },
   notifIcon: { fontSize: 18, lineHeight: 22 },
+  notifIconCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  sideTag: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginBottom: 2 },
   nextMoveTitle: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   nextMoveLabel: { fontSize: 14, lineHeight: 19, fontWeight: '800', color: '#8a5d00', marginTop: 1 },
   notifBody: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },

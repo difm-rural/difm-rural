@@ -268,7 +268,12 @@ function TabIcon({ name, active, avatarUrl }) {
     return <Icon name={active ? 'person-circle' : 'person-circle-outline'} size={26} color={c} />
   }
   const [outline, filled] = TAB_ICONS[name] || ['ellipse-outline', 'ellipse']
-  return <Icon name={active ? filled : outline} size={24} color={c} />
+  // The marketplace-side tabs are always colour-coded (amber = Jobs, blue =
+  // Listings), active or not; the label below keeps the grey/green active state.
+  const iconColor = name === 'Jobs' ? colors.jobIcon
+    : name === 'Browse' ? colors.listingIcon
+    : c
+  return <Icon name={active ? filled : outline} size={24} color={iconColor} />
 }
 
 function CustomTabBar({ state, navigation, activityBadge, jobsBadge, servicesBadge, clearJobsBadge, clearServicesBadge }) {

@@ -1,4 +1,5 @@
 import {notificationBody} from '../../shared/notificationBody'
+import {notificationSide, sideTag} from '../../shared/marketSide'
 import React, { useCallback, useRef, useState } from 'react'
 import {
   FlatList,
@@ -130,6 +131,9 @@ export default function NotificationsScreen({ navigation, route }) {
   const hasUnread = items.some(n => !n.read)
 
   function renderItem({ item }) {
+    const side = notificationSide(item)
+    const tag  = side ? sideTag(side, item) : null
+    const iconName = NOTIFICATION_ICONS[item.type] || 'notifications-outline'
     return (
       <TouchableOpacity
         style={[styles.row, item._wasUnread && styles.rowUnread]}
@@ -138,8 +142,15 @@ export default function NotificationsScreen({ navigation, route }) {
         activeOpacity={0.75}
         accessibilityRole="button"
         accessibilityLabel={notificationBody(item)}>
-        <Icon name={NOTIFICATION_ICONS[item.type] || 'notifications-outline'} size={20} color={colors.primary} />
+        {side ? (
+          <View style={[styles.rowIconCircle, { backgroundColor: side === 'job' ? colors.jobFill : colors.listingFill }]}>
+            <Icon name={iconName} size={18} color={side === 'job' ? colors.jobIcon : colors.listingIcon} />
+          </View>
+        ) : (
+          <Icon name={iconName} size={20} color={colors.primary} />
+        )}
         <View style={styles.rowContent}>
+          {tag && <Text style={[styles.sideTag, { color: side === 'job' ? colors.jobInk : colors.listingInk }]}>{tag}</Text>}
           <Text style={styles.rowBody}>{notificationBody(item)}</Text>
           {openingId === item.id && <Text accessibilityRole="text" style={styles.rowTime}>Opening…</Text>}
           {item.type === 'availability_check' && !item._availabilityAnswered && (
@@ -255,6 +266,8 @@ const styles = StyleSheet.create({
   },
   rowUnread:  { backgroundColor: '#f0faf4' },
   rowIcon:    { fontSize: 22, lineHeight: 26 },
+  rowIconCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  sideTag:    { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginBottom: 2 },
   rowContent: { flex: 1 },
   rowBody:    { fontSize: 15, color: colors.textPrimary, lineHeight: 21 },
   rowTime:    { fontSize: 12, color: colors.textMuted, marginTop: 4 },

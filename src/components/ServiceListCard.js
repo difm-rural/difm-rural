@@ -1,4 +1,5 @@
 import {listingCardCopy} from '../../shared/listingCardCopy'
+import {LISTING_KINDS} from '../../shared/listingPricing'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -61,6 +62,10 @@ export default function ServiceListCard({ item, onPress }) {
       )}
 
       <View style={styles.content}>
+        <View style={styles.tagRow}>
+          <View style={styles.sideTag}><Text style={styles.sideTagText}>Listing</Text></View>
+          <Text style={styles.tagKind} numberOfLines={1}>{LISTING_KINDS.find(k => k.id === (item.kind || 'service'))?.label || 'Service'}</Text>
+        </View>
         <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
         <Text style={[styles.provider, !!copy.headline && styles.cardHeadlineCompact]} numberOfLines={1}>
           {copy.headline || providerName}
@@ -121,6 +126,10 @@ const styles = StyleSheet.create({
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
   content:  { flex: 1, minWidth: 0 },
+  tagRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  sideTag:  { backgroundColor: colors.listingFill, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  sideTagText: { fontSize: 11, fontWeight: '700', color: colors.listingInk },
+  tagKind:  { flexShrink: 1, fontSize: 11, color: colors.textMuted },
   title:    { lineHeight:20, minHeight:40, fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
   provider: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 },
   location: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 },
@@ -128,7 +137,7 @@ const styles = StyleSheet.create({
 
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   rating:    { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-  price:     { fontSize: 13, fontWeight: '700', color: colors.primary },
+  price:     { fontSize: 13, fontWeight: '700', color: colors.listingInk },
   availabilityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
   availabilityPillLimited: { backgroundColor: colors.warningLight },
   availabilityPillMuted: { backgroundColor: colors.background },
