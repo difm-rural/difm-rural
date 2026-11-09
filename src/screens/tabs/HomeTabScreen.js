@@ -33,15 +33,11 @@ import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalR
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
 import { fetchActionableNextMoves } from '../../lib/nextMove'
 
-function PrimaryAction({ title, subtitle, onPress, variant = 'primary', borderColor }) {
+function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   const isPrimary = variant === 'primary'
   return (
     <TouchableOpacity
-      style={[
-        styles.actionCard,
-        isPrimary ? styles.primaryAction : styles.secondaryAction,
-        !isPrimary && borderColor ? { borderColor } : null,
-      ]}
+      style={[styles.actionCard, isPrimary ? styles.primaryAction : styles.secondaryAction]}
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
@@ -65,6 +61,7 @@ export default function HomeTabScreen({ navigation }) {
   const [connections, setConnections]   = useState([])
   const [invitedJobs, setInvitedJobs]   = useState([])
   const [seasonalReminders, setSeasonalReminders] = useState([])
+  const [seasonalExpanded, setSeasonalExpanded] = useState(false)
   const [nextMoves, setNextMoves]         = useState([])
   const [loading, setLoading]           = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
@@ -197,6 +194,18 @@ export default function HomeTabScreen({ navigation }) {
     { label: 'Offers on open jobs', count: summary.pendingBids || 0, target: 'Activity' },
     { label: 'Work & requests', count: (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0), target: 'Activity' },
   ]
+  const visibleTiles = activityTiles.filter(t => t.count > 0)
+  // Nothing on the go at all → show only the "No active work yet" empty state.
+  const nothingAtAll = totalActive === 0 && seasonalReminders.length === 0
+  // One-line "all caught up" summary: first non-zero of posts / offers / work.
+  const workActive = (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0)
+  const statusSummary = (summary.activeJobs || 0) > 0
+    ? `${summary.activeJobs} job${summary.activeJobs === 1 ? '' : 's'} posted`
+    : (summary.pendingBids || 0) > 0
+      ? `${summary.pendingBids} offer${summary.pendingBids === 1 ? '' : 's'} waiting`
+      : workActive > 0
+        ? `${workActive} in progress`
+        : null
 
   function openAttentionItem(item) {
     if (item._kind === 'notification') {
@@ -262,15 +271,14 @@ export default function HomeTabScreen({ navigation }) {
           <View style={[styles.actionsGrid, styles.panelGrid]}>
             <PrimaryAction
               title="Post a job"
-              subtitle="Describe the work and get local help"
+              subtitle="Get local help with a job"
               onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })}
             />
             {isProvider && (
               <PrimaryAction
                 title="Find jobs"
-                subtitle="Browse open rural work nearby"
+                subtitle="Open work nearby"
                 variant="secondary"
-                borderColor={colors.jobLine}
                 onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'JobsBoard' })}
               />
             )}
@@ -288,17 +296,15 @@ export default function HomeTabScreen({ navigation }) {
           <View style={[styles.actionsGrid, styles.panelGrid]}>
             <PrimaryAction
               title="Browse listings"
-              subtitle="Find rural listings near you"
+              subtitle="Listings near you"
               variant="secondary"
-              borderColor={colors.listingLine}
               onPress={() => navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })}
             />
             {isProvider && (
               <PrimaryAction
                 title="Create a listing"
-                subtitle="Advertise a service, grazing, gear, space or goods"
+                subtitle="Advertise what you offer"
                 variant="secondary"
-                borderColor={colors.listingLine}
                 onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
               />
             )}
@@ -324,32 +330,45 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         )}
 
-        {/* Needs attention — unread notifications */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Needs attention</Text>
-            <TouchableOpacity
-              onPress={() => nextMoves.length > 0
-                ? navigation.getParent()?.navigate('Activity')
-                : navigation.navigate('Notifications')}
-              accessibilityRole="button"
-              accessibilityLabel={nextMoves.length > 0 ? 'View all activity' : 'All notifications'}>
-              <Text style={styles.sectionLink}>
-                {nextMoves.length > 0
-                  ? `View activity (${nextMoves.length})`
-                  : unread.length > 0
-                    ? `All notifications (${unread.length})`
-                    : 'All notifications'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          {attention.length === 0 ? (
-            <View style={styles.attentionClear}>
-              <Icon name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={styles.attentionClearText}>All caught up — nothing waiting on you.</Text>
+        {attention.length === 0 ? (
+          nothingAtAll ? null : (
+          /* Compact "all caught up" row — replaces Needs attention + activity tiles */
+          <TouchableOpacity
+            style={styles.statusRow}
+            onPress={() => navigation.getParent()?.navigate('Activity')}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`All caught up${statusSummary ? '. ' + statusSummary : ''}. View activity`}>
+            <Icon name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={styles.statusText} numberOfLines={1}>
+              <Text style={styles.statusStrong}>All caught up</Text>
+              {statusSummary ? <Text style={styles.statusMuted}>{` · ${statusSummary}`}</Text> : null}
+            </Text>
+            <Text style={styles.statusLink}>Activity ›</Text>
+          </TouchableOpacity>
+          )
+        ) : (
+          <>
+          {/* Needs attention — unread notifications */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Needs attention</Text>
+              <TouchableOpacity
+                onPress={() => nextMoves.length > 0
+                  ? navigation.getParent()?.navigate('Activity')
+                  : navigation.navigate('Notifications')}
+                accessibilityRole="button"
+                accessibilityLabel={nextMoves.length > 0 ? 'View all activity' : 'All notifications'}>
+                <Text style={styles.sectionLink}>
+                  {nextMoves.length > 0
+                    ? `View activity (${nextMoves.length})`
+                    : unread.length > 0
+                      ? `All notifications (${unread.length})`
+                      : 'All notifications'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            attention.map((item, i) => {
+            {attention.map((item, i) => {
               const isNextMove = item._kind === 'nextMove'
               const side = isNextMove ? null : notificationSide(item)
               const tag  = side ? sideTag(side, item) : null
@@ -387,32 +406,33 @@ export default function HomeTabScreen({ navigation }) {
                   <View style={styles.notifDot} />
                 </TouchableOpacity>
               )
-            })
-          )}
-        </View>
-
-        {/* Active work summary — stat tiles */}
-        {totalActive > 0 && (
-          <View style={styles.activitySection}>
-            <Text style={styles.activityHeading}>Your activity</Text>
-            <View style={styles.statRow}>
-              {activityTiles.map(t => (
-                <TouchableOpacity
-                  key={t.label}
-                  style={styles.statTile}
-                  onPress={() => navigation.getParent()?.navigate(t.target)}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${t.count} ${t.label}`}>
-                  <Text style={styles.statNumber}>{t.count}</Text>
-                  <Text style={styles.statLabel}>{t.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            })}
           </View>
+
+          {/* Active work summary — only tiles with a count */}
+          {visibleTiles.length > 0 && (
+            <View style={styles.activitySection}>
+              <Text style={styles.activityHeading}>Your activity</Text>
+              <View style={styles.statRow}>
+                {visibleTiles.map(t => (
+                  <TouchableOpacity
+                    key={t.label}
+                    style={styles.statTile}
+                    onPress={() => navigation.getParent()?.navigate(t.target)}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t.count} ${t.label}`}>
+                    <Text style={styles.statNumber}>{t.count}</Text>
+                    <Text style={styles.statLabel}>{t.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+          </>
         )}
 
-        {totalActive === 0 && (
+        {nothingAtAll && (
           <View style={styles.section}>
             <EmptyState
               compact
@@ -429,15 +449,32 @@ export default function HomeTabScreen({ navigation }) {
 
         {seasonalReminders.length > 0 && (
           <View style={styles.seasonalSection}>
-            <Text style={styles.activityHeading}>Useful right now</Text>
-            {seasonalReminders.map(campaign => (
-              <SeasonalReminderCard
-                key={campaign.id}
-                campaign={campaign}
-                onAction={openSeasonalAction}
-                onDismiss={dismissSeasonalReminder}
-              />
-            ))}
+            <View style={styles.seasonalHeader}>
+              <Text style={[styles.activityHeading, { marginBottom: 0 }]}>Useful right now</Text>
+              {seasonalReminders.length > 2 && !seasonalExpanded && (
+                <TouchableOpacity
+                  onPress={() => setSeasonalExpanded(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="See all reminders">
+                  <Text style={styles.sectionLink}>See all</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={276}
+              decelerationRate="fast"
+              contentContainerStyle={styles.seasonalRow}>
+              {(seasonalExpanded ? seasonalReminders : seasonalReminders.slice(0, 2)).map(campaign => (
+                <SeasonalReminderCard
+                  key={campaign.id}
+                  campaign={campaign}
+                  onAction={openSeasonalAction}
+                  onDismiss={dismissSeasonalReminder}
+                />
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -478,20 +515,20 @@ const styles = StyleSheet.create({
   title:      { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 
-  actionsGrid: { flexDirection: 'row', gap: 12, marginBottom: 15 },
+  actionsGrid: { flexDirection: 'row', gap: 10, marginBottom: 15 },
   panelGrid:   { marginBottom: 0 },
-  actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 104 },
+  actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 84 },
 
-  // Grouped jobs / listings panels (colour-coded, always with a word)
-  sidePanel:      { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 12 },
-  jobPanel:       { backgroundColor: colors.jobFill, borderColor: colors.jobLine },
-  listingPanel:   { backgroundColor: colors.listingFill, borderColor: colors.listingLine },
+  // Grouped jobs / listings panels (colour-coded fills, no border — white cards sit on top)
+  sidePanel:      { borderRadius: 16, padding: 14, marginBottom: 12 },
+  jobPanel:       { backgroundColor: colors.jobFill },
+  listingPanel:   { backgroundColor: colors.listingFill },
   sidePanelHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   sidePanelIcon:  { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   sidePanelLabel: { flex: 1, fontSize: 13, fontWeight: '800' },
   primaryAction:   { backgroundColor: colors.primary },
-  secondaryAction: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
-  actionTitle:    { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  secondaryAction: { backgroundColor: colors.white },
+  actionTitle:    { fontSize: 17, fontWeight: '700', marginBottom: 4 },
   actionSubtitle: { fontSize: 12, lineHeight: 17 },
   primaryActionText:   { color: colors.white },
   primaryActionSub:    { color: 'rgba(255,255,255,0.85)' },
@@ -517,6 +554,24 @@ const styles = StyleSheet.create({
 
   attentionClear: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
   attentionClearText: { fontSize: 13, color: colors.textMuted },
+
+  // Compact "all caught up" status row
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    minHeight: 52,
+    marginBottom: 12,
+  },
+  statusText:   { flex: 1, fontSize: 14 },
+  statusStrong: { fontWeight: '700', color: colors.textPrimary },
+  statusMuted:  { color: colors.textMuted },
+  statusLink:   { fontSize: 13, fontWeight: '700', color: colors.primary },
 
   inviteCard: {
     flexDirection: 'row',
@@ -574,6 +629,8 @@ const styles = StyleSheet.create({
   // "Your activity" stat tiles
   activitySection: { marginBottom: 12 },
   seasonalSection: { marginTop: 1 },
+  seasonalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  seasonalRow:     { gap: 12, paddingRight: 20 },
   activityHeading: {
     fontSize: 13,
     fontWeight: '700',
