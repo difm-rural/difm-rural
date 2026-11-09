@@ -68,6 +68,10 @@ export type ListingCardData = {
   cardStyle?: CardStyle
   priceLabel?: string | null
   kindLabel?: string | null
+  // Marketplace side — amber "Job" tag or blue "Listing" tag before the title,
+  // with the category/kind beside it in muted text, and the price in the ink
+  // colour. Omit on manage/chooser cards that shouldn't carry a side tag.
+  side?: 'job' | 'listing'
   badge?: { label: string; tone: 'live' | 'paused' | 'closed' } | null
 }
 
@@ -84,11 +88,12 @@ export function ListingCard({ data, footer, href, ariaLabel }: { data: ListingCa
         cardStyle={data.cardStyle}
       />
       <div className="lcard-body">
+        {data.side && <div className="lcard-tagrow"><span className={'lcard-sidetag ' + data.side}>{data.side === 'job' ? 'Job' : 'Listing'}</span>{data.kindLabel && <span className="lcard-tagcat">{data.kindLabel}</span>}</div>}
         <div className="lcard-title" title={data.title || 'Untitled listing'}>{data.title || 'Untitled listing'}</div>
         {data.description!==undefined && <p className="lcard-description">{data.description}</p>}
         <div className="lcard-meta">
-          {data.priceLabel && <span className="lcard-price">{data.priceLabel}</span>}
-          {data.kindLabel && <span className="kind-tag">{data.kindLabel}</span>}
+          {data.priceLabel && <span className={'lcard-price' + (data.side ? ' ' + data.side : '')}>{data.priceLabel}</span>}
+          {data.kindLabel && !data.side && <span className="kind-tag">{data.kindLabel}</span>}
         </div>
         {data.badge && (
           <span className={`badge ${data.badge.tone}`}>{data.badge.label}</span>

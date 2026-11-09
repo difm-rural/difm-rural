@@ -14,10 +14,14 @@ import { useWebAlerts } from './web-alerts'
 import {SetupNavigation} from './setup-navigation'
 
 // Shared navigation for requester and provider workflows.
-const navigation = [
+const navigation: { href: string; label: string; icon: typeof House; color?: string; colorDark?: string }[] = [
   { href: '/', label: 'Home', icon: House },
-  { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
-  { href: '/browse', label: 'Listings', icon: Search },
+  // Amber = jobs, blue = listings — the nav icons carry the same colour code as
+  // the tabs and cards (the label is always alongside). colorDark is the
+  // lightened shade used on the dark desktop sidebar; color is the base shade
+  // used on the light mobile tab bar.
+  { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness, color: 'var(--job-icon)', colorDark: 'var(--job-icon-on-dark)' },
+  { href: '/browse', label: 'Listings', icon: Search, color: 'var(--listing-icon)', colorDark: 'var(--listing-icon-on-dark)' },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/listings', label: 'My listings', icon: ListChecks },
   { href: '/account', label: 'Account', icon: UserRound },
@@ -48,7 +52,7 @@ export function AppShell({ children, providerName, setupMode=false, loading=fals
             const Icon = item.icon
             return (
               <Link key={item.href} href={item.href} aria-current={active?'page':undefined} onClick={()=>setMenuPath(null)} className={active ? 'nav-item active' : 'nav-item'}>
-                <Icon size={18} /><span>{item.label}</span>{active && <ChevronRight size={15} className="nav-arrow" />}
+                <Icon size={18} style={item.colorDark?{color:item.colorDark}:undefined} /><span>{item.label}</span>{active && <ChevronRight size={15} className="nav-arrow" />}
                 {counts && item.href==='/activity' && counts.messages>0 && <span className="web-badge" aria-label={counts.messages+' unread messages'}>{counts.messages}</span>}
               </Link>
             )
@@ -64,7 +68,7 @@ export function AppShell({ children, providerName, setupMode=false, loading=fals
       {!setupMode&&<nav className="mobile-tabbar" aria-label="Quick navigation">{primary.map(item=>{
         const active=item.href==='/'?displayPath==='/':displayPath.startsWith(item.href),Icon=item.icon
         const unread=item.href==='/activity'&&counts?counts.messages:0
-        return <Link href={item.href} key={item.href} aria-current={active?'page':undefined} onClick={()=>setMenuPath(null)}><span className="mobile-tab-icon"><Icon size={21}/>{unread>0&&<span className="mobile-unread" aria-label={unread+' unread updates'}>{unread>99?'99+':unread}</span>}</span><span>{item.label}</span></Link>
+        return <Link href={item.href} key={item.href} aria-current={active?'page':undefined} onClick={()=>setMenuPath(null)}><span className="mobile-tab-icon"><Icon size={21} style={item.color&&!active?{color:item.color}:undefined}/>{unread>0&&<span className="mobile-unread" aria-label={unread+' unread updates'}>{unread>99?'99+':unread}</span>}</span><span>{item.label}</span></Link>
       })}</nav>}
     </div>
   )
