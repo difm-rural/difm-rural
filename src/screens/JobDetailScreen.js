@@ -26,6 +26,7 @@ import { useUser } from '../context/UserContext'
 import { recordJobProviderView } from '../lib/listingPerformance'
 import WorkScheduleCard from '../components/WorkScheduleCard'
 import ArrivalWindowModal from '../components/ArrivalWindowModal'
+import JobPaymentHandoff from '../components/JobPaymentHandoff'
 import {
   addWorkToPhoneCalendar,
   fetchWorkSchedule,
@@ -547,9 +548,12 @@ export default function JobDetailScreen({ route, navigation }) {
     }
 
     function handleMarkComplete() {
+      const paidMessage = myBid?.payment_marked_sent_at
+        ? `${requesterFirstName} marked payment sent on ${nzDate(new Date(myBid.payment_marked_sent_at))}. Check it has arrived, then mark complete — this closes the job and invites them to leave a review.`
+        : `Check the work is finished and you've sorted payment with ${requesterFirstName} — cash, bank transfer or invoice, whatever you agreed. This closes the job and invites them to leave a review.`
       Alert.alert(
         'Before you mark this complete',
-        `Check the work is finished and you've sorted payment with ${requesterFirstName} — cash, bank transfer or invoice, whatever you agreed. This closes the job and invites them to leave a review.`,
+        paidMessage,
         [
           { text: 'Not yet', style: 'cancel' },
           {
@@ -700,6 +704,23 @@ export default function JobDetailScreen({ route, navigation }) {
               </View>
             ) : null}
           </View>
+
+          {isAcceptedProvider && ['accepted', 'in_progress'].includes(job.status) && myBid?.id ? (
+            <JobPaymentHandoff
+              viewerRole="provider"
+              jobId={job.id}
+              jobTitle={job.title}
+              bidId={myBid.id}
+              method={myBid.payment_method || null}
+              markedSentAt={myBid.payment_marked_sent_at || null}
+              paymentMessageId={myBid.payment_message_id || null}
+              otherFirstName={requesterFirstName}
+              counterpartId={job.requester_id}
+              currentUserId={currentUser?.id}
+              availableFrom={myBid.available_from || null}
+              onChanged={fetchData}
+            />
+          ) : null}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>

@@ -22,6 +22,7 @@ import CancelModal from '../components/CancelModal'
 import Icon from '../components/Icon'
 import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
+import JobPaymentHandoff from '../components/JobPaymentHandoff'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 import { fetchInvitesForJob, inviteStatusLabel } from '../lib/invites'
@@ -167,7 +168,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function fetchAcceptedBid() {
     const { data: bidData } = await supabase
       .from('bids')
-      .select('provider_id, amount, pricing_type, materials')
+      .select('id, provider_id, amount, pricing_type, materials, payment_method, payment_details_sent_at, payment_marked_sent_at, payment_message_id')
       .eq('job_id', job.id)
       .eq('status', 'accepted')
       .single()
@@ -178,12 +179,17 @@ export default function ManageTaskScreen({ navigation, route }) {
         .eq('id', bidData.provider_id)
         .single()
       setAcceptedBid({
+        bidId: bidData.id,
         providerId: bidData.provider_id,
         providerName: provProfile?.full_name || 'Provider',
         avatarUrl: provProfile?.avatar_url || null,
         bidAmount: bidData.amount,
         pricingType: bidData.pricing_type,
         materials: bidData.materials,
+        paymentMethod: bidData.payment_method || null,
+        paymentDetailsSentAt: bidData.payment_details_sent_at || null,
+        paymentMarkedSentAt: bidData.payment_marked_sent_at || null,
+        paymentMessageId: bidData.payment_message_id || null,
       })
     }
     setLoadingBid(false)
@@ -332,6 +338,8 @@ export default function ManageTaskScreen({ navigation, route }) {
     bidCount: Math.max(bidCount || 0, bids.length),
     unansweredQuestionCount: questionCount,
     hasPendingBid: !isTaskOwner && !isAcceptedProvider,
+    paymentMethod: acceptedBid?.paymentMethod,
+    paymentMarkedSentAt: acceptedBid?.paymentMarkedSentAt,
   })
 
   function ensureTaskOwner() {
@@ -567,6 +575,22 @@ export default function ManageTaskScreen({ navigation, route }) {
                 otherPartyName,
               })}
               onRunningLate={handleRunningLate}
+            />
+          ) : null}
+
+          {isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status) && acceptedBid?.bidId ? (
+            <JobPaymentHandoff
+              viewerRole="requester"
+              jobId={job.id}
+              jobTitle={job.title}
+              bidId={acceptedBid.bidId}
+              method={acceptedBid.paymentMethod}
+              markedSentAt={acceptedBid.paymentMarkedSentAt}
+              paymentMessageId={acceptedBid.paymentMessageId}
+              otherFirstName={otherPartyFirstName}
+              counterpartId={acceptedBid.providerId}
+              currentUserId={currentUserId}
+              onChanged={fetchAcceptedBid}
             />
           ) : null}
 

@@ -259,6 +259,7 @@ export default function ActivityTabScreen({ navigation }) {
       let bidCountMap = {}
       let questionCountMap = {}
       let acceptedProviderMap = {}
+      let paymentMap = {}
 
       const [bidsResult, questionsResult, acceptedResult] = await Promise.all([
         openIds.length
@@ -268,13 +269,14 @@ export default function ActivityTabScreen({ navigation }) {
           ? supabase.from('job_questions').select('job_id').in('job_id', openIds).is('answer', null)
           : Promise.resolve({ data: [] }),
         awardedIds.length
-          ? supabase.from('bids').select('job_id, provider_id').in('job_id', awardedIds).eq('status', 'accepted')
+          ? supabase.from('bids').select('job_id, provider_id, payment_method, payment_marked_sent_at').in('job_id', awardedIds).eq('status', 'accepted')
           : Promise.resolve({ data: [] }),
       ])
       ;(bidsResult.data || []).forEach(b => { bidCountMap[b.job_id] = (bidCountMap[b.job_id] || 0) + 1 })
       ;(questionsResult.data || []).forEach(q => { questionCountMap[q.job_id] = (questionCountMap[q.job_id] || 0) + 1 })
 
       const acceptedBids = acceptedResult.data || []
+      acceptedBids.forEach(bid => { paymentMap[bid.job_id] = { method: bid.payment_method, marked: bid.payment_marked_sent_at } })
       const providerIds = [...new Set(acceptedBids.map(b => b.provider_id).filter(Boolean))]
       if (providerIds.length > 0) {
         const { data: providers } = await supabase.from('profiles_public').select('id, full_name').in('id', providerIds)
@@ -288,6 +290,8 @@ export default function ActivityTabScreen({ navigation }) {
         bidCount: bidCountMap[j.id] || 0,
         unansweredQuestionCount: questionCountMap[j.id] || 0,
         providerName: acceptedProviderMap[j.id],
+        _paymentMethod: paymentMap[j.id]?.method || null,
+        _paymentMarkedSentAt: paymentMap[j.id]?.marked || null,
       })))
     } else {
       setActiveJobs([])
@@ -344,6 +348,8 @@ export default function ActivityTabScreen({ navigation }) {
       ...b.jobs,
       _bidAmount: b.amount,
       _bidStatus: b.status,
+      _paymentMethod: b.payment_method || null,
+      _paymentMarkedSentAt: b.payment_marked_sent_at || null,
       requesterName: requesterNames[b.jobs.requester_id],
       bidCount: 0,
     })))
@@ -695,6 +701,8 @@ export default function ActivityTabScreen({ navigation }) {
                     otherName: job.providerName,
                     bidCount: job.bidCount,
                     unansweredQuestionCount: job.unansweredQuestionCount,
+                    paymentMethod: job._paymentMethod,
+                    paymentMarkedSentAt: job._paymentMarkedSentAt,
                   })}
                   onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
                 />
@@ -751,6 +759,8 @@ export default function ActivityTabScreen({ navigation }) {
                   nextMove={jobNextMove(job, 'provider', {
                     otherName: job.requesterName,
                     hasPendingBid: job._bidStatus === 'pending',
+                    paymentMethod: job._paymentMethod,
+                    paymentMarkedSentAt: job._paymentMarkedSentAt,
                   })}
                   onPress={() => navigation.navigate('JobDetail', { job })}
                 />

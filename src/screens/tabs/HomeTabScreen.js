@@ -213,7 +213,8 @@ export default function HomeTabScreen({ navigation }) {
       return
     }
     if (item.entityType === 'job') {
-      navigation.navigate('ManageTask', { job: item.item, bidCount: item.item.bidCount || 0 })
+      if (item.viewerRole === 'provider') navigation.navigate('JobDetail', { job: item.item })
+      else navigation.navigate('ManageTask', { job: item.item, bidCount: item.item.bidCount || 0 })
       return
     }
     navigation.navigate('ServiceBookingDetail', {
