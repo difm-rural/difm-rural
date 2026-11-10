@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireProvider } from '@/lib/auth'
 import { JOB_EDITOR_COLUMNS, jobInput, jobOwnerActions, validId, type JobSeed } from '@/lib/job-input'
 import { validateFlowFeedback } from '@shared/flowFeedback'
+import { parseNzDate } from '@shared/dates'
 import type { ActionState } from '@/components/action-form'
 import { offerInput } from '@/lib/offer-input'
 import { pricingRevision, pricingSnapshot, bookingResponseActions } from '@/lib/booking-detail'
@@ -100,6 +101,34 @@ export async function changeOffer(_:ActionState,data:FormData):Promise<ActionSta
  if(result.error)return {error:'Could not change your offer. The job may have been accepted or closed. Refresh and try again.'}
  revalidatePath('/jobs/'+offer.job_id);revalidatePath('/activity');return {error:'',success:intent==='withdraw'?'Offer withdrawn.':'Offer updated.'}
 }
+
+// Provider: record how they'd like to be paid and post the message into the job
+// thread. The RPC enforces that only the accepted provider can call it.
+export async function setJobPaymentMethod(_:ActionState,data:FormData):Promise<ActionState>{
+ const {supabase}=await requireProvider()
+ const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),method=text(data,'method'),message=text(data,'message')
+ if(!validId(bidId))return failed()
+ if(!['bank_transfer','cash','invoice','agreed'].includes(method))return {error:'Choose how you would like to be paid.'}
+ if(message.length>2000)return {error:'Keep the message to 2,000 characters.'}
+ const {error}=await supabase.rpc('set_job_payment_method',{p_bid:bidId,p_method:method,p_message:message})
+ if(error)return {error:'Could not save the payment method. Refresh and try again.'}
+ if(validId(jobId))revalidatePath('/jobs/'+jobId)
+ revalidatePath('/activity');revalidatePath('/')
+ return {error:'',success:'Payment details sent to the requester.'}
+}
+
+// Requester: mark the payment sent (or undo before the job is completed). The
+// RPC enforces that only the job's requester can call it.
+export async function markJobPaymentSent(_:ActionState,data:FormData):Promise<ActionState>{
+ const {supabase}=await requireProvider()
+ const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),undo=data.get('undo')==='true'
+ if(!validId(bidId))return failed()
+ const {error}=await supabase.rpc('mark_job_payment_sent',{p_bid:bidId,p_undo:undo})
+ if(error)return {error:'Could not update. Refresh and try again.'}
+ if(validId(jobId))revalidatePath('/jobs/'+jobId)
+ revalidatePath('/activity');revalidatePath('/')
+ return {error:'',success:undo?'Marked as not paid.':'Payment marked sent.'}
+}
 export async function jobQuestion(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),questionId=text(data,'question_id'),content=text(data,questionId?'answer':'question')
  if(!validId(id)||!content||content.length>2000)return {error:'Write a question or answer of up to 2,000 characters.'}
@@ -129,8 +158,8 @@ export async function sendOffer(_: ActionState, data: FormData): Promise<ActionS
   if (existing.data?.length) return {error:'You already have an offer on this job. You can track it in Activity.'}
   const { error } = await supabase.from('bids').insert({...input.value,job_id:id,provider_id:user.id,status:'pending'})
   if (error) return failed()
-  revalidatePath('/')
-  redirect('/activity')
+  revalidatePath('/jobs/'+id)
+  return {error:'',success:'Offer sent. The requester will review it — you can track it in Activity.'}
 }
 
 export async function acceptOffer(_: ActionState, data: FormData): Promise<ActionState> {
@@ -151,8 +180,8 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   if(!validId(id)||!validId(requestId)||!location||location.length>300||!Number.isFinite(quantity)||quantity<=0||quantity>10000000)return {error:'Add a location (up to 300 characters) and a positive quantity.'}
   const notes=text(data,'notes'),locationNote=text(data,'location_note'),schedule=text(data,'schedule_type'),date=text(data,'date'),lat=text(data,'latitude'),lng=text(data,'longitude')
   if(notes.length>5000||locationNote.length>2000)return {error:'Keep notes to 5,000 characters and arrival directions to 2,000.'}
-  const day=new Date(date+'T12:00:00Z')
-  if(!['asap','flexible','specific'].includes(schedule)||(schedule==='specific'&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(day.getTime())||day.toISOString().slice(0,10)!==date)))return {error:'Choose a valid preferred date or flexible timing.'}
+  const isoDate=schedule==='specific'?parseNzDate(date):null
+  if(!['asap','flexible','specific'].includes(schedule)||(schedule==='specific'&&!isoDate))return {error:'Choose a valid preferred date or flexible timing.'}
   if(!!lat!==!!lng||(lat&&(!Number.isFinite(Number(lat))||Math.abs(Number(lat))>90||!Number.isFinite(Number(lng))||Math.abs(Number(lng))>180)))return {error:'Clear the invalid GPS location or choose it again.'}
   const {data:existing,error:existingError}=await supabase.from('bookings').select('id').eq('id',requestId).eq('requester_id',user.id).maybeSingle()
   if(existingError)return failed()
@@ -166,7 +195,7 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   if(active.data?.length)return {error:'You already have an active request for this listing. Open Activity to view it.'}
   let snapshot
   try{snapshot=pricingSnapshot(s,text(data,'variant_index'),quantity)}catch{return {error:'This rate option has changed. Go back to the listing and choose a rate again.'}}
-  const {error:saveError}=await supabase.from('bookings').insert({id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,location_name:location,latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,location_note:locationNote||null,scheduled_date:schedule==='specific'?date:schedule,notes:notes||null})
+  const {error:saveError}=await supabase.from('bookings').insert({id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,location_name:location,latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,location_note:locationNote||null,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
   if(saveError)return failed()
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/browse/'+id)
   redirect('/activity/booking/'+requestId+'/manage')

@@ -62,7 +62,16 @@ export function jobNextMove(
     bidCount = job?.bidCount || 0,
     unansweredQuestionCount = job?.unansweredQuestionCount || 0,
     hasPendingBid = false,
-  }: { otherName?: string | null; bidCount?: number; unansweredQuestionCount?: number; hasPendingBid?: boolean } = {},
+    paymentMethod = null,
+    paymentMarkedSentAt = null,
+  }: {
+    otherName?: string | null
+    bidCount?: number
+    unansweredQuestionCount?: number
+    hasPendingBid?: boolean
+    paymentMethod?: string | null
+    paymentMarkedSentAt?: string | null
+  } = {},
 ): NextMove | null {
   if (!job) return null
   const other = firstName(otherName, viewerRole === 'requester' ? 'the provider' : 'the requester')
@@ -89,21 +98,50 @@ export function jobNextMove(
   }
 
   if (job.status === 'accepted' || job.status === 'in_progress') {
+    // A future-dated schedule label (null once the date has passed / none set).
     const schedule = scheduledLabel(job)
-    if (schedule) {
-      return move(schedule, viewerRole === 'provider' ? 'You are booked for this job' : `${other} is booked for this job`, {
-        tone: 'scheduled',
-        icon: 'calendar-outline',
-      })
-    }
+    const method = paymentMethod || null
+    const paid = !!paymentMarkedSentAt
+
     if (viewerRole === 'provider') {
+      // Step 1: how do you want to be paid? (timing + method in one move)
+      if (!method) {
+        return move('Waiting on you', "Confirm timing and how you'd like to be paid", {
+          needsAction: true, tone: 'attention', icon: 'card-outline', actionLabel: 'Next steps',
+        })
+      }
+      // Step 3: requester says they've paid → check, then complete.
+      if (paid) {
+        return move('Payment marked sent', "Check it's arrived, then mark the job complete", {
+          needsAction: true, tone: 'active', icon: 'checkmark-done-outline', actionLabel: 'View job',
+        })
+      }
+      // Step 2: method set, doing the work — a future schedule still wins.
+      if (schedule) {
+        return move(schedule, 'You are booked for this job', { tone: 'scheduled', icon: 'calendar-outline' })
+      }
       return move('Waiting on you', 'Complete the work, then mark it complete', {
-        tone: 'active',
-        icon: 'construct-outline',
-        actionLabel: 'View job',
+        tone: 'active', icon: 'construct-outline', actionLabel: 'View job',
       })
     }
-    return move(`Waiting on ${other}`, 'They will mark the job complete when finished')
+
+    // Requester side.
+    if (!method) {
+      return move(`Waiting on ${other}`, "They'll confirm timing and how to pay")
+    }
+    if (paid) {
+      return move(`Waiting on ${other}`, "They'll mark the job complete")
+    }
+    // Method set, not paid → it's the requester's turn to pay.
+    const detail = method === 'cash' ? 'Pay on the day'
+      : method === 'agreed' ? 'Pay as agreed'
+      : `Pay ${other} when the work's done`   // bank_transfer | invoice
+    return move('Waiting on you', detail, {
+      needsAction: !schedule,                 // only chase once the scheduled date has passed
+      tone: schedule ? 'scheduled' : 'attention',
+      icon: 'card-outline',
+      actionLabel: schedule ? null : 'View job',
+    })
   }
 
   return null
