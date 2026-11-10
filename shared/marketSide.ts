@@ -21,11 +21,13 @@ export function notificationSide(n: Notice): MarketSide | null {
 // a listing/booking they host) → the tag reads "YOUR JOB" / "YOUR LISTING".
 // Everything else keeps the neutral "JOB" / "LISTING" so we never claim
 // ownership we aren't sure of.
-// Upgrades to YOUR: new_bid, new_question, job_ready, job_completed (their job);
-// new_booking, service_quote_accepted, booking_ready, booking_completed,
-// work_completion_due, booking_cancellation_requested (a listing/booking they host).
+// Upgrades to YOUR: new_bid, new_question, job_ready, job_completed,
+// payment_details_sent (their job); new_booking, service_quote_accepted,
+// booking_ready, booking_completed, work_completion_due,
+// booking_cancellation_requested (a listing/booking they host).
+// payment_marked_sent goes to the provider (not the job owner) → stays neutral.
 const OWNER_TYPES = new Set([
-  'new_bid', 'new_question', 'job_ready', 'job_completed',
+  'new_bid', 'new_question', 'job_ready', 'job_completed', 'payment_details_sent',
   'new_booking', 'service_quote_accepted', 'booking_ready',
   'booking_completed', 'work_completion_due', 'booking_cancellation_requested',
 ])
