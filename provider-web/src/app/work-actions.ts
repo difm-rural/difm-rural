@@ -101,6 +101,34 @@ export async function changeOffer(_:ActionState,data:FormData):Promise<ActionSta
  if(result.error)return {error:'Could not change your offer. The job may have been accepted or closed. Refresh and try again.'}
  revalidatePath('/jobs/'+offer.job_id);revalidatePath('/activity');return {error:'',success:intent==='withdraw'?'Offer withdrawn.':'Offer updated.'}
 }
+
+// Provider: record how they'd like to be paid and post the message into the job
+// thread. The RPC enforces that only the accepted provider can call it.
+export async function setJobPaymentMethod(_:ActionState,data:FormData):Promise<ActionState>{
+ const {supabase}=await requireProvider()
+ const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),method=text(data,'method'),message=text(data,'message')
+ if(!validId(bidId))return failed()
+ if(!['bank_transfer','cash','invoice','agreed'].includes(method))return {error:'Choose how you would like to be paid.'}
+ if(message.length>2000)return {error:'Keep the message to 2,000 characters.'}
+ const {error}=await supabase.rpc('set_job_payment_method',{p_bid:bidId,p_method:method,p_message:message})
+ if(error)return {error:'Could not save the payment method. Refresh and try again.'}
+ if(validId(jobId))revalidatePath('/jobs/'+jobId)
+ revalidatePath('/activity');revalidatePath('/')
+ return {error:'',success:'Payment details sent to the requester.'}
+}
+
+// Requester: mark the payment sent (or undo before the job is completed). The
+// RPC enforces that only the job's requester can call it.
+export async function markJobPaymentSent(_:ActionState,data:FormData):Promise<ActionState>{
+ const {supabase}=await requireProvider()
+ const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),undo=data.get('undo')==='true'
+ if(!validId(bidId))return failed()
+ const {error}=await supabase.rpc('mark_job_payment_sent',{p_bid:bidId,p_undo:undo})
+ if(error)return {error:'Could not update. Refresh and try again.'}
+ if(validId(jobId))revalidatePath('/jobs/'+jobId)
+ revalidatePath('/activity');revalidatePath('/')
+ return {error:'',success:undo?'Marked as not paid.':'Payment marked sent.'}
+}
 export async function jobQuestion(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),questionId=text(data,'question_id'),content=text(data,questionId?'answer':'question')
  if(!validId(id)||!content||content.length>2000)return {error:'Write a question or answer of up to 2,000 characters.'}

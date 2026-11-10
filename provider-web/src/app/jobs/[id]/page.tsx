@@ -19,6 +19,8 @@ import { Conversation } from '@/components/conversation/conversation'
 import { ManageActions } from '@/components/work/manage-actions'
 import { ReviewsSection } from '@/components/work/reviews-section'
 import { PostFeedback } from '@/components/post-feedback'
+import { PaymentProvider } from './payment-provider'
+import { PaymentRequester } from './payment-requester'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
 export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string}>}){
@@ -31,7 +33,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const {data:watched,error:watchError}=await supabase.from('watchlist').select('id').eq('user_id',user.id).eq('job_id',id).maybeSingle()
  const own=job.requester_id===user.id
  const canAskQuestion=!own&&job.status==='open'
- let offerQuery=supabase.from('bids').select('id,provider_id,amount,message,status,available_from,estimated_duration,line_items,pricing_type,materials').eq('job_id',id).order('created_at',{ascending:false})
+ let offerQuery=supabase.from('bids').select('id,provider_id,amount,message,status,available_from,estimated_duration,line_items,pricing_type,materials,payment_method,payment_details_sent_at,payment_marked_sent_at,payment_message_id').eq('job_id',id).order('created_at',{ascending:false})
  if(!own)offerQuery=offerQuery.eq('provider_id',user.id)
  const [{data:offers,error:offerError},{data:questions,error:questionError}]=await Promise.all([offerQuery,supabase.from('job_questions').select('id,asker_id,question,answer,created_at').eq('job_id',id).order('created_at',{ascending:true})])
  const {data:sentInvites,error:sentInviteError}=own?await supabase.from('job_invites').select('id,provider_id,status').eq('job_id',id).eq('requester_id',user.id):{data:[],error:null}
@@ -57,13 +59,30 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  // Next-step bar: requester (owner) / provider (active bidder or accepted provider); never for a plain viewer.
  const nextRole:'requester'|'provider'|null=own?'requester':(job.status==='open'&&myOffer?'provider':(isAcceptedProvider?'provider':null))
  const nextOtherName=own?(acceptedProviderId?names.get(acceptedProviderId):undefined):names.get(job.requester_id)
- const next=nextRole?jobNextMove(job,nextRole,{otherName:nextOtherName,bidCount:own?(offerError?0:offers?.length||0):0,unansweredQuestionCount:own?(questions?.filter(q=>!q.answer).length||0):0,hasPendingBid:myOffer?.status==='pending'}):null
+ const next=nextRole?jobNextMove(job,nextRole,{otherName:nextOtherName,bidCount:own?(offerError?0:offers?.length||0):0,unansweredQuestionCount:own?(questions?.filter(q=>!q.answer).length||0):0,hasPendingBid:myOffer?.status==='pending',paymentMethod:acceptedOffer?.payment_method,paymentMarkedSentAt:acceptedOffer?.payment_marked_sent_at}):null
 
  // Reviews (completed only).
  let reviews:{id:string;reviewer_id:string;reviewer_role:string;rating:number;comment:string|null;created_at:string}[]|null=null,reviewError=false
  if(job.status==='completed'){const r=await supabase.from('reviews').select('id,reviewer_id,reviewer_role,rating,comment,created_at').eq('job_id',id);reviewError=!!r.error;reviews=r.data}
  const ownReview=reviews?.find(x=>x.reviewer_id===user.id&&x.reviewer_role===manageRole)
  const received=reviews?.find(x=>x.reviewer_id===otherId&&x.reviewer_role!==manageRole)
+
+ // ─── Payment handoff (jobs only) ────────────────────────────────────────────
+ const payActive=['accepted','in_progress'].includes(job.status)
+ const payMethod=acceptedOffer?.payment_method as string|null|undefined
+ // The requester's bank details live only in the thread — fetch the provider's
+ // message posted when they shared the method.
+ let bankDetails:string|null=null
+ if(own&&payMethod==='bank_transfer'&&acceptedOffer?.payment_message_id){
+   const {data:payMsg}=await supabase.from('messages').select('content').eq('id',acceptedOffer.payment_message_id).maybeSingle()
+   bankDetails=payMsg?.content || null
+ }
+ const paymentProviderCard=isAcceptedProvider&&payActive&&acceptedOffer
+   ? <PaymentProvider bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterId={job.requester_id} requesterFirst={otherFirst} availableFrom={acceptedOffer.available_from} method={payMethod || null}/>
+   : null
+ const paymentRequesterCard=own&&payMethod&&['accepted','in_progress','awaiting_completion'].includes(job.status)&&acceptedOffer
+   ? <PaymentRequester bidId={acceptedOffer.id} jobId={id} method={payMethod} providerFirst={otherFirst} bankDetails={bankDetails} markedSent={!!acceptedOffer.payment_marked_sent_at}/>
+   : null
 
  // Conversation: load ONLY the selected thread. Side panel once there is an accepted
  // counterpart; inline under the selected offer before acceptance.
@@ -96,7 +115,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {job.materials_type&&<p>Materials: {MATERIALS[job.materials_type as keyof typeof MATERIALS] || job.materials_type}</p>}
    {job.access_conditions?.length>0&&<p>Site access: {job.access_conditions.map((a:string)=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}
    {job.photos?.length>0&&<div className="job-photo-grid">{job.photos.map((url:string,i:number)=><a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a>)}</div>}
-   <p className="muted">Agree scope, timing and payment directly. Rural Connections does not handle payments.</p>
+   <p className="muted">Rural Connections doesn&apos;t handle payments — you&apos;ll arrange it together once an offer is accepted.</p>
   </article>
 
  const qaSection=<section className="card"><h2 id="questions" tabIndex={-1} style={{scrollMarginTop:96}}>Questions & answers</h2><p className="muted">Questions and answers are public. Keep phone numbers, exact addresses and other private details out of them.</p>{questionError?<p role="alert">Could not load questions. Refresh to try again.</p>:<>{!questions?.length&&<p>No questions yet.</p>}{questions?.map(q=><article className="work-offer" key={q.id} id={'question-'+q.id} tabIndex={-1} style={{scrollMarginTop:96}}><h3>{names.get(q.asker_id) || 'Community member'} asks</h3><p className="work-description">{q.question}</p>{q.answer&&<div className="account-current"><strong>Requester&apos;s answer</strong><p className="work-description">{q.answer}</p></div>}{own&&job.status==='open'&&<details className="activity-action"><summary>{q.answer?'Edit answer':'Answer question'}</summary><ActionForm action={jobQuestion} label="Save answer"><input type="hidden" name="job_id" value={id}/><input type="hidden" name="question_id" value={q.id}/><label className="lform-field">Public answer<textarea name="answer" rows={3} maxLength={2000} required defaultValue={q.answer || ''}/></label></ActionForm></details>}</article>)}{canAskQuestion&&<ActionForm action={jobQuestion} label="Post question"><input type="hidden" name="job_id" value={id}/><label className="lform-field">Your question{job.visibility==='public'&&<small id="question-visibility" className="muted">Your question and the reply are visible to anyone who can view this job</small>}<textarea aria-describedby={job.visibility==='public'?'question-visibility':undefined} name="question" rows={3} maxLength={2000} required/></label></ActionForm>}</>}</section>
@@ -119,6 +138,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const mainColumn=<>
   {posted==='1'&&own&&<PostFeedback jobId={id}/>}
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}><strong>{next.label}</strong><span>{next.detail}</span></div>}
+  {paymentProviderCard}
+  {paymentRequesterCard}
   {job.visibility==='invite_only'&&<p className="account-current">Private invited job — visible to the requester and invited providers.</p>}
   {job.status==='open'&&!own&&(watchError?<p role="alert">Could not check saved-job status. Refresh before saving.</p>:<ActionForm action={saveWatchedJob} label={watched?'Remove saved job':'Save job'}><input name="job_id" type="hidden" value={id}/><input name="intent" type="hidden" value={watched?'remove':'save'}/></ActionForm>)}
   {own&&job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider from Connections →</Link>}
@@ -126,7 +147,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
   {((own&&(ownerActions.edit||ownerActions.repeat))||canAskQuestion||job.status==='open')&&<div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>}
   {job.status==='open'?<>{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
-  <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
+  <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst} paymentMarkedSentAt={manageRole==='provider'?acceptedOffer?.payment_marked_sent_at:null}/>
   {job.status==='completed'&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'}/>}
   {job.status==='completed'&&<p className="home-clear">Job complete. You can find it again in History.</p>}
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}
