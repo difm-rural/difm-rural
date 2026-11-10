@@ -1,6 +1,7 @@
 import { ALL_CAPABILITIES, CATEGORIES } from '@shared/categories'
 import { PROVIDER_AVAILABILITY_OPTIONS } from '@shared/providerAvailability'
 import {publicNameError} from '@shared/profileName'
+import {parseNzDate} from '@shared/dates'
 
 export const PUBLIC_PROFILE_COLUMNS='id,full_name,display_name,avatar_url,bio,skills,qualifications,region,created_at,availability_status,availability_until,availability_updated_at'
 export const PRIVATE_PROFILE_COLUMNS=PUBLIC_PROFILE_COLUMNS+',phone,address,latitude,longitude'
@@ -33,13 +34,14 @@ export function nzToday(now=new Date()){
 export function availabilityInput(data:FormData,now=new Date()):Validation<{availability_status:string;availability_until:string|null;availability_updated_at:string}>{
   const status=text(data,'availability_status'),until=text(data,'availability_until')
   if(status!=='unknown' && !PROVIDER_AVAILABILITY_OPTIONS.some(o=>o.value===status))return {ok:false,error:'Choose an availability option.'}
+  let iso:string|null=null
   if(status==='unavailable_until'){
     if(!until)return {ok:false,error:'Choose a date.'}
-    const date=new Date(until+'T12:00:00Z')
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(until) || Number.isNaN(date.getTime()) || date.toISOString().slice(0,10)!==until)return {ok:false,error:'Choose a valid date.'}
-    if(until<nzToday(now))return {ok:false,error:'Choose today or a future date.'}
+    iso=parseNzDate(until)
+    if(!iso)return {ok:false,error:'Choose a valid date.'}
+    if(iso<nzToday(now))return {ok:false,error:'Choose today or a future date.'}
   }
-  return {ok:true,value:{availability_status:status,availability_until:status==='unavailable_until'?until:null,availability_updated_at:now.toISOString()}}
+  return {ok:true,value:{availability_status:status,availability_until:iso,availability_updated_at:now.toISOString()}}
 }
 export const EMAIL_OPTIONS=[
   {key:'email_transactional',label:'Booking and job updates',description:'Important updates about your jobs, offers and bookings.'},

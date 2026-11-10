@@ -1,14 +1,23 @@
 'use client'
 import {DateInput} from '@/components/date-input'
-import {useState} from 'react'
-import {ActionForm} from '@/components/action-form'
+import {useState,useEffect,useRef,useActionState} from 'react'
+import {useRouter} from 'next/navigation'
+import Link from '@/components/navigation-link'
 import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,formatOfferAmount} from '@shared/offers'
 import {sendOffer,changeOffer} from '../../work-actions'
 type Offer={id:string;amount:number;message:string|null;line_items:{label:string;amount:number}[]|null;pricing_type:string|null;materials:string|null;available_from:string|null;estimated_duration:string|null}
 export function OfferForm({jobId,offer,providerMaterials}:{jobId:string;offer?:Offer;providerMaterials:boolean}){
+ const router=useRouter()
+ const [state,submit,pending]=useActionState(offer?changeOffer:sendOffer,{error:''})
  const [items,setItems]=useState((offer?.line_items?.length?offer.line_items:[{label:'Labour',amount:offer?.amount || ''}]).map(i=>({...i,amount:String(i.amount)}))),[pricing,setPricing]=useState(offer?.pricing_type || 'fixed')
  const total=items.reduce((sum,i)=>sum+(Number(i.amount)||0),0)
- return <ActionForm action={offer?changeOffer:sendOffer} label={offer?'Save offer changes':'Send offer'}>
+ // On success the server has revalidated the job page; a refresh re-renders it
+ // with the saved "Your offer" card in place of this form. Focus the status
+ // line first so screen readers announce the confirmation.
+ const statusRef=useRef<HTMLParagraphElement>(null)
+ useEffect(()=>{if(state.success){statusRef.current?.focus();router.refresh()}},[state.success,router])
+ if(state.success)return <div className="lform"><p className="home-clear" role="status" tabIndex={-1} ref={statusRef}>{state.success}</p><Link href="/activity" className="card-link">Track in Activity →</Link></div>
+ return <form action={submit} className="lform"><fieldset disabled={pending} className="work-fieldset">
   <input name="job_id" type="hidden" value={jobId}/>{offer&&<><input name="offer_id" type="hidden" value={offer.id}/><input name="intent" type="hidden" value="edit"/></>}
   <p className="muted">Your offer is private to you and the requester.</p><label className="lform-field">Pricing basis<select name="pricing_type" value={pricing} onChange={e=>setPricing(e.target.value)}>{OFFER_PRICING_TYPES.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
   {items.map((item,i)=><div className="lform-repeat" key={i}><div className="lform-repeat-grid"><label className="lform-field">Price line {i+1}<input name="item_label" maxLength={120} value={item.label} required onChange={e=>setItems(items.map((v,n)=>n===i?{...v,label:e.target.value}:v))}/></label><label className="lform-field">Amount ($)<input name="item_amount" type="number" min="0" max="10000000" step="0.01" required value={item.amount} onChange={e=>setItems(items.map((v,n)=>n===i?{...v,amount:e.target.value}:v))}/></label></div>{items.length>1&&<button type="button" className="lform-repeat-remove" onClick={()=>setItems(items.filter((_,n)=>n!==i))}>Remove line {i+1}</button>}</div>)}
@@ -18,5 +27,8 @@ export function OfferForm({jobId,offer,providerMaterials}:{jobId:string;offer?:O
   <label className="lform-field">Message (optional)<textarea name="message" maxLength={5000} rows={4} defaultValue={offer?.message || ''} placeholder="Explain how you can help and what your price includes."/></label>
   <label className="lform-field">Available from (optional)<DateInput type="date" name="available_from" defaultValue={offer?.available_from || ''}/></label><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} defaultValue={offer?.estimated_duration || ''} placeholder="e.g. Half a day"/></label>
   <p className="muted">The requester will review your offer. Work is agreed when they accept.</p>
- </ActionForm>
+ </fieldset>
+ {state.error&&<p className="form-error" role="alert">{state.error}</p>}
+ <button className="lform-save" disabled={pending}>{pending?'Saving…':(offer?'Save offer changes':'Send offer')}</button>
+ </form>
 }
