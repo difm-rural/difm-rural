@@ -39,6 +39,17 @@ function toIso(y: number, m: number, d: number): string | null {
 
 const toYear = (y: number) => (y < 100 ? 2000 + y : y)
 
+// Format a Date as a LOCAL 'YYYY-MM-DD' — the calendar day as it reads on the
+// device. Use this for date-only values (a bid's available_from, a booking's
+// scheduled_date) instead of `d.toISOString().split('T')[0]`, which converts to
+// UTC and shifts the day backwards for zones east of UTC (NZ is UTC+12/13, so a
+// day picked at local midnight becomes the previous day). Returns null for a
+// missing or Invalid Date, so callers never hit `toISOString()`'s RangeError.
+export function toLocalIsoDate(d: Date | null | undefined): string | null {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null
+  return `${String(d.getFullYear()).padStart(4, '0')}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export function parseNzDate(input: unknown): string | null {
   if (typeof input !== 'string') return null
   const s = input.trim()

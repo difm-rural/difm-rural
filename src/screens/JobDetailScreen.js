@@ -1,5 +1,6 @@
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
+import {toLocalIsoDate} from '../../shared/dates'
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -353,29 +354,34 @@ export default function JobDetailScreen({ route, navigation }) {
     if (submittingBidRef.current) return
     submittingBidRef.current = true
     setLoading(true)
-    const { error } = await supabase.from('bids').insert({
-      job_id:             job.id,
-      provider_id:        currentUser.id,
-      amount:             total,
-      message:            bidMessage,
-      status:             'pending',
-      line_items:         buildLineItemsPayload(),
-      available_from:     availableFrom ? availableFrom.toISOString().split('T')[0] : null,
-      estimated_duration: estimatedDuration || null,
-      pricing_type:       bidPricingType,
-      materials:          job.materials_type === 'provider' ? bidMaterials : null,
-    })
-    if (error) {
-      Alert.alert('Error', error.message)
-    } else {
-      trackEvent('bid_placed', { job_id: job.id, amount: total })
-      Alert.alert('Offer sent!', 'Your offer has been submitted successfully.')
-      setAlreadyBid(true)
-      setEditingBid(false)
-      fetchData()
+    try {
+      const { error } = await supabase.from('bids').insert({
+        job_id:             job.id,
+        provider_id:        currentUser.id,
+        amount:             total,
+        message:            bidMessage,
+        status:             'pending',
+        line_items:         buildLineItemsPayload(),
+        available_from:     toLocalIsoDate(availableFrom),
+        estimated_duration: estimatedDuration || null,
+        pricing_type:       bidPricingType,
+        materials:          job.materials_type === 'provider' ? bidMaterials : null,
+      })
+      if (error) {
+        Alert.alert('Error', error.message)
+      } else {
+        trackEvent('bid_placed', { job_id: job.id, amount: total })
+        Alert.alert('Offer sent!', 'Your offer has been submitted successfully.')
+        setAlreadyBid(true)
+        setEditingBid(false)
+        fetchData()
+      }
+    } catch (e) {
+      Alert.alert("Couldn't send offer", e?.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+      submittingBidRef.current = false
     }
-    setLoading(false)
-    submittingBidRef.current = false
   }
 
   async function handleUpdateBid() {
@@ -383,23 +389,28 @@ export default function JobDetailScreen({ route, navigation }) {
     const total = getBidTotal()
     if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter an offer amount'); return }
     setLoading(true)
-    const { error } = await supabase.from('bids').update({
-      amount:             total,
-      message:            bidMessage,
-      line_items:         buildLineItemsPayload(),
-      available_from:     availableFrom ? availableFrom.toISOString().split('T')[0] : null,
-      estimated_duration: estimatedDuration || null,
-      pricing_type:       bidPricingType,
-      materials:          job.materials_type === 'provider' ? bidMaterials : null,
-    }).eq('id', myBid.id)
-    if (error) {
-      Alert.alert('Error', error.message)
-    } else {
-      Alert.alert('Offer updated!', 'Your offer has been updated.')
-      setEditingBid(false)
-      fetchData()
+    try {
+      const { error } = await supabase.from('bids').update({
+        amount:             total,
+        message:            bidMessage,
+        line_items:         buildLineItemsPayload(),
+        available_from:     toLocalIsoDate(availableFrom),
+        estimated_duration: estimatedDuration || null,
+        pricing_type:       bidPricingType,
+        materials:          job.materials_type === 'provider' ? bidMaterials : null,
+      }).eq('id', myBid.id)
+      if (error) {
+        Alert.alert('Error', error.message)
+      } else {
+        Alert.alert('Offer updated!', 'Your offer has been updated.')
+        setEditingBid(false)
+        fetchData()
+      }
+    } catch (e) {
+      Alert.alert("Couldn't send offer", e?.message || 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function handleAskQuestion() {
@@ -580,15 +591,20 @@ export default function JobDetailScreen({ route, navigation }) {
 
     async function handleSaveArrivalWindow(start, end, expectedComplete) {
       setSavingArrival(true)
-      const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
-      setSavingArrival(false)
-      if (error) {
-        Alert.alert("Couldn't save arrival time", arrivalErrorMessage(error))
-        return
+      try {
+        const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
+        if (error) {
+          Alert.alert("Couldn't save arrival time", arrivalErrorMessage(error))
+          return
+        }
+        setWorkSchedule(data)
+        setArrivalModalVisible(false)
+        Alert.alert('Arrival time confirmed', `${requesterFirstName} has been notified.`)
+      } catch (e) {
+        Alert.alert("Couldn't save arrival time", e?.message || 'Something went wrong. Please try again.')
+      } finally {
+        setSavingArrival(false)
       }
-      setWorkSchedule(data)
-      setArrivalModalVisible(false)
-      Alert.alert('Arrival time confirmed', `${requesterFirstName} has been notified.`)
     }
 
     function handleRunningLate() {
@@ -600,12 +616,16 @@ export default function JobDetailScreen({ route, navigation }) {
     }
 
     async function submitLateNotice(minutes) {
-      const { error } = await sendRunningLate({ jobId: job.id, minutes })
-      if (error) {
-        Alert.alert('Notice not sent', error.message || 'Please try again.')
-        return
+      try {
+        const { error } = await sendRunningLate({ jobId: job.id, minutes })
+        if (error) {
+          Alert.alert('Notice not sent', error.message || 'Please try again.')
+          return
+        }
+        Alert.alert('Update sent', `${requesterFirstName} has been told you are about ${minutes} minutes late.`)
+      } catch (e) {
+        Alert.alert('Notice not sent', e?.message || 'Please try again.')
       }
-      Alert.alert('Update sent', `${requesterFirstName} has been told you are about ${minutes} minutes late.`)
     }
 
     return (

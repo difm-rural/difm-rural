@@ -1,4 +1,5 @@
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
+import {toLocalIsoDate} from '../../shared/dates'
 import React, { useEffect, useState } from 'react'
 import { CommonActions } from '@react-navigation/native'
 import {
@@ -137,7 +138,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
       total_amount:   estimate.baseAmount ?? 0,
       payment_timing: service.payment_timing,
       status:         'pending',
-      scheduled_date: scheduleType === 'specific' ? (date ? date.toISOString().split('T')[0] : null) : scheduleType,
+      scheduled_date: scheduleType === 'specific' ? toLocalIsoDate(date) : scheduleType,
       location_name:  location.trim(),
       latitude,
       longitude,

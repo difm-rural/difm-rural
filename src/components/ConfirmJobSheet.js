@@ -56,20 +56,25 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   async function confirm() {
     if (blocked) return
     setBusy(true); setError('')
-    const { error: rpcError } = await supabase.rpc('confirm_job', {
-      p_bid: bidId,
-      p_arrival: start.toISOString(),
-      p_method: choice,
-      p_message: paymentMessage,
-    })
-    setBusy(false)
-    if (rpcError) {
-      setError(rpcError.message === 'Choose an arrival time in the future and a finish time after it'
-        ? 'That time has already passed. Pick a time later today or another day.'
-        : (rpcError.message || 'Could not confirm. Pull to refresh and try again.'))
-      return
+    try {
+      const { error: rpcError } = await supabase.rpc('confirm_job', {
+        p_bid: bidId,
+        p_arrival: start.toISOString(),
+        p_method: choice,
+        p_message: paymentMessage,
+      })
+      if (rpcError) {
+        setError(rpcError.message === 'Choose an arrival time in the future and a finish time after it'
+          ? 'That time has already passed. Pick a time later today or another day.'
+          : (rpcError.message || 'Could not confirm. Pull to refresh and try again.'))
+        return
+      }
+      onConfirmed?.()
+    } catch (e) {
+      setError(e?.message || 'Could not confirm. Pull to refresh and try again.')
+    } finally {
+      setBusy(false)
     }
-    onConfirmed?.()
   }
 
   return (
