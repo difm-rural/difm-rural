@@ -26,13 +26,13 @@ export async function fetchWorkSchedule({ jobId, bookingId }) {
   return data || null
 }
 
-export async function saveArrivalWindow({ jobId, bookingId, start, end, expectedComplete }) {
+export async function saveArrivalWindow({ jobId, bookingId, start, end }) {
+  // Expected finish is filled in server-side (p_expected_complete defaults NULL).
   const { data, error } = await supabase.rpc('set_work_arrival_window', {
     p_job_id: jobId || null,
     p_booking_id: bookingId || null,
     p_start: start.toISOString(),
     p_end: end.toISOString(),
-    p_expected_complete: expectedComplete.toISOString(),
   })
   return { data, error }
 }
@@ -57,9 +57,7 @@ export function formatArrivalWindow(schedule) {
     timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit',
   })
   const sameDay = nzDay(start) === nzDay(new Date())
-  let out = sameDay ? `Expected around ${time(start)}` : `Expected ${formatDate(start)}, around ${time(start)}`
-  if (schedule.expected_complete_at) out += ` · finish about ${time(new Date(schedule.expected_complete_at))}`
-  return out
+  return sameDay ? `Expected around ${time(start)}` : `Expected ${formatDate(start)}, around ${time(start)}`
 }
 
 // The arrival RPC rejects a past time with a message containing "future"; show a
@@ -107,9 +105,9 @@ export async function addWorkToPhoneCalendar({
     }
 
     const start = new Date(schedule.arrival_start_at)
-    const end = new Date(schedule.expected_complete_at || schedule.arrival_end_at)
+    const end = new Date(schedule.arrival_end_at)
     await Calendar.createEventInCalendarAsync({
-      title: `Rural Connections: ${title}`,
+      title: `Expected arrival: ${title}`,
       startDate: start,
       endDate: end,
       location: location || undefined,

@@ -58,45 +58,30 @@ export default function ArrivalWindowModal({
   onSave,
 }) {
   const [start, setStart] = useState(() => initialStart(schedule, suggestedDate))
-  const [expectedComplete, setExpectedComplete] = useState(() => new Date(start.getTime() + 6 * 60 * 60 * 1000))
   const [picker, setPicker] = useState(null)
 
   useEffect(() => {
     if (!visible) return
-    const nextStart = initialStart(schedule, suggestedDate)
-    setStart(nextStart)
-    setExpectedComplete(schedule?.expected_complete_at
-      ? new Date(schedule.expected_complete_at)
-      : new Date(nextStart.getTime() + 6 * 60 * 60 * 1000))
+    setStart(initialStart(schedule, suggestedDate))
     setPicker(null)
-  }, [visible, schedule?.arrival_start_at, schedule?.expected_complete_at, suggestedDate])
+  }, [visible, schedule?.arrival_start_at, suggestedDate])
 
   function changeDate(nextDate) {
-    const nextStart = defaultStartForDate(nextDate)
-    setStart(nextStart)
-    setExpectedComplete(new Date(nextStart.getTime() + 6 * 60 * 60 * 1000))
+    setStart(defaultStartForDate(nextDate))
   }
 
   function changeStart(nextTime) {
     const next = new Date(start)
     next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
     setStart(next)
-    if (expectedComplete <= next) setExpectedComplete(new Date(next.getTime() + 6 * 60 * 60 * 1000))
   }
 
-  function changeExpectedComplete(nextTime) {
-    const next = new Date(start)
-    next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
-    if (next <= start) next.setDate(next.getDate() + 1)
-    setExpectedComplete(next)
-  }
-
-  const pickerValue = picker === 'date' || picker === 'start' ? start : expectedComplete
   const isPast = start.getTime() <= Date.now()
 
   function handleSave() {
-    const end = new Date(start.getTime() + ARRIVAL_GRACE_MIN * 60 * 1000)
-    onSave(start, end, expectedComplete)
+    // The expected finish is filled in server-side; we only send arrival + a
+    // short grace as the end.
+    onSave(start, new Date(start.getTime() + ARRIVAL_GRACE_MIN * 60 * 1000))
   }
 
   return (
@@ -124,17 +109,13 @@ export default function ArrivalWindowModal({
             <Text style={styles.fieldLabel}>Expected arrival</Text>
             <Text style={styles.fieldValue}>{timeLabel(start)}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.field} onPress={() => setPicker('complete')}>
-            <Text style={styles.fieldLabel}>Expected finish</Text>
-            <Text style={styles.fieldValue}>{timeLabel(expectedComplete)}</Text>
-          </TouchableOpacity>
 
           {isPast ? <Text style={styles.errorText}>Pick a time later today</Text> : null}
 
           {picker ? (
             <View style={styles.pickerWrap}>
               <DateTimePicker
-                value={pickerValue}
+                value={start}
                 mode={picker === 'date' ? 'date' : 'time'}
                 minimumDate={picker === 'date' ? new Date() : undefined}
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
@@ -142,8 +123,7 @@ export default function ArrivalWindowModal({
                   if (Platform.OS === 'android') setPicker(null)
                   if (!value || event.type === 'dismissed') return
                   if (picker === 'date') changeDate(value)
-                  else if (picker === 'start') changeStart(value)
-                  else changeExpectedComplete(value)
+                  else changeStart(value)
                 }}
               />
               {Platform.OS === 'ios' ? (
