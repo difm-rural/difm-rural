@@ -9,11 +9,12 @@
 //   • services + bookings — provider-led directory
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
+// Jobs are one-step: open → accepted → completed (provider marks it done
+// directly) / cancelled. in_progress and awaiting_completion are retired for
+// jobs (bookings still use them).
 export const JOB_STATUS = {
   OPEN:                'open',
   ACCEPTED:            'accepted',
-  IN_PROGRESS:         'in_progress',
-  AWAITING_COMPLETION: 'awaiting_completion',
   COMPLETED:           'completed',
   CANCELLED:           'cancelled',
 }
@@ -22,17 +23,11 @@ export const JOB_STATUS = {
 export const JOB_ACTIVE_STATUSES = [
   JOB_STATUS.OPEN,
   JOB_STATUS.ACCEPTED,
-  JOB_STATUS.IN_PROGRESS,
-  JOB_STATUS.AWAITING_COMPLETION,
 ]
 // Finished (show in "past" / history lists).
 export const JOB_TERMINAL_STATUSES = [JOB_STATUS.COMPLETED, JOB_STATUS.CANCELLED]
 // A bid has been accepted — job is "awarded" and uses the awarded layout.
-export const JOB_AWARDED_STATUSES = [
-  JOB_STATUS.ACCEPTED,
-  JOB_STATUS.IN_PROGRESS,
-  JOB_STATUS.AWAITING_COMPLETION,
-]
+export const JOB_AWARDED_STATUSES = [JOB_STATUS.ACCEPTED]
 
 export const isJobActive   = s => JOB_ACTIVE_STATUSES.includes(s)
 export const isJobTerminal = s => JOB_TERMINAL_STATUSES.includes(s)
@@ -120,8 +115,8 @@ export function statusLabel(status, bidCount = 0) {
     case JOB_STATUS.ACCEPTED:                   // jobs: a bid was accepted
     case BOOKING_STATUS.CONFIRMED:              // bookings: provider confirmed
       return 'Confirmed'
-    case JOB_STATUS.IN_PROGRESS:                return 'In progress'
-    case JOB_STATUS.AWAITING_COMPLETION:        return 'Completion recorded'
+    case BOOKING_STATUS.IN_PROGRESS:            return 'In progress'
+    case BOOKING_STATUS.AWAITING_COMPLETION:    return 'Completion recorded'
     case BOOKING_STATUS.CANCELLATION_REQUESTED: return 'Cancellation requested'
     case JOB_STATUS.COMPLETED:                  return 'Completed'
     case BOOKING_STATUS.WITHDRAWN:              return 'Withdrawn'
@@ -140,8 +135,8 @@ export function statusTone(status) {
     case BOOKING_STATUS.QUOTE_SENT:             return 'waiting'
     case JOB_STATUS.ACCEPTED:
     case BOOKING_STATUS.CONFIRMED:
-    case JOB_STATUS.IN_PROGRESS:                return 'engaged'
-    case JOB_STATUS.AWAITING_COMPLETION:
+    case BOOKING_STATUS.IN_PROGRESS:            return 'engaged'
+    case BOOKING_STATUS.AWAITING_COMPLETION:
     case BOOKING_STATUS.CANCELLATION_REQUESTED: return 'attention'
     case JOB_STATUS.COMPLETED:                  return 'done'
     case BOOKING_STATUS.WITHDRAWN:

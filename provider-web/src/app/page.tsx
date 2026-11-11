@@ -36,7 +36,7 @@ export default async function HomePage() {
   const offerIds = [...new Set((offers.data || []).map(o => o.job_id))]
   const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status').in('id',offerIds) : {data:[],error:null}
   const openOfferJobs = new Set((offerJobs.data || []).filter(j => j.status === 'open').map(j => j.id))
-  const activeOfferJobs = (offerJobs.data || []).filter(j => ['accepted','in_progress','awaiting_completion'].includes(j.status))
+  const activeOfferJobs = (offerJobs.data || []).filter(j => j.status === 'accepted')
   const pendingOffers = (offers.data || []).filter(o => o.status === 'pending' && openOfferJobs.has(o.job_id)).length
   const jobsDoing = activeOfferJobs.filter(j => (offers.data || []).some(o => o.job_id === j.id && o.status === 'accepted')).length
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs].some(r => r.error)

@@ -48,7 +48,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const acceptedOffer=offers?.find(b=>b.status==='accepted')
  const acceptedProviderId=acceptedOffer?.provider_id || null
  const isAcceptedProvider=!!acceptedProviderId && acceptedProviderId===user.id
- const awarded=job.status!=='open'   // accepted/in_progress/awaiting/cancellation_requested/completed/cancelled
+ const awarded=job.status!=='open'   // accepted / completed / cancelled
  // ActivityWork for the shared manage + review policy (reuses workActions/workRole).
  const work:ActivityWork={id:job.id,kind:'job',status:job.status,requesterId:job.requester_id,providerId:acceptedProviderId,title:job.title,location:job.location_name,notes:job.description,cancellationReason:job.cancellation_reason,cancellationNote:job.cancellation_note}
  const manageRole=workRole(work,user.id)   // requester | provider | null
@@ -68,7 +68,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const received=reviews?.find(x=>x.reviewer_id===otherId&&x.reviewer_role!==manageRole)
 
  // ─── Payment handoff (jobs only) ────────────────────────────────────────────
- const payActive=['accepted','in_progress'].includes(job.status)
+ const payActive=job.status==='accepted'
  const payMethod=acceptedOffer?.payment_method as string|null|undefined
  // Confirmed once arrival (work schedule) and payment method are both set.
  let workArrival:string|null=null
@@ -84,7 +84,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    const {data:payMsg}=await supabase.from('messages').select('content').eq('id',acceptedOffer.payment_message_id).maybeSingle()
    bankDetails=payMsg?.content || null
  }
- const confirmedStatus=['accepted','in_progress','awaiting_completion'].includes(job.status)
+ const confirmedStatus=job.status==='accepted'
  const paymentProviderCard=isAcceptedProvider&&payActive&&acceptedOffer
    ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} method={payMethod || null}/>
    : null

@@ -542,7 +542,6 @@ export default function JobDetailScreen({ route, navigation }) {
     const budgetText = jobBudget(job)
     const isCompleted = job.status === 'completed'
     const isCancelled = job.status === 'cancelled'
-    const isAwaitingCompletion = job.status === 'awaiting_completion'
 
     function handleChat() {
       navigation.navigate('Chat', {
@@ -641,9 +640,7 @@ export default function JobDetailScreen({ route, navigation }) {
                 <Text style={styles.infoBoxGreenText}>
                   {isCompleted
                     ? `This job is complete. You can now review ${requesterFirstName}.`
-                    : isAwaitingCompletion
-                      ? 'Completion recorded. Refresh to see the completed job.'
-                      : `This job has been awarded to you for ${nzMoney(myBid.amount)}. Use chat to confirm timing and details with ${requesterFirstName}.`}
+                    : `This job has been awarded to you for ${nzMoney(myBid.amount)}. Use chat to confirm timing and details with ${requesterFirstName}.`}
                 </Text>
               </View>
             )}
@@ -661,7 +658,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           ) : null}
 
-          {(!isCompleted && !isCancelled && !isAwaitingCompletion) ? (
+          {(!isCompleted && !isCancelled) ? (
             jobConfirmed ? (
               <WorkScheduleCard
                 schedule={workSchedule}
@@ -718,7 +715,7 @@ export default function JobDetailScreen({ route, navigation }) {
             ) : null}
           </View>
 
-          {jobConfirmed && ['accepted', 'in_progress'].includes(job.status) && myBid?.id ? (
+          {jobConfirmed && job.status === 'accepted' && myBid?.id ? (
             <JobPaymentHandoff
               viewerRole="provider"
               jobId={job.id}
@@ -746,21 +743,13 @@ export default function JobDetailScreen({ route, navigation }) {
               />
             )}
             {(!isCompleted && !isCancelled) ? (
-              isAwaitingCompletion ? (
-                <View style={styles.awaitingBox}>
-                  <Text style={styles.awaitingBoxText}>
-                    <Icon name="checkmark-circle-outline" size={14} color={colors.primary} /> Completion recorded. Refresh to see the completed job.
-                  </Text>
-                </View>
-              ) : (
-                <Button
-                  icon="checkmark"
-                  title="Mark as completed"
-                  onPress={handleMarkComplete}
-                  style={{ marginBottom: 10 }}
-                  accessibilityLabel="Mark job as completed"
-                />
-              )
+              <Button
+                icon="checkmark"
+                title="Mark as completed"
+                onPress={handleMarkComplete}
+                style={{ marginBottom: 10 }}
+                accessibilityLabel="Mark job as completed"
+              />
             ) : null}
             {isCompleted ? (
               <Button

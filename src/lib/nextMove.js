@@ -41,7 +41,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
           .select('id, job_id, payment_method, payment_marked_sent_at, jobs!inner(*)')
           .eq('provider_id', userId)
           .eq('status', 'accepted')
-          .in('jobs.status', ['accepted', 'in_progress'])
+          .eq('jobs.status', 'accepted')
       : Promise.resolve({ data: [] }),
   ])
 
@@ -52,7 +52,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
     .map(bid => ({ bid, job: bid.jobs }))
     .filter(entry => entry.job)
   const jobIds = jobs.map(job => job.id)
-  const awardedJobIds = jobs.filter(job => ['accepted', 'in_progress'].includes(job.status)).map(job => job.id)
+  const awardedJobIds = jobs.filter(job => job.status === 'accepted').map(job => job.id)
   const otherIds = [
     ...requesterBookings.map(booking => booking.provider_id),
     ...providerBookings.map(booking => booking.requester_id),

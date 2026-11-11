@@ -1,4 +1,4 @@
-export const ACTIVE_JOBS = ['open', 'accepted', 'in_progress', 'awaiting_completion']
+export const ACTIVE_JOBS = ['open', 'accepted']
 export const ACTIVE_BOOKINGS = ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested']
 export function statusLabel(status: string) {
   return ({ pending: 'Booking request', quote_sent: 'Quote to review', confirmed: 'Confirmed', in_progress: 'In progress',

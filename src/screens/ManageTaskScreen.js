@@ -293,10 +293,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           ? { label, color: '#92400e', bg: '#fef3c7' }
           : { label, color: '#166534', bg: '#dcfce7' }
       case 'accepted':
-      case 'in_progress':
         return { label, color: '#1e40af', bg: '#dbeafe' }
-      case 'awaiting_completion':
-        return { label, color: '#92400e', bg: '#fef3c7' }
       case 'completed':
         return { label, color: colors.textSecondary, bg: colors.border }
       case 'cancelled':
@@ -566,7 +563,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
           <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
 
-          {['accepted', 'in_progress'].includes(job.status) ? (
+          {job.status === 'accepted' ? (
             (isTaskOwner && !jobConfirmed) ? (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Waiting on {otherPartyFirstName}</Text>
@@ -588,7 +585,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             )
           ) : null}
 
-          {isTaskOwner && jobConfirmed && ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status) && acceptedBid?.bidId ? (
+          {isTaskOwner && jobConfirmed && job.status === 'accepted' && acceptedBid?.bidId ? (
             <JobPaymentHandoff
               viewerRole="requester"
               jobId={job.id}
