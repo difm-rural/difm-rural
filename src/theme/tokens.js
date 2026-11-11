@@ -36,6 +36,11 @@ export const colors = {
   listingLine:    '#bcd0ea',
   listingIcon:    '#1565c0',
   listingInk:     '#0f4c94',
+  // Lighter side tints for the icon + label when they sit on a dark/green
+  // header (the ink shades disappear on green). Mirrors provider-web's
+  // --job-icon-on-dark / --listing-icon-on-dark.
+  jobIconOnDark:     '#e9a23b',
+  listingIconOnDark: '#8db8f0',
 }
 
 export const spacing = {

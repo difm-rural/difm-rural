@@ -23,6 +23,7 @@ import ReviewModal from '../components/ReviewModal'
 import ReceivedReview from '../components/ReceivedReview'
 import ReputationCard from '../components/ReputationCard'
 import Icon from '../components/Icon'
+import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
 import NextMoveBanner from '../components/NextMoveBanner'
 import { bookingNextMove } from '../lib/nextMove'
@@ -423,7 +424,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       enabled={Platform.OS === 'android'}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <SideHeader kind="listing" label="LISTING" topInset={insets.top} />
+      <View style={[styles.header, { paddingTop: 6 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backText}>Back</Text>
         </TouchableOpacity>

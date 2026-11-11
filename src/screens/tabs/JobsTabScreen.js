@@ -27,6 +27,7 @@ import { saveJobSearch, SAVED_INTEREST_FREQUENCIES } from '../../lib/savedIntere
 import JobCard from '../../components/JobCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../../components/JobServiceCard'
 import SkeletonCard from '../../components/SkeletonCard'
+import SideHeader from '../../components/SideHeader'
 import EmptyState from '../../components/EmptyState'
 import Button from '../../components/Button'
 import Icon from '../../components/Icon'
@@ -445,14 +446,8 @@ export default function JobsTabScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
-          <View style={[styles.sideStrip, { backgroundColor: colors.jobIcon }]} />
-        </View>
-        <View style={[styles.header, { paddingTop: 12 }]}>
-          <View style={styles.brandSide}>
-            <Icon name="briefcase" size={14} color={colors.jobInk} />
-            <Text style={[styles.brandLabel, styles.jobBrandLabel]}>JOBS · WANTED</Text>
-          </View>
+        <SideHeader kind="job" label="JOBS · WANTED" topInset={insets.top} />
+        <View style={[styles.header, { paddingTop: 0 }]}>
           <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         </View>
         <View style={{ padding: 16 }}>
@@ -516,15 +511,11 @@ export default function JobsTabScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
-        <View style={[styles.sideStrip, { backgroundColor: colors.jobIcon }]} />
-      </View>
-      <View style={[styles.header, { paddingTop: 12 }]}>
-        <View style={styles.brandRow}>
-          <View style={styles.brandSide}>
-            <Icon name="briefcase" size={14} color={colors.jobInk} />
-            <Text style={[styles.brandLabel, styles.jobBrandLabel]}>JOBS · WANTED</Text>
-          </View>
+      <SideHeader
+        kind="job"
+        label="JOBS · WANTED"
+        topInset={insets.top}
+        right={
           <TouchableOpacity
             style={styles.helpBtn}
             onPress={() => navigation.navigate('HowItWorks')}
@@ -532,7 +523,9 @@ export default function JobsTabScreen({ navigation }) {
             accessibilityLabel="How it works">
             <Text style={styles.helpText}>How it works</Text>
           </TouchableOpacity>
-        </View>
+        }
+      />
+      <View style={[styles.header, { paddingTop: 0 }]}>
         <Text style={styles.headerTitle} accessibilityRole="header">Jobs</Text>
         <Text style={styles.headerSub}>The community job board</Text>
         <View style={styles.searchWrap}>

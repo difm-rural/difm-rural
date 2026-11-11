@@ -3,6 +3,7 @@ import {bookingNextMove} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
+import { SideKicker } from '@/components/side-kicker'
 import { requireProvider } from '@/lib/auth'
 import { LiveRefresh } from '@/components/live-refresh'
 import { statusLabel } from '@/lib/work'
@@ -73,7 +74,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
 
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
     <Link href={'/activity'+(history?'?view=history':'')} className="card-link">Back to {history?'History':'Activity'}</Link>
-    <header className="home-heading"><div><p className="eyebrow">{statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
+    <header className="home-heading work-head listing-head"><div><SideKicker side="listing" label="Listings · offered"/><p className="eyebrow">{statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
     {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
   </section></AppShell>
 }

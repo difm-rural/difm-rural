@@ -4,6 +4,7 @@ import Link from '@/components/navigation-link'
 import {notFound} from 'next/navigation'
 import {requireProvider} from '@/lib/auth'
 import {AppShell} from '@/components/app-shell'
+import {SideKicker} from '@/components/side-kicker'
 import {PhotoGallery} from '@/components/photo-gallery'
 import {formatRate,addOnDisplay,variantDisplay,materialsLabel} from '@shared/listingPricing'
 import {allPublicReviews} from '@/lib/profile-data'
@@ -34,7 +35,7 @@ export default async function ListingPage({params,searchParams}:{params:Promise<
  }else{
    try{enquiry=await loadConversation(supabase,user.id,{kind:'listing',id,person:s.provider_id})}catch{}
  }
- return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href={own?'/listings':'/browse'} className="card-link">{own?'Back to My listings':'Back to listings'}</Link><p className="eyebrow">{({service:'Service',grazing:'Grazing',hire:'Gear for hire',lease:'Space to lease',for_sale:'For sale'} as Record<string,string>)[s.kind] || 'Listing'}{own?' · Your listing':''}</p><h1>{s.title}</h1>
+ return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href={own?'/listings':'/browse'} className="card-link">{own?'Back to My listings':'Back to listings'}</Link><header className="work-head listing-head"><SideKicker side="listing" label="Listings · offered"/><p className="eyebrow">{({service:'Service',grazing:'Grazing',hire:'Gear for hire',lease:'Space to lease',for_sale:'For sale'} as Record<string,string>)[s.kind] || 'Listing'}{own?' · Your listing':''}</p><h1>{s.title}</h1></header>
  {s.photos?.length?<PhotoGallery photos={s.photos} title={s.title}/>:<div className="card"><p className="muted">No photos provided.</p></div>}
  {own&&<p className="account-current">{s.closed_at?'Closed listing — visible only to you here':s.is_active?'Live listing':'Paused listing — visible only to you here'} · Manage your listing from My listings.</p>}
  <article className="card work-detail"><h2>Listing details</h2><p>{s.category} · {s.location_name || 'Location to be arranged'}</p><strong>{formatRate(s.pricing_type,s.rate,s.unit_label,s.min_charge)}</strong><p className="work-description">{s.description}</p>

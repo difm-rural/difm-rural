@@ -4,6 +4,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
+import SideHeader from '../../components/SideHeader'
 import AiJobAssistant from '../../components/AiJobAssistant'
 
 // Step 1 is really title + timing — the category is inferred later, so "Basics"
@@ -15,7 +16,9 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
   const navigation=useNavigation()
   const routes=[navigation.getState().routeNames.includes('GuestPostJob')?'GuestPostJob':'PostJob','PostJobStep2Location','PostJobStep3Details','PostJobStep4Budget','PostJobStep5Review']
   return (
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <View style={styles.header}>
+      <SideHeader kind="job" label="POST A JOB · WANTED" tone="dark" topInset={insets.top} bg={colors.primary} pad={16} />
+      <View style={styles.body}>
       <View style={styles.titleRow}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -49,6 +52,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
           )
         })}
       </View>
+      </View>
     </View>
   )
 }
@@ -56,7 +60,10 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
 const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
+  },
+  body: {
     paddingHorizontal: 16,
+    paddingTop: 6,
     paddingBottom: 14,
   },
   titleRow: {

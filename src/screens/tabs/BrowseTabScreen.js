@@ -16,6 +16,7 @@ import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import ServiceListCard from '../../components/ServiceListCard'
 import EmptyState from '../../components/EmptyState'
+import SideHeader from '../../components/SideHeader'
 import { SkeletonList } from '../../components/SkeletonCard'
 import useNearbyBrowsing from '../../hooks/useNearbyBrowsing'
 import NearbyControls from '../../components/NearbyControls'
@@ -149,15 +150,11 @@ export default function BrowseTabScreen({ navigation }) {
   return (
     <View style={styles.screen}>
 
-      <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
-        <View style={[styles.sideStrip, { backgroundColor: colors.listingIcon }]} />
-      </View>
-      <View style={[styles.header, { paddingTop: 12 }]}>
-        <View style={styles.brandRow}>
-          <View style={styles.brandSide}>
-            <Icon name="pricetag" size={14} color={colors.listingInk} />
-            <Text style={[styles.brandLabel, styles.listingBrandLabel]}>LISTINGS · OFFERED</Text>
-          </View>
+      <SideHeader
+        kind="listing"
+        label="LISTINGS · OFFERED"
+        topInset={insets.top}
+        right={
           <TouchableOpacity
             style={styles.helpBtn}
             onPress={() => navigation.navigate('HowItWorks')}
@@ -165,7 +162,9 @@ export default function BrowseTabScreen({ navigation }) {
             accessibilityLabel="How it works">
             <Text style={styles.helpText}>How it works</Text>
           </TouchableOpacity>
-        </View>
+        }
+      />
+      <View style={[styles.header, { paddingTop: 0 }]}>
         <Text style={styles.title}>Listings</Text>
         <Text style={styles.subtitle}>Services, grazing, hire and local goods</Text>
         <TextInput

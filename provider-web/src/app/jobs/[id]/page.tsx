@@ -4,6 +4,7 @@ import {jobNextMove} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
+import { SideKicker } from '@/components/side-kicker'
 import { requireProvider } from '@/lib/auth'
 import { ActionForm } from '@/components/action-form'
 import { LiveRefresh } from '@/components/live-refresh'
@@ -163,7 +164,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}
  </>
 
- return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/jobs" className="card-link">Back to Jobs</Link><header className="home-heading"><div><p className="eyebrow">{statusLabel(job.status)}</p><h1>{job.title}</h1></div><LiveRefresh/></header>
+ return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/jobs" className="card-link">Back to Jobs</Link><header className="home-heading work-head job-head"><div><SideKicker side="job" label="Jobs · wanted"/><p className="eyebrow">{statusLabel(job.status)}</p><h1>{job.title}</h1></div><LiveRefresh/></header>
   {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
  </section></AppShell>
 }

@@ -11,6 +11,7 @@ import { markJobComplete, acceptBid } from '../lib/jobActions'
 import { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
 import ReceivedReview from '../components/ReceivedReview'
 import Icon from '../components/Icon'
+import SideHeader from '../components/SideHeader'
 import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
 import { colors } from '../theme/tokens'
@@ -524,7 +525,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const discreetHouseSit = job.hide_exact_location && !isJobOwner && !isAcceptedProvider
 
   const headerJSX = (
-    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+    <View>
+    <SideHeader kind="job" label="JOB" topInset={insets.top} />
+    <View style={[styles.header, { paddingTop: 6 }]}>
       <View style={styles.headerTopRow}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -541,8 +544,8 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
-      <Text style={styles.kicker}>Job details</Text>
       <Text style={styles.headerTitle} accessibilityRole="header">{job.title}</Text>
+    </View>
     </View>
   )
 

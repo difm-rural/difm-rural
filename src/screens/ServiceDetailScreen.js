@@ -20,6 +20,7 @@ import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle
 import { cancelBookingByRequester } from '../lib/bookingActions'
 import ReviewList from '../components/ReviewList'
 import Icon from '../components/Icon'
+import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
 import { KIND_ENQUIRY, KIND_ENQUIRY_ONLY } from '../../shared/listingPricing'
 import { listingChatParams, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
@@ -296,7 +297,8 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
+      <SideHeader kind="listing" label="LISTING" topInset={insets.top} />
+      <View style={[styles.header, { paddingTop: 8 }]}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
@@ -305,7 +307,6 @@ export default function ServiceDetailScreen({ route, navigation }) {
           accessibilityLabel="Go back">
           <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Listing</Text>
         <Text style={styles.headerTitle} numberOfLines={2} accessibilityRole="header">{service.title}</Text>
         {profile?.full_name ? (
           <Text style={styles.headerSub}>by {profile.full_name}</Text>

@@ -20,6 +20,7 @@ import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
 import CancelModal from '../components/CancelModal'
 import Icon from '../components/Icon'
+import SideHeader from '../components/SideHeader'
 import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
 import JobPaymentHandoff from '../components/JobPaymentHandoff'
@@ -482,7 +483,9 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   // ─── Shared header JSX ────────────────────────────────────────────
   const headerJSX = (
-    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+    <View>
+    <SideHeader kind="job" label="JOB" topInset={insets.top} />
+    <View style={[styles.header, { paddingTop: 6 }]}>
       <TouchableOpacity
         style={[styles.backBtn, styles.backBtnRow]}
         onPress={() => navigation.goBack()}
@@ -492,9 +495,9 @@ export default function ManageTaskScreen({ navigation, route }) {
         <Icon name="chevron-back" size={18} color={colors.primary} />
         <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
-      <Text style={styles.kicker}>Job</Text>
       <Text style={styles.headerTitle} accessibilityRole="header">Manage job</Text>
       <Text style={styles.headerSubtitle} numberOfLines={2}>{job.title}</Text>
+    </View>
     </View>
   )
 

@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import { KindTag } from '../components/SideHeader'
 import EnquiryPersonCard from '../components/EnquiryPersonCard'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
 import { markNotificationsReadFor } from '../lib/notifications'
@@ -339,7 +340,10 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
         <Text style={styles.kicker}>Chat</Text>
         <Text style={styles.headerName} accessibilityRole="header">{otherUserName}</Text>
-        <Text style={styles.headerJob} numberOfLines={1}>{jobTitle}</Text>
+        <View style={styles.headerSubjectRow}>
+          <KindTag kind={(bookingId || serviceId) ? 'listing' : 'job'} />
+          {jobTitle ? <Text style={styles.headerJob} numberOfLines={1}>{jobTitle}</Text> : null}
+        </View>
       </View>
 
       {/* ── Message list + input, avoid keyboard ─────────────────── */}
@@ -447,7 +451,8 @@ const styles = StyleSheet.create({
   backText:   { color: colors.primary, fontSize: 15, fontWeight: '600' },
   kicker:     { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
   headerName: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
-  headerJob:  { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
+  headerSubjectRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  headerJob:  { flexShrink: 1, fontSize: 15, lineHeight: 22, color: colors.textSecondary },
 
   // ─── Message list ──────────────────────────────────────────────────
   messageList: { padding: 16, flexGrow: 1 },

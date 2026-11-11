@@ -11,7 +11,7 @@ import {SaveSearch} from '@/components/save-search'
 import {discoveryFilters,discover,discoveryHref,coordinates} from '@/lib/discovery'
 import {loadDiscoveryJobs,watchedJobs,ownedInterest} from '@/lib/discovery-data'
 import {browsingOrigin} from '@/lib/browsing-origin'
-import {Briefcase} from 'lucide-react'
+import {SideKicker} from '@/components/side-kicker'
 export const dynamic='force-dynamic'
 function filledAgo(iso:string){
  const days=Math.floor((Date.now()-new Date(iso).getTime())/86400000)
@@ -32,7 +32,7 @@ export default async function JobsPage({searchParams}:{searchParams:Promise<Reco
  // Privacy-safe recent activity (coarse category + area only), near the browsing origin.
  let filled:{category:string;area:string;filled_at:string}[]=[],filledCount=0
  try{const geo=origin?{p_lat:origin.latitude,p_lng:origin.longitude,p_radius_km:50}:{};const [rf,fc]=await Promise.all([supabase.rpc('recently_filled_jobs',{...geo,p_limit:12}),supabase.rpc('filled_jobs_count',geo)]);if(!rf.error&&Array.isArray(rf.data))filled=rf.data as {category:string;area:string;filled_at:string}[];if(!fc.error&&typeof fc.data==='number')filledCount=fc.data}catch{}
- return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><header className="home-heading work-head job-head"><div><p className="work-kicker job"><Briefcase size={14}/>Jobs · wanted</p><h1>Find local work</h1><p className="muted">Open jobs from people in your community</p></div><Link href="/jobs/new" className="lform-save">Post a job</Link></header><nav className="activity-segments" aria-label="Jobs views"><Link href="/jobs" aria-current="page">All jobs</Link><Link href="/jobs/saved">Saved</Link><Link href="/account/interests">Alerts</Link></nav>
+ return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><header className="home-heading work-head job-head"><div><SideKicker side="job" label="Jobs · wanted"/><h1>Find local work</h1><p className="muted">Open jobs from people in your community</p></div><Link href="/jobs/new" className="lform-save">Post a job</Link></header><nav className="activity-segments" aria-label="Jobs views"><Link href="/jobs" aria-current="page">All jobs</Link><Link href="/jobs/saved">Saved</Link><Link href="/account/interests">Alerts</Link></nav>
  <DiscoverySearch filters={f} locationLabel={locationLabel} hasLocation={!!origin}/>{f.interest&&<p className="account-current">Viewing a saved search. Changing the search options starts a new search; your saved search stays unchanged.</p>}
  {watchError&&<p role="alert">Could not load saved-job status. Refresh before saving or removing jobs.</p>}
  {error?<div className="card" role="alert"><h2>Couldn&apos;t load jobs or the saved search</h2><p>Check your connection and try again.</p><Link href={href(f.page)} className="card-link">Retry</Link></div>:needsLocation?<div className="card"><h2>{locationError?'Could not load your location':'Choose a browsing location'}</h2><p>Use current location in Search options, add a private GPS location to your profile, or search Any distance with Newest first.</p><Link href="/account/profile" className="card-link">Open Profile</Link></div>:<>

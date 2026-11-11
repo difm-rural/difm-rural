@@ -29,6 +29,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
+import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { existingListingPin, listingLocationFields } from '../lib/listingLocation'
@@ -1911,7 +1912,12 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <SideHeader
+        kind="listing"
+        label={isEditing ? 'EDIT LISTING' : 'CREATE A LISTING · OFFERED'}
+        topInset={insets.top}
+      />
+      <View style={[styles.header, { paddingTop: 4 }]}>
         <View style={styles.headerActions}>
           <Text style={styles.compactTitle} numberOfLines={1} accessibilityRole="header">
             {isEditing ? 'Edit listing' : (KIND_COPY[kind]?.header || 'Advertise a listing')}

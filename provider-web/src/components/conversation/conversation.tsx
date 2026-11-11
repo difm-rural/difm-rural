@@ -78,7 +78,7 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
   const counterpartFirst=context.name && context.name!=='Community member'?context.name.trim().split(/\s+/)[0]:'the other person'
   return <section className={'message-conversation'+(compact?' compact':'')} aria-label={'Conversation with '+context.name}>
     {compact && heading && <header className="conversation-compact-head"><h2>{heading}</h2><p className="muted">Only you and {counterpartFirst} can see these messages.</p></header>}
-    {!compact && <header className="enq-thread-head"><Link href="/activity" className="card-link">← Activity</Link><h2>{context.name}</h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
+    {!compact && <header className="enq-thread-head"><Link href="/activity" className="card-link">← Activity</Link><h2>{context.name} <span className={'lcard-sidetag '+(context.kind==='job'?'job':'listing')}>{context.kind==='job'?'Job':'Listing'}</span></h2><span>{context.title} · {context.kind==='listing'?'Listing enquiry':context.kind==='job'?'Job':'Booking'}</span>
       <Link href={'/people/'+context.person} className="card-link">Profile & reviews →</Link>
       {context.kind!=='listing' && <Link className="card-link" href={workManageHref(context.kind,context.id)}>Arrangement details & reviews →</Link>}
     </header>}
