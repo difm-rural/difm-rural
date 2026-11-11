@@ -29,21 +29,8 @@ export function markJobComplete(jobId) {
       .from('jobs')
       .update({ status: JOB_STATUS.COMPLETED })
       .eq('id', jobId)
-      .in('status', [JOB_STATUS.ACCEPTED, JOB_STATUS.IN_PROGRESS]),
-    'This job is no longer in progress — please refresh.'
-  )
-}
-
-// Requester confirms the work is done -> closes the job.
-export function confirmJobComplete(jobId, requesterId) {
-  return commit(
-    supabase
-      .from('jobs')
-      .update({ status: JOB_STATUS.COMPLETED })
-      .eq('id', jobId)
-      .eq('requester_id', requesterId)
-      .in('status', [JOB_STATUS.AWAITING_COMPLETION]),
-    'This job can no longer be confirmed — please refresh.'
+      .eq('status', JOB_STATUS.ACCEPTED),
+    'This job is no longer accepted — please refresh.'
   )
 }
 
@@ -61,8 +48,8 @@ export function cancelJob(jobId, requesterId, { reason, note } = {}) {
 }
 
 // Requester deletes their job. Blocked while a provider is actively engaged
-// (accepted / in_progress / awaiting_completion) — deleting then would orphan
-// their work, so the owner must cancel (which notifies the provider) first.
+// (accepted) — deleting then would orphan their work, so the owner must cancel
+// (which notifies the provider) first.
 // Open and finished (cancelled/completed) jobs can still be removed.
 export function deleteJob(jobId, requesterId) {
   return commit(

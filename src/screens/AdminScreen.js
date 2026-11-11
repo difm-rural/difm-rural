@@ -14,7 +14,7 @@ import Icon from '../components/Icon'
 import Loading from '../components/Loading'
 import EmptyState from '../components/EmptyState'
 
-const JOB_AWARDED = ['accepted', 'in_progress', 'awaiting_completion']
+const JOB_AWARDED = ['accepted']
 const BOOKING_ACTIVE = ['pending', 'quote_sent', 'confirmed', 'in_progress', 'awaiting_completion', 'cancellation_requested']
 const TIME_FILTERS = [
   { key: '24h', label: 'Last 24 hours', hours: 24 },

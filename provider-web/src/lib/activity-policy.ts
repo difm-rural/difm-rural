@@ -22,8 +22,8 @@ export function workActions(work: ActivityWork, userId: string): WorkAction[] {
     ...(role === 'provider' && work.listingKind === 'grazing' && work.closedAt ? ['relist' as const] : []),
   ]
   if (work.kind === 'job') {
-    if (role === 'requester' && ['open', 'accepted', 'in_progress', 'awaiting_completion'].includes(work.status)) return ['cancel']
-    if (role === 'provider' && ['accepted', 'in_progress'].includes(work.status)) return ['complete']
+    if (role === 'requester' && ['open', 'accepted'].includes(work.status)) return ['cancel']
+    if (role === 'provider' && work.status === 'accepted') return ['complete']
   } else {
     if (role === 'requester') {
       if (['pending', 'quote_sent'].includes(work.status)) return ['withdraw']
@@ -36,6 +36,6 @@ export function workActions(work: ActivityWork, userId: string): WorkAction[] {
   return []
 }
 export function activityIsActive(kind: WorkKind | 'offer', status: string, jobStatus?: string) {
-  if (kind === 'offer') return (status === 'pending' && jobStatus === 'open') || (status === 'accepted' && ['accepted', 'in_progress', 'awaiting_completion'].includes(jobStatus || ''))
-  return (kind === 'job' ? ['open','accepted','in_progress','awaiting_completion'] : ['pending','quote_sent','confirmed','in_progress','awaiting_completion','cancellation_requested']).includes(status)
+  if (kind === 'offer') return (status === 'pending' && jobStatus === 'open') || (status === 'accepted' && jobStatus === 'accepted')
+  return (kind === 'job' ? ['open','accepted'] : ['pending','quote_sent','confirmed','in_progress','awaiting_completion','cancellation_requested']).includes(status)
 }

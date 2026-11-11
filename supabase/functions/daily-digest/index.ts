@@ -40,15 +40,9 @@ async function summarize(supabase: SB, uid: string): Promise<string[]> {
     lines.push(`${openJobs} open job${plural(openJobs)}${offers > 0 ? ` · ${offers} offer${plural(offers)}` : ''}`)
   }
 
-  const jobsToConfirm = await countRows(
-    supabase.from('jobs').select('id', { count: 'exact', head: true })
-      .eq('requester_id', uid).eq('status', 'awaiting_completion')
-  )
-  if (jobsToConfirm > 0) lines.push(`${jobsToConfirm} job${plural(jobsToConfirm)} to confirm complete`)
-
   const jobsAwarded = await countRows(
     supabase.from('jobs').select('id', { count: 'exact', head: true })
-      .eq('requester_id', uid).in('status', ['accepted', 'in_progress'])
+      .eq('requester_id', uid).eq('status', 'accepted')
   )
   if (jobsAwarded > 0) lines.push(`${jobsAwarded} job${plural(jobsAwarded)} in progress`)
 
@@ -80,7 +74,7 @@ async function summarize(supabase: SB, uid: string): Promise<string[]> {
     const jobIds = acceptedBids.map((b: { job_id: string }) => b.job_id)
     const jobsDoing = await countRows(
       supabase.from('jobs').select('id', { count: 'exact', head: true })
-        .in('id', jobIds).in('status', ['accepted', 'in_progress', 'awaiting_completion'])
+        .in('id', jobIds).eq('status', 'accepted')
     )
     if (jobsDoing > 0) lines.push(`${jobsDoing} job${plural(jobsDoing)} you're doing`)
   }
