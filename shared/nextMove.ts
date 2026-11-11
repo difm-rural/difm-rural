@@ -64,6 +64,7 @@ export function jobNextMove(
     hasPendingBid = false,
     paymentMethod = null,
     paymentMarkedSentAt = null,
+    hasArrival = true,
   }: {
     otherName?: string | null
     bidCount?: number
@@ -71,6 +72,7 @@ export function jobNextMove(
     hasPendingBid?: boolean
     paymentMethod?: string | null
     paymentMarkedSentAt?: string | null
+    hasArrival?: boolean
   } = {},
 ): NextMove | null {
   if (!job) return null
@@ -103,13 +105,18 @@ export function jobNextMove(
     const method = paymentMethod || null
     const paid = !!paymentMarkedSentAt
 
-    if (viewerRole === 'provider') {
-      // Step 1: how do you want to be paid? (timing + method in one move)
-      if (!method) {
-        return move('Waiting on you', "Confirm timing and how you'd like to be paid", {
-          needsAction: true, tone: 'attention', icon: 'card-outline', actionLabel: 'Next steps',
+    // One step first: confirm the arrival time and how to get paid. Until both
+    // are set, everything else waits on that.
+    if (!hasArrival || !method) {
+      if (viewerRole === 'provider') {
+        return move('Waiting on you', 'Confirm the job — arrival time and how to get paid', {
+          needsAction: true, tone: 'attention', icon: 'calendar-outline', actionLabel: 'Confirm job',
         })
       }
+      return move(`Waiting on ${other}`, "They'll confirm the arrival time and how to pay")
+    }
+
+    if (viewerRole === 'provider') {
       // Step 3: requester says they've paid → check, then complete.
       if (paid) {
         return move('Payment marked sent', "Check it's arrived, then mark the job complete", {
@@ -125,10 +132,7 @@ export function jobNextMove(
       })
     }
 
-    // Requester side.
-    if (!method) {
-      return move(`Waiting on ${other}`, "They'll confirm timing and how to pay")
-    }
+    // Requester side (job is confirmed: arrival + method set).
     if (paid) {
       return move(`Waiting on ${other}`, "They'll mark the job complete")
     }

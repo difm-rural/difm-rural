@@ -117,6 +117,36 @@ export async function setJobPaymentMethod(_:ActionState,data:FormData):Promise<A
  return {error:'',success:'Payment details sent to the requester.'}
 }
 
+// Provider: confirm the job — arrival time + how to get paid, in one step.
+export async function confirmJob(_:ActionState,data:FormData):Promise<ActionState>{
+ const {supabase}=await requireProvider()
+ const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),arrival=text(data,'arrival'),method=text(data,'method'),message=text(data,'message')
+ if(!validId(bidId))return failed()
+ if(!['bank_transfer','cash','invoice','agreed'].includes(method))return {error:'Choose how you would like to be paid.'}
+ const when=new Date(arrival)
+ if(Number.isNaN(when.getTime())||when.getTime()<=Date.now())return {error:'Choose an arrival time in the future.'}
+ if(message.length>2000)return {error:'Keep the message to 2,000 characters.'}
+ const {error}=await supabase.rpc('confirm_job',{p_bid:bidId,p_arrival:when.toISOString(),p_method:method,p_message:message})
+ if(error)return {error:'Could not confirm the job. Refresh and try again.'}
+ if(validId(jobId))revalidatePath('/jobs/'+jobId)
+ revalidatePath('/activity');revalidatePath('/')
+ return {error:'',success:'Job confirmed. The requester has been notified.'}
+}
+
+// Provider: change just the arrival time later (reuses the arrival RPC).
+export async function changeJobArrival(_:ActionState,data:FormData):Promise<ActionState>{
+ const {supabase}=await requireProvider()
+ const jobId=text(data,'job_id'),arrival=text(data,'arrival')
+ const when=new Date(arrival)
+ if(Number.isNaN(when.getTime())||when.getTime()<=Date.now())return {error:'Choose an arrival time in the future.'}
+ const end=new Date(when.getTime()+30*60000)
+ const {error}=await supabase.rpc('set_work_arrival_window',{p_job_id:jobId,p_booking_id:null,p_start:when.toISOString(),p_end:end.toISOString()})
+ if(error)return {error:'Could not update the arrival time. Refresh and try again.'}
+ if(validId(jobId))revalidatePath('/jobs/'+jobId)
+ revalidatePath('/activity');revalidatePath('/')
+ return {error:'',success:'Arrival time updated.'}
+}
+
 // Requester: mark the payment sent (or undo before the job is completed). The
 // RPC enforces that only the job's requester can call it.
 export async function markJobPaymentSent(_:ActionState,data:FormData):Promise<ActionState>{

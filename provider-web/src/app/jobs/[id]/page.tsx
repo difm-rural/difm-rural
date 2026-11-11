@@ -1,5 +1,5 @@
 import {jobMapTarget} from '@shared/jobMapTarget'
-import {formatMoney as nzMoney,formatDate as nzDate} from '@shared/formatting'
+import {formatMoney as nzMoney,formatDate as nzDate,formatDateTime as nzDateTime} from '@shared/formatting'
 import {jobNextMove} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
@@ -19,7 +19,7 @@ import { Conversation } from '@/components/conversation/conversation'
 import { ManageActions } from '@/components/work/manage-actions'
 import { ReviewsSection } from '@/components/work/reviews-section'
 import { PostFeedback } from '@/components/post-feedback'
-import { PaymentProvider } from './payment-provider'
+import { ConfirmJob } from './confirm-job'
 import { PaymentRequester } from './payment-requester'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
@@ -70,6 +70,13 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  // ─── Payment handoff (jobs only) ────────────────────────────────────────────
  const payActive=['accepted','in_progress'].includes(job.status)
  const payMethod=acceptedOffer?.payment_method as string|null|undefined
+ // Confirmed once arrival (work schedule) and payment method are both set.
+ let workArrival:string|null=null
+ if(payActive&&acceptedProviderId){
+   const {data:ws}=await supabase.from('work_schedules').select('arrival_start_at').eq('job_id',id).maybeSingle()
+   workArrival=ws?.arrival_start_at || null
+ }
+ const jobConfirmed=!!workArrival&&!!payMethod
  // The requester's bank details live only in the thread — fetch the provider's
  // message posted when they shared the method.
  let bankDetails:string|null=null
@@ -77,11 +84,14 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    const {data:payMsg}=await supabase.from('messages').select('content').eq('id',acceptedOffer.payment_message_id).maybeSingle()
    bankDetails=payMsg?.content || null
  }
+ const confirmedStatus=['accepted','in_progress','awaiting_completion'].includes(job.status)
  const paymentProviderCard=isAcceptedProvider&&payActive&&acceptedOffer
-   ? <PaymentProvider bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterId={job.requester_id} requesterFirst={otherFirst} availableFrom={acceptedOffer.available_from} method={payMethod || null}/>
+   ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} method={payMethod || null}/>
    : null
- const paymentRequesterCard=own&&payMethod&&['accepted','in_progress','awaiting_completion'].includes(job.status)&&acceptedOffer
-   ? <PaymentRequester bidId={acceptedOffer.id} jobId={id} method={payMethod} providerFirst={otherFirst} bankDetails={bankDetails} markedSent={!!acceptedOffer.payment_marked_sent_at}/>
+ const paymentRequesterCard=own&&confirmedStatus&&acceptedOffer
+   ? (jobConfirmed
+     ? <><section className="card payment-card"><p><strong>Arriving around {nzDateTime(new Date(workArrival!))}</strong></p></section><PaymentRequester bidId={acceptedOffer.id} jobId={id} method={payMethod!} providerFirst={otherFirst} bankDetails={bankDetails} markedSent={!!acceptedOffer.payment_marked_sent_at}/></>
+     : <section className="card payment-card"><p><strong>Waiting on {otherFirst}</strong></p><p className="muted">{otherFirst} will confirm the arrival time and how to pay.</p></section>)
    : null
 
  // Conversation: load ONLY the selected thread. Side panel once there is an accepted

@@ -333,6 +333,8 @@ export default function ManageTaskScreen({ navigation, route }) {
   const budgetText = job.price_type === 'fixed' ? `${nzMoney(job.price)}` : 'Open to offers'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
+  // Confirmed once the provider has set BOTH the arrival time and how to be paid.
+  const jobConfirmed = !!workSchedule?.arrival_start_at && !!acceptedBid?.paymentMethod
   const isAwarded = isJobAwarded(job.status)
   const nextMove = jobNextMove(job, isAcceptedProvider ? 'provider' : 'requester', {
     otherName: isAcceptedProvider ? requesterProfile?.full_name : acceptedBid?.providerName,
@@ -565,21 +567,28 @@ export default function ManageTaskScreen({ navigation, route }) {
           <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
 
           {['accepted', 'in_progress'].includes(job.status) ? (
-            <WorkScheduleCard
-              schedule={workSchedule}
-              canSetWindow={isAcceptedProvider}
-              onSetWindow={() => setArrivalModalVisible(true)}
-              onAddCalendar={() => addWorkToPhoneCalendar({
-                title: job.title,
-                schedule: workSchedule,
-                location: job.location_name,
-                otherPartyName,
-              })}
-              onRunningLate={handleRunningLate}
-            />
+            (isTaskOwner && !jobConfirmed) ? (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Waiting on {otherPartyFirstName}</Text>
+                <Text style={styles.waitBody}>{otherPartyFirstName} will confirm the arrival time and how to pay.</Text>
+              </View>
+            ) : (
+              <WorkScheduleCard
+                schedule={workSchedule}
+                canSetWindow={isAcceptedProvider}
+                onSetWindow={() => setArrivalModalVisible(true)}
+                onAddCalendar={() => addWorkToPhoneCalendar({
+                  title: job.title,
+                  schedule: workSchedule,
+                  location: job.location_name,
+                  otherPartyName,
+                })}
+                onRunningLate={handleRunningLate}
+              />
+            )
           ) : null}
 
-          {isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status) && acceptedBid?.bidId ? (
+          {isTaskOwner && jobConfirmed && ['accepted', 'in_progress', 'awaiting_completion'].includes(job.status) && acceptedBid?.bidId ? (
             <JobPaymentHandoff
               viewerRole="requester"
               jobId={job.id}
@@ -1033,6 +1042,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   accessBody: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 21,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  waitBody: {
     fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 21,

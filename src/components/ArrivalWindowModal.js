@@ -25,7 +25,7 @@ function roundUpToHalfHour(d) {
 // Default arrival for a given date: today (or earlier) → now rounded up to the
 // next half hour, nudged on +30 min if that lands under 15 min away; otherwise
 // 9:00 am on that date.
-function defaultStartForDate(suggestedDate) {
+export function defaultStartForDate(suggestedDate) {
   const now = new Date()
   const base = suggestedDate ? new Date(suggestedDate) : new Date()
   const picked = Number.isNaN(base.getTime()) ? new Date() : base
@@ -45,7 +45,7 @@ function initialStart(schedule, suggestedDate) {
   return defaultStartForDate(suggestedDate)
 }
 
-function timeLabel(date) {
+export function timeLabel(date) {
   return date.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone: 'Pacific/Auckland' })
 }
 

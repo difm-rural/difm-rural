@@ -93,19 +93,6 @@ export default function JobPaymentHandoff({
   const [acct, setAcct] = useState('')
   const [acctNo, setAcctNo] = useState('')
   const [reference, setReference] = useState('Payment for ' + (jobTitle || 'the job'))
-  const [timing, setTiming] = useState(
-    `Hi ${otherFirstName}, I can do ${availableFrom ? nzDate(availableFrom) : 'this'} — does that suit?`,
-  )
-  const [timingState, setTimingState] = useState('idle') // idle | busy | sent
-
-  async function sendTiming() {
-    if (timingState === 'busy' || !timing.trim()) return
-    setTimingState('busy')
-    const { error: msgError } = await supabase.from('messages')
-      .insert({ job_id: jobId, sender_id: currentUserId, receiver_id: counterpartId, content: timing.trim() })
-    if (msgError) { setTimingState('idle'); setError('Could not send the message. Try again.'); return }
-    setTimingState('sent'); onChanged?.()
-  }
 
   async function sendMethod() {
     if (busy || !choice) return
@@ -136,26 +123,7 @@ export default function JobPaymentHandoff({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Next steps</Text>
-
-      <Text style={styles.stepLabel}>1. Confirm timing</Text>
-      <TextInput
-        style={styles.input}
-        value={timing}
-        onChangeText={setTiming}
-        multiline
-        maxLength={1000}
-        accessibilityLabel="Timing message"
-      />
-      <Button
-        variant="secondary"
-        title={timingState === 'sent' ? 'Message sent' : timingState === 'busy' ? 'Sending…' : `Send to ${otherFirstName}`}
-        onPress={sendTiming}
-        disabled={timingState !== 'idle'}
-        style={{ marginBottom: 14 }}
-      />
-
-      <Text style={styles.stepLabel}>2. How would you like to be paid?</Text>
+      <Text style={styles.title}>How would you like to be paid?</Text>
       <View style={styles.options}>
         {Object.entries(METHOD_LABELS).map(([id, label]) => (
           <TouchableOpacity

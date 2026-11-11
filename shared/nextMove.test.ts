@@ -18,9 +18,17 @@ const futureWeekday = new Date(future + 'T12:00:00').toLocaleDateString('en-NZ',
 const pick = (m: ReturnType<typeof jobNextMove>) => m && { label: m.label, detail: m.detail, needsAction: m.needsAction, tone: m.tone, actionLabel: m.actionLabel }
 
 // ---- Provider, accepted/in_progress ----
-check('provider · no method',
+check('provider · not confirmed → confirm job',
   pick(jobNextMove({ status: 'accepted' }, 'provider', {})),
-  { label: 'Waiting on you', detail: "Confirm timing and how you'd like to be paid", needsAction: true, tone: 'attention', actionLabel: 'Next steps' })
+  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
+
+check('provider · arrival set but no method → still confirm',
+  pick(jobNextMove({ status: 'accepted' }, 'provider', { hasArrival: true, paymentMethod: null })),
+  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
+
+check('provider · method set but no arrival → still confirm',
+  pick(jobNextMove({ status: 'accepted' }, 'provider', { hasArrival: false, paymentMethod: 'cash' })),
+  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
 
 check('provider · method set, no schedule → complete the work',
   pick(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash' })),
@@ -34,14 +42,18 @@ check('provider · marked paid',
   pick(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentMarkedSentAt: '2026-11-09T00:00:00Z' })),
   { label: 'Payment marked sent', detail: "Check it's arrived, then mark the job complete", needsAction: true, tone: 'active', actionLabel: 'View job' })
 
-check('provider · in_progress behaves like accepted (no method)',
+check('provider · in_progress, not confirmed → confirm job',
   pick(jobNextMove({ status: 'in_progress' }, 'provider', {})),
-  { label: 'Waiting on you', detail: "Confirm timing and how you'd like to be paid", needsAction: true, tone: 'attention', actionLabel: 'Next steps' })
+  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
 
 // ---- Requester, accepted/in_progress ----
-check('requester · no method',
+check('requester · not confirmed → they will confirm',
   pick(jobNextMove({ status: 'accepted' }, 'requester', {})),
-  { label: 'Waiting on the provider', detail: "They'll confirm timing and how to pay", needsAction: false, tone: 'waiting', actionLabel: null })
+  { label: 'Waiting on the provider', detail: "They'll confirm the arrival time and how to pay", needsAction: false, tone: 'waiting', actionLabel: null })
+
+check('requester · method set but no arrival → waiting to confirm',
+  pick(jobNextMove({ status: 'accepted' }, 'requester', { hasArrival: false, paymentMethod: 'cash' })),
+  { label: 'Waiting on the provider', detail: "They'll confirm the arrival time and how to pay", needsAction: false, tone: 'waiting', actionLabel: null })
 
 check('requester · bank, not paid, no/past schedule → pay now (needsAction)',
   pick(jobNextMove({ status: 'accepted', scheduled_date: past }, 'requester', { paymentMethod: 'bank_transfer' })),

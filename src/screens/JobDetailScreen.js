@@ -27,6 +27,7 @@ import { recordJobProviderView } from '../lib/listingPerformance'
 import WorkScheduleCard from '../components/WorkScheduleCard'
 import ArrivalWindowModal from '../components/ArrivalWindowModal'
 import JobPaymentHandoff from '../components/JobPaymentHandoff'
+import ConfirmJobSheet from '../components/ConfirmJobSheet'
 import {
   addWorkToPhoneCalendar,
   fetchWorkSchedule,
@@ -103,6 +104,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [savingProviderReview, setSavingProviderReview] = useState(false)
   const [workSchedule, setWorkSchedule] = useState(null)
   const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
+  const [confirmJobVisible, setConfirmJobVisible] = useState(false)
   const [savingArrival, setSavingArrival] = useState(false)
 
   // Bid form state (Features 3 & 4)
@@ -504,6 +506,8 @@ export default function JobDetailScreen({ route, navigation }) {
   // them to enable providing first.
   const needsProviderOptIn = !isJobOwner && job.status === 'open' && !!profile && !canProvideJobs
   const isAcceptedProvider = !isJobOwner && myBid?.status === 'accepted'
+  // Confirmed once the provider has set BOTH the arrival time and how to be paid.
+  const jobConfirmed = isAcceptedProvider && !!workSchedule?.arrival_start_at && !!myBid?.payment_method
   // Hidden-location job seen by anyone who isn't the owner or the accepted
   // provider: show the suburb only and no navigation, so location stays discreet.
   const discreetHouseSit = job.hide_exact_location && !isJobOwner && !isAcceptedProvider
@@ -658,18 +662,26 @@ export default function JobDetailScreen({ route, navigation }) {
           ) : null}
 
           {(!isCompleted && !isCancelled && !isAwaitingCompletion) ? (
-            <WorkScheduleCard
-              schedule={workSchedule}
-              canSetWindow
-              onSetWindow={() => setArrivalModalVisible(true)}
-              onAddCalendar={() => addWorkToPhoneCalendar({
-                title: job.title,
-                schedule: workSchedule,
-                location: jobLocation(job),
-                otherPartyName: requesterProfile?.full_name,
-              })}
-              onRunningLate={handleRunningLate}
-            />
+            jobConfirmed ? (
+              <WorkScheduleCard
+                schedule={workSchedule}
+                canSetWindow
+                onSetWindow={() => setArrivalModalVisible(true)}
+                onAddCalendar={() => addWorkToPhoneCalendar({
+                  title: job.title,
+                  schedule: workSchedule,
+                  location: jobLocation(job),
+                  otherPartyName: requesterProfile?.full_name,
+                })}
+                onRunningLate={handleRunningLate}
+              />
+            ) : (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Confirm the job</Text>
+                <Text style={styles.confirmBody}>Set your arrival time and how you&apos;d like to be paid — {requesterFirstName} will be notified.</Text>
+                <Button title="Confirm job" onPress={() => setConfirmJobVisible(true)} accessibilityLabel="Confirm the job" />
+              </View>
+            )
           ) : null}
 
           {isCompleted && <ReceivedReview review={receivedReview} fromLabel="requester" />}
@@ -706,7 +718,7 @@ export default function JobDetailScreen({ route, navigation }) {
             ) : null}
           </View>
 
-          {isAcceptedProvider && ['accepted', 'in_progress'].includes(job.status) && myBid?.id ? (
+          {jobConfirmed && ['accepted', 'in_progress'].includes(job.status) && myBid?.id ? (
             <JobPaymentHandoff
               viewerRole="provider"
               jobId={job.id}
@@ -793,6 +805,19 @@ export default function JobDetailScreen({ route, navigation }) {
           saving={savingArrival}
           onClose={() => setArrivalModalVisible(false)}
           onSave={handleSaveArrivalWindow}
+        />
+        <ConfirmJobSheet
+          visible={confirmJobVisible}
+          bidId={myBid?.id}
+          jobTitle={job.title}
+          requesterFirst={requesterFirstName}
+          availableFrom={myBid?.available_from || job.scheduled_date || job.date_from}
+          onClose={() => setConfirmJobVisible(false)}
+          onConfirmed={() => {
+            setConfirmJobVisible(false)
+            fetchData()
+            Alert.alert('Job confirmed', `${requesterFirstName} has been notified.`)
+          }}
         />
         </KeyboardAvoidingView>
       </View>
@@ -1384,6 +1409,7 @@ const styles = StyleSheet.create({
 
   section:      { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 14 },
+  confirmBody: { fontSize: 13, lineHeight: 19, color: colors.textSecondary, marginTop: -4, marginBottom: 14 },
   optInBody: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
 
   input:     { backgroundColor: colors.background, borderRadius: 8, padding: 14, fontSize: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
