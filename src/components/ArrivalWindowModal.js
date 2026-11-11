@@ -6,19 +6,47 @@ import Button from './Button'
 import Icon from './Icon'
 import { colors } from '../theme/tokens'
 
+// The schema still stores an arrival_end_at, and the running-late + completion
+// logic (and the DB check) need an end, so we save arrival + a short grace.
+const ARRIVAL_GRACE_MIN = 30
+
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+
+function roundUpToHalfHour(d) {
+  const r = new Date(d)
+  r.setSeconds(0, 0)
+  const m = r.getMinutes()
+  if (m === 0 || m === 30) return r
+  if (m < 30) r.setMinutes(30)
+  else { r.setMinutes(0); r.setHours(r.getHours() + 1) }
+  return r
+}
+
+// Default arrival for a given date: today (or earlier) → now rounded up to the
+// next half hour, nudged on +30 min if that lands under 15 min away; otherwise
+// 9:00 am on that date.
+function defaultStartForDate(suggestedDate) {
+  const now = new Date()
+  const base = suggestedDate ? new Date(suggestedDate) : new Date()
+  const picked = Number.isNaN(base.getTime()) ? new Date() : base
+  if (startOfDay(picked) <= startOfDay(now)) {
+    // e.g. now 1:45 pm → round up to 2:00, which is within 15 min → 2:30 pm.
+    let r = roundUpToHalfHour(now)
+    if (r.getTime() - now.getTime() <= 15 * 60 * 1000) r = new Date(r.getTime() + 30 * 60 * 1000)
+    return r
+  }
+  const nine = new Date(picked)
+  nine.setHours(9, 0, 0, 0)
+  return nine
+}
+
 function initialStart(schedule, suggestedDate) {
   if (schedule?.arrival_start_at) return new Date(schedule.arrival_start_at)
-  let date = suggestedDate ? new Date(suggestedDate) : new Date()
-  if (Number.isNaN(date.getTime()) || date < new Date()) {
-    date = new Date()
-    date.setDate(date.getDate() + 1)
-  }
-  date.setHours(9, 0, 0, 0)
-  return date
+  return defaultStartForDate(suggestedDate)
 }
 
 function timeLabel(date) {
-  return date.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone:'Pacific/Auckland' })
+  return date.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone: 'Pacific/Auckland' })
 }
 
 export default function ArrivalWindowModal({
@@ -30,7 +58,6 @@ export default function ArrivalWindowModal({
   onSave,
 }) {
   const [start, setStart] = useState(() => initialStart(schedule, suggestedDate))
-  const [end, setEnd] = useState(() => new Date(start.getTime() + 2 * 60 * 60 * 1000))
   const [expectedComplete, setExpectedComplete] = useState(() => new Date(start.getTime() + 6 * 60 * 60 * 1000))
   const [picker, setPicker] = useState(null)
 
@@ -38,52 +65,39 @@ export default function ArrivalWindowModal({
     if (!visible) return
     const nextStart = initialStart(schedule, suggestedDate)
     setStart(nextStart)
-    setEnd(schedule?.arrival_end_at
-      ? new Date(schedule.arrival_end_at)
-      : new Date(nextStart.getTime() + 60 * 60 * 1000))
     setExpectedComplete(schedule?.expected_complete_at
       ? new Date(schedule.expected_complete_at)
       : new Date(nextStart.getTime() + 6 * 60 * 60 * 1000))
     setPicker(null)
-  }, [visible, schedule?.arrival_start_at, schedule?.arrival_end_at, suggestedDate])
+  }, [visible, schedule?.arrival_start_at, schedule?.expected_complete_at, suggestedDate])
 
   function changeDate(nextDate) {
-    const duration = end.getTime() - start.getTime()
-    const nextStart = new Date(start)
-    nextStart.setFullYear(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate())
+    const nextStart = defaultStartForDate(nextDate)
     setStart(nextStart)
-    setEnd(new Date(nextStart.getTime() + Math.max(duration, 30 * 60 * 1000)))
-    const finishDuration = expectedComplete.getTime() - start.getTime()
-    setExpectedComplete(new Date(nextStart.getTime() + Math.max(finishDuration, duration)))
+    setExpectedComplete(new Date(nextStart.getTime() + 6 * 60 * 60 * 1000))
   }
 
   function changeStart(nextTime) {
     const next = new Date(start)
     next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
     setStart(next)
-    if (end <= next) setEnd(new Date(next.getTime() + 60 * 60 * 1000))
     if (expectedComplete <= next) setExpectedComplete(new Date(next.getTime() + 6 * 60 * 60 * 1000))
-  }
-
-  function changeEnd(nextTime) {
-    const next = new Date(start)
-    next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
-    if (next <= start) next.setDate(next.getDate() + 1)
-    setEnd(next)
-    if (expectedComplete < next) setExpectedComplete(next)
   }
 
   function changeExpectedComplete(nextTime) {
     const next = new Date(start)
     next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
-    if (next < end) next.setDate(next.getDate() + 1)
+    if (next <= start) next.setDate(next.getDate() + 1)
     setExpectedComplete(next)
   }
 
-  const pickerValue = picker === 'date' ? start
-    : picker === 'start' ? start
-    : picker === 'end' ? end
-    : expectedComplete
+  const pickerValue = picker === 'date' || picker === 'start' ? start : expectedComplete
+  const isPast = start.getTime() <= Date.now()
+
+  function handleSave() {
+    const end = new Date(start.getTime() + ARRIVAL_GRACE_MIN * 60 * 1000)
+    onSave(start, end, expectedComplete)
+  }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -92,7 +106,7 @@ export default function ArrivalWindowModal({
           <View style={styles.heading}>
             <View>
               <Text style={styles.kicker}>WORK SCHEDULE</Text>
-              <Text style={styles.title}>Confirm arrival window</Text>
+              <Text style={styles.title}>Confirm arrival time</Text>
             </View>
             <TouchableOpacity onPress={onClose} accessibilityLabel="Close">
               <Icon name="close" size={24} color={colors.textSecondary} />
@@ -106,20 +120,16 @@ export default function ArrivalWindowModal({
             <Text style={styles.fieldLabel}>Date</Text>
             <Text style={styles.fieldValue}>{nzDate(start)}</Text>
           </TouchableOpacity>
-          <View style={styles.timeRow}>
-            <TouchableOpacity style={[styles.field, styles.timeField]} onPress={() => setPicker('start')}>
-              <Text style={styles.fieldLabel}>Arrive from</Text>
-              <Text style={styles.fieldValue}>{timeLabel(start)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.field, styles.timeField]} onPress={() => setPicker('end')}>
-              <Text style={styles.fieldLabel}>By</Text>
-              <Text style={styles.fieldValue}>{timeLabel(end)}</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.field} onPress={() => setPicker('start')}>
+            <Text style={styles.fieldLabel}>Expected arrival</Text>
+            <Text style={styles.fieldValue}>{timeLabel(start)}</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.field} onPress={() => setPicker('complete')}>
             <Text style={styles.fieldLabel}>Expected finish</Text>
             <Text style={styles.fieldValue}>{timeLabel(expectedComplete)}</Text>
           </TouchableOpacity>
+
+          {isPast ? <Text style={styles.errorText}>Pick a time later today</Text> : null}
 
           {picker ? (
             <View style={styles.pickerWrap}>
@@ -133,7 +143,6 @@ export default function ArrivalWindowModal({
                   if (!value || event.type === 'dismissed') return
                   if (picker === 'date') changeDate(value)
                   else if (picker === 'start') changeStart(value)
-                  else if (picker === 'end') changeEnd(value)
                   else changeExpectedComplete(value)
                 }}
               />
@@ -147,7 +156,7 @@ export default function ArrivalWindowModal({
 
           <View style={styles.actions}>
             <Button variant="secondary" title="Cancel" onPress={onClose} style={styles.action} />
-            <Button title="Confirm window" onPress={() => onSave(start, end, expectedComplete)} loading={saving} style={styles.action} />
+            <Button title="Confirm time" onPress={handleSave} loading={saving} disabled={isPast} style={styles.action} />
           </View>
         </View>
       </View>
@@ -165,8 +174,7 @@ const styles = StyleSheet.create({
   field: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, marginBottom: 10 },
   fieldLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
   fieldValue: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  timeRow: { flexDirection: 'row', gap: 10 },
-  timeField: { flex: 1 },
+  errorText: { color: colors.danger, fontSize: 13, fontWeight: '600', marginBottom: 6 },
   pickerWrap: { borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 10 },
   done: { alignSelf: 'flex-end', padding: 8 },
   doneText: { color: colors.primary, fontWeight: '700' },

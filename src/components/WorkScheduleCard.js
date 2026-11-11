@@ -1,4 +1,3 @@
-import {formatDate as nzDate} from '../../shared/formatting.js'
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Icon from './Icon'
@@ -30,15 +29,6 @@ export default function WorkScheduleCard({
   onAddCalendar,
   onRunningLate,
 }) {
-  const expectedFinish = (() => {
-    if (!schedule?.expected_complete_at) return null
-    const arrival = new Date(schedule.arrival_start_at)
-    const finish = new Date(schedule.expected_complete_at)
-    const time = finish.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone:'Pacific/Auckland' })
-    return arrival.toDateString() === finish.toDateString()
-      ? time
-      : `${nzDate(finish)}, ${time}`
-  })()
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -47,7 +37,6 @@ export default function WorkScheduleCard({
           <Text style={styles.title}>
             {schedule ? formatArrivalWindow(schedule) : 'Arrival time not confirmed'}
           </Text>
-          {expectedFinish ? <Text style={styles.finish}>Expected finish {expectedFinish}</Text> : null}
         </View>
         <Icon name="calendar-outline" size={23} color={colors.primary} />
       </View>
@@ -106,7 +95,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 16 },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 0.9, marginBottom: 5 },
   title: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
-  finish: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
   row: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: '#f0f1ef' },
   iconBox: { width: 38, height: 38, borderRadius: 9, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },

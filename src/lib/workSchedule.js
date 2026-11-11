@@ -45,15 +45,29 @@ export async function sendRunningLate({ jobId, bookingId, minutes }) {
   })
 }
 
+// A single expected arrival time (old rows with a real window just use the
+// start), plus the expected finish when set.
 export function formatArrivalWindow(schedule) {
-  if (!schedule?.arrival_start_at || !schedule?.arrival_end_at) return ''
+  if (!schedule?.arrival_start_at) return ''
   const start = new Date(schedule.arrival_start_at)
-  const end = new Date(schedule.arrival_end_at)
-  const date = formatDate(start)
   const time = value => value.toLocaleTimeString('en-NZ', {
-    hour: 'numeric', minute: '2-digit', timeZone:'Pacific/Auckland',
+    hour: 'numeric', minute: '2-digit', timeZone: 'Pacific/Auckland',
   })
-  return `${date}, ${time(start)}–${time(end)}`
+  const nzDay = value => value.toLocaleDateString('en-NZ', {
+    timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  const sameDay = nzDay(start) === nzDay(new Date())
+  let out = sameDay ? `Expected around ${time(start)}` : `Expected ${formatDate(start)}, around ${time(start)}`
+  if (schedule.expected_complete_at) out += ` · finish about ${time(new Date(schedule.expected_complete_at))}`
+  return out
+}
+
+// The arrival RPC rejects a past time with a message containing "future"; show a
+// friendly line for that and pass through anything else.
+export function arrivalErrorMessage(error) {
+  const message = error?.message || ''
+  if (/future/i.test(message)) return 'That time has already passed. Pick a time later today or another day.'
+  return message || 'Please try again.'
 }
 
 function reminderOffsets(start, Calendar) {
