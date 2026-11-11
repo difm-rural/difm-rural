@@ -41,6 +41,7 @@ import {
   addWorkToPhoneCalendar,
   fetchWorkSchedule,
   saveArrivalWindow,
+  arrivalErrorMessage,
   sendRunningLate,
 } from '../lib/workSchedule'
 
@@ -214,12 +215,12 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     const { data, error } = await saveArrivalWindow({ bookingId: booking.id, start, end, expectedComplete })
     setSavingArrival(false)
     if (error) {
-      Alert.alert('Could not save arrival window', error.message || 'Please try again.')
+      Alert.alert("Couldn't save arrival time", arrivalErrorMessage(error))
       return
     }
     setWorkSchedule(data)
     setArrivalModalVisible(false)
-    Alert.alert('Arrival window confirmed', 'The requester has been notified.')
+    Alert.alert('Arrival time confirmed', 'The requester has been notified.')
   }
 
   function handleRunningLate() {
