@@ -27,7 +27,7 @@ export function notificationSide(n: Notice): MarketSide | null {
 // booking_cancellation_requested (a listing/booking they host).
 // payment_marked_sent goes to the provider (not the job owner) → stays neutral.
 const OWNER_TYPES = new Set([
-  'new_bid', 'new_question', 'job_ready', 'job_completed', 'payment_details_sent',
+  'new_bid', 'new_question', 'job_ready', 'job_completed', 'payment_details_sent', 'job_confirmed',
   'new_booking', 'service_quote_accepted', 'booking_ready',
   'booking_completed', 'work_completion_due', 'booking_cancellation_requested',
 ])

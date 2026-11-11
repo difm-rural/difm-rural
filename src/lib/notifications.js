@@ -35,6 +35,7 @@ export const NOTIFICATION_ICONS = {
   booking_cancellation_requested:  'alert-circle-outline',
   payment_details_sent:            'card-outline',
   payment_marked_sent:             'checkmark-done-outline',
+  job_confirmed:                   'checkmark-circle-outline',
 }
 
 export async function fetchNotifications(limit = 50) {
