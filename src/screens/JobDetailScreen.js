@@ -1,9 +1,11 @@
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
+import { localDate } from '../lib/quickPickDates'
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import DateChips from '../components/DateChips'
+import NativeDateTimePicker, { openDateTimePicker } from '../components/NativeDateTimePicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
@@ -119,9 +121,20 @@ export default function JobDetailScreen({ route, navigation }) {
   const [bidMessage,        setBidMessage]        = useState('')
   const [availableFrom,     setAvailableFrom]     = useState(null)
   const [showDatePicker,    setShowDatePicker]    = useState(false)
+
   const [estimatedDuration, setEstimatedDuration] = useState('')
   const [bidPricingType,    setBidPricingType]    = useState('fixed')
   const [bidMaterials,      setBidMaterials]      = useState('included')
+
+  function availabilityPickerOptions() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return { value: availableFrom || today, minimumDate: today, onSelect: setAvailableFrom }
+  }
+
+  function openAvailabilityDatePicker() {
+    openDateTimePicker({ ...availabilityPickerOptions(), onShow: () => setShowDatePicker(true) })
+  }
 
   // Q&A state (Feature 2)
   const [questions,    setQuestions]    = useState([])
@@ -199,7 +212,7 @@ export default function JobDetailScreen({ route, navigation }) {
       setEstimatedDuration(existingBid.estimated_duration || '')
       setBidPricingType(existingBid.pricing_type || 'fixed')
       setBidMaterials(existingBid.materials || 'included')
-      if (existingBid.available_from) setAvailableFrom(new Date(existingBid.available_from))
+      if (existingBid.available_from) setAvailableFrom(localDate(existingBid.available_from))
     } else {
       setAlreadyBid(false)
       setMyBid(null)
@@ -641,6 +654,11 @@ export default function JobDetailScreen({ route, navigation }) {
       }
     }
 
+    const offerDate = localDate(myBid?.available_from)
+    const arrivalSuggestion = offerDate && offerDate > new Date()
+      ? myBid.available_from
+      : job.scheduled_date || job.date_from
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {headerJSX}
@@ -826,7 +844,7 @@ export default function JobDetailScreen({ route, navigation }) {
         <ArrivalWindowModal
           visible={arrivalModalVisible}
           schedule={workSchedule}
-          suggestedDate={job.scheduled_date || job.date_from}
+          suggestedDate={arrivalSuggestion}
           saving={savingArrival}
           onClose={() => setArrivalModalVisible(false)}
           onSave={handleSaveArrivalWindow}
@@ -960,7 +978,8 @@ export default function JobDetailScreen({ route, navigation }) {
         accessibilityLabel="Message to requester, optional"
       />
 
-      <TouchableOpacity style={styles.availabilityBtn} onPress={() => setShowDatePicker(true)}
+      <DateChips value={availableFrom} onSelect={setAvailableFrom} onOpen={openAvailabilityDatePicker} />
+      <TouchableOpacity style={styles.availabilityBtn} onPress={openAvailabilityDatePicker}
         accessibilityRole="button" accessibilityLabel="Set availability date">
         <Text style={styles.availabilityBtnText}>
           <Icon name="calendar-outline" size={14} color={colors.textSecondary} /> {availableFrom
@@ -974,18 +993,11 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </TouchableOpacity>
-      {showDatePicker && (
-        <DateTimePicker
-          value={availableFrom || new Date()}
-          mode="date"
-          display="default"
-          minimumDate={new Date()}
-          onChange={(event, selected) => {
-            if (Platform.OS === 'android') setShowDatePicker(false)
-            if (event?.type !== 'dismissed' && selected) setAvailableFrom(selected)
-          }}
-        />
-      )}
+      <NativeDateTimePicker
+        visible={showDatePicker}
+        {...availabilityPickerOptions()}
+        onDone={() => setShowDatePicker(false)}
+      />
 
       <TextInput
         style={styles.input}

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import DateChips from './DateChips'
+import NativeDateTimePicker, { openDateTimePicker } from './NativeDateTimePicker'
 import { formatDate as nzDate } from '../../shared/formatting.js'
-import { defaultStartForDate, timeLabel } from './ArrivalWindowModal'
+import { timeLabel } from './ArrivalWindowModal'
+import { defaultStartForDate } from '../lib/quickPickDates'
 import { supabase } from '../lib/supabase'
 import { paymentLine } from '../../shared/offers'
 import Button from './Button'
@@ -42,6 +44,19 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     const next = new Date(start)
     next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
     setStart(next)
+  }
+
+  function pickerOptions(mode) {
+    return {
+      value: start,
+      mode,
+      minimumDate: mode === 'date' ? new Date() : undefined,
+      onSelect: mode === 'date' ? changeDate : changeTime,
+    }
+  }
+
+  function openPicker(mode) {
+    openDateTimePicker({ ...pickerOptions(mode), onShow: () => setPicker(mode) })
   }
 
   const isPast = start.getTime() <= Date.now()
@@ -96,33 +111,15 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
 
           <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.section}>When will you arrive?</Text>
-            <TouchableOpacity style={styles.field} onPress={() => setPicker('date')}>
+            <DateChips value={start} arrival onSelect={changeDate} onOpen={() => openPicker('date')} />
+            <TouchableOpacity style={styles.field} onPress={() => openPicker('date')}>
               <Text style={styles.fieldLabel}>Date</Text><Text style={styles.fieldValue}>{nzDate(start)}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.field} onPress={() => setPicker('time')}>
+            <TouchableOpacity style={styles.field} onPress={() => openPicker('time')}>
               <Text style={styles.fieldLabel}>Expected arrival</Text><Text style={styles.fieldValue}>{timeLabel(start)}</Text>
             </TouchableOpacity>
             {isPast ? <Text style={styles.error}>Pick a time later today</Text> : null}
-            {picker ? (
-              <View style={styles.pickerWrap}>
-                <DateTimePicker
-                  value={start}
-                  mode={picker === 'date' ? 'date' : 'time'}
-                  minimumDate={picker === 'date' ? new Date() : undefined}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, value) => {
-                    if (Platform.OS === 'android') setPicker(null)
-                    if (!value || event.type === 'dismissed') return
-                    if (picker === 'date') changeDate(value); else changeTime(value)
-                  }}
-                />
-                {Platform.OS === 'ios' ? (
-                  <TouchableOpacity style={styles.done} onPress={() => setPicker(null)}>
-                    <Text style={styles.doneText}>Done</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            ) : null}
+            {picker && <NativeDateTimePicker visible {...pickerOptions(picker)} onDone={() => setPicker(null)} />}
 
             <Text style={styles.section}>How would you like to be paid?</Text>
             <View style={styles.options}>
@@ -202,9 +199,6 @@ const styles = StyleSheet.create({
   previewHead: { fontSize: 12, fontWeight: '800', color: colors.textSecondary, marginBottom: 4 },
   previewText: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
   error: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: 6, marginBottom: 4 },
-  pickerWrap: { borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 10 },
-  done: { alignSelf: 'flex-end', padding: 8 },
-  doneText: { color: colors.primary, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   action: { flex: 1 },
 })
