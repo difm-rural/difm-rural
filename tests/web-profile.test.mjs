@@ -3,7 +3,7 @@ import test from 'node:test'
 import {readFile} from 'node:fs/promises'
 import {stripTypeScriptTypes} from 'node:module'
 let source=await readFile(new URL('../provider-web/src/lib/profile-input.ts',import.meta.url),'utf8')
-for(const name of ['categories','providerAvailability','profileName'])source=source.replace(`'@shared/${name}'`,`'${new URL('../shared/'+name+'.ts',import.meta.url).href}'`)
+for(const name of ['categories','providerAvailability','profileName','dates'])source=source.replace(`'@shared/${name}'`,`'${new URL('../shared/'+name+'.ts',import.meta.url).href}'`)
 const inputUrl='data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64')
 const {profileInput,availabilityInput,preferencesInput,nzToday,PUBLIC_PROFILE_COLUMNS}=await import(inputUrl)
 const form=values=>{const f=new FormData();for(const [k,v] of Object.entries(values))for(const value of Array.isArray(v)?v:[v])f.append(k,value);return f}

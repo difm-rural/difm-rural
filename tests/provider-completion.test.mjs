@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { stripTypeScriptTypes } from 'node:module'
 const read = async path => await readFile(new URL(path, import.meta.url), 'utf8')
 const moduleFromSource = source => import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 globalThis.completionLifecycle = await moduleFromSource(await read('../src/lib/lifecycle.js'))
@@ -13,10 +14,10 @@ const replacements = source => source
   .replace("import { saveReview } from './reviews'", 'const saveReview = () => {}')
 const { markJobComplete } = await moduleFromSource(replacements(await read('../src/lib/jobActions.js')))
 const { markBookingReady } = await moduleFromSource(replacements(await read('../src/lib/bookingActions.js')))
-const { bookingNextMove } = await moduleFromSource((await read('../src/lib/nextMove.js'))
-  .replace("import { bookingPricingType } from './listingEstimate'",`import { bookingPricingType } from '${new URL('../shared/listingEstimate.ts',import.meta.url).href}'`)
-  .replace("import { supabase } from './supabase'", 'const supabase = {}')
-  .replace("import { BOOKING_ACTIVE_STATUSES, JOB_ACTIVE_STATUSES } from './lifecycle'", 'const { BOOKING_ACTIVE_STATUSES, JOB_ACTIVE_STATUSES } = globalThis.completionLifecycle'))
+// The pure next-step logic lives in shared/nextMove.ts (src/lib/nextMove.js only
+// re-exports it and adds data fetching), so load it from there.
+const { bookingNextMove } = await moduleFromSource(stripTypeScriptTypes((await read('../shared/nextMove.ts'))
+  .replace("import { bookingPricingType } from './listingEstimate'",`import { bookingPricingType } from '${new URL('../shared/listingEstimate.ts',import.meta.url).href}'`)))
 
 test('accepted grazing directs both parties to ongoing arrangements rather than completion', () => {
   for (const role of ['provider', 'requester']) {
@@ -43,11 +44,11 @@ function mutationClient(result) {
   return calls
 }
 
-test('provider job completion writes completed directly from awarded states', async () => {
+test('provider job completion writes completed directly from the accepted state', async () => {
   const calls = mutationClient({ data: [{ id: 'job', status: 'completed' }], error: null })
   assert.equal((await markJobComplete('job')).error, null)
   assert.deepEqual(calls, [['from', 'jobs'], ['update', { status: 'completed' }],
-    ['eq', 'id', 'job'], ['in', 'status', ['accepted', 'in_progress']]])
+    ['eq', 'id', 'job'], ['eq', 'status', 'accepted']])
 })
 test('provider booking completion writes completed directly from underway states', async () => {
   const calls = mutationClient({ data: [{ id: 'booking', status: 'completed' }], error: null })

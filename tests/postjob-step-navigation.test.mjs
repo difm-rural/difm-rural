@@ -16,7 +16,7 @@ for(const first of ['PostJob','GuestPostJob'])test(`mobile completed Basics retu
   if(name==='@react-navigation/native')return {useNavigation:()=>({getState:()=>({routeNames:[first,'PostJobStep2Location']}),popTo:name=>calls.push(name)})}
   if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:0})}
   if(name==='../../theme/tokens')return {colors:{}}
-  if(name==='../../components/Icon'||name==='../../components/AiJobAssistant')return {default:()=>null,__esModule:true}
+  if(name==='../../components/Icon'||name==='../../components/AiJobAssistant'||name==='../../components/SideHeader')return {default:()=>null,__esModule:true}
   throw Error(name)
  }})
  const tree=module.exports.default({currentStep:3,onBack(){}})

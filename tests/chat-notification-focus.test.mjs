@@ -36,6 +36,7 @@ test('blurred chats stop reading notifications; reopening loads and reads only t
     'expo-image-picker': {}, '../lib/supabase': { supabase: client },
     '../theme/tokens': { colors: {} }, '../components/Icon': () => null,
     '../components/EnquiryPersonCard': () => null,
+    '../components/SideHeader': () => null,
     '../lib/location': {}, '../lib/notifications': { async markNotificationsReadFor(params) { reads.push(params) } },
   }
   const module = { exports: {} }

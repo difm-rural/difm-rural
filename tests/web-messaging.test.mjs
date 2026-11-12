@@ -53,5 +53,5 @@ test('conversation links validate UUIDs and encode query values',()=>{
   assert.equal(validConversation(ref),true)
   assert.equal(validConversation({...ref,id:'id),sender_id.eq.other'}),false)
   assert.equal(validConversation({...ref,kind:'private-table'}),false)
-  assert.match(conversationHref({...ref,person:'person&other=bad'}),/person=person%26other%3Dbad$/)
+  assert.match(conversationHref({...ref,person:'person&other=bad'}),/\?thread=person%26other%3Dbad#enquiries$/)
 })
