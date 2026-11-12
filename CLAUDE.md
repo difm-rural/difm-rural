@@ -11,13 +11,18 @@ npx expo start --ios
 npx expo start --web
 ```
 
-No lint config. Tests: `npm test` runs every unit test from a fresh checkout (Node 24+; after the root `npm install` it installs `provider-web`'s dependencies itself the first time, because two tests render web components). `tests/e2e-job-flow.js` is separate — a standalone Node script that exercises the job flow against Supabase (see `tests/README.md`).
+No lint config. Tests: `npm test` runs every unit test from a fresh checkout. **`npm test` needs Node 24+** (`engines` in `package.json`). After the root `npm install` it installs `provider-web`'s dependencies itself the first time, because two tests render web components. `tests/e2e-job-flow.js` is separate — a standalone Node script that exercises the job flow against Supabase (see `tests/README.md`).
 
 ## Before merging
 
 - Run `npm test` (the full suite: `tests/*.test.mjs` plus `shared/*.test.ts`) before every merge to main; all must pass.
 - If a test fails because behaviour changed on purpose, update the test in the same branch.
 - Never push or open PRs unless explicitly asked; never deploy edge functions to production (ask me to).
+
+## Shipping
+
+- An EAS update (`eas update --channel preview`, not a new build) is fine for JS-only changes — including when `package.json` changed only in `scripts`, `engines`, or `devDependencies` used by tests.
+- A new `eas build --profile preview` is needed only when `dependencies`, `app.json` / `app.config`, or native config change.
 
 ## Architecture
 
