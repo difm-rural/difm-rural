@@ -13,6 +13,12 @@ npx expo start --web
 
 No lint config. Tests: `tests/e2e-job-flow.js` is a standalone Node script that exercises the job flow against Supabase (see `tests/README.md`) — not a unit-test runner.
 
+## Before merging
+
+- Run the full test suite (`tests/` plus the shared tests) before every merge to main; all must pass. `tests/`: `node --test --test-isolation=none tests/*.test.mjs`; shared: `shared/*.test.ts` (run commands are in each file's header).
+- If a test fails because behaviour changed on purpose, update the test in the same branch.
+- Never push or open PRs unless explicitly asked; never deploy edge functions to production (ask me to).
+
 ## Architecture
 
 **difm-rural** is a React Native / Expo marketplace for rural New Zealand. It is really **two marketplaces** sharing one app:
