@@ -23,7 +23,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import DateChips from '../components/DateChips'
+import NativeDateTimePicker, { openDateTimePicker } from '../components/NativeDateTimePicker'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../lib/supabase'
@@ -261,6 +262,16 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [availableFrom,   setAvailableFrom]   = useState(toDateValue(editingService?.availability))
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [serviceActive, setServiceActive] = useState(editingService?.is_active !== false)
+
+  function availabilityPickerOptions() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return { value: availableFrom || today, minimumDate: today, onSelect: setAvailableFrom }
+  }
+
+  function openAvailabilityDatePicker() {
+    openDateTimePicker({ ...availabilityPickerOptions(), onShow: () => setShowDatePicker(true) })
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const stepTranslateX = useRef(new Animated.Value(0)).current
@@ -1658,9 +1669,10 @@ export default function CreateServiceScreen({ navigation, route }) {
         {!!travelRangeError(travelRange) && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{travelRangeError(travelRange)}</Text>}
 
         <Text style={styles.fieldLabel}>Available from <Text style={styles.optional}>(optional)</Text></Text>
+        <DateChips value={availableFrom} onSelect={setAvailableFrom} onOpen={openAvailabilityDatePicker} />
         <TouchableOpacity
           style={[styles.datePickerBtn, !!listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && {borderColor:colors.danger,borderWidth:2}]}
-          onPress={() => setShowDatePicker(true)}
+          onPress={openAvailabilityDatePicker}
           accessibilityRole="button"
           accessibilityLabel="Select available from date">
           <Text style={availableFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
@@ -1674,27 +1686,11 @@ export default function CreateServiceScreen({ navigation, route }) {
             <Text style={styles.clearDateText}>Clear date</Text>
           </TouchableOpacity>
         )}
-        {showDatePicker && (
-          <>
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowDatePicker(false)}>
-                <Text style={styles.pickerDoneText}>Done</Text>
-              </TouchableOpacity>
-            )}
-            <DateTimePicker
-              value={toDateValue(availableFrom) || new Date()}
-              mode="date"
-              minimumDate={new Date()}
-              onChange={(event, selected) => {
-                if (Platform.OS === 'android') setShowDatePicker(false)
-                if (event?.type !== 'dismissed') {
-                  const nextDate = toDateValue(selected)
-                  if (nextDate) setAvailableFrom(nextDate)
-                }
-              }}
-            />
-          </>
-        )}
+        <NativeDateTimePicker
+          visible={showDatePicker}
+          {...availabilityPickerOptions()}
+          onDone={() => setShowDatePicker(false)}
+        />
 
       </>
     )
@@ -2226,8 +2222,6 @@ const styles = StyleSheet.create({
   datePickerValue:       { fontSize: 16, color: colors.textPrimary, flex: 1 },
   datePickerPlaceholder: { fontSize: 16, color: colors.textMuted, flex: 1 },
   datePickerIcon:        { fontSize: 18, marginLeft: 8 },
-  pickerDoneBtn:         { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8 },
-  pickerDoneText:        { fontSize: 16, fontWeight: '600', color: colors.primary },
   clearDateBtn:          { marginTop: 6, paddingVertical: 4 },
   clearDateText:         { fontSize: 13, color: colors.textMuted, textDecorationLine: 'underline' },
   startContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28, gap: 12 },

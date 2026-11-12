@@ -17,7 +17,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import DateChips from '../../components/DateChips'
+import NativeDateTimePicker, { openDateTimePicker } from '../../components/NativeDateTimePicker'
 import Constants from 'expo-constants'
 import * as Updates from 'expo-updates'
 import { testPhoneAlert } from '../../lib/push'
@@ -246,6 +247,7 @@ export default function AccountTabScreen({ navigation, route }) {
   const [availabilityUntil, setAvailabilityUntil]   = useState(null)
   const [availabilityUpdatedAt, setAvailabilityUpdatedAt] = useState(null)
   const [availabilityDateVisible, setAvailabilityDateVisible] = useState(false)
+  const [showAvailabilityPicker, setShowAvailabilityPicker] = useState(false)
   const [availabilityDate, setAvailabilityDate] = useState(() => {
     const date = new Date()
     date.setDate(date.getDate() + 7)
@@ -399,10 +401,22 @@ export default function AccountTabScreen({ navigation, route }) {
       const date = new Date()
       date.setDate(date.getDate() + 7)
       setAvailabilityDate(date)
+      setShowAvailabilityPicker(false)
       setAvailabilityDateVisible(true)
       return
     }
     saveAvailability(status)
+  }
+
+  function availabilityPickerOptions() {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    return { value: availabilityDate, minimumDate: tomorrow, onSelect: setAvailabilityDate }
+  }
+
+  function openAvailabilityDatePicker() {
+    openDateTimePicker({ ...availabilityPickerOptions(), onShow: () => setShowAvailabilityPicker(true) })
   }
 
   function confirmUnavailableUntil() {
@@ -1098,7 +1112,6 @@ export default function AccountTabScreen({ navigation, route }) {
         {section === 'help'    && helpContent}
       </ScrollView>
 
-      {/* ── Location modal ──────────────────────────────────────────────────── */}
       <Modal
         visible={availabilityDateVisible}
         transparent
@@ -1110,13 +1123,18 @@ export default function AccountTabScreen({ navigation, route }) {
             <Text style={styles.availabilityDateHint}>
               You won’t be matched with new work before this date.
             </Text>
-            <DateTimePicker
-              value={availabilityDate}
-              mode="date"
-              minimumDate={new Date(Date.now() + 86400000)}
-              onChange={(event, selected) => {
-                if (selected) setAvailabilityDate(selected)
-              }}
+            <DateChips value={availabilityDate} minimumDate={availabilityPickerOptions().minimumDate}
+              onSelect={setAvailabilityDate} onOpen={openAvailabilityDatePicker} />
+            <TouchableOpacity onPress={openAvailabilityDatePicker} accessibilityRole="button"
+              accessibilityLabel="Select unavailable until date" style={styles.availabilityDateField}>
+              <Text style={styles.availabilityDateValue}>
+                {availabilityDate.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </TouchableOpacity>
+            <NativeDateTimePicker
+              visible={showAvailabilityPicker}
+              {...availabilityPickerOptions()}
+              onDone={() => setShowAvailabilityPicker(false)}
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setAvailabilityDateVisible(false)}>
@@ -1366,6 +1384,8 @@ const styles = StyleSheet.create({
   availabilityOptionSub: { fontSize: 11.5, lineHeight: 16, color: colors.textMuted, marginTop: 1 },
   availabilityFreshness: { fontSize: 11.5, lineHeight: 16, color: colors.textMuted, marginTop: 10 },
   availabilityDateHint: { fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginBottom: 12 },
+  availabilityDateField: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, marginBottom: 10 },
+  availabilityDateValue: { color: colors.textPrimary, fontWeight: '600' },
 
   opportunityCard: { padding: 14 },
   opportunityTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
