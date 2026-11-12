@@ -1,5 +1,5 @@
-// Run with the TS resolve harness (see scratchpad ts-register.mjs):
-//   node --import <scratch>/ts-register.mjs shared/nextMove.test.ts
+// Run with: npm test   (whole suite), or on its own:
+//   node --import ./tests/support/ts-resolve.mjs shared/nextMove.test.ts
 import assert from 'node:assert/strict'
 import { jobNextMove } from './nextMove.ts'
 

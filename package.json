@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "pretest": "node tests/support/ensure-web-deps.mjs",
+    "test": "node --import ./tests/support/ts-resolve.mjs --test --test-isolation=none \"tests/*.test.mjs\" \"shared/*.test.ts\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

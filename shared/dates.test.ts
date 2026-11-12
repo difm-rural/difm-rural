@@ -1,4 +1,5 @@
-// Run with: node shared/dates.test.ts   (Node >= 23.6 strips TS types natively)
+// Run with: npm test   (whole suite), or on its own:
+//   node --import ./tests/support/ts-resolve.mjs shared/dates.test.ts
 import assert from 'node:assert/strict'
 import { parseNzDate, toLocalIsoDate } from './dates.ts'
 

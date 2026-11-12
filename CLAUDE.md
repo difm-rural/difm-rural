@@ -11,11 +11,11 @@ npx expo start --ios
 npx expo start --web
 ```
 
-No lint config. Tests: `tests/e2e-job-flow.js` is a standalone Node script that exercises the job flow against Supabase (see `tests/README.md`) — not a unit-test runner.
+No lint config. Tests: `npm test` runs every unit test from a fresh checkout (Node 24+; after the root `npm install` it installs `provider-web`'s dependencies itself the first time, because two tests render web components). `tests/e2e-job-flow.js` is separate — a standalone Node script that exercises the job flow against Supabase (see `tests/README.md`).
 
 ## Before merging
 
-- Run the full test suite (`tests/` plus the shared tests) before every merge to main; all must pass. `tests/`: `node --test --test-isolation=none tests/*.test.mjs`; shared: `shared/*.test.ts` (run commands are in each file's header).
+- Run `npm test` (the full suite: `tests/*.test.mjs` plus `shared/*.test.ts`) before every merge to main; all must pass.
 - If a test fails because behaviour changed on purpose, update the test in the same branch.
 - Never push or open PRs unless explicitly asked; never deploy edge functions to production (ask me to).
 
