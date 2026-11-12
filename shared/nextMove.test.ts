@@ -38,9 +38,13 @@ check('provider · method set, future schedule wins',
   pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'bank_transfer' })),
   { label: `Scheduled for ${futureWeekday}`, detail: 'You are booked for this job', needsAction: false, tone: 'scheduled', actionLabel: null })
 
-check('provider · marked paid',
-  pick(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentMarkedSentAt: '2026-11-09T00:00:00Z' })),
-  { label: 'Payment marked sent', detail: "Check it's arrived, then mark the job complete", needsAction: true, tone: 'active', actionLabel: 'View job' })
+check('provider · payment sorted → mark complete',
+  pick(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: '2026-11-09T00:00:00Z' })),
+  { label: 'Waiting on you', detail: "Payment's sorted — mark the job complete when you're done", needsAction: true, tone: 'active', actionLabel: 'View job' })
+
+check('provider · payment sorted beats a future schedule',
+  pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'bank_transfer', paymentSortedAt: '2026-11-09T00:00:00Z' })),
+  { label: 'Waiting on you', detail: "Payment's sorted — mark the job complete when you're done", needsAction: true, tone: 'active', actionLabel: 'View job' })
 
 check('provider · in_progress, not confirmed → confirm job',
   pick(jobNextMove({ status: 'in_progress' }, 'provider', {})),
@@ -55,33 +59,35 @@ check('requester · method set but no arrival → waiting to confirm',
   pick(jobNextMove({ status: 'accepted' }, 'requester', { hasArrival: false, paymentMethod: 'cash' })),
   { label: 'Waiting on the provider', detail: "They'll confirm the arrival time and how to pay", needsAction: false, tone: 'waiting', actionLabel: null })
 
-check('requester · bank, not paid, no/past schedule → pay now (needsAction)',
+const calm = (label: string, detail: string) => ({ label, detail, needsAction: false, tone: 'scheduled', actionLabel: null })
+
+check('requester · bank, not sorted, past schedule → pay as agreed, never needsAction',
   pick(jobNextMove({ status: 'accepted', scheduled_date: past }, 'requester', { paymentMethod: 'bank_transfer' })),
-  { label: 'Waiting on you', detail: "Pay the provider when the work's done", needsAction: true, tone: 'attention', actionLabel: 'View job' })
+  calm('Job confirmed', 'Pay as agreed'))
 
-check('requester · invoice → same pay-when-done copy',
+check('requester · invoice → pay as agreed',
   pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'invoice' })),
-  { label: 'Waiting on you', detail: "Pay the provider when the work's done", needsAction: true, tone: 'attention', actionLabel: 'View job' })
-
-check('requester · cash → pay on the day',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash' })),
-  { label: 'Waiting on you', detail: 'Pay on the day', needsAction: true, tone: 'attention', actionLabel: 'View job' })
+  calm('Job confirmed', 'Pay as agreed'))
 
 check('requester · agreed → pay as agreed',
   pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'agreed' })),
-  { label: 'Waiting on you', detail: 'Pay as agreed', needsAction: true, tone: 'attention', actionLabel: 'View job' })
+  calm('Job confirmed', 'Pay as agreed'))
 
-check('requester · method set, future schedule → scheduled, no needsAction',
+check('requester · cash → pay on the day',
+  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash' })),
+  calm('Job confirmed', 'Pay on the day'))
+
+check('requester · not sorted, future schedule → schedule label',
   pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'requester', { paymentMethod: 'bank_transfer' })),
-  { label: 'Waiting on you', detail: "Pay the provider when the work's done", needsAction: false, tone: 'scheduled', actionLabel: null })
+  calm(`Scheduled for ${futureWeekday}`, 'Pay as agreed'))
 
-check('requester · marked paid',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash', paymentMarkedSentAt: '2026-11-09T00:00:00Z' })),
+check('requester · payment sorted → waiting on provider',
+  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash', paymentSortedAt: '2026-11-09T00:00:00Z' })),
   { label: 'Waiting on the provider', detail: "They'll mark the job complete", needsAction: false, tone: 'waiting', actionLabel: null })
 
-check('requester · otherName used for first name in pay copy',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'invoice', otherName: 'Sam Rata' })),
-  { label: 'Waiting on you', detail: "Pay Sam when the work's done", needsAction: true, tone: 'attention', actionLabel: 'View job' })
+check('requester · payment sorted uses the provider first name',
+  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'invoice', paymentSortedAt: '2026-11-09T00:00:00Z', otherName: 'Sam Rata' })),
+  { label: 'Waiting on Sam', detail: "They'll mark the job complete", needsAction: false, tone: 'waiting', actionLabel: null })
 
 // ---- Regression: untouched branches ----
 check('open · requester with offers',
@@ -94,4 +100,4 @@ check('open · provider pending bid',
 
 check('completed → null', jobNextMove({ status: 'completed' }, 'provider', {}), null)
 
-console.log(`\n✅ jobNextMove payment handoff: all ${passed} cases passed`)
+console.log(`\n✅ jobNextMove flexible payment: all ${passed} cases passed`)

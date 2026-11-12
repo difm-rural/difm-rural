@@ -2,11 +2,14 @@
 import {useActionState,useEffect,useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {formatDateTime as nzDateTime} from '@shared/formatting'
+import {paymentLine} from '@shared/offers'
 import {confirmJob,changeJobArrival,setJobPaymentMethod} from '../../work-actions'
 
 const METHOD_LABELS:Record<string,string>={bank_transfer:'Bank transfer',cash:'Cash on the day',invoice:"I'll send an invoice",agreed:'Already agreed'}
-const METHOD_MESSAGES:Record<string,string>={cash:"I'll take cash on the day.",invoice:"I'll send you an invoice.",agreed:"Let's settle up the way we agreed."}
-const SUMMARY_LABELS:Record<string,string>={bank_transfer:'Bank transfer',cash:'Cash on the day',invoice:'Invoice',agreed:'Already agreed'}
+// The RPCs post the "Payment: $150 by …" line themselves; only bank details ride along.
+const bankMessage=(choice:string,acct:string,acctNo:string,reference:string)=>choice==='bank_transfer'
+  ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
+  : ''
 
 function roundUpHalfHour(d:Date){const r=new Date(d);r.setSeconds(0,0);const m=r.getMinutes();if(m===0||m===30)return r;if(m<30)r.setMinutes(30);else{r.setMinutes(0);r.setHours(r.getHours()+1)}return r}
 function toLocal(d:Date){const p=(n:number)=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
@@ -20,8 +23,8 @@ function defaultArrival(availableFrom?:string|null){
 
 // Provider card for an accepted job: one step to confirm arrival + payment, then
 // a summary with "Change time" / "Change payment".
-export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,arrivalStart,method}:{
- bidId:string;jobId:string;jobTitle:string;requesterFirst:string;availableFrom:string|null;arrivalStart:string|null;method:string|null}){
+export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,arrivalStart,method,amount,pricingType}:{
+ bidId:string;jobId:string;jobTitle:string;requesterFirst:string;availableFrom:string|null;arrivalStart:string|null;method:string|null;amount:number|null;pricingType:string|null}){
  const router=useRouter()
  const confirmed=!!arrivalStart&&!!method
 
@@ -30,22 +33,23 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,ar
  const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(availableFrom)))
  const [choice,setChoice]=useState('')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
+ const [note,setNote]=useState('')
  useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
 
  if(confirmed){
   return <section className="card payment-card">
-   <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong> · Paid by {SUMMARY_LABELS[method!]||method}</p>
+   <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong> · {paymentLine(amount,pricingType,method)}</p>
    <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} availableFrom={availableFrom}/></details>
-   <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst}/></details>
+   <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>
  }
 
  const arrivalDate=new Date(arrival)
  const isPast=!Number.isNaN(arrivalDate.getTime())&&arrivalDate.getTime()<=Date.now()
  const bankIncomplete=choice==='bank_transfer'&&(!acct.trim()||!acctNo.trim())
- const message=choice==='bank_transfer'
-   ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
-   : (METHOD_MESSAGES[choice]||'')
+ const message=bankMessage(choice,acct,acctNo,reference)
+ const noteText=note.trim()
+ const preview=`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}.\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
  const blocked=isPast||!choice||bankIncomplete||Number.isNaN(arrivalDate.getTime())
 
  return <form action={submit} className="card payment-card lform">
@@ -65,7 +69,8 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,ar
     <label className="lform-field">Account number<input value={acctNo} inputMode="numeric" placeholder="00-0000-0000000-00" onChange={e=>setAcctNo(e.target.value)}/><small className="muted">NZ format, e.g. 00-0000-0000000-00(0)</small></label>
     <label className="lform-field">Reference<input value={reference} maxLength={120} onChange={e=>setReference(e.target.value)}/></label>
    </div>}
-   {choice&&<div className="account-current"><strong>Message to {requesterFirst}</strong><p className="work-description">{`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}.`}{message?`\n\n${message}`:''}</p></div>}
+   <label className="lform-field">Note (optional)<textarea name="note" rows={2} maxLength={500} value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. about 3 hours, bring the gate key"/></label>
+   {choice&&<div className="account-current"><strong>Message to {requesterFirst}</strong><p className="work-description">{preview}</p></div>}
   </fieldset>
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
   <button className="lform-save" disabled={blocked||pending}>{pending?'Confirming…':'Confirm job'}</button>
@@ -87,15 +92,13 @@ function ChangeTime({jobId,availableFrom}:{jobId:string;availableFrom:string|nul
  </form>
 }
 
-function ChangePayment({bidId,jobId,jobTitle,requesterFirst}:{bidId:string;jobId:string;jobTitle:string;requesterFirst:string}){
+function ChangePayment({bidId,jobId,jobTitle,requesterFirst,amount,pricingType}:{bidId:string;jobId:string;jobTitle:string;requesterFirst:string;amount:number|null;pricingType:string|null}){
  const router=useRouter()
  const [state,submit,pending]=useActionState(setJobPaymentMethod,{error:''})
  const [choice,setChoice]=useState('')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
- const message=choice==='bank_transfer'
-   ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
-   : (METHOD_MESSAGES[choice]||'')
+ const message=bankMessage(choice,acct,acctNo,reference)
  const bankIncomplete=choice==='bank_transfer'&&(!acct.trim()||!acctNo.trim())
  return <form action={submit} className="lform">
   <input type="hidden" name="bid_id" value={bidId}/><input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="method" value={choice}/><input type="hidden" name="message" value={message}/>
@@ -106,7 +109,7 @@ function ChangePayment({bidId,jobId,jobTitle,requesterFirst}:{bidId:string;jobId
    <label className="lform-field">Account number<input value={acctNo} inputMode="numeric" placeholder="00-0000-0000000-00" onChange={e=>setAcctNo(e.target.value)}/></label>
    <label className="lform-field">Reference<input value={reference} maxLength={120} onChange={e=>setReference(e.target.value)}/></label>
   </div>}
-  {choice&&<div className="account-current"><strong>Message to {requesterFirst}</strong><p className="work-description">{message}</p></div>}
+  {choice&&<div className="account-current"><strong>Message to {requesterFirst}</strong><p className="work-description">{paymentLine(amount,pricingType,choice)}{message?`\n\n${message}`:''}</p></div>}
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
   <button className="lform-save" disabled={!choice||bankIncomplete||pending}>{pending?'Sending…':'Update payment'}</button>
  </form>

@@ -170,7 +170,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function fetchAcceptedBid() {
     const { data: bidData } = await supabase
       .from('bids')
-      .select('id, provider_id, amount, pricing_type, materials, payment_method, payment_details_sent_at, payment_marked_sent_at, payment_message_id')
+      .select('id, provider_id, amount, pricing_type, materials, payment_method, payment_details_sent_at, payment_sorted_at, payment_sorted_by, payment_message_id')
       .eq('job_id', job.id)
       .eq('status', 'accepted')
       .single()
@@ -190,7 +190,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         materials: bidData.materials,
         paymentMethod: bidData.payment_method || null,
         paymentDetailsSentAt: bidData.payment_details_sent_at || null,
-        paymentMarkedSentAt: bidData.payment_marked_sent_at || null,
+        paymentSortedAt: bidData.payment_sorted_at || null,
+        paymentSortedBy: bidData.payment_sorted_by || null,
         paymentMessageId: bidData.payment_message_id || null,
       })
     }
@@ -340,7 +341,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     unansweredQuestionCount: questionCount,
     hasPendingBid: !isTaskOwner && !isAcceptedProvider,
     paymentMethod: acceptedBid?.paymentMethod,
-    paymentMarkedSentAt: acceptedBid?.paymentMarkedSentAt,
+    paymentSortedAt: acceptedBid?.paymentSortedAt,
   })
 
   function ensureTaskOwner() {
@@ -595,7 +596,10 @@ export default function ManageTaskScreen({ navigation, route }) {
               jobTitle={job.title}
               bidId={acceptedBid.bidId}
               method={acceptedBid.paymentMethod}
-              markedSentAt={acceptedBid.paymentMarkedSentAt}
+              amount={acceptedBid.bidAmount}
+              pricingType={acceptedBid.pricingType}
+              sortedAt={acceptedBid.paymentSortedAt}
+              sortedBy={acceptedBid.paymentSortedBy}
               paymentMessageId={acceptedBid.paymentMessageId}
               otherFirstName={otherPartyFirstName}
               counterpartId={acceptedBid.providerId}

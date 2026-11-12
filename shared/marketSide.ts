@@ -26,6 +26,8 @@ export function notificationSide(n: Notice): MarketSide | null {
 // booking_ready, booking_completed, work_completion_due,
 // booking_cancellation_requested (a listing/booking they host).
 // payment_marked_sent goes to the provider (not the job owner) → stays neutral.
+// payment_sorted / payment_unsorted carry job_id (side = job) and can go to
+// either party → stay neutral too.
 const OWNER_TYPES = new Set([
   'new_bid', 'new_question', 'job_ready', 'job_completed', 'payment_details_sent', 'job_confirmed',
   'new_booking', 'service_quote_accepted', 'booking_ready',

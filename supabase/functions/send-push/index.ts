@@ -36,6 +36,8 @@ const TITLES: Record<string, string> = {
   availability_check:             'Are you available this week?',
   arrival_window_confirmed:       'Arrival time confirmed',
   job_confirmed:                  'Job confirmed',
+  payment_sorted:                 'Payment sorted',
+  payment_unsorted:               'Payment update',
   running_late:                   'Running late',
   work_completion_due:            'Is the work complete?',
 }
