@@ -63,7 +63,7 @@ export function jobNextMove(
     unansweredQuestionCount = job?.unansweredQuestionCount || 0,
     hasPendingBid = false,
     paymentMethod = null,
-    paymentMarkedSentAt = null,
+    paymentSortedAt = null,
     hasArrival = true,
   }: {
     otherName?: string | null
@@ -71,7 +71,7 @@ export function jobNextMove(
     unansweredQuestionCount?: number
     hasPendingBid?: boolean
     paymentMethod?: string | null
-    paymentMarkedSentAt?: string | null
+    paymentSortedAt?: string | null
     hasArrival?: boolean
   } = {},
 ): NextMove | null {
@@ -103,7 +103,7 @@ export function jobNextMove(
     // A future-dated schedule label (null once the date has passed / none set).
     const schedule = scheduledLabel(job)
     const method = paymentMethod || null
-    const paid = !!paymentMarkedSentAt
+    const sorted = !!paymentSortedAt
 
     // One step first: confirm the arrival time and how to get paid. Until both
     // are set, everything else waits on that.
@@ -117,13 +117,13 @@ export function jobNextMove(
     }
 
     if (viewerRole === 'provider') {
-      // Step 3: requester says they've paid → check, then complete.
-      if (paid) {
-        return move('Payment marked sent', "Check it's arrived, then mark the job complete", {
+      // Either party has said payment is taken care of → just complete the job.
+      if (sorted) {
+        return move('Waiting on you', "Payment's sorted — mark the job complete when you're done", {
           needsAction: true, tone: 'active', icon: 'checkmark-done-outline', actionLabel: 'View job',
         })
       }
-      // Step 2: method set, doing the work — a future schedule still wins.
+      // Doing the work — a future schedule still wins.
       if (schedule) {
         return move(schedule, 'You are booked for this job', { tone: 'scheduled', icon: 'calendar-outline' })
       }
@@ -133,18 +133,13 @@ export function jobNextMove(
     }
 
     // Requester side (job is confirmed: arrival + method set).
-    if (paid) {
+    if (sorted) {
       return move(`Waiting on ${other}`, "They'll mark the job complete")
     }
-    // Method set, not paid → it's the requester's turn to pay.
-    const detail = method === 'cash' ? 'Pay on the day'
-      : method === 'agreed' ? 'Pay as agreed'
-      : `Pay ${other} when the work's done`   // bank_transfer | invoice
-    return move('Waiting on you', detail, {
-      needsAction: !schedule,                 // only chase once the scheduled date has passed
-      tone: schedule ? 'scheduled' : 'attention',
-      icon: 'card-outline',
-      actionLabel: schedule ? null : 'View job',
+    // Payment is flexible (before, on the day, or invoiced later), so this is a
+    // calm reminder — never something we chase the requester about.
+    return move(schedule || 'Job confirmed', method === 'cash' ? 'Pay on the day' : 'Pay as agreed', {
+      tone: 'scheduled', icon: 'card-outline',
     })
   }
 

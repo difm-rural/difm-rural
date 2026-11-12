@@ -4,6 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { formatDate as nzDate } from '../../shared/formatting.js'
 import { defaultStartForDate, timeLabel } from './ArrivalWindowModal'
 import { supabase } from '../lib/supabase'
+import { paymentLine } from '../../shared/offers'
 import Button from './Button'
 import Icon from './Icon'
 import { colors } from '../theme/tokens'
@@ -14,21 +15,18 @@ const METHOD_LABELS = {
   invoice: "I'll send an invoice",
   agreed: 'Already agreed',
 }
-const METHOD_MESSAGES = {
-  cash: "I'll take cash on the day.",
-  invoice: "I'll send you an invoice.",
-  agreed: "Let's settle up the way we agreed.",
-}
 
 // One-step job confirmation: arrival time + how to get paid, posted together via
-// the confirm_job RPC (one message, one notification).
-export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, availableFrom, onClose, onConfirmed }) {
+// the confirm_job RPC (one message, one notification). The RPC writes the
+// "Payment: $150 by bank transfer" line itself; the preview mirrors it.
+export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, availableFrom, amount, pricingType, onClose, onConfirmed }) {
   const [start, setStart] = useState(() => defaultStartForDate(availableFrom))
   const [picker, setPicker] = useState(null)
   const [choice, setChoice] = useState('')
   const [acct, setAcct] = useState('')
   const [acctNo, setAcctNo] = useState('')
   const [reference, setReference] = useState('Payment for ' + (jobTitle || 'the job'))
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -36,7 +34,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     if (!visible) return
     setStart(defaultStartForDate(availableFrom))
     setPicker(null); setChoice(''); setAcct(''); setAcctNo('')
-    setReference('Payment for ' + (jobTitle || 'the job')); setError('')
+    setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
   }, [visible, availableFrom, jobTitle])
 
   function changeDate(nextDate) { setStart(defaultStartForDate(nextDate)) }
@@ -49,7 +47,11 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   const isPast = start.getTime() <= Date.now()
   const paymentMessage = choice === 'bank_transfer'
     ? `Please pay by bank transfer.\nAccount name: ${acct || '—'}\nAccount number: ${acctNo || '—'}\nReference: ${reference || '—'}`
-    : (METHOD_MESSAGES[choice] || '')
+    : ''
+  const noteText = note.trim()
+  const preview = `Confirmed: I'll be there around ${timeLabel(start)} (${nzDate(start)}).\n${paymentLine(amount, pricingType, choice)}`
+    + (noteText ? `\nNote: ${noteText}` : '')
+    + (paymentMessage ? `\n\n${paymentMessage}` : '')
   const bankIncomplete = choice === 'bank_transfer' && (!acct.trim() || !acctNo.trim())
   const blocked = isPast || !choice || bankIncomplete || busy
 
@@ -62,6 +64,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
         p_arrival: start.toISOString(),
         p_method: choice,
         p_message: paymentMessage,
+        p_note: noteText || null,
       })
       if (rpcError) {
         setError(rpcError.message === 'Choose an arrival time in the future and a finish time after it'
@@ -146,10 +149,21 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
                 <TextInput style={styles.input} value={reference} onChangeText={setReference} maxLength={120} />
               </View>
             ) : null}
+            <Text style={styles.fieldLabel2}>Note (optional)</Text>
+            <TextInput
+              style={[styles.input, styles.noteInput]}
+              value={note}
+              onChangeText={setNote}
+              maxLength={500}
+              multiline
+              placeholder="e.g. about 3 hours, bring the gate key"
+              placeholderTextColor={colors.textMuted}
+              accessibilityLabel="Note (optional)"
+            />
             {choice ? (
               <View style={styles.previewBox}>
                 <Text style={styles.previewHead}>Message to {requesterFirst}</Text>
-                <Text style={styles.previewText}>{`Confirmed: I'll be there around ${timeLabel(start)} (${nzDate(start)}).`}{paymentMessage ? `\n\n${paymentMessage}` : ''}</Text>
+                <Text style={styles.previewText}>{preview}</Text>
               </View>
             ) : null}
             {!!error && <Text style={styles.error}>{error}</Text>}
@@ -177,6 +191,7 @@ const styles = StyleSheet.create({
   fieldLabel2: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 4, marginTop: 8 },
   fieldValue: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary },
+  noteInput: { minHeight: 64, textAlignVertical: 'top', marginBottom: 10 },
   hint: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   option: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.white },

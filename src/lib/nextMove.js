@@ -38,7 +38,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
     isProvider
       ? supabase
           .from('bids')
-          .select('id, job_id, payment_method, payment_marked_sent_at, jobs!inner(*)')
+          .select('id, job_id, payment_method, payment_sorted_at, jobs!inner(*)')
           .eq('provider_id', userId)
           .eq('status', 'accepted')
           .eq('jobs.status', 'accepted')
@@ -71,7 +71,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
       : Promise.resolve({ data: [] }),
     // Payment state on the requester's own awarded jobs (the accepted bid).
     awardedJobIds.length
-      ? supabase.from('bids').select('job_id, payment_method, payment_marked_sent_at').in('job_id', awardedJobIds).eq('status', 'accepted')
+      ? supabase.from('bids').select('job_id, payment_method, payment_sorted_at').in('job_id', awardedJobIds).eq('status', 'accepted')
       : Promise.resolve({ data: [] }),
   ])
 
@@ -82,7 +82,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
   const names = {}
   ;(profilesResult.data || []).forEach(profile => { names[profile.id] = profile.full_name })
   const payByJob = {}
-  ;(reqPaymentResult.data || []).forEach(row => { payByJob[row.job_id] = { method: row.payment_method, marked: row.payment_marked_sent_at } })
+  ;(reqPaymentResult.data || []).forEach(row => { payByJob[row.job_id] = { method: row.payment_method, sorted: row.payment_sorted_at } })
 
   const items = []
 
@@ -92,7 +92,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
       bidCount: bidCounts[job.id] || 0,
       unansweredQuestionCount: questionCounts[job.id] || 0,
       paymentMethod: pay.method,
-      paymentMarkedSentAt: pay.marked,
+      paymentSortedAt: pay.sorted,
     })
     if (nextMove?.needsAction) {
       items.push({
@@ -112,7 +112,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
     const nextMove = jobNextMove(job, 'provider', {
       otherName: names[job.requester_id],
       paymentMethod: bid.payment_method,
-      paymentMarkedSentAt: bid.payment_marked_sent_at,
+      paymentSortedAt: bid.payment_sorted_at,
     })
     if (nextMove?.needsAction) {
       items.push({

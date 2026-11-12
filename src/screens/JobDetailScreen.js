@@ -28,7 +28,8 @@ import { useUser } from '../context/UserContext'
 import { recordJobProviderView } from '../lib/listingPerformance'
 import WorkScheduleCard from '../components/WorkScheduleCard'
 import ArrivalWindowModal from '../components/ArrivalWindowModal'
-import JobPaymentHandoff from '../components/JobPaymentHandoff'
+import JobPaymentHandoff, { paymentSortedByline } from '../components/JobPaymentHandoff'
+import MarkCompleteSheet from '../components/MarkCompleteSheet'
 import ConfirmJobSheet from '../components/ConfirmJobSheet'
 import {
   addWorkToPhoneCalendar,
@@ -107,6 +108,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const [workSchedule, setWorkSchedule] = useState(null)
   const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
   const [confirmJobVisible, setConfirmJobVisible] = useState(false)
+  const [completeVisible, setCompleteVisible] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const [completeError, setCompleteError] = useState('')
   const [savingArrival, setSavingArrival] = useState(false)
 
   // Bid form state (Features 3 & 4)
@@ -566,30 +570,36 @@ export default function JobDetailScreen({ route, navigation }) {
     }
 
     function handleMarkComplete() {
-      const paidMessage = myBid?.payment_marked_sent_at
-        ? `${requesterFirstName} marked payment sent on ${nzDate(new Date(myBid.payment_marked_sent_at))}. Check it has arrived, then mark complete — this closes the job and invites them to leave a review.`
-        : `Check the work is finished and you've sorted payment with ${requesterFirstName} — cash, bank transfer or invoice, whatever you agreed. This closes the job and invites them to leave a review.`
-      Alert.alert(
-        'Before you mark this complete',
-        paidMessage,
-        [
-          { text: 'Not yet', style: 'cancel' },
-          {
-            text: 'Yes, mark complete',
-            onPress: async () => {
-              const { error } = await markJobComplete(job.id)
-              if (error) {
-                Alert.alert('Could not update', error.message)
-                if (error.code === 'stale') fetchData()
-                return
-              }
-              trackEvent('job_marked_complete', { job_id: job.id })
-              setJob(prev => ({ ...prev, status: 'completed' }))
-              Alert.alert('Thanks!', `${requesterFirstName} has been notified and can now leave a review.`)
-            },
-          },
-        ]
-      )
+      setCompleteError('')
+      setCompleteVisible(true)
+    }
+
+    // "The work is finished" is the only required tick. If the provider also
+    // ticked the optional payment box, record that first; unticked completes
+    // anyway (invoice later).
+    async function completeJob({ paymentSorted }) {
+      if (completing) return
+      setCompleting(true); setCompleteError('')
+      try {
+        if (paymentSorted && myBid?.id) {
+          const { error: payError } = await supabase.rpc('mark_job_payment_sorted', { p_bid: myBid.id, p_undo: false })
+          if (payError) { setCompleteError('Could not record the payment. Try again, or untick it and mark complete.'); return }
+        }
+        const { error } = await markJobComplete(job.id)
+        if (error) {
+          setCompleteError(error.message || 'Could not update. Please try again.')
+          if (error.code === 'stale') fetchData()
+          return
+        }
+        trackEvent('job_marked_complete', { job_id: job.id })
+        setCompleteVisible(false)
+        setJob(prev => ({ ...prev, status: 'completed' }))
+        Alert.alert('Thanks!', `${requesterFirstName} has been notified and can now leave a review.`)
+      } catch (e) {
+        setCompleteError(e?.message || 'Could not update. Please try again.')
+      } finally {
+        setCompleting(false)
+      }
     }
 
     async function handleSaveArrivalWindow(start, end, expectedComplete) {
@@ -745,7 +755,10 @@ export default function JobDetailScreen({ route, navigation }) {
               jobTitle={job.title}
               bidId={myBid.id}
               method={myBid.payment_method || null}
-              markedSentAt={myBid.payment_marked_sent_at || null}
+              amount={myBid.amount}
+              pricingType={myBid.pricing_type}
+              sortedAt={myBid.payment_sorted_at || null}
+              sortedBy={myBid.payment_sorted_by || null}
               paymentMessageId={myBid.payment_message_id || null}
               otherFirstName={requesterFirstName}
               counterpartId={job.requester_id}
@@ -818,12 +831,28 @@ export default function JobDetailScreen({ route, navigation }) {
           onClose={() => setArrivalModalVisible(false)}
           onSave={handleSaveArrivalWindow}
         />
+        <MarkCompleteSheet
+          visible={completeVisible}
+          otherFirstName={requesterFirstName}
+          paymentSortedByline={myBid?.payment_sorted_at ? paymentSortedByline({
+            sortedAt: myBid.payment_sorted_at,
+            sortedBy: myBid.payment_sorted_by,
+            currentUserId: currentUser?.id,
+            otherFirstName: requesterFirstName,
+          }) : null}
+          busy={completing}
+          error={completeError}
+          onClose={() => { if (!completing) setCompleteVisible(false) }}
+          onConfirm={completeJob}
+        />
         <ConfirmJobSheet
           visible={confirmJobVisible}
           bidId={myBid?.id}
           jobTitle={job.title}
           requesterFirst={requesterFirstName}
           availableFrom={myBid?.available_from || job.scheduled_date || job.date_from}
+          amount={myBid?.amount}
+          pricingType={myBid?.pricing_type}
           onClose={() => setConfirmJobVisible(false)}
           onConfirmed={() => {
             setConfirmJobVisible(false)

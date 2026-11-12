@@ -24,6 +24,14 @@ export async function manageArrangement(_:ActionState,data:FormData):Promise<Act
       if(error)throw error
       if(!rows?.length)return {error:'The listing has already changed. Refresh to see its current state.'}
     }else{
+      // Optional tick on a job's "Mark complete": record payment as taken care of
+      // first. Unticked completes anyway (invoice later).
+      if(kind==='job'&&intent==='complete'&&data.get('payment_sorted')==='on'){
+        const bidId=value(data,'bid_id')
+        if(!/^[0-9a-f-]{36}$/i.test(bidId))return {error:'Could not record the payment. Refresh and try again.'}
+        const {error}=await supabase.rpc('mark_job_payment_sorted',{p_bid:bidId,p_undo:false})
+        if(error)return {error:'Could not record the payment. Refresh and try again, or untick it and mark complete.'}
+      }
       const status=intent==='complete'?'completed':intent==='request_cancel'?'cancellation_requested':intent==='withdraw'?'withdrawn':'cancelled'
       const patch={status,...(['cancel','withdraw','request_cancel'].includes(intent)?{cancellation_reason:reason,cancellation_note:note || null}:{})}
       const {data:rows,error}=await supabase.from(kind==='job'?'jobs':'bookings').update(patch).eq('id',id).eq('status',work.status).select('id')

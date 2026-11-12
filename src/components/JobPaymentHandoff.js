@@ -1,107 +1,134 @@
 import React, { useEffect, useState } from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native'
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native'
 import { colors } from '../theme/tokens'
 import { supabase } from '../lib/supabase'
 import { formatDate as nzDate } from '../../shared/formatting'
+import { paymentLine } from '../../shared/offers'
 import Button from './Button'
 import Icon from './Icon'
 
 // Payment handoff for an accepted JOB. Rural Connections never handles money —
-// this only makes "whose turn" clear. Provider says how they'd like to be paid
-// (bank details only ever go into the thread); requester marks it sent.
+// this only keeps both people on the same page. The provider says how they'd
+// like to be paid (bank details only ever go into the thread); EITHER person
+// can then say "Payment all taken care of" at any time, and undo it.
 const METHOD_LABELS = {
   bank_transfer: 'Bank transfer',
   cash: 'Cash on the day',
   invoice: "I'll send an invoice",
   agreed: 'Already agreed',
 }
-const METHOD_MESSAGES = {
-  cash: "I'll take cash on the day.",
-  invoice: "I'll send you an invoice.",
-  agreed: "Let's settle up the way we agreed.",
+
+// "You, 12 Nov 2026" / "Sam, 12 Nov 2026" — who marked payment sorted and when.
+export function paymentSortedByline({ sortedAt, sortedBy, currentUserId, otherFirstName }) {
+  const who = sortedBy && sortedBy === currentUserId ? 'You' : (otherFirstName || 'Them')
+  return `${who}, ${nzDate(new Date(sortedAt))}`
 }
 
-export default function JobPaymentHandoff({
-  jobId, jobTitle, viewerRole, bidId, method, markedSentAt, paymentMessageId,
-  otherFirstName, counterpartId, currentUserId, availableFrom, onChanged,
-}) {
+// The single button both sides see, and its "done · Undo" state.
+function PaymentSortedControl({ bidId, sortedAt, sortedBy, currentUserId, otherFirstName, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  // ── Requester view ─────────────────────────────────────────────────────────
-  const [bankDetails, setBankDetails] = useState(null)
-  useEffect(() => {
-    let active = true
-    // Bank details come ONLY from the message the RPC pinned — never by scanning
-    // the thread.
-    if (viewerRole === 'requester' && method === 'bank_transfer' && paymentMessageId) {
-      supabase.from('messages').select('content').eq('id', paymentMessageId).maybeSingle()
-        .then(({ data }) => { if (active) setBankDetails(data?.content || null) })
-    }
-    return () => { active = false }
-  }, [viewerRole, method, paymentMessageId])
-
-  async function markPaid(undo) {
+  async function mark(undo) {
     if (busy) return
     setBusy(true); setError('')
-    const { error: rpcError } = await supabase.rpc('mark_job_payment_sent', { p_bid: bidId, p_undo: !!undo })
+    const { error: rpcError } = await supabase.rpc('mark_job_payment_sorted', { p_bid: bidId, p_undo: !!undo })
     setBusy(false)
     if (rpcError) { setError('Could not update. Pull to refresh and try again.'); return }
     onChanged?.()
   }
 
-  if (viewerRole === 'requester') {
-    if (!method) return null // nothing to pay yet; the next-move banner says to wait
-    if (markedSentAt) {
-      return (
-        <View style={styles.card}>
-          <View style={styles.doneRow}>
-            <Icon name="checkmark-done-outline" size={18} color={colors.primary} />
-            <Text style={styles.doneText}>Payment marked sent</Text>
-            <TouchableOpacity onPress={() => markPaid(true)} disabled={busy} accessibilityRole="button" accessibilityLabel="Undo payment marked sent">
-              <Text style={styles.undo}>{busy ? '…' : 'Undo'}</Text>
-            </TouchableOpacity>
-          </View>
-          {!!error && <Text style={styles.error}>{error}</Text>}
-        </View>
-      )
-    }
+  function confirmUndo() {
+    Alert.alert('Mark payment as not sorted?', `${otherFirstName} will be told.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Mark not sorted', onPress: () => mark(true) },
+    ])
+  }
+
+  if (sortedAt) {
     return (
-      <View style={styles.card}>
-        <Text style={styles.title}>Pay {otherFirstName}</Text>
-        <Text style={styles.metaRow}>How: {METHOD_LABELS[method] || method}</Text>
-        {method === 'bank_transfer' && !!bankDetails && (
-          <View style={styles.detailsBox}><Text style={styles.detailsText}>{bankDetails}</Text></View>
-        )}
-        {method === 'bank_transfer' && (
-          <Text style={styles.safety}>Only pay the account {otherFirstName} sent in this conversation. Rural Connections never asks for payment.</Text>
-        )}
-        <Button
-          title={method === 'cash' ? 'Paid on the day' : `I've paid — let ${otherFirstName} know`}
-          onPress={() => markPaid(false)}
-          loading={busy}
-          accessibilityLabel="Mark payment sent"
-        />
+      <View>
+        <View style={styles.doneRow}>
+          <Icon name="checkmark-done-outline" size={18} color={colors.primary} />
+          <Text style={styles.doneText}>
+            Payment all taken care of
+            <Text style={styles.doneMeta}> · {paymentSortedByline({ sortedAt, sortedBy, currentUserId, otherFirstName })}</Text>
+          </Text>
+          <TouchableOpacity onPress={confirmUndo} disabled={busy} accessibilityRole="button" accessibilityLabel="Undo payment all taken care of">
+            <Text style={styles.undo}>{busy ? '…' : 'Undo'}</Text>
+          </TouchableOpacity>
+        </View>
         {!!error && <Text style={styles.error}>{error}</Text>}
       </View>
     )
   }
+  return (
+    <View>
+      <Button title="Payment all taken care of" onPress={() => mark(false)} loading={busy} accessibilityLabel="Payment all taken care of" />
+      {!!error && <Text style={styles.error}>{error}</Text>}
+    </View>
+  )
+}
 
-  // ── Provider view ────────────────────────────────────────────────────────────
+export default function JobPaymentHandoff(props) {
+  return props.viewerRole === 'requester' ? <RequesterPayment {...props} /> : <ProviderPayment {...props} />
+}
+
+function RequesterPayment({
+  bidId, method, amount, pricingType, sortedAt, sortedBy, paymentMessageId, otherFirstName, currentUserId, onChanged,
+}) {
+  const [bankDetails, setBankDetails] = useState(null)
+  useEffect(() => {
+    let active = true
+    // Bank details come ONLY from the message the RPC pinned — never by scanning
+    // the thread.
+    if (method === 'bank_transfer' && paymentMessageId) {
+      supabase.from('messages').select('content').eq('id', paymentMessageId).maybeSingle()
+        .then(({ data }) => { if (active) setBankDetails(data?.content || null) })
+    }
+    return () => { active = false }
+  }, [method, paymentMessageId])
+
+  if (!method) return null // not confirmed yet; the next-move banner says to wait
+  const sorted = { bidId, sortedAt, sortedBy, currentUserId, otherFirstName, onChanged }
+
+  if (sortedAt) return <View style={styles.card}><PaymentSortedControl {...sorted} /></View>
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>{paymentLine(amount, pricingType, method)}</Text>
+      {method === 'bank_transfer' && !!bankDetails && (
+        <View style={styles.detailsBox}><Text style={styles.detailsText}>{bankDetails}</Text></View>
+      )}
+      {method === 'bank_transfer' && (
+        <Text style={[styles.safety, styles.safetyAbove]}>Only pay the account {otherFirstName} sent in this conversation. Rural Connections never asks for payment.</Text>
+      )}
+      <PaymentSortedControl {...sorted} />
+    </View>
+  )
+}
+
+function ProviderPayment({
+  jobTitle, bidId, method, amount, pricingType, sortedAt, sortedBy, otherFirstName, currentUserId, onChanged,
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const [open, setOpen] = useState(!method)
   const [choice, setChoice] = useState('')
   const [acct, setAcct] = useState('')
   const [acctNo, setAcctNo] = useState('')
   const [reference, setReference] = useState('Payment for ' + (jobTitle || 'the job'))
 
+  // The RPC posts the "Payment: $150 by …" line itself; only bank details ride along.
+  const details = choice === 'bank_transfer'
+    ? `Please pay by bank transfer.\nAccount name: ${acct.trim() || '—'}\nAccount number: ${acctNo.trim() || '—'}\nReference: ${reference.trim() || '—'}`
+    : ''
+
   async function sendMethod() {
     if (busy || !choice) return
     if (choice === 'bank_transfer' && (!acct.trim() || !acctNo.trim())) { setError('Add the account name and number.'); return }
-    const message = choice === 'bank_transfer'
-      ? `Please pay by bank transfer.\nAccount name: ${acct.trim()}\nAccount number: ${acctNo.trim()}\nReference: ${reference.trim() || '—'}`
-      : (METHOD_MESSAGES[choice] || '')
     setBusy(true); setError('')
-    const { error: rpcError } = await supabase.rpc('set_job_payment_method', { p_bid: bidId, p_method: choice, p_message: message })
+    const { error: rpcError } = await supabase.rpc('set_job_payment_method', { p_bid: bidId, p_method: choice, p_message: details })
     setBusy(false)
     if (rpcError) { setError('Could not save. Pull to refresh and try again.'); return }
     setOpen(false); onChanged?.()
@@ -110,13 +137,17 @@ export default function JobPaymentHandoff({
   if (method && !open) {
     return (
       <View style={styles.card}>
-        <View style={styles.doneRow}>
+        <View style={[styles.doneRow, styles.methodRow]}>
           <Icon name="card-outline" size={18} color={colors.primary} />
-          <Text style={styles.doneText}>Paid by: {METHOD_LABELS[method] || method}</Text>
+          <Text style={styles.doneText}>{paymentLine(amount, pricingType, method)}</Text>
           <TouchableOpacity onPress={() => { setOpen(true); setChoice('') }} accessibilityRole="button" accessibilityLabel="Change payment method">
             <Text style={styles.undo}>Change</Text>
           </TouchableOpacity>
         </View>
+        <PaymentSortedControl
+          bidId={bidId} sortedAt={sortedAt} sortedBy={sortedBy}
+          currentUserId={currentUserId} otherFirstName={otherFirstName} onChanged={onChanged}
+        />
       </View>
     )
   }
@@ -153,16 +184,17 @@ export default function JobPaymentHandoff({
       {!!choice && (
         <View style={styles.previewBox}>
           <Text style={styles.previewHead}>Message to {otherFirstName}</Text>
-          <Text style={styles.previewText}>
-            {choice === 'bank_transfer'
-              ? `Please pay by bank transfer.\nAccount name: ${acct || '—'}\nAccount number: ${acctNo || '—'}\nReference: ${reference || '—'}`
-              : (METHOD_MESSAGES[choice] || '')}
-          </Text>
+          <Text style={styles.previewText}>{paymentLine(amount, pricingType, choice)}{details ? `\n\n${details}` : ''}</Text>
         </View>
       )}
 
       {!!choice && (
         <Button title={busy ? 'Sending…' : 'Send'} onPress={sendMethod} loading={busy} />
+      )}
+      {!!method && (
+        <TouchableOpacity onPress={() => { setOpen(false); setError('') }} accessibilityRole="button" style={styles.cancelChange}>
+          <Text style={styles.undo}>Keep current payment</Text>
+        </TouchableOpacity>
       )}
       {!!error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.safety}>Rural Connections never handles the money — only share account details here, in the conversation.</Text>
@@ -174,10 +206,8 @@ export default function JobPaymentHandoff({
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 16, marginBottom: 12 },
   title: { fontSize: 16, fontWeight: '800', color: colors.textPrimary, marginBottom: 10 },
-  stepLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, marginTop: 4 },
   fieldLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 4, marginTop: 8 },
   hint: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
-  metaRow: { fontSize: 14, color: colors.textPrimary, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary, backgroundColor: colors.white, marginBottom: 2 },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   option: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.white },
@@ -191,8 +221,12 @@ const styles = StyleSheet.create({
   detailsBox: { backgroundColor: colors.background, borderRadius: 10, padding: 12, marginBottom: 8 },
   detailsText: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
   safety: { fontSize: 12, color: colors.textMuted, marginTop: 10, lineHeight: 17 },
+  safetyAbove: { marginTop: 0, marginBottom: 12 },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  methodRow: { marginBottom: 12 },
   doneText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  doneMeta: { fontWeight: '500', color: colors.textSecondary },
   undo: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  cancelChange: { marginTop: 10, alignSelf: 'flex-start' },
   error: { fontSize: 13, color: colors.danger, marginTop: 8 },
 })

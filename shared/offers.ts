@@ -46,3 +46,17 @@ export function formatOfferAmount(amount:number, pricingType:string|null|undefin
     default:         return `${nzMoney(amount)}`
   }
 }
+
+// "Payment: $150 by bank transfer" — the line posted with a job confirmation.
+// Mirrors public.job_payment_line() in the database so previews match.
+const PAYMENT_METHOD_PHRASES: Record<string, string> = {
+  bank_transfer: 'by bank transfer',
+  cash: 'cash on the day',
+  invoice: 'by invoice',
+  agreed: 'as agreed',
+}
+export function paymentLine(amount:number|string|null|undefined, pricingType:string|null|undefined, method:string|null|undefined) {
+  const value = Number(amount)
+  const money = amount !== null && amount !== undefined && Number.isFinite(value) && value > 0 ? `${formatOfferAmount(value, pricingType)} ` : ''
+  return `Payment: ${money}${PAYMENT_METHOD_PHRASES[method || ''] || 'as agreed'}`
+}
