@@ -1,6 +1,7 @@
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
+import {offerDefaultDay, requestedLabel} from '../../shared/requestedDate'
 import { localDate } from '../lib/quickPickDates'
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
@@ -72,11 +73,10 @@ function jobLocation(job) {
   return stripPlusCode(job.location_name) || job.location_area || "Location shared once you're accepted"
 }
 
-function jobDates(job) {
-  if (!job.date_from || !job.date_to) return null
-  try {
-    return `${nzDate(new Date(job.date_from))} – ${nzDate(new Date(job.date_to))}`
-  } catch { return null }
+// When the requester asked for the job — every schedule type:
+// "Sat 15 Nov" | "15–18 Nov" | "Flexible" | "As soon as possible" (+ " (passed)").
+function jobRequested(job) {
+  return requestedLabel(job, toLocalIsoDate(new Date()))
 }
 
 export default function JobDetailScreen({ route, navigation }) {
@@ -121,6 +121,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [bidMessage,        setBidMessage]        = useState('')
   const [availableFrom,     setAvailableFrom]     = useState(null)
   const [showDatePicker,    setShowDatePicker]    = useState(false)
+  const offerDateDefaulted = useRef(false)
 
   const [estimatedDuration, setEstimatedDuration] = useState('')
   const [bidPricingType,    setBidPricingType]    = useState('fixed')
@@ -216,6 +217,13 @@ export default function JobDetailScreen({ route, navigation }) {
     } else {
       setAlreadyBid(false)
       setMyBid(null)
+      // New offer: start "Available from" on the requested (first) date when it
+      // is today or later. Once only, so clearing or changing it sticks.
+      if (!offerDateDefaulted.current) {
+        offerDateDefaulted.current = true
+        const requestedDay = offerDefaultDay(currentJob, toLocalIsoDate(new Date()))
+        if (requestedDay) setAvailableFrom(current => current || localDate(requestedDay))
+      }
     }
 
     const { data: reqProfile } = await supabase
@@ -752,12 +760,10 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.detailLabel}>Your offer</Text>
               <Text style={[styles.detailValue, { color: colors.primary, fontWeight: '700' }]}>{formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
             </View>
-            {job.scheduled_date ? (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Schedule</Text>
-                <Text style={styles.detailValue}>{nzDate(new Date(job.scheduled_date))}</Text>
-              </View>
-            ) : null}
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Requested</Text>
+              <Text style={styles.detailValue}>{jobRequested(job)}</Text>
+            </View>
             {job.description ? (
               <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                 <Text style={styles.detailLabel}>Details</Text>
@@ -845,6 +851,8 @@ export default function JobDetailScreen({ route, navigation }) {
           visible={arrivalModalVisible}
           schedule={workSchedule}
           suggestedDate={arrivalSuggestion}
+          job={job}
+          offerDay={myBid?.available_from}
           saving={savingArrival}
           onClose={() => setArrivalModalVisible(false)}
           onSave={handleSaveArrivalWindow}
@@ -868,7 +876,8 @@ export default function JobDetailScreen({ route, navigation }) {
           bidId={myBid?.id}
           jobTitle={job.title}
           requesterFirst={requesterFirstName}
-          availableFrom={myBid?.available_from || job.scheduled_date || job.date_from}
+          job={job}
+          availableFrom={myBid?.available_from}
           amount={myBid?.amount}
           pricingType={myBid?.pricing_type}
           onClose={() => setConfirmJobVisible(false)}
@@ -978,7 +987,7 @@ export default function JobDetailScreen({ route, navigation }) {
         accessibilityLabel="Message to requester, optional"
       />
 
-      <DateChips value={availableFrom} onSelect={setAvailableFrom} onOpen={openAvailabilityDatePicker} />
+      <DateChips value={availableFrom} requestedLabel={jobRequested(job)} onSelect={setAvailableFrom} onOpen={openAvailabilityDatePicker} />
       <TouchableOpacity style={styles.availabilityBtn} onPress={openAvailabilityDatePicker}
         accessibilityRole="button" accessibilityLabel="Set availability date">
         <Text style={styles.availabilityBtnText}>
@@ -1107,7 +1116,7 @@ export default function JobDetailScreen({ route, navigation }) {
             <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
           ) : null}
           {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}
-          {jobDates(job) ? <Text style={styles.locationNote}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> {jobDates(job)}</Text> : null}
+          <Text style={styles.locationNote}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Requested: {jobRequested(job)}</Text>
           <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
         </View>
 

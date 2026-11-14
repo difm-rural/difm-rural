@@ -43,6 +43,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const names=new Map((people || []).map(p=>[p.id,p.full_name]))
  const ownerActions=jobOwnerActions(job.status,offerError?1:offers?.length || 0),myOffer=offers?.find(b=>b.provider_id===user.id)
  const mapTarget=jobMapTarget(job)
+ // What the requester asked for — shown on the offer, confirm and change-time forms.
+ const jobSchedule={schedule_type:job.schedule_type,scheduled_date:job.scheduled_date,date_from:job.date_from,date_to:job.date_to}
  const schedule=job.schedule_type==='range'?nzDate(job.date_from)+' – '+nzDate(job.date_to):job.schedule_type==='specific'?nzDate(job.scheduled_date):SCHEDULES[job.schedule_type as keyof typeof SCHEDULES] || 'Flexible timing'
 
  // ─── Workspace state ────────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const sortedAt=(acceptedOffer?.payment_sorted_at as string|null|undefined) || null
  const sortedByName=acceptedOffer?.payment_sorted_by===user.id?'You':otherFirst==='the other person'?'Them':otherFirst
  const paymentProviderCard=isAcceptedProvider&&payActive&&acceptedOffer
-   ? <><ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} method={payMethod || null} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>{jobConfirmed&&<section className="card payment-card"><PaymentSorted bidId={acceptedOffer.id} jobId={id} sortedAt={sortedAt} sortedByName={sortedByName} otherFirst={otherFirst}/></section>}</>
+   ? <><ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} schedule={jobSchedule} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} method={payMethod || null} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>{jobConfirmed&&<section className="card payment-card"><PaymentSorted bidId={acceptedOffer.id} jobId={id} sortedAt={sortedAt} sortedByName={sortedByName} otherFirst={otherFirst}/></section>}</>
    : null
  const paymentRequesterCard=own&&confirmedStatus&&acceptedOffer
    ? (jobConfirmed
@@ -139,11 +141,11 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link>:'Your offer'} · {formatOfferAmount(b.amount,b.pricing_type)}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{b.line_items?.length>0&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}: {nzMoney(item.amount)}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {nzDate(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
     {own&&job.status==='open'&&b.status!=='rejected'&&<Link className="card-link" href={'/jobs/'+id+'?thread='+b.provider_id+'#offer-'+b.id}>Message {names.get(b.provider_id)?.trim().split(/\s+/)[0] || 'this provider'}</Link>}
     {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary>Accept this offer</summary><ActionForm action={acceptOffer} label="Accept offer"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p><label className="account-setting"><input type="checkbox" required/>I agree to accept this offer.</label></ActionForm></details>:<>
-     <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'}/></details>
+     <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'} schedule={jobSchedule}/></details>
      <details className="activity-action"><summary>Withdraw offer</summary><ActionForm action={changeOffer} label="Withdraw offer"><input type="hidden" name="offer_id" value={b.id}/><input type="hidden" name="intent" value="withdraw"/><p>This removes your pending offer. You can send a new offer while the job is open.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to withdraw this offer.</label></ActionForm></details></>)}
     {convPlacement==='inline'&&conversation&&convPerson===b.provider_id&&<div className="work-inline-chat"><Conversation compact context={conversation} heading={chatHeading}/></div>}
    </article>)}
-   {!own&&!myOffer&&job.status==='open'&&<OfferForm jobId={id} providerMaterials={job.materials_type==='provider'}/>}
+   {!own&&!myOffer&&job.status==='open'&&<OfferForm jobId={id} providerMaterials={job.materials_type==='provider'} schedule={jobSchedule}/>}
    {!own&&!myOffer&&job.status!=='open'&&<p>This job is no longer accepting offers.</p>}
   </section>
 

@@ -3,6 +3,9 @@ import {useActionState,useEffect,useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {formatDateTime as nzDateTime} from '@shared/formatting'
 import {paymentLine} from '@shared/offers'
+import {toLocalIsoDate} from '@shared/dates'
+import {nzCalendarDay,type JobSchedule} from '@shared/postingDates'
+import {arrivalDayChoices,arrivalDayNote} from '@shared/requestedDate'
 import {confirmJob,changeJobArrival,setJobPaymentMethod} from '../../work-actions'
 
 const METHOD_LABELS:Record<string,string>={bank_transfer:'Bank transfer',cash:'Cash on the day',invoice:"I'll send an invoice",agreed:'Already agreed'}
@@ -21,16 +24,29 @@ function defaultArrival(availableFrom?:string|null){
   const nine=new Date(base);nine.setHours(9,0,0,0);return nine
 }
 
+// "Requested: Sat 15 Nov" plus one-tap day chips (the requested date, the days
+// of a requested range, the date on the provider's own offer). A chip sets the
+// day and that day's default time; the datetime field stays for any other date.
+function RequestedDays({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;offerDay:string|null;arrival:string;onPick:(value:string)=>void}){
+ const days=arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay})
+ return <>
+  <p className="muted requested-date">Requested: <strong>{days.requestedLabel}</strong></p>
+  {days.chips.length>0&&<div className="payment-options">{days.chips.map(chip=>
+   <button key={chip.day} type="button" aria-pressed={arrival.slice(0,10)===chip.day} className={'lform-kind'+(arrival.slice(0,10)===chip.day?' active':'')} onClick={()=>onPick(toLocal(defaultArrival(chip.day)))}>{chip.label}</button>)}</div>}
+ </>
+}
+
 // Provider card for an accepted job: one step to confirm arrival + payment, then
 // a summary with "Change time" / "Change payment".
-export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,arrivalStart,method,amount,pricingType}:{
- bidId:string;jobId:string;jobTitle:string;requesterFirst:string;availableFrom:string|null;arrivalStart:string|null;method:string|null;amount:number|null;pricingType:string|null}){
+export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availableFrom,arrivalStart,method,amount,pricingType}:{
+ bidId:string;jobId:string;jobTitle:string;requesterFirst:string;schedule:JobSchedule;availableFrom:string|null;arrivalStart:string|null;method:string|null;amount:number|null;pricingType:string|null}){
  const router=useRouter()
  const confirmed=!!arrivalStart&&!!method
 
  // ── Confirm form (not yet confirmed) ──
  const [state,submit,pending]=useActionState(confirmJob,{error:''})
- const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(availableFrom)))
+ // Start on the requested day when there is one (today or later); otherwise the offer date.
+ const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay:availableFrom}).preselect||availableFrom)))
  const [choice,setChoice]=useState('')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  const [note,setNote]=useState('')
@@ -39,7 +55,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,ar
  if(confirmed){
   return <section className="card payment-card">
    <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong> · {paymentLine(amount,pricingType,method)}</p>
-   <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} availableFrom={availableFrom}/></details>
+   <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom}/></details>
    <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>
  }
@@ -49,7 +65,9 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,ar
  const bankIncomplete=choice==='bank_transfer'&&(!acct.trim()||!acctNo.trim())
  const message=bankMessage(choice,acct,acctNo,reference)
  const noteText=note.trim()
- const preview=`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}.\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
+ // Mirrors the message confirm_job posts, including how the day relates to the one asked for.
+ const dayNote=arrivalDayNote(schedule,Number.isNaN(arrivalDate.getTime())?null:nzCalendarDay(arrivalDate))
+ const preview=`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}${dayNote.suffix}.`+(dayNote.line?`\n${dayNote.line}`:'')+`\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
  const blocked=isPast||!choice||bankIncomplete||Number.isNaN(arrivalDate.getTime())
 
  return <form action={submit} className="card payment-card lform">
@@ -59,6 +77,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,ar
   <input type="hidden" name="method" value={choice}/><input type="hidden" name="message" value={message}/>
   <fieldset disabled={pending} className="work-fieldset">
    <p className="payment-substep">When will you arrive?</p>
+   <RequestedDays schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
    <label className="lform-field">Expected arrival<input type="datetime-local" value={arrival} onChange={e=>setArrival(e.target.value)} required/></label>
    {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
    <p className="payment-substep">How would you like to be paid?</p>
@@ -77,7 +96,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,availableFrom,ar
  </form>
 }
 
-function ChangeTime({jobId,availableFrom}:{jobId:string;availableFrom:string|null}){
+function ChangeTime({jobId,schedule,availableFrom}:{jobId:string;schedule:JobSchedule;availableFrom:string|null}){
  const router=useRouter()
  const [state,submit,pending]=useActionState(changeJobArrival,{error:''})
  const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(availableFrom)))
@@ -85,6 +104,7 @@ function ChangeTime({jobId,availableFrom}:{jobId:string;availableFrom:string|nul
  const d=new Date(arrival),isPast=!Number.isNaN(d.getTime())&&d.getTime()<=Date.now()
  return <form action={submit} className="lform">
   <input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="arrival" value={Number.isNaN(d.getTime())?'':d.toISOString()}/>
+  <RequestedDays schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
   <label className="lform-field">Expected arrival<input type="datetime-local" value={arrival} onChange={e=>setArrival(e.target.value)} required/></label>
   {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
