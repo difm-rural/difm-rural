@@ -3,6 +3,9 @@ import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import DateChips from './DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from './NativeDateTimePicker'
 import { formatDate as nzDate } from '../../shared/formatting.js'
+import { toLocalIsoDate } from '../../shared/dates'
+import { nzCalendarDay } from '../../shared/postingDates'
+import { arrivalDayChoices, arrivalDayNote, dayLabel } from '../../shared/requestedDate'
 import { timeLabel } from './ArrivalWindowModal'
 import { defaultStartForDate } from '../lib/quickPickDates'
 import { supabase } from '../lib/supabase'
@@ -21,8 +24,16 @@ const METHOD_LABELS = {
 // One-step job confirmation: arrival time + how to get paid, posted together via
 // the confirm_job RPC (one message, one notification). The RPC writes the
 // "Payment: $150 by bank transfer" line itself; the preview mirrors it.
-export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, availableFrom, amount, pricingType, onClose, onConfirmed }) {
-  const [start, setStart] = useState(() => defaultStartForDate(availableFrom))
+//
+// `job` carries the requested schedule (schedule_type, scheduled_date, date_from,
+// date_to): the requested date is shown, offered as the first chip and
+// pre-selected so the provider can accept it in one tap. `availableFrom` is the
+// date on the provider's own offer.
+export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, job, availableFrom, amount, pricingType, onClose, onConfirmed }) {
+  const days = arrivalDayChoices(job, { today: toLocalIsoDate(new Date()), offerDay: availableFrom })
+  // Requested day first; otherwise the offer date (a past one falls back to today).
+  const initialDay = days.preselect || availableFrom
+  const [start, setStart] = useState(() => defaultStartForDate(initialDay))
   const [picker, setPicker] = useState(null)
   const [choice, setChoice] = useState('')
   const [acct, setAcct] = useState('')
@@ -34,10 +45,10 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
 
   useEffect(() => {
     if (!visible) return
-    setStart(defaultStartForDate(availableFrom))
+    setStart(defaultStartForDate(initialDay))
     setPicker(null); setChoice(''); setAcct(''); setAcctNo('')
     setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
-  }, [visible, availableFrom, jobTitle])
+  }, [visible, initialDay, jobTitle])
 
   function changeDate(nextDate) { setStart(defaultStartForDate(nextDate)) }
   function changeTime(nextTime) {
@@ -64,7 +75,13 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     ? `Please pay by bank transfer.\nAccount name: ${acct || '—'}\nAccount number: ${acctNo || '—'}\nReference: ${reference || '—'}`
     : ''
   const noteText = note.trim()
-  const preview = `Confirmed: I'll be there around ${timeLabel(start)} (${nzDate(start)}).\n${paymentLine(amount, pricingType, choice)}`
+  // Mirrors the message confirm_job posts, including how the day relates to
+  // the one the requester asked for.
+  const arrivalDay = nzCalendarDay(start)
+  const dayNote = arrivalDayNote(job, arrivalDay)
+  const preview = `Confirmed: I'll be there around ${arrivalDay ? dayLabel(arrivalDay) : nzDate(start)}, ${timeLabel(start)}${dayNote.suffix}.`
+    + (dayNote.line ? `\n${dayNote.line}` : '')
+    + `\n${paymentLine(amount, pricingType, choice)}`
     + (noteText ? `\nNote: ${noteText}` : '')
     + (paymentMessage ? `\n\n${paymentMessage}` : '')
   const bankIncomplete = choice === 'bank_transfer' && (!acct.trim() || !acctNo.trim())
@@ -111,7 +128,8 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
 
           <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
             <Text style={styles.section}>When will you arrive?</Text>
-            <DateChips value={start} arrival onSelect={changeDate} onOpen={() => openPicker('date')} />
+            <DateChips value={start} arrival requestedLabel={days.requestedLabel} chips={days.chips} quickPicks={days.quickPicks}
+              onSelect={changeDate} onOpen={() => openPicker('date')} />
             <TouchableOpacity style={styles.field} onPress={() => openPicker('date')}>
               <Text style={styles.fieldLabel}>Date</Text><Text style={styles.fieldValue}>{nzDate(start)}</Text>
             </TouchableOpacity>

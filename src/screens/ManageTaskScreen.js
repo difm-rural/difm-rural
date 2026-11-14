@@ -705,6 +705,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           visible={arrivalModalVisible}
           schedule={workSchedule}
           suggestedDate={job.scheduled_date || job.date_from}
+          job={job}
           saving={savingArrival}
           onClose={() => setArrivalModalVisible(false)}
           onSave={handleSaveArrivalWindow}

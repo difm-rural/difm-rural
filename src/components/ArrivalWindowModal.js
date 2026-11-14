@@ -4,6 +4,8 @@ import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import DateChips from './DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from './NativeDateTimePicker'
 import { defaultStartForDate } from '../lib/quickPickDates'
+import { toLocalIsoDate } from '../../shared/dates'
+import { arrivalDayChoices } from '../../shared/requestedDate'
 import Button from './Button'
 import Icon from './Icon'
 import { colors } from '../theme/tokens'
@@ -25,12 +27,16 @@ export default function ArrivalWindowModal({
   visible,
   schedule,
   suggestedDate,
+  job,
+  offerDay,
   saving,
   onClose,
   onSave,
 }) {
   const [start, setStart] = useState(() => initialStart(schedule, suggestedDate))
   const [picker, setPicker] = useState(null)
+  // Requested date (and the day chips that go with it) when the job is passed in.
+  const days = job ? arrivalDayChoices(job, { today: toLocalIsoDate(new Date()), offerDay }) : null
 
   useEffect(() => {
     if (!visible) return
@@ -86,7 +92,8 @@ export default function ArrivalWindowModal({
             This becomes the shared time for calendar events, reminders and completion prompts.
           </Text>
 
-          <DateChips value={start} arrival onSelect={changeDate} onOpen={() => openPicker('date')} />
+          <DateChips value={start} arrival requestedLabel={days?.requestedLabel} chips={days?.chips} quickPicks={days?.quickPicks}
+            onSelect={changeDate} onOpen={() => openPicker('date')} />
           <TouchableOpacity style={styles.field} onPress={() => openPicker('date')}>
             <Text style={styles.fieldLabel}>Date</Text>
             <Text style={styles.fieldValue}>{nzDate(start)}</Text>
