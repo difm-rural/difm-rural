@@ -87,3 +87,10 @@ test('changing day keeps an explicitly chosen time unless it has passed', () => 
   // No chosen time: the day's default.
   assert.equal(startForDay('2026-11-14', { now }).getHours(), 9)
 })
+
+import { newJobId } from '../src/lib/draftId.js'
+test('a posting session id is a well-formed, fresh v4 UUID', () => {
+  const ids = Array.from({ length: 200 }, newJobId)
+  for (const id of ids) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  assert.equal(new Set(ids).size, ids.length)
+})

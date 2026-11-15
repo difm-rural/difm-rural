@@ -26,6 +26,7 @@ const MATERIALS_OPTIONS = [
 const SCHEDULE_LABELS = {
   asap:     'As soon as possible',
   specific: 'On a specific date',
+  range:    'Over a period',
   flexible: "I'm flexible",
 }
 
@@ -66,6 +67,8 @@ export default function PostJobStep4Budget({ navigation, route }) {
   const scheduleLabel   = SCHEDULE_LABELS[jobData.scheduleType] || jobData.scheduleType
   const scheduleDisplay = jobData.scheduleType === 'specific' && jobData.scheduledDate
     ? `${scheduleLabel} — ${formatDate(jobData.scheduledDate)}`
+    : jobData.scheduleType === 'range' && jobData.dateFrom && jobData.dateTo
+    ? `${formatDate(jobData.dateFrom)} – ${formatDate(jobData.dateTo)}`
     : scheduleLabel
 
   // Keep context in sync
@@ -135,26 +138,6 @@ export default function PostJobStep4Budget({ navigation, route }) {
             </View>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
-            {attempted && !materialsType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose who supplies the materials.</Text>}
-            <View style={[styles.tilesRow, attempted && !materialsType && {borderColor:colors.danger,borderWidth:2}]}>
-              {MATERIALS_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[styles.tile, materialsType === opt.id && styles.tileActive]}
-                  onPress={() => setMaterialsType(opt.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: materialsType === opt.id }}>
-                  <Icon name={opt.icon} size={22} color={colors.primary} />
-                  <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
           {priceType === 'fixed' && (
             <View style={styles.card}>
               <Text style={styles.cardQuestion}>What's your budget?</Text>
@@ -177,6 +160,26 @@ export default function PostJobStep4Budget({ navigation, route }) {
               {(attempted||!!String(price??'').trim()) && !!moneyInputError(price,'Budget') && <Text accessibilityRole="alert" style={{ color: colors.danger, marginTop: 10 }}>{moneyInputError(price,'Budget')}</Text>}
             </View>
           )}
+
+          <View style={styles.card}>
+            <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
+            {attempted && !materialsType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose who supplies the materials.</Text>}
+            <View style={[styles.tilesRow, attempted && !materialsType && {borderColor:colors.danger,borderWidth:2}]}>
+              {MATERIALS_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[styles.tile, materialsType === opt.id && styles.tileActive]}
+                  onPress={() => setMaterialsType(opt.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: materialsType === opt.id }}>
+                  <Icon name={opt.icon} size={22} color={colors.primary} />
+                  <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.settleBox}>
             <Icon name="chatbubbles-outline" size={18} color={colors.textSecondary} />

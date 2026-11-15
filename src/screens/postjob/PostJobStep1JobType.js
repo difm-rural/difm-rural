@@ -6,7 +6,8 @@ import {
   Keyboard, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import DateChips from '../../components/DateChips'
+import NativeDateTimePicker, { openDateTimePicker } from '../../components/NativeDateTimePicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
@@ -49,7 +50,6 @@ export default function PostJobStep1JobType({ navigation, route }) {
     if (jobData.scheduledDate)   return new Date(jobData.scheduledDate)
     return null
   })
-  const [showDatePicker, setShowDatePicker] = useState(false)
   const [dateFrom,       setDateFrom]       = useState(() => {
     if (editJob?.date_from) return new Date(editJob.date_from)
     if (jobData.dateFrom)   return new Date(jobData.dateFrom)
@@ -60,8 +60,26 @@ export default function PostJobStep1JobType({ navigation, route }) {
     if (jobData.dateTo)   return new Date(jobData.dateTo)
     return null
   })
-  const [showFromPicker, setShowFromPicker] = useState(false)
-  const [showToPicker,   setShowToPicker]   = useState(false)
+  // Which date is being picked: 'date' | 'from' | 'to'. Uses the same picker as
+  // the rest of the app (a dialog on Android, an inline spinner with Done on iOS).
+  const [picker, setPicker] = useState(null)
+
+  function pickerOptions(which) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (which === 'from') {
+      return {
+        value: dateFrom || today, mode: 'date', minimumDate: today,
+        onSelect: selected => { setDateFrom(selected); if (dateTo && selected > dateTo) setDateTo(null) },
+      }
+    }
+    if (which === 'to') return { value: dateTo || dateFrom || today, mode: 'date', minimumDate: dateFrom || today, onSelect: setDateTo }
+    return { value: scheduledDate || today, mode: 'date', minimumDate: today, onSelect: setScheduledDate }
+  }
+
+  function openPicker(which) {
+    openDateTimePicker({ ...pickerOptions(which), onShow: () => setPicker(which) })
+  }
 
   // Seed context from editJob on first entry into this edit session
   useEffect(() => {
@@ -232,30 +250,15 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
                   {opt.id === 'specific' && scheduleType === 'specific' && (
                     <View style={styles.scheduleSub}>
-                      <TouchableOpacity style={styles.datePicker} onPress={() => setShowDatePicker(true)} accessibilityRole="button">
+                      <DateChips value={scheduledDate} wrap onSelect={setScheduledDate} onOpen={() => openPicker('date')} />
+                      <TouchableOpacity style={styles.datePicker} onPress={() => openPicker('date')} accessibilityRole="button"
+                        accessibilityLabel={scheduledDate ? `Date: ${formatDate(scheduledDate)}. Change` : 'Select a date'}>
                         <Text style={scheduledDate ? styles.datePickerValue : styles.datePickerPlaceholder}>
                           {scheduledDate ? formatDate(scheduledDate) : 'Select a date'}
                         </Text>
                         <Icon name="calendar-outline" size={18} color={colors.textMuted} />
                       </TouchableOpacity>
-                      {showDatePicker && (
-                        <>
-                          {Platform.OS === 'ios' && (
-                            <TouchableOpacity style={styles.pickerDone} onPress={() => setShowDatePicker(false)}>
-                              <Text style={styles.pickerDoneText}>Done</Text>
-                            </TouchableOpacity>
-                          )}
-                          <DateTimePicker
-                            value={scheduledDate || new Date()}
-                            mode="date"
-                            minimumDate={new Date()}
-                            onChange={(event, selected) => {
-                              if (Platform.OS === 'android') setShowDatePicker(false)
-                              if (event?.type !== 'dismissed' && selected) setScheduledDate(selected)
-                            }}
-                          />
-                        </>
-                      )}
+                      {picker === 'date' && <NativeDateTimePicker visible {...pickerOptions('date')} onDone={() => setPicker(null)} />}
                     </View>
                   )}
 
@@ -264,7 +267,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
                       <View style={styles.rangeRow}>
                         <View style={styles.rangeCol}>
                           <Text style={styles.rangeLabel}>From</Text>
-                          <TouchableOpacity style={styles.datePicker} onPress={() => setShowFromPicker(true)} accessibilityRole="button">
+                          <TouchableOpacity style={styles.datePicker} onPress={() => openPicker('from')} accessibilityRole="button">
                             <Text style={dateFrom ? styles.datePickerValue : styles.datePickerPlaceholder}>
                               {dateFrom ? formatDate(dateFrom) : 'Start date'}
                             </Text>
@@ -273,7 +276,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
                         </View>
                         <View style={styles.rangeCol}>
                           <Text style={styles.rangeLabel}>To</Text>
-                          <TouchableOpacity style={styles.datePicker} onPress={() => setShowToPicker(true)} accessibilityRole="button">
+                          <TouchableOpacity style={styles.datePicker} onPress={() => openPicker('to')} accessibilityRole="button">
                             <Text style={dateTo ? styles.datePickerValue : styles.datePickerPlaceholder}>
                               {dateTo ? formatDate(dateTo) : 'End date'}
                             </Text>
@@ -286,44 +289,8 @@ export default function PostJobStep1JobType({ navigation, route }) {
                           <Icon name="moon-outline" size={13} color={colors.primary} /> {rangeDays} {rangeDays === 1 ? 'night' : 'nights'} · {formatShort(dateFrom)} – {formatShort(dateTo)}
                         </Text>
                       )}
-                      {showFromPicker && (
-                        <>
-                          {Platform.OS === 'ios' && (
-                            <TouchableOpacity style={styles.pickerDone} onPress={() => setShowFromPicker(false)}>
-                              <Text style={styles.pickerDoneText}>Done</Text>
-                            </TouchableOpacity>
-                          )}
-                          <DateTimePicker
-                            value={dateFrom || new Date()}
-                            mode="date"
-                            minimumDate={new Date()}
-                            onChange={(event, selected) => {
-                              if (Platform.OS === 'android') setShowFromPicker(false)
-                              if (event?.type !== 'dismissed' && selected) {
-                                setDateFrom(selected)
-                                if (dateTo && selected > dateTo) setDateTo(null)
-                              }
-                            }}
-                          />
-                        </>
-                      )}
-                      {showToPicker && (
-                        <>
-                          {Platform.OS === 'ios' && (
-                            <TouchableOpacity style={styles.pickerDone} onPress={() => setShowToPicker(false)}>
-                              <Text style={styles.pickerDoneText}>Done</Text>
-                            </TouchableOpacity>
-                          )}
-                          <DateTimePicker
-                            value={dateTo || dateFrom || new Date()}
-                            mode="date"
-                            minimumDate={dateFrom || new Date()}
-                            onChange={(event, selected) => {
-                              if (Platform.OS === 'android') setShowToPicker(false)
-                              if (event?.type !== 'dismissed' && selected) setDateTo(selected)
-                            }}
-                          />
-                        </>
+                      {(picker === 'from' || picker === 'to') && (
+                        <NativeDateTimePicker visible {...pickerOptions(picker)} onDone={() => setPicker(null)} />
                       )}
                     </View>
                   )}

@@ -199,7 +199,7 @@ export default function PostJobStep3Details({ navigation, route }) {
             </Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Gate code 1234, last gate on left past the woolshed..."
+              placeholder="e.g. Last gate on the left past the woolshed, park by the shed..."
               placeholderTextColor={colors.textMuted}
               value={locationNote}
               onChangeText={setLocationNote}
@@ -209,6 +209,11 @@ export default function PostJobStep3Details({ navigation, route }) {
               autoCapitalize="sentences"
               accessibilityLabel="Access note"
             />
+            <Text style={[styles.hintText, !jobData.hideExactLocation && { color: colors.danger }]}>
+              {jobData.hideExactLocation
+                ? 'Only shared with the provider you accept.'
+                : 'Anyone viewing this job can read this. Keep gate codes and key locations out of it — or go back to Location and hide your exact address.'}
+            </Text>
           </View>
 
         </ScrollView>

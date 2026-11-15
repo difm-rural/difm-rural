@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react'
+import { newJobId } from '../lib/draftId'
 
 const PostJobContext = createContext({})
 
@@ -24,21 +25,27 @@ const INITIAL_STATE = {
   inviteProviderName: null,
   dateFrom:           null,
   dateTo:             null,
-  hideExactLocation:  false,
+  // Private by default (as on the web): only the town/area shows publicly, and
+  // the address, map pin and access note go to the provider you accept.
+  hideExactLocation:  true,
   locationArea:       '',
   repeatedFromJobId:  null,
   recurrenceFrequency: 'one_time',
 }
 
+// Each posting session gets its own job id, so a retried post can't create a
+// duplicate (see lib/draftId).
+const freshState = () => ({ ...INITIAL_STATE, draftJobId: newJobId() })
+
 export function PostJobProvider({ children }) {
-  const [jobData, setJobData] = useState(INITIAL_STATE)
+  const [jobData, setJobData] = useState(freshState)
 
   function updateJobData(updates) {
     setJobData(prev => ({ ...prev, ...updates }))
   }
 
   function resetJobData() {
-    setJobData(INITIAL_STATE)
+    setJobData(freshState())
   }
 
   return (
