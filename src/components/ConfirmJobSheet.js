@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import DateChips from './DateChips'
-import NativeDateTimePicker, { openDateTimePicker } from './NativeDateTimePicker'
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import ArrivalWhen, { timeLabel } from './ArrivalWhen'
+import FullScreenSheet from './FullScreenSheet'
 import { formatDate as nzDate } from '../../shared/formatting.js'
 import { toLocalIsoDate } from '../../shared/dates'
 import { nzCalendarDay } from '../../shared/postingDates'
 import { arrivalDayChoices, arrivalDayNote, dayLabel } from '../../shared/requestedDate'
-import { timeLabel } from './ArrivalWindowModal'
 import { defaultStartForDate } from '../lib/quickPickDates'
 import { supabase } from '../lib/supabase'
 import { paymentLine } from '../../shared/offers'
 import Button from './Button'
-import Icon from './Icon'
 import { colors } from '../theme/tokens'
 
 const METHOD_LABELS = {
@@ -29,12 +27,14 @@ const METHOD_LABELS = {
 // date_to): the requested date is shown, offered as the first chip and
 // pre-selected so the provider can accept it in one tap. `availableFrom` is the
 // date on the provider's own offer.
+//
+// Full screen: "When" is one collapsed row (ArrivalWhen), then payment, note and
+// the message preview; Confirm job stays pinned above the keyboard.
 export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, job, availableFrom, amount, pricingType, onClose, onConfirmed }) {
   const days = arrivalDayChoices(job, { today: toLocalIsoDate(new Date()), offerDay: availableFrom })
   // Requested day first; otherwise the offer date (a past one falls back to today).
   const initialDay = days.preselect || availableFrom
   const [start, setStart] = useState(() => defaultStartForDate(initialDay))
-  const [picker, setPicker] = useState(null)
   const [choice, setChoice] = useState('')
   const [acct, setAcct] = useState('')
   const [acctNo, setAcctNo] = useState('')
@@ -46,29 +46,9 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   useEffect(() => {
     if (!visible) return
     setStart(defaultStartForDate(initialDay))
-    setPicker(null); setChoice(''); setAcct(''); setAcctNo('')
+    setChoice(''); setAcct(''); setAcctNo('')
     setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
   }, [visible, initialDay, jobTitle])
-
-  function changeDate(nextDate) { setStart(defaultStartForDate(nextDate)) }
-  function changeTime(nextTime) {
-    const next = new Date(start)
-    next.setHours(nextTime.getHours(), nextTime.getMinutes(), 0, 0)
-    setStart(next)
-  }
-
-  function pickerOptions(mode) {
-    return {
-      value: start,
-      mode,
-      minimumDate: mode === 'date' ? new Date() : undefined,
-      onSelect: mode === 'date' ? changeDate : changeTime,
-    }
-  }
-
-  function openPicker(mode) {
-    openDateTimePicker({ ...pickerOptions(mode), onShow: () => setPicker(mode) })
-  }
 
   const isPast = start.getTime() <= Date.now()
   const paymentMessage = choice === 'bank_transfer'
@@ -113,98 +93,64 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <View style={styles.heading}>
-            <View>
-              <Text style={styles.kicker}>CONFIRM THE JOB</Text>
-              <Text style={styles.title}>Arrival & payment</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} accessibilityLabel="Close">
-              <Icon name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+    <FullScreenSheet
+      visible={visible}
+      title="Confirm the job"
+      onClose={onClose}
+      footer={<Button title="Confirm job" onPress={confirm} loading={busy} disabled={blocked} />}>
+      <Text style={styles.section}>When will you arrive?</Text>
+      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} />
 
-          <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
-            <Text style={styles.section}>When will you arrive?</Text>
-            <DateChips value={start} arrival requestedLabel={days.requestedLabel} chips={days.chips} quickPicks={days.quickPicks}
-              onSelect={changeDate} onOpen={() => openPicker('date')} />
-            <TouchableOpacity style={styles.field} onPress={() => openPicker('date')}>
-              <Text style={styles.fieldLabel}>Date</Text><Text style={styles.fieldValue}>{nzDate(start)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.field} onPress={() => openPicker('time')}>
-              <Text style={styles.fieldLabel}>Expected arrival</Text><Text style={styles.fieldValue}>{timeLabel(start)}</Text>
-            </TouchableOpacity>
-            {isPast ? <Text style={styles.error}>Pick a time later today</Text> : null}
-            {picker && <NativeDateTimePicker visible {...pickerOptions(picker)} onDone={() => setPicker(null)} />}
-
-            <Text style={styles.section}>How would you like to be paid?</Text>
-            <View style={styles.options}>
-              {Object.entries(METHOD_LABELS).map(([id, label]) => (
-                <TouchableOpacity
-                  key={id}
-                  style={[styles.option, choice === id && styles.optionActive]}
-                  onPress={() => setChoice(id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: choice === id }}
-                  accessibilityLabel={label}>
-                  <Text style={[styles.optionText, choice === id && styles.optionTextActive]}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {choice === 'bank_transfer' ? (
-              <View>
-                <Text style={styles.fieldLabel2}>Account name</Text>
-                <TextInput style={styles.input} value={acct} onChangeText={setAcct} maxLength={120} />
-                <Text style={styles.fieldLabel2}>Account number</Text>
-                <TextInput style={styles.input} value={acctNo} onChangeText={setAcctNo} placeholder="00-0000-0000000-00" placeholderTextColor={colors.textMuted} keyboardType="numbers-and-punctuation" />
-                <Text style={styles.hint}>NZ format, e.g. 00-0000-0000000-00(0)</Text>
-                <Text style={styles.fieldLabel2}>Reference</Text>
-                <TextInput style={styles.input} value={reference} onChangeText={setReference} maxLength={120} />
-              </View>
-            ) : null}
-            <Text style={styles.fieldLabel2}>Note (optional)</Text>
-            <TextInput
-              style={[styles.input, styles.noteInput]}
-              value={note}
-              onChangeText={setNote}
-              maxLength={500}
-              multiline
-              placeholder="e.g. about 3 hours, bring the gate key"
-              placeholderTextColor={colors.textMuted}
-              accessibilityLabel="Note (optional)"
-            />
-            {choice ? (
-              <View style={styles.previewBox}>
-                <Text style={styles.previewHead}>Message to {requesterFirst}</Text>
-                <Text style={styles.previewText}>{preview}</Text>
-              </View>
-            ) : null}
-            {!!error && <Text style={styles.error}>{error}</Text>}
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <Button variant="secondary" title="Cancel" onPress={onClose} style={styles.action} />
-            <Button title="Confirm job" onPress={confirm} loading={busy} disabled={blocked} style={styles.action} />
-          </View>
-        </View>
+      <Text style={styles.section}>How would you like to be paid?</Text>
+      <View style={styles.options}>
+        {Object.entries(METHOD_LABELS).map(([id, label]) => (
+          <TouchableOpacity
+            key={id}
+            style={[styles.option, choice === id && styles.optionActive]}
+            onPress={() => setChoice(id)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: choice === id }}
+            accessibilityLabel={label}>
+            <Text style={[styles.optionText, choice === id && styles.optionTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
-    </Modal>
+      {choice === 'bank_transfer' ? (
+        <View>
+          <Text style={styles.fieldLabel2}>Account name</Text>
+          <TextInput style={styles.input} value={acct} onChangeText={setAcct} maxLength={120} />
+          <Text style={styles.fieldLabel2}>Account number</Text>
+          <TextInput style={styles.input} value={acctNo} onChangeText={setAcctNo} placeholder="00-0000-0000000-00" placeholderTextColor={colors.textMuted} keyboardType="numbers-and-punctuation" />
+          <Text style={styles.hint}>NZ format, e.g. 00-0000-0000000-00(0)</Text>
+          <Text style={styles.fieldLabel2}>Reference</Text>
+          <TextInput style={styles.input} value={reference} onChangeText={setReference} maxLength={120} />
+        </View>
+      ) : null}
+      <Text style={styles.fieldLabel2}>Note (optional)</Text>
+      <TextInput
+        style={[styles.input, styles.noteInput]}
+        value={note}
+        onChangeText={setNote}
+        maxLength={500}
+        multiline
+        placeholder="e.g. about 3 hours, bring the gate key"
+        placeholderTextColor={colors.textMuted}
+        accessibilityLabel="Note (optional)"
+      />
+      {choice ? (
+        <View style={styles.previewBox}>
+          <Text style={styles.previewHead}>Message to {requesterFirst}</Text>
+          <Text style={styles.previewText}>{preview}</Text>
+        </View>
+      ) : null}
+      {!!error && <Text style={styles.error}>{error}</Text>}
+    </FullScreenSheet>
   )
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(12,28,22,0.48)', justifyContent: 'center', padding: 20 },
-  sheet: { backgroundColor: colors.white, borderRadius: 16, padding: 20 },
-  heading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
-  kicker: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 5 },
-  title: { color: colors.textPrimary, fontSize: 22, fontWeight: '700' },
-  section: { color: colors.textPrimary, fontSize: 15, fontWeight: '800', marginTop: 12, marginBottom: 8 },
-  field: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, marginBottom: 10 },
-  fieldLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
+  section: { color: colors.textPrimary, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   fieldLabel2: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 4, marginTop: 8 },
-  fieldValue: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary },
   noteInput: { minHeight: 64, textAlignVertical: 'top', marginBottom: 10 },
   hint: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
@@ -217,6 +163,4 @@ const styles = StyleSheet.create({
   previewHead: { fontSize: 12, fontWeight: '800', color: colors.textSecondary, marginBottom: 4 },
   previewText: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
   error: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: 6, marginBottom: 4 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  action: { flex: 1 },
 })
