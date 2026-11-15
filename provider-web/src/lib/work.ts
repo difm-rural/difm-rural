@@ -5,6 +5,11 @@ export function statusLabel(status: string) {
     cancellation_requested: 'Cancellation requested', completed: 'Completed', open: 'Open', accepted: 'Accepted',
     cancelled: 'Cancelled', withdrawn: 'Withdrawn', declined: 'Declined' } as Record<string,string>)[status] || status.replaceAll('_', ' ')
 }
+// For someone who is not a party to the job (job board, saved jobs): an
+// accepted job is simply taken — "Filled" rather than "Accepted".
+export function jobBoardStatusLabel(status: string) {
+  return status === 'accepted' ? 'Filled' : statusLabel(status)
+}
 export function messagePreview(content: string | null) {
   if (!content) return 'New message'
   try { const value = JSON.parse(content); if (value.type === 'photo') return value.caption || 'Photo'; if (value.type === 'location') return 'Shared location' } catch {}

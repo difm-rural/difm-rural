@@ -151,7 +151,8 @@ export default function JobServiceCard({
   // also what terminal states (Completed, Cancelled, Declined) keep.
   const badge = !showStatusBadge ? null
     : nextMove?.badge
-      ? { label: nextMove.badge, ...(STATUS_TONE_COLORS[nextMove.badgeTone] || STATUS_TONE_COLORS.muted) }
+      // This card is narrow (155pt), so it uses the short form: "Your turn" / "Sam's turn".
+      ? { label: nextMove.badgeShort || nextMove.badge, ...(STATUS_TONE_COLORS[nextMove.badgeTone] || STATUS_TONE_COLORS.muted) }
       : statusBadgeProps(status || item.status, bidCount)
   // The badge already says "Waiting on …", so the box below drops that heading
   // and keeps the detail line (plus a schedule / state heading when there is one).
@@ -219,7 +220,7 @@ export default function JobServiceCard({
         {/* Status badge overlay (top-left) */}
         {badge && (
           <View style={[styles.overlayBadge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.overlayBadgeText, { color: badge.fg }]} numberOfLines={2}>{badge.label}</Text>
+            <Text style={[styles.overlayBadgeText, { color: badge.fg }]} numberOfLines={1} ellipsizeMode="tail">{badge.label}</Text>
           </View>
         )}
 

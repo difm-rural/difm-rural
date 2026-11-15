@@ -17,6 +17,9 @@ export type NextMove = {
   // Short "whose turn + what's next" label for the top of a card, shown in place
   // of the raw status: 'Waiting on you to confirm', 'Waiting on Sam to complete'.
   badge: string
+  // The same, for narrow cards: 'Your turn' / "Sam's turn". Labels that are
+  // nobody's turn ('Waiting for offers', 'Arrangement accepted') stay as they are.
+  badgeShort: string
   // 'attention' when the viewer must act now, otherwise 'muted'.
   badgeTone: 'attention' | 'muted'
 }
@@ -56,7 +59,18 @@ function scheduledLabel(item: Scheduleable | null | undefined): string | null {
 
 function move(badge: string, label: string, detail: string, opts: Partial<Omit<NextMove, 'label' | 'detail' | 'badge' | 'badgeTone'>> = {}): NextMove {
   const { needsAction = false, tone = 'waiting', icon = 'time-outline', actionLabel = null } = opts
-  return { label, detail, needsAction, tone, icon, actionLabel, badge, badgeTone: needsAction ? 'attention' : 'muted' }
+  return { label, detail, needsAction, tone, icon, actionLabel, badge, badgeShort: shortBadge(badge), badgeTone: needsAction ? 'attention' : 'muted' }
+}
+
+// 'Waiting on you to confirm' → 'Your turn'; 'Waiting on Sam to complete' →
+// "Sam's turn"; with no name, 'Waiting on the provider to …' → "Provider's turn".
+function shortBadge(badge: string): string {
+  const waiting = /^Waiting on (.+) to \w+$/.exec(badge)
+  if (!waiting) return badge
+  const who = waiting[1]
+  if (who === 'you') return 'Your turn'
+  const name = who.startsWith('the ') ? who.charAt(4).toUpperCase() + who.slice(5) : who
+  return `${name}'s turn`
 }
 
 // The heading for a next-move box that sits under a card or page already

@@ -33,6 +33,12 @@ export const isJobActive   = s => JOB_ACTIVE_STATUSES.includes(s)
 export const isJobTerminal = s => JOB_TERMINAL_STATUSES.includes(s)
 export const isJobAwarded  = s => JOB_AWARDED_STATUSES.includes(s)
 
+// On the public job board the viewer is not a party to the job, so an accepted
+// job is simply taken: "Filled" rather than "Confirmed".
+export function jobBoardStatusLabel(status) {
+  return status === JOB_STATUS.ACCEPTED ? 'Filled' : statusLabel(status)
+}
+
 // Job convenience wrapper — delegates to the shared vocabulary below.
 export function jobStatusLabel(status, bidCount = 0) {
   return statusLabel(status, bidCount)

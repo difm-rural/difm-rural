@@ -161,6 +161,36 @@ for (const m of [
   bookingNextMove({ status: 'confirmed', ...fixed }, 'requester'),
 ]) check(`badge tone follows needsAction · ${m!.badge}`, m!.badgeTone, m!.needsAction ? 'attention' : 'muted')
 
+// ---- Short badge for narrow cards: "Your turn" / "Sam's turn" ----
+const short = (m: ReturnType<typeof jobNextMove>) => m && m.badgeShort
+check('short · needs action → Your turn', short(jobNextMove({ status: 'accepted' }, 'provider', {})), 'Your turn')
+check('short · requester must choose → Your turn', short(jobNextMove({ status: 'open' }, 'requester', { bidCount: 2 })), 'Your turn')
+check('short · requester must answer → Your turn', short(jobNextMove({ status: 'open' }, 'requester', { unansweredQuestionCount: 1 })), 'Your turn')
+check('short · your move even when not urgent (doing the work) → Your turn', short(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash' })), 'Your turn')
+check('short · your move, scheduled ahead → Your turn', short(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'cash' })), 'Your turn')
+check('short · other party, first name only', short(jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam Rata' })), "Sam's turn")
+check('short · other party to complete', short(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash', otherName: 'Christopher Longname' })), "Christopher's turn")
+check('short · provider waiting on the requester to choose', short(jobNextMove({ status: 'open' }, 'provider', { hasPendingBid: true, otherName: 'Ana' })), "Ana's turn")
+check('short · no name, requester view → Provider', short(jobNextMove({ status: 'accepted' }, 'requester', {})), "Provider's turn")
+check('short · no name, provider view → Requester', short(jobNextMove({ status: 'open' }, 'provider', { hasPendingBid: true })), "Requester's turn")
+check('short · Waiting for offers is unchanged', short(jobNextMove({ status: 'open' }, 'requester', {})), 'Waiting for offers')
+check('short · booking request · provider', short(bookingNextMove({ status: 'pending', ...fixed }, 'provider')), 'Your turn')
+check('short · booking request · requester', short(bookingNextMove({ status: 'pending', ...fixed }, 'requester', { otherName: 'Sam Rata' })), "Sam's turn")
+check('short · quote sent · requester', short(bookingNextMove({ status: 'quote_sent', ...quote }, 'requester')), 'Your turn')
+check('short · confirmed booking · provider', short(bookingNextMove({ status: 'confirmed', ...fixed }, 'provider')), 'Your turn')
+check('short · confirmed booking · requester', short(bookingNextMove({ status: 'confirmed', ...fixed }, 'requester', { otherName: 'Sam' })), "Sam's turn")
+check('short · cancellation · requester', short(bookingNextMove({ status: 'cancellation_requested', ...fixed }, 'requester', { otherName: 'Sam' })), "Sam's turn")
+check('short · grazing arrangement is unchanged', short(bookingNextMove({ status: 'confirmed', service: { kind: 'grazing' } }, 'provider')), 'Arrangement accepted')
+check('short · the full badge is still there for wide headers', jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam Rata' })!.badge, 'Waiting on Sam to confirm')
+// Whenever the viewer must act, the short badge is "Your turn".
+for (const m of [
+  jobNextMove({ status: 'open' }, 'requester', { bidCount: 1 }),
+  jobNextMove({ status: 'accepted' }, 'provider', {}),
+  jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: sorted }),
+  bookingNextMove({ status: 'pending', ...quote }, 'provider'),
+  bookingNextMove({ status: 'cancellation_requested', ...fixed }, 'provider'),
+]) check(`short · needsAction is always Your turn · ${m!.badge}`, [m!.needsAction, m!.badgeShort], [true, 'Your turn'])
+
 // ---- Next-move box heading under a badge ----
 check('heading · "Waiting on you" repeats the badge → dropped', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'provider', {})), null)
 check('heading · "Waiting on Sam" repeats the badge → dropped', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam' })), null)
