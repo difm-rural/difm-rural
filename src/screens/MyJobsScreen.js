@@ -69,6 +69,25 @@ export default function MyJobsScreen({ navigation, route }) {
       questionsData?.forEach(q => { questionCountMap[q.job_id] = (questionCountMap[q.job_id] || 0) + 1 })
     }
 
+    // Awarded jobs: the accepted offer's payment state + the provider's name,
+    // so the card can say whose turn it is (confirm vs complete).
+    const awardedIds = rawJobs.filter(j => j.status === 'accepted').map(j => j.id)
+    const awardedMap = {}
+    if (awardedIds.length > 0) {
+      const { data: awardedBids } = await supabase
+        .from('bids').select('job_id, provider_id, payment_method, payment_sorted_at')
+        .in('job_id', awardedIds).eq('status', 'accepted')
+      const providerIds = [...new Set((awardedBids || []).map(bid => bid.provider_id).filter(Boolean))]
+      const { data: providers } = providerIds.length
+        ? await supabase.from('profiles_public').select('id, full_name').in('id', providerIds)
+        : { data: [] }
+      const providerNames = {}
+      ;(providers || []).forEach(provider => { providerNames[provider.id] = provider.full_name })
+      ;(awardedBids || []).forEach(bid => {
+        awardedMap[bid.job_id] = { name: providerNames[bid.provider_id], method: bid.payment_method, sorted: bid.payment_sorted_at }
+      })
+    }
+
     const completedIds = rawJobs.filter(j => j.status === 'completed').map(j => j.id)
     const acceptedBidAmountMap = {}
     const requesterRatingMap = {}
@@ -103,6 +122,9 @@ export default function MyJobsScreen({ navigation, route }) {
       profiles: profileData || null,
       bidCount: bidCountMap[job.id] || 0,
       unansweredQuestionCount: questionCountMap[job.id] || 0,
+      providerName: awardedMap[job.id]?.name,
+      _paymentMethod: awardedMap[job.id]?.method || null,
+      _paymentSortedAt: awardedMap[job.id]?.sorted || null,
       acceptedBidAmount: acceptedBidAmountMap[job.id],
       completedAmount: acceptedBidAmountMap[job.id],
       requesterRatingGiven: requesterRatingMap[job.id],
@@ -283,8 +305,11 @@ export default function MyJobsScreen({ navigation, route }) {
                   showStatusBadge
                   status={job.status}
                   nextMove={jobNextMove(job, 'requester', {
+                    otherName: job.providerName,
                     bidCount: job.bidCount,
                     unansweredQuestionCount: job.unansweredQuestionCount,
+                    paymentMethod: job._paymentMethod,
+                    paymentSortedAt: job._paymentSortedAt,
                   })}
                   onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
                 />
@@ -360,6 +385,8 @@ export default function MyJobsScreen({ navigation, route }) {
                   nextMove={jobNextMove(bid.jobs, 'provider', {
                     otherName: bid.jobs?.profiles?.full_name,
                     hasPendingBid: bid.status === 'pending',
+                    paymentMethod: bid.payment_method,
+                    paymentSortedAt: bid.payment_sorted_at,
                   })}
                   onPress={() => navigation.navigate('JobDetail', { job: bid.jobs })}
                 />

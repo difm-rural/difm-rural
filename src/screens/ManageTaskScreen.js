@@ -613,7 +613,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             <View style={styles.acceptedHeaderRow}>
               <Text style={styles.acceptedJobTitle} numberOfLines={3}>{job.title}</Text>
               <View style={styles.greenBadge}>
-                <Text style={styles.greenBadgeText}>{jobStatusLabel(job.status, bidCount)}</Text>
+                <Text style={styles.greenBadgeText}>{nextMove?.badge || jobStatusLabel(job.status, bidCount)}</Text>
               </View>
             </View>
             <SummaryRow icon="location-outline" label="Location" value={job.location_name} />
@@ -824,7 +824,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Job summary</Text>
             <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-              <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.label}</Text>
+              <Text style={[styles.statusBadgeText, { color: badge.color }]}>{nextMove?.badge || badge.label}</Text>
             </View>
           </View>
           <SummaryRow icon="pricetag-outline" label="Category" value={job.category} />

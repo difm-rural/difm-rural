@@ -10,6 +10,7 @@ import NativeDateTimePicker, { openDateTimePicker } from '../components/NativeDa
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
+import { jobNextMove } from '../lib/nextMove'
 import { markJobComplete, acceptBid } from '../lib/jobActions'
 import { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
 import ReceivedReview from '../components/ReceivedReview'
@@ -667,6 +668,15 @@ export default function JobDetailScreen({ route, navigation }) {
       ? myBid.available_from
       : job.scheduled_date || job.date_from
 
+    // Header label: whose turn + what's next ("Waiting on you to confirm") rather
+    // than the bare status; completed / cancelled keep their status word.
+    const providerMove = jobNextMove(job, 'provider', {
+      otherName: requesterProfile?.full_name,
+      paymentMethod: myBid?.payment_method,
+      paymentSortedAt: myBid?.payment_sorted_at,
+      hasArrival: !!workSchedule?.arrival_start_at,
+    })
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {headerJSX}
@@ -678,7 +688,7 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.category}>{job.category}</Text>
               <View style={[styles.acceptedBadge, isCancelled && styles.cancelledBadge]}>
                 <Text style={[styles.acceptedBadgeText, isCancelled && styles.cancelledBadgeText]}>
-                  {jobStatusLabel(job.status)}
+                  {providerMove?.badge || jobStatusLabel(job.status)}
                 </Text>
               </View>
             </View>

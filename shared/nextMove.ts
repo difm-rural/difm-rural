@@ -14,6 +14,11 @@ export type NextMove = {
   tone: string
   icon: string
   actionLabel: string | null
+  // Short "whose turn + what's next" label for the top of a card, shown in place
+  // of the raw status: 'Waiting on you to confirm', 'Waiting on Sam to complete'.
+  badge: string
+  // 'attention' when the viewer must act now, otherwise 'muted'.
+  badgeTone: 'attention' | 'muted'
 }
 
 type Scheduleable = { scheduled_date?: string | null; date_from?: string | null }
@@ -49,9 +54,18 @@ function scheduledLabel(item: Scheduleable | null | undefined): string | null {
   return `Scheduled for ${day}`
 }
 
-function move(label: string, detail: string, opts: Partial<Omit<NextMove, 'label' | 'detail'>> = {}): NextMove {
+function move(badge: string, label: string, detail: string, opts: Partial<Omit<NextMove, 'label' | 'detail' | 'badge' | 'badgeTone'>> = {}): NextMove {
   const { needsAction = false, tone = 'waiting', icon = 'time-outline', actionLabel = null } = opts
-  return { label, detail, needsAction, tone, icon, actionLabel }
+  return { label, detail, needsAction, tone, icon, actionLabel, badge, badgeTone: needsAction ? 'attention' : 'muted' }
+}
+
+// The heading for a next-move box that sits under a card or page already
+// showing the badge. A "Waiting on …" label only repeats the badge, so it is
+// dropped (null) and the detail line stands alone; a schedule or state label
+// ("Scheduled for Friday", "Job confirmed") adds something and is kept.
+export function nextMoveHeading(next: Pick<NextMove, 'label'> | null | undefined): string | null {
+  const label = next?.label || ''
+  return !label || label.startsWith('Waiting on') ? null : label
 }
 
 export function jobNextMove(
@@ -81,6 +95,7 @@ export function jobNextMove(
   if (job.status === 'open') {
     if (viewerRole === 'requester' && unansweredQuestionCount > 0) {
       return move(
+        'Waiting on you to answer',
         'Waiting on you',
         unansweredQuestionCount === 1 ? 'Answer a provider question' : `Answer ${unansweredQuestionCount} provider questions`,
         { needsAction: true, tone: 'attention', icon: 'chatbubble-ellipses-outline', actionLabel: 'Answer' },
@@ -88,15 +103,16 @@ export function jobNextMove(
     }
     if (viewerRole === 'requester' && bidCount > 0) {
       return move(
+        'Waiting on you to choose',
         'Waiting on you',
         bidCount === 1 ? 'Review and choose an offer' : `Review and choose from ${bidCount} offers`,
         { needsAction: true, tone: 'attention', icon: 'hand-left-outline', actionLabel: 'Review offers' },
       )
     }
     if (viewerRole === 'provider' && hasPendingBid) {
-      return move(`Waiting on ${other}`, 'Your offer is being considered')
+      return move(`Waiting on ${other} to choose`, `Waiting on ${other}`, 'Your offer is being considered')
     }
-    return move('No response yet', 'The job is open to local providers', { tone: 'muted', icon: 'hourglass-outline' })
+    return move('Waiting for offers', 'No response yet', 'The job is open to local providers', { tone: 'muted', icon: 'hourglass-outline' })
   }
 
   if (job.status === 'accepted' || job.status === 'in_progress') {
@@ -109,40 +125,41 @@ export function jobNextMove(
     // are set, everything else waits on that.
     if (!hasArrival || !method) {
       if (viewerRole === 'provider') {
-        return move('Waiting on you', 'Confirm the job — arrival time and how to get paid', {
+        return move('Waiting on you to confirm', 'Waiting on you', 'Confirm the job — arrival time and how to get paid', {
           needsAction: true, tone: 'attention', icon: 'calendar-outline', actionLabel: 'Confirm job',
         })
       }
-      return move(`Waiting on ${other}`, "They'll confirm the arrival time and how to pay")
+      return move(`Waiting on ${other} to confirm`, `Waiting on ${other}`, "They'll confirm the arrival time and how to pay")
     }
 
     if (viewerRole === 'provider') {
       // Either party has said payment is taken care of → just complete the job.
       if (sorted) {
-        return move('Waiting on you', "Payment's sorted — mark the job complete when you're done", {
+        return move('Waiting on you to complete', 'Waiting on you', "Payment's sorted — mark the job complete when you're done", {
           needsAction: true, tone: 'active', icon: 'checkmark-done-outline', actionLabel: 'View job',
         })
       }
       // Doing the work — a future schedule still wins.
       if (schedule) {
-        return move(schedule, 'You are booked for this job', { tone: 'scheduled', icon: 'calendar-outline' })
+        return move('Waiting on you to complete', schedule, 'You are booked for this job', { tone: 'scheduled', icon: 'calendar-outline' })
       }
-      return move('Waiting on you', 'Complete the work, then mark it complete', {
+      return move('Waiting on you to complete', 'Waiting on you', 'Complete the work, then mark it complete', {
         tone: 'active', icon: 'construct-outline', actionLabel: 'View job',
       })
     }
 
     // Requester side (job is confirmed: arrival + method set).
     if (sorted) {
-      return move(`Waiting on ${other}`, "They'll mark the job complete")
+      return move(`Waiting on ${other} to complete`, `Waiting on ${other}`, "They'll mark the job complete")
     }
     // Payment is flexible (before, on the day, or invoiced later), so this is a
     // calm reminder — never something we chase the requester about.
-    return move(schedule || 'Job confirmed', method === 'cash' ? 'Pay on the day' : 'Pay as agreed', {
+    return move(`Waiting on ${other} to complete`, schedule || 'Job confirmed', method === 'cash' ? 'Pay on the day' : 'Pay as agreed', {
       tone: 'scheduled', icon: 'card-outline',
     })
   }
 
+  // Completed / cancelled: no next move — cards keep the status word.
   return null
 }
 
@@ -159,56 +176,57 @@ export function bookingNextMove(
   if (booking.status === 'pending') {
     if (viewerRole === 'provider') {
       return quoteRequired
-        ? move('Waiting on you', 'Send a quote or decline the request', {
+        ? move('Waiting on you to respond', 'Waiting on you', 'Send a quote or decline the request', {
             needsAction: true, tone: 'attention', icon: 'document-text-outline', actionLabel: 'Send quote',
           })
-        : move('Waiting on you', 'Confirm or decline the booking', {
+        : move('Waiting on you to respond', 'Waiting on you', 'Confirm or decline the booking', {
             needsAction: true, tone: 'attention', icon: 'calendar-outline', actionLabel: 'Respond',
           })
     }
-    return move(`Waiting on ${other}`, quoteRequired ? 'A quote is needed' : 'Booking confirmation is needed')
+    return move(`Waiting on ${other} to respond`, `Waiting on ${other}`, quoteRequired ? 'A quote is needed' : 'Booking confirmation is needed')
   }
 
   if (booking.status === 'quote_sent') {
     if (viewerRole === 'requester') {
-      return move('Waiting on you', 'Review and accept the quote', {
+      return move('Waiting on you to respond', 'Waiting on you', 'Review and accept the quote', {
         needsAction: true, tone: 'attention', icon: 'document-text-outline', actionLabel: 'Review quote',
       })
     }
-    return move(`Waiting on ${other}`, 'Your quote is ready for review')
+    return move(`Waiting on ${other} to respond`, `Waiting on ${other}`, 'Your quote is ready for review')
   }
 
   if (booking.status === 'confirmed' || booking.status === 'in_progress') {
     if ((service as { kind?: string }).kind === 'grazing') {
-      return move('Grazing arrangement accepted', 'Use Chat to agree ongoing grazing details, dates and payment directly with each other.'
+      return move('Arrangement accepted', 'Grazing arrangement accepted', 'Use Chat to agree ongoing grazing details, dates and payment directly with each other.'
         + (viewerRole === 'provider' ? ' When the arrangement has finished, choose Complete arrangement to close the listing or relist for new requests.' : ''), {
         tone: 'active', icon: 'chatbubble-outline', actionLabel: 'View booking',
       })
     }
     const schedule = scheduledLabel(booking)
     if (schedule) {
-      return move(schedule, viewerRole === 'provider' ? 'You are booked for this service' : `${other} is booked`, {
+      return move(viewerRole === 'provider' ? 'Waiting on you to complete' : `Waiting on ${other} to complete`,
+        schedule, viewerRole === 'provider' ? 'You are booked for this service' : `${other} is booked`, {
         tone: 'scheduled',
         icon: 'calendar-outline',
       })
     }
     if (viewerRole === 'provider') {
-      return move('Waiting on you', 'Complete the service, then mark it complete', {
+      return move('Waiting on you to complete', 'Waiting on you', 'Complete the service, then mark it complete', {
         tone: 'active',
         icon: 'construct-outline',
         actionLabel: 'View booking',
       })
     }
-    return move(`Waiting on ${other}`, 'They will mark the service complete when finished')
+    return move(`Waiting on ${other} to complete`, `Waiting on ${other}`, 'They will mark the service complete when finished')
   }
 
   if (booking.status === 'cancellation_requested') {
     if (viewerRole === 'provider') {
-      return move('Waiting on you', 'Respond to the cancellation request', {
+      return move('Waiting on you to respond', 'Waiting on you', 'Respond to the cancellation request', {
         needsAction: true, tone: 'attention', icon: 'alert-circle-outline', actionLabel: 'Respond',
       })
     }
-    return move(`Waiting on ${other}`, 'Cancellation needs their confirmation')
+    return move(`Waiting on ${other} to respond`, `Waiting on ${other}`, 'Cancellation needs their confirmation')
   }
 
   return null

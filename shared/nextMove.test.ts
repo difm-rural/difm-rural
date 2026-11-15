@@ -1,7 +1,7 @@
 // Run with: npm test   (whole suite), or on its own:
 //   node --import ./tests/support/ts-resolve.mjs shared/nextMove.test.ts
 import assert from 'node:assert/strict'
-import { jobNextMove } from './nextMove.ts'
+import { bookingNextMove, jobNextMove, nextMoveHeading } from './nextMove.ts'
 
 let passed = 0
 function check(name: string, got: unknown, expected: unknown) {
@@ -100,4 +100,73 @@ check('open · provider pending bid',
 
 check('completed → null', jobNextMove({ status: 'completed' }, 'provider', {}), null)
 
-console.log(`\n✅ jobNextMove flexible payment: all ${passed} cases passed`)
+// ---- Badge: whose turn + what's next (every branch) ----
+const badge = (m: ReturnType<typeof jobNextMove>) => m && [m.badge, m.badgeTone]
+const sorted = '2026-11-09T00:00:00Z'
+
+// Jobs · open
+check('badge · open · requester with a question', badge(jobNextMove({ status: 'open' }, 'requester', { unansweredQuestionCount: 1, bidCount: 2 })), ['Waiting on you to answer', 'attention'])
+check('badge · open · requester with offers', badge(jobNextMove({ status: 'open' }, 'requester', { bidCount: 2 })), ['Waiting on you to choose', 'attention'])
+check('badge · open · provider with a pending offer', badge(jobNextMove({ status: 'open' }, 'provider', { hasPendingBid: true, otherName: 'Sam Rata' })), ['Waiting on Sam to choose', 'muted'])
+check('badge · open · no offers yet', badge(jobNextMove({ status: 'open' }, 'requester', {})), ['Waiting for offers', 'muted'])
+
+// Jobs · accepted, not yet confirmed
+check('badge · provider must confirm', badge(jobNextMove({ status: 'accepted' }, 'provider', {})), ['Waiting on you to confirm', 'attention'])
+check('badge · requester waits for confirmation', badge(jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam Rata' })), ['Waiting on Sam to confirm', 'muted'])
+check('badge · requester, no name → role word', badge(jobNextMove({ status: 'accepted' }, 'requester', {})), ['Waiting on the provider to confirm', 'muted'])
+
+// Jobs · confirmed
+check('badge · provider, payment sorted', badge(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: sorted })), ['Waiting on you to complete', 'attention'])
+check('badge · provider, scheduled ahead', badge(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'cash' })), ['Waiting on you to complete', 'muted'])
+check('badge · provider, doing the work', badge(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash' })), ['Waiting on you to complete', 'muted'])
+check('badge · requester, payment sorted', badge(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash', paymentSortedAt: sorted, otherName: 'Sam' })), ['Waiting on Sam to complete', 'muted'])
+check('badge · requester, not sorted', badge(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'invoice', otherName: 'Sam' })), ['Waiting on Sam to complete', 'muted'])
+check('badge · requester, not sorted, scheduled ahead', badge(jobNextMove({ status: 'accepted', scheduled_date: future }, 'requester', { paymentMethod: 'invoice', otherName: 'Sam' })), ['Waiting on Sam to complete', 'muted'])
+
+// Jobs · terminal states have no next move → cards keep the status word
+for (const status of ['completed', 'cancelled']) {
+  check(`badge · job ${status} → none`, jobNextMove({ status }, 'provider', {}), null)
+  check(`badge · job ${status} (requester) → none`, jobNextMove({ status }, 'requester', {}), null)
+}
+
+// Bookings
+const quote = { service: { pricing_type: 'quote_required' } }
+const fixed = { service: { pricing_type: 'fixed' } }
+const bk = (booking: object, role: string, name?: string) => badge(bookingNextMove(booking, role, { otherName: name }))
+check('badge · booking request · provider', bk({ status: 'pending', ...fixed }, 'provider'), ['Waiting on you to respond', 'attention'])
+check('badge · quote request · provider', bk({ status: 'pending', ...quote }, 'provider'), ['Waiting on you to respond', 'attention'])
+check('badge · booking request · requester', bk({ status: 'pending', ...fixed }, 'requester', 'Sam Rata'), ['Waiting on Sam to respond', 'muted'])
+check('badge · quote sent · requester', bk({ status: 'quote_sent', ...quote }, 'requester'), ['Waiting on you to respond', 'attention'])
+check('badge · quote sent · provider', bk({ status: 'quote_sent', ...quote }, 'provider', 'Ana'), ['Waiting on Ana to respond', 'muted'])
+for (const status of ['confirmed', 'in_progress']) {
+  check(`badge · ${status} · provider`, bk({ status, ...fixed }, 'provider'), ['Waiting on you to complete', 'muted'])
+  check(`badge · ${status} · requester`, bk({ status, ...fixed }, 'requester', 'Sam'), ['Waiting on Sam to complete', 'muted'])
+  check(`badge · ${status} · provider, scheduled ahead`, bk({ status, scheduled_date: future, ...fixed }, 'provider'), ['Waiting on you to complete', 'muted'])
+  check(`badge · ${status} · requester, scheduled ahead`, bk({ status, scheduled_date: future, ...fixed }, 'requester', 'Sam'), ['Waiting on Sam to complete', 'muted'])
+  check(`badge · ${status} · grazing`, bk({ status, service: { kind: 'grazing' } }, 'provider'), ['Arrangement accepted', 'muted'])
+}
+check('badge · cancellation requested · provider', bk({ status: 'cancellation_requested', ...fixed }, 'provider'), ['Waiting on you to respond', 'attention'])
+check('badge · cancellation requested · requester', bk({ status: 'cancellation_requested', ...fixed }, 'requester', 'Sam'), ['Waiting on Sam to respond', 'muted'])
+for (const status of ['completed', 'cancelled', 'declined', 'withdrawn']) {
+  check(`badge · booking ${status} → none`, bookingNextMove({ status, ...fixed }, 'provider'), null)
+}
+
+// The attention tone always goes with needsAction, and nothing else.
+for (const m of [
+  jobNextMove({ status: 'open' }, 'requester', { bidCount: 1 }),
+  jobNextMove({ status: 'accepted' }, 'provider', {}),
+  jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash' }),
+  jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash' }),
+  bookingNextMove({ status: 'pending', ...fixed }, 'provider'),
+  bookingNextMove({ status: 'confirmed', ...fixed }, 'requester'),
+]) check(`badge tone follows needsAction · ${m!.badge}`, m!.badgeTone, m!.needsAction ? 'attention' : 'muted')
+
+// ---- Next-move box heading under a badge ----
+check('heading · "Waiting on you" repeats the badge → dropped', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'provider', {})), null)
+check('heading · "Waiting on Sam" repeats the badge → dropped', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam' })), null)
+check('heading · schedule line is kept', nextMoveHeading(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'cash' })), `Scheduled for ${futureWeekday}`)
+check('heading · "Job confirmed" is kept', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash' })), 'Job confirmed')
+check('heading · "No response yet" is kept', nextMoveHeading(jobNextMove({ status: 'open' }, 'requester', {})), 'No response yet')
+check('heading · no move', nextMoveHeading(null), null)
+
+console.log(`\n✅ nextMove: all ${passed} cases passed`)
