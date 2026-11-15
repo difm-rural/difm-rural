@@ -1,6 +1,7 @@
 import {LISTING_KINDS} from '../../shared/listingPricing'
 import {listingCardCopy} from '../../shared/listingCardCopy'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
+import {nextMoveHeading} from '../../shared/nextMove'
 import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -145,7 +146,16 @@ export default function JobServiceCard({
   const ratingAvg   = isService ? Number(item.ratingAverage || 0).toFixed(1) : null
   const ratingText  = ratingCount > 0 ? `★ ${ratingAvg} · ${ratingCount}` : '★ New'
 
-  const badge = showStatusBadge ? statusBadgeProps(status || item.status, bidCount) : null
+  // Top label: whose turn + what's next when a next move is passed in
+  // ("Waiting on you to confirm"); otherwise the plain status word, which is
+  // also what terminal states (Completed, Cancelled, Declined) keep.
+  const badge = !showStatusBadge ? null
+    : nextMove?.badge
+      ? { label: nextMove.badge, ...(STATUS_TONE_COLORS[nextMove.badgeTone] || STATUS_TONE_COLORS.muted) }
+      : statusBadgeProps(status || item.status, bidCount)
+  // The badge already says "Waiting on …", so the box below drops that heading
+  // and keeps the detail line (plus a schedule / state heading when there is one).
+  const boxHeading = badge && nextMove?.badge ? nextMoveHeading(nextMove) : nextMove?.label
   const showHeart = !!onWatchlistToggle || isGuest
 
   function handleHeartPress() {
@@ -209,7 +219,7 @@ export default function JobServiceCard({
         {/* Status badge overlay (top-left) */}
         {badge && (
           <View style={[styles.overlayBadge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.overlayBadgeText, { color: badge.fg }]}>{badge.label}</Text>
+            <Text style={[styles.overlayBadgeText, { color: badge.fg }]} numberOfLines={2}>{badge.label}</Text>
           </View>
         )}
 
@@ -274,22 +284,24 @@ export default function JobServiceCard({
             nextMove.tone === 'scheduled' && styles.nextMoveScheduled,
             nextMove.tone === 'active' && styles.nextMoveActive,
           ]}>
-            <View style={styles.nextMoveHeading}>
-              <Icon
-                name={nextMove.icon || 'time-outline'}
-                size={12}
-                color={nextMove.tone === 'attention' ? '#9a6700' : colors.primary}
-              />
-              <Text
-                style={[
-                  styles.nextMoveLabel,
-                  nextMove.tone === 'attention' && styles.nextMoveLabelAttention,
-                ]}
-                numberOfLines={1}>
-                {nextMove.label}
-              </Text>
-            </View>
-            <Text style={styles.nextMoveDetail} numberOfLines={2}>{nextMove.detail}</Text>
+            {boxHeading ? (
+              <View style={styles.nextMoveHeading}>
+                <Icon
+                  name={nextMove.icon || 'time-outline'}
+                  size={12}
+                  color={nextMove.tone === 'attention' ? '#9a6700' : colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.nextMoveLabel,
+                    nextMove.tone === 'attention' && styles.nextMoveLabelAttention,
+                  ]}
+                  numberOfLines={1}>
+                  {boxHeading}
+                </Text>
+              </View>
+            ) : null}
+            <Text style={[styles.nextMoveDetail, !boxHeading && styles.nextMoveDetailAlone]} numberOfLines={boxHeading ? 2 : 3}>{nextMove.detail}</Text>
           </View>
         )}
       </View>
@@ -342,11 +354,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 7,
     left: 7,
+    maxWidth: CARD_WIDTH - 14,
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  overlayBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
+  overlayBadgeText: { fontSize: 9, lineHeight: 12, fontWeight: '800', letterSpacing: 0.2 },
   cardMessage: {
     position: 'absolute',
     left: 0,
@@ -393,6 +406,7 @@ const styles = StyleSheet.create({
   nextMoveLabel: { flex: 1, fontSize: 9.5, lineHeight: 12, fontWeight: '800', color: colors.primary },
   nextMoveLabelAttention: { color: '#8a5d00' },
   nextMoveDetail: { marginTop: 2, fontSize: 8.5, lineHeight: 11, color: colors.textSecondary },
+  nextMoveDetailAlone: { marginTop: 0, fontSize: 9, lineHeight: 12, color: colors.textPrimary },
 
   // Row 1
   row1: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },

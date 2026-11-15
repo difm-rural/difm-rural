@@ -4,27 +4,45 @@ import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
 import { statusLabel } from '@/lib/work'
+import { bookingNextMove, jobNextMove, nextMoveHeading, type NextMove } from '@shared/nextMove'
 import { activityIsActive } from '@/lib/activity-policy'
 import { loadInbox, unreadNotices } from '@/lib/messaging-data'
 export const dynamic='force-dynamic'
+// Top label on an activity card: whose turn + what's next ("Waiting on you to
+// confirm") when there is a next move; otherwise the status word, which is what
+// completed / cancelled / declined work keeps. The line under it drops a
+// "Waiting on …" heading the badge already says and keeps the detail.
+function TurnLabel({next,fallback}:{next:NextMove|null;fallback:string}){
+  if(!next)return <p className="work-badge">{fallback}</p>
+  const heading=nextMoveHeading(next)
+  return <><p className={'work-badge'+(next.badgeTone==='attention'?' attention':'')}>{next.badge}</p><p className="muted work-badge-detail">{heading?heading+' · ':''}{next.detail}</p></>
+}
 export default async function ActivityPage({searchParams}:{searchParams:Promise<{view?:string}>}){
   const {view}=await searchParams
   const history=view==='history'
   const {supabase,user,profile}=await requireProvider()
   const [jobs,offers,bookings]=await Promise.all([
-    supabase.from('jobs').select('id,title,status,created_at').eq('requester_id',user.id).order('created_at',{ascending:false}),
-    supabase.from('bids').select('id,job_id,amount,status').eq('provider_id',user.id),
+    supabase.from('jobs').select('id,title,status,created_at,scheduled_date,date_from').eq('requester_id',user.id).order('created_at',{ascending:false}),
+    supabase.from('bids').select('id,job_id,amount,status,payment_method,payment_sorted_at').eq('provider_id',user.id),
     supabase.from('bookings').select('*,service:services(title,kind,pricing_type)').or('requester_id.eq.'+user.id+',provider_id.eq.'+user.id).order('created_at',{ascending:false}),
   ])
   const jobIds=[...new Set((offers.data || []).map(o=>o.job_id))]
-  const offerJobs=jobIds.length?await supabase.from('jobs_public').select('id,title,status').in('id',jobIds):{data:[],error:null}
+  const offerJobs=jobIds.length?await supabase.from('jobs_public').select('id,title,status,requester_id,scheduled_date,date_from').in('id',jobIds):{data:[],error:null}
   const shownJobs=(jobs.data || []).filter(j=>activityIsActive('job',j.status)!==history)
   const jobsById=new Map(shownJobs.map(job=>[job.id,job]))
   const questions=shownJobs.length ? await supabase.from('job_questions')
     .select('id,job_id,asker_id,question,answer').in('job_id',shownJobs.map(job=>job.id))
     .order('created_at',{ascending:false}) : {data:[],error:null}
+  // Offers on your own active jobs: how many are waiting, and the accepted one's
+  // provider + payment state — what the whose-turn label needs.
+  const ownBids=shownJobs.length&&!history?await supabase.from('bids').select('job_id,provider_id,status,payment_method,payment_sorted_at').in('job_id',shownJobs.map(job=>job.id)).in('status',['pending','accepted']):{data:[],error:null}
+  const pendingBidCount=new Map<string,number>()
+  const acceptedBid=new Map<string,{provider_id:string;payment_method:string|null;payment_sorted_at:string|null}>()
+  ;(ownBids.data || []).forEach(bid=>{if(bid.status==='accepted')acceptedBid.set(bid.job_id,bid);else pendingBidCount.set(bid.job_id,(pendingBidCount.get(bid.job_id) || 0)+1)})
   const nameIds=[...new Set([
     ...(bookings.data || []).flatMap(b=>[b.provider_id,b.requester_id]),
+    ...(ownBids.data || []).filter(bid=>bid.status==='accepted').map(bid=>bid.provider_id),
+    ...(offerJobs.data || []).map(job=>job.requester_id),
     ...(questions.data || []).map(question=>question.asker_id),
   ])]
   const people=nameIds.length?await supabase.from('profiles_public').select('id,full_name').in('id',nameIds):{data:[]}
@@ -73,10 +91,10 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
         </article>
       })}</div>
     </section>}
-    {shownJobs.length>0 && <section><h2>Your jobs</h2><div className="work-grid">{shownJobs.map(j=><Link className="card" key={j.id} href={'/jobs/'+j.id+'#manage'}><h3>{j.title}{(unread.get('job:'+j.id) || 0)>0&&<span className="web-badge" aria-label={unread.get('job:'+j.id)+' unread messages'}> {unread.get('job:'+j.id)}</span>}</h3><p>{statusLabel(j.status)}</p><span className="card-link">View details & actions →</span></Link>)}</div></section>}
-    {shownOffers.length>0 && <section><h2>Your offers</h2><div className="work-grid">{shownOffers.map(o=>{const job=offerJobs.data?.find(j=>j.id===o.job_id);return <article className="card" key={o.id}><h3><Link href={o.status==='accepted'?'/jobs/'+o.job_id+'#manage':'/jobs/'+o.job_id}>{job?.title || 'Job'}</Link>{(unread.get('job:'+o.job_id) || 0)>0&&<span className="web-badge" aria-label={unread.get('job:'+o.job_id)+' unread messages'}> {unread.get('job:'+o.job_id)}</span>}</h3><p>{nzMoney(o.amount)} · {o.status==='pending'?'Awaiting response':statusLabel(o.status)}</p>{o.status==='accepted' && <Link className="card-link" href={'/jobs/'+o.job_id+'#conversation'}>Open conversation →</Link>}</article>})}</div></section>}
+    {shownJobs.length>0 && <section><h2>Your jobs</h2><div className="work-grid">{shownJobs.map(j=><Link className="card" key={j.id} href={'/jobs/'+j.id+'#manage'}><h3>{j.title}{(unread.get('job:'+j.id) || 0)>0&&<span className="web-badge" aria-label={unread.get('job:'+j.id)+' unread messages'}> {unread.get('job:'+j.id)}</span>}</h3><TurnLabel fallback={statusLabel(j.status)} next={jobNextMove({...j,scheduled_date:j.scheduled_date,date_from:j.date_from},'requester',{otherName:names.get(acceptedBid.get(j.id)?.provider_id || ''),bidCount:pendingBidCount.get(j.id) || 0,unansweredQuestionCount:(questions.data || []).filter(q=>q.job_id===j.id&&!q.answer).length,paymentMethod:acceptedBid.get(j.id)?.payment_method,paymentSortedAt:acceptedBid.get(j.id)?.payment_sorted_at})}/><span className="card-link">View details & actions →</span></Link>)}</div></section>}
+    {shownOffers.length>0 && <section><h2>Your offers</h2><div className="work-grid">{shownOffers.map(o=>{const job=offerJobs.data?.find(j=>j.id===o.job_id);return <article className="card" key={o.id}><h3><Link href={o.status==='accepted'?'/jobs/'+o.job_id+'#manage':'/jobs/'+o.job_id}>{job?.title || 'Job'}</Link>{(unread.get('job:'+o.job_id) || 0)>0&&<span className="web-badge" aria-label={unread.get('job:'+o.job_id)+' unread messages'}> {unread.get('job:'+o.job_id)}</span>}</h3><p>{nzMoney(o.amount)}</p><TurnLabel fallback={o.status==='pending'?'Awaiting response':statusLabel(o.status)} next={job&&['pending','accepted'].includes(o.status)?jobNextMove(job,'provider',{otherName:names.get(job.requester_id),hasPendingBid:o.status==='pending',paymentMethod:o.payment_method,paymentSortedAt:o.payment_sorted_at}):null}/>{o.status==='accepted' && <Link className="card-link" href={'/jobs/'+o.job_id+'#conversation'}>Open conversation →</Link>}</article>})}</div></section>}
     {shownBookings.length>0 && <section><h2>Bookings & requests</h2>
-      <div className="work-grid">{shownBookings.map(b=>{const provider=b.provider_id===user.id, other=provider?b.requester_id:b.provider_id;return <article key={b.id} id={'booking-'+b.id} className="card work-detail"><p className="eyebrow">{provider?'Providing':'Requested by you'}</p><h3><Link href={'/bookings/'+b.id}>{b.service?.title || 'Booking'}</Link>{(unread.get('booking:'+b.id) || 0)>0&&<span className="web-badge" aria-label={unread.get('booking:'+b.id)+' unread messages'}> {unread.get('booking:'+b.id)}</span>}</h3><strong>{statusLabel(b.status)}</strong><p>{names.get(other) || 'Community member'}</p><p>{b.location_name}</p><p>{b.scheduled_date}</p>{b.notes && <p className="work-description">{b.notes}</p>}
+      <div className="work-grid">{shownBookings.map(b=>{const provider=b.provider_id===user.id, other=provider?b.requester_id:b.provider_id;return <article key={b.id} id={'booking-'+b.id} className="card work-detail"><p className="eyebrow">{provider?'Providing':'Requested by you'}</p><h3><Link href={'/bookings/'+b.id}>{b.service?.title || 'Booking'}</Link>{(unread.get('booking:'+b.id) || 0)>0&&<span className="web-badge" aria-label={unread.get('booking:'+b.id)+' unread messages'}> {unread.get('booking:'+b.id)}</span>}</h3><TurnLabel fallback={statusLabel(b.status)} next={bookingNextMove(b,provider?'provider':'requester',{otherName:names.get(other)})}/><p>{names.get(other) || 'Community member'}</p><p>{b.location_name}</p><p>{b.scheduled_date}</p>{b.notes && <p className="work-description">{b.notes}</p>}
         {b.quote_amount!=null && <p>Quote: {nzMoney(b.quote_amount)}</p>}{b.quote_notes && <p>{b.quote_notes}</p>}
         {b.status==='confirmed' && <p>{b.service?.kind==='grazing'?'Grazing arrangement accepted. Use Chat to agree ongoing dates, details and payment.':'Your booking is confirmed. Use Chat to arrange details and payment.'}</p>}
         <Link href={'/bookings/'+b.id+'#manage'} className="lform-save">{b.status==='completed'?'View details & reviews':'View details & actions'}</Link>

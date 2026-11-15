@@ -1,6 +1,7 @@
 import {formatDate as nzDate} from '@shared/formatting'
 import {notificationBody} from '@shared/notificationBody'
 import {notificationSide, sideTag} from '@shared/marketSide'
+import {bookingNextMove} from '@shared/nextMove'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
@@ -90,7 +91,7 @@ export default async function HomePage() {
         : <>
           <section className="card home-attention"><div className="card-head"><h2>Needs attention</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link><Link href="/notifications" className="card-link">All notifications</Link></div>
             <ul className="list">
-              {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;const tag = b.provider_id === user.id ? 'YOUR LISTING' : 'LISTING';return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><span className="attention-icon listing"><Bell size={18}/></span><span className="row-main"><span className="side-tag listing">{tag}</span><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">Waiting on you</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
+              {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;const tag = b.provider_id === user.id ? 'YOUR LISTING' : 'LISTING';return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><span className="attention-icon listing"><Bell size={18}/></span><span className="row-main"><span className="side-tag listing">{tag}</span><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">{bookingNextMove({status:b.status,service},b.provider_id === user.id ? 'provider' : 'requester')?.badge || 'Waiting on you'}</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
               {attention.slice(0,5).map(n => { const side = notificationSide(n); const tag = sideTag(side, n);return <li key={n.id}><Link className="row" href={notificationHref(n)}>{side ? <span className={'attention-icon ' + side}><MessageSquare size={18}/></span> : <MessageSquare size={20}/>}<span className="row-main">{tag && <span className={'side-tag ' + side}>{tag}</span>}<strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>})}
             </ul>
           </section>

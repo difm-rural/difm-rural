@@ -1,5 +1,5 @@
 import {formatDate as nzDate} from '@shared/formatting'
-import {bookingNextMove} from '@shared/nextMove'
+import {bookingNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
@@ -61,7 +61,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
   </article>
 
   const mainColumn=<>
-    {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}><strong>{next.label}</strong><span>{next.detail}</span></div>}
+    {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
     {headerCard}
     {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
     {actions.filter(a=>a!=='review').length>0&&<div className="lform-actions"><a className="lform-cancel" href="#manage">Manage this booking</a></div>}
@@ -74,7 +74,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
 
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
     <Link href={'/activity'+(history?'?view=history':'')} className="card-link">Back to {history?'History':'Activity'}</Link>
-    <header className="home-heading work-head listing-head"><div><SideKicker side="listing" label="Listings · offered"/><p className="eyebrow">{statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
+    <header className="home-heading work-head listing-head"><div><SideKicker side="listing" label="Listings · offered"/><p className="eyebrow">{next?.badge || statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
     {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
   </section></AppShell>
 }
