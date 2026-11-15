@@ -2,7 +2,7 @@ import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
-import { jobStatusLabel } from '../lib/lifecycle'
+import { jobBoardStatusLabel } from '../lib/lifecycle'
 import { stripPlusCode, coarseSuburb } from '../lib/location'
 import { categoryImage } from '../lib/categoryImages'
 import { categoryVisual } from './JobServiceCard'
@@ -78,7 +78,7 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
             </View>
           ) : !isOpen ? (
             <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>{jobStatusLabel(job.status)}</Text>
+              <Text style={styles.statusPillText}>{jobBoardStatusLabel(job.status)}</Text>
             </View>
           ) : null}
         </View>
