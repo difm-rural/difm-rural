@@ -9,7 +9,8 @@ import { colors } from '../theme/tokens'
 //   chips          — extra chips first ({ day: 'YYYY-MM-DD', label }), e.g.
 //                    "Use requested date · Sat 15" (see shared/requestedDate.ts)
 //   quickPicks     — false hides the usual Today / Tomorrow / … chips
-export default function DateChips({ value, minimumDate, arrival, requestedLabel, chips = [], quickPicks = true, onSelect, onOpen }) {
+//   wrap           — chips wrap onto rows instead of scrolling sideways
+export default function DateChips({ value, minimumDate, arrival, requestedLabel, chips = [], quickPicks = true, wrap = false, onSelect, onOpen }) {
   const selectedDay = toLocalIsoDate(value)
   const leading = chips.map(({ day, label }) => ({ key: day, date: localDate(day), label }))
   const usual = quickPicks
@@ -20,6 +21,15 @@ export default function DateChips({ value, minimumDate, arrival, requestedLabel,
   const days = [...leading, ...usual]
   const otherSelected = !!selectedDay && !days.some(({ key }) => key === selectedDay)
 
+  const chipList = (
+    <>
+      {days.map(({ key, date, label }) => (
+        <Chip key={key} label={label} selected={key === selectedDay} onPress={() => onSelect(date)} />
+      ))}
+      <Chip label="Other date…" selected={otherSelected} onPress={onOpen} />
+    </>
+  )
+
   return (
     <View>
       {requestedLabel ? (
@@ -27,18 +37,17 @@ export default function DateChips({ value, minimumDate, arrival, requestedLabel,
           Requested: <Text style={styles.requestedValue}>{requestedLabel}</Text>
         </Text>
       ) : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-        style={styles.scroll} contentContainerStyle={styles.row}>
-        {days.map(({ key, date, label }) => (
-          <Chip key={key} label={label} selected={key === selectedDay} onPress={() => onSelect(date)} />
-        ))}
-        <Chip label="Other date…" selected={otherSelected} onPress={onOpen} />
-      </ScrollView>
+      {wrap ? <View style={styles.wrap}>{chipList}</View> : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          style={styles.scroll} contentContainerStyle={styles.row}>
+          {chipList}
+        </ScrollView>
+      )}
     </View>
   )
 }
 
-function Chip({ label, selected, onPress }) {
+export function Chip({ label, selected, onPress }) {
   return (
     <TouchableOpacity style={[styles.chip, selected && styles.selected]} accessibilityRole="button"
       accessibilityState={{ selected }} onPress={onPress}>
@@ -52,6 +61,7 @@ const styles = StyleSheet.create({
   requestedValue: { color: colors.textPrimary, fontWeight: '700' },
   scroll: { flexGrow: 0 },
   row: { gap: 8, paddingBottom: 10 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 10 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },
   selected: { backgroundColor: colors.primary, borderColor: colors.primary },
   label: { color: colors.textPrimary, fontWeight: '700', fontSize: 13 },

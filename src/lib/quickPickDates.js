@@ -43,3 +43,45 @@ export function quickPickDays({ now = new Date(), minimumDate = now, arrival = f
   }
   return days
 }
+
+// Quick arrival times: 7 am – 4 pm on the hour.
+export const QUICK_PICK_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+
+function hourLabel(hour) {
+  return `${hour % 12 || 12} ${hour < 12 ? 'am' : 'pm'}`
+}
+
+// Time chips for the chosen day. On today, times that have already passed (or
+// are happening right now) are hidden; any other day shows them all. A day
+// before today has none.
+export function quickPickTimes({ day, now = new Date() } = {}) {
+  const chosen = startOfDay(localDate(day) || now)
+  const today = startOfDay(now)
+  if (chosen < today) return []
+  return QUICK_PICK_HOURS
+    .map(hour => {
+      const date = new Date(chosen)
+      date.setHours(hour, 0, 0, 0)
+      return { hour, label: hourLabel(hour), date }
+    })
+    .filter(({ date }) => date.getTime() > now.getTime())
+}
+
+// The chip matching a start time exactly (on the hour), or null — in which case
+// the time shows as the "Other time" value (e.g. today's next-half-hour default).
+export function selectedQuickPickHour(start, now = new Date()) {
+  if (!start || start.getMinutes() !== 0) return null
+  return quickPickTimes({ day: start, now }).find(({ date }) => date.getTime() === start.getTime())?.hour ?? null
+}
+
+// Moving to another day: keep a time the provider has explicitly chosen when it
+// is still ahead of now on that day; otherwise use the day's default (9 am, or
+// today's next half hour).
+export function startForDay(day, { keepTimeFrom = null, now = new Date() } = {}) {
+  if (keepTimeFrom) {
+    const kept = startOfDay(localDate(day) || now)
+    kept.setHours(keepTimeFrom.getHours(), keepTimeFrom.getMinutes(), 0, 0)
+    if (kept.getTime() > now.getTime()) return kept
+  }
+  return defaultStartForDate(day, now)
+}
