@@ -641,6 +641,12 @@ export default function AppNavigator() {
         .select('id')
         .single()
 
+      // The draft carries its own id: a clash means an earlier flush already
+      // posted it, so clear the draft instead of alerting or posting twice.
+      if (error?.code === '23505' && job.id) {
+        await AsyncStorage.removeItem('pendingJob')
+        return
+      }
       if (error) {
         // Keep the draft so the user can retry — don't silently lose their work.
         Alert.alert('Job not posted', `${error.message}\n\nYour details are saved — please try posting again from your jobs.`)

@@ -21,7 +21,7 @@ import { trackCategoryInterest } from '../../lib/preferences'
 import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { inferJobCategory } from '../../lib/categorize'
-import { isHouseSitting } from '../../lib/categories'
+import { CATEGORIES, isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -104,7 +104,7 @@ function AuthSheet({ onDismiss, onLogin }) {
 
 export default function PostJobStep5Review({ navigation, route }) {
   const insets = useSafeAreaInsets()
-  const { jobData, resetJobData } = usePostJob()
+  const { jobData, updateJobData, resetJobData } = usePostJob()
 
   const isEditMode   = route.params?.mode === 'edit'
   const isRepeatMode = route.params?.mode === 'repeat'
@@ -127,6 +127,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     hideExactLocation, locationArea,
     repeatedFromJobId,
     recurrenceFrequency,
+    draftJobId,
   } = jobData
 
   const isInvite = !!inviteProviderId && !isEditMode
@@ -135,6 +136,18 @@ export default function PostJobStep5Review({ navigation, route }) {
   const [showAuthSheet, setShowAuthSheet] = useState(false)
   const [alsoPublic,    setAlsoPublic]    = useState(false)
   const [mapFailed,     setMapFailed]     = useState(false)
+  // The category is chosen automatically from the title + details. Work it out
+  // on arrival so it can be shown — and corrected — before posting.
+  const [detectedCategory, setDetectedCategory] = useState('')
+  const [categoryPicker,   setCategoryPicker]   = useState(false)
+  const houseSit = isHouseSitting(title)
+  useEffect(() => {
+    if (houseSit || (category && category.trim())) return
+    let active = true
+    inferJobCategory(title, description).then(found => { if (active) setDetectedCategory(found || '') })
+    return () => { active = false }
+  }, [])
+  const shownCategory = houseSit ? 'Property & House Sitting' : (category && category.trim()) || detectedCategory
   // Guards against a double-tap posting the job twice. A ref (not state)
   // because setState is async — a second tap can fire before the re-render
   // disables the button, which is exactly how duplicates got created.
@@ -161,16 +174,20 @@ export default function PostJobStep5Review({ navigation, route }) {
   // popCount = screens to pop from Step5 to reach that step
   const rows = [
     { label: 'Location',    value: locationSummary, popCount: 3 },
-    category ? { label: 'Category', value: category, popCount: 4 } : null,
+    { label: 'Category', value: shownCategory || 'Choosing from your title and details…',
+      // House-sitting is set by the title; anything else can be corrected here.
+      onEdit: houseSit ? null : () => setCategoryPicker(true), editLabel: 'Change' },
     { label: 'Title',       value: title,           popCount: 4 },
     { label: 'When',        value: scheduleDisplay, popCount: 4 },
     { label: 'Budget',      value: budgetDisplay,   popCount: 1 },
     photos.length > 0
       ? { label: 'Photos', value: `${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`, popCount: 2 }
       : null,
-    locationNote ? { label: 'Location note', value: locationNote, popCount: 3 } : null,
+    // The access note is entered on Details (step 3).
+    locationNote ? { label: 'Access note', value: locationNote, popCount: 2 } : null,
     { label: 'Description', value: description,     popCount: 2 },
-    materialsType ? { label: 'Materials', value: MATERIALS_LABELS[materialsType] || materialsType, popCount: 2 } : null,
+    // Materials are chosen on Budget (step 4).
+    materialsType ? { label: 'Materials', value: MATERIALS_LABELS[materialsType] || materialsType, popCount: 1 } : null,
     accessConditions.length > 0
       ? { label: 'Site access', value: accessConditions.map(c => ACCESS_LABELS[c] || c).join(', '), popCount: 2 }
       : null,
@@ -219,7 +236,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       ? 'Property & House Sitting'
       : (category && category.trim())
         ? category
-        : await inferJobCategory(title, description)
+        : detectedCategory || await inferJobCategory(title, description)
 
     const payload = {
       title,
@@ -250,7 +267,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     if (!user) {
       // Save photos with the draft so they survive the login round-trip.
       const pendingPhotos = (photos || []).map(toStorablePhoto)
-      await AsyncStorage.setItem('pendingJob', JSON.stringify({ ...payload, _photos: pendingPhotos }))
+      await AsyncStorage.setItem('pendingJob', JSON.stringify({ ...payload, ...(draftJobId ? { id: draftJobId } : {}), _photos: pendingPhotos }))
       setUploadStatus('')          // sign-in interrupts the post; drop the busy state
       setShowAuthSheet(true)
       return
@@ -275,11 +292,19 @@ export default function PostJobStep5Review({ navigation, route }) {
 
     const visibility = isInvite ? (alsoPublic ? 'public' : 'invite_only') : 'public'
 
-    const { data: newJob, error: insertError } = await supabase
+    // Insert under this session's own id. If an earlier attempt already landed
+    // (its response was lost), the id clashes — that job is ours, so carry on
+    // with it rather than posting a second copy.
+    let { data: newJob, error: insertError } = await supabase
       .from('jobs')
-      .insert({ ...payload, requester_id: user.id, status: 'open', visibility })
+      .insert({ ...payload, ...(draftJobId ? { id: draftJobId } : {}), requester_id: user.id, status: 'open', visibility })
       .select('id')
       .single()
+    if (insertError?.code === '23505' && draftJobId) {
+      const { data: existing } = await supabase
+        .from('jobs').select('id').eq('id', draftJobId).eq('requester_id', user.id).maybeSingle()
+      if (existing) { newJob = existing; insertError = null }
+    }
     if (insertError) { setUploadStatus(''); Alert.alert('Error', insertError.message); return }
 
     if (photos.length > 0) {
@@ -404,11 +429,15 @@ export default function PostJobStep5Review({ navigation, route }) {
                   {row.value}
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => handleEditRow(row.popCount)}
-                hitSlop={{ top: 8, bottom: 8, left: 16, right: 4 }}>
-                <Text style={styles.editLink}>Edit</Text>
-              </TouchableOpacity>
+              {row.onEdit !== null && (
+                <TouchableOpacity
+                  onPress={row.onEdit || (() => handleEditRow(row.popCount))}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.editLabel || 'Edit'} ${row.label.toLowerCase()}`}
+                  hitSlop={{ top: 8, bottom: 8, left: 16, right: 4 }}>
+                  <Text style={styles.editLink}>{row.editLabel || 'Edit'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))}
         </View>
@@ -447,6 +476,31 @@ export default function PostJobStep5Review({ navigation, route }) {
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={categoryPicker} transparent animationType="fade" onRequestClose={() => setCategoryPicker(false)}>
+        <View style={styles.categoryBackdrop}>
+          <View style={styles.categorySheet}>
+            <Text style={styles.categoryTitle}>Choose a category</Text>
+            <Text style={styles.categoryHelp}>Providers are matched to jobs by category, so the right one helps the right people find it.</Text>
+            <ScrollView style={styles.categoryList}>
+              {CATEGORIES.map(name => (
+                <TouchableOpacity
+                  key={name}
+                  style={styles.categoryRow}
+                  onPress={() => { updateJobData({ category: name }); setCategoryPicker(false) }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: name === shownCategory }}>
+                  <Text style={[styles.categoryName, name === shownCategory && styles.categoryNameOn]}>{name}</Text>
+                  {name === shownCategory ? <Icon name="checkmark" size={18} color={colors.primary} /> : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.categoryCancel} onPress={() => setCategoryPicker(false)} accessibilityRole="button">
+              <Text style={styles.editLink}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.footerBtns}>
@@ -606,6 +660,15 @@ const styles = StyleSheet.create({
   backBtn:           { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   backBtnText:       { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 
+  categoryBackdrop: { flex: 1, backgroundColor: 'rgba(12,28,22,0.48)', justifyContent: 'center', padding: 20 },
+  categorySheet:    { backgroundColor: colors.white, borderRadius: 16, padding: 20, maxHeight: '80%' },
+  categoryTitle:    { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  categoryHelp:     { fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginBottom: 10 },
+  categoryList:     { flexGrow: 0 },
+  categoryRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 46, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  categoryName:     { flex: 1, fontSize: 15, color: colors.textPrimary },
+  categoryNameOn:   { fontWeight: '700', color: colors.primary },
+  categoryCancel:   { alignSelf: 'flex-end', paddingTop: 14 },
   absoluteFill: { ...StyleSheet.absoluteFillObject },
   backdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },
   sheet: {

@@ -12,7 +12,6 @@ import JobLocationMap from '../../components/JobLocationMap'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { reverseGeocode, coarseSuburb } from '../../lib/location'
 import { usePostJob } from '../../context/PostJobContext'
-import { isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -46,9 +45,9 @@ export default function PostJobStep2Location({ navigation, route }) {
   const [areaPolygon,  setAreaPolygon]  = useState(jobData.areaPolygon || [])
   const [areaHectares, setAreaHectares] = useState(jobData.areaHectares)
   const [mapType,      setMapType]      = useState('satellite')
-  // Default the privacy toggle ON for house-sitting.
+  // The privacy toggle is ON by default for every new job.
   const [hideExactLocation, setHideExactLocation] = useState(
-    jobData.hideExactLocation || isHouseSitting(jobData.title)
+    jobData.hideExactLocation ?? true
   )
   const [locationArea, setLocationArea] = useState(jobData.locationArea || '')
 
@@ -281,7 +280,9 @@ export default function PostJobStep2Location({ navigation, route }) {
               <Text style={styles.privacySub}>
                 {hideExactLocation && shortAddr
                   ? `Only “${shortAddr}” shows publicly. The exact address is shared with the provider you accept.`
-                  : 'Only your area shows publicly. The exact address is shared with the provider you accept.'}
+                  : hideExactLocation
+                    ? 'Only your area shows publicly. The exact address, map pin and access note are shared with the provider you accept.'
+                    : 'Your exact address, map pin and access note will be visible to anyone viewing this job.'}
               </Text>
             </View>
           </TouchableOpacity>
