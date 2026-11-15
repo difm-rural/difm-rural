@@ -33,7 +33,7 @@ import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
-import { existingListingPin, listingLocationFields } from '../lib/listingLocation'
+import { existingListingPin, listingLocationFields, lookUpListingPin } from '../lib/listingLocation'
 import { CATEGORIES, LISTING_CATEGORIES } from '../lib/categories'
 import { categoryImage } from '../lib/categoryImages'
 import {
@@ -863,7 +863,10 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     setSubmitting(true)
-    if (!await confirmPublishingLocation({ ...locationPin, area: locationName, kind: 'listing' }, user.id, () => setStep(4))) { setSubmitting(false); return }
+    // No pin (the location was typed, not picked): find one from the text, so the
+    // listing can appear in nearby searches.
+    const publishPin = locationPin || await lookUpListingPin(locationName)
+    if (!await confirmPublishingLocation({ ...publishPin, area: locationName, kind: 'listing' }, user.id, () => setStep(4))) { setSubmitting(false); return }
     const publishRate = pricingType === 'quote_required' ? 0 : parseFloat(rate)
     const supportsMinimum = pricingType !== 'quote_required' && pricingType !== 'fixed'
     const parsedMin = parseFloat(minimumUnits)
@@ -912,7 +915,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       description: description.trim() || null,
       category,
       location_name: locationName.trim(),
-      ...listingLocationFields(locationPin),
+      ...listingLocationFields(publishPin),
       travel_range_km: travelRangeValue(travelRange),
       kind,
       direction: 'offering',

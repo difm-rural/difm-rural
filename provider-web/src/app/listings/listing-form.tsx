@@ -8,6 +8,7 @@ import {runSubmission} from '@shared/submission'
 import {travelRangeError,travelRangeValue} from '@shared/travelRange'
 import {listingMoneyError} from '@shared/postingMoney'
 import {listingDateError,nzToday} from '@shared/postingDates'
+import {createPublicAreaCache,lookupPublicArea} from '@shared/publicJobArea'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
@@ -38,8 +39,14 @@ const KIND_LABEL: Record<string, string> = {
 type StoredAddOn = { label?: string; amount?: number | string; basis?: string; unit_label?: string; optional?: boolean }
 type StoredVariant = { label?: string; pricing_type?: string; rate?: number | string; unit_label?: string; min_units?: number | string; min_charge?: number | string }
 
+// A listing with no map pin is left out of nearby searches, so the form finds
+// one from the location text when it saves.
+const findPin = createPublicAreaCache(area => lookupPublicArea(process.env.NEXT_PUBLIC_SUPABASE_URL + '/functions/v1/maps-proxy', area))
+
 export type EditListing = {
   id: string
+  latitude?: number | string | null
+  longitude?: number | string | null
   kind: string | null
   title: string | null
   category: string | null
@@ -318,6 +325,20 @@ export function ListingForm({
     if(dateError){setError(dateError);setStep(3);return}
     if(!await locationWarning.check({area:locationName,kind:'listing'})){setBusy(false);goToStep(3);return}
 
+    // Map pin for nearby searches. Keep an existing pin while the location text is
+    // unchanged; otherwise look one up. If the text changed and nothing is found,
+    // clear the old pin rather than leave it pointing at the previous place.
+    const locationChanged = locationName.trim() !== (listing?.location_name ?? '').trim()
+    const hadPin = listing?.latitude != null && listing?.longitude != null
+    let pinFields: Record<string, number | null> = {}
+    if (locationChanged || !hadPin) {
+      const point = await findPin(locationName)
+      if (point || locationChanged) pinFields = {
+        latitude: point?.latitude ?? null, longitude: point?.longitude ?? null,
+        service_latitude: point?.latitude ?? null, service_longitude: point?.longitude ?? null,
+      }
+    }
+
     // --- Non-pricing (B1) ---
     const parsedTravel = travelRangeValue(travelRange)
 
@@ -372,6 +393,7 @@ export function ListingForm({
       category,
       description: description.trim() || null,
       location_name: locationName.trim(),
+      ...pinFields,
       travel_range_km: parsedTravel,
       // B2a default-view pricing
       pricing_type: pricingType,
@@ -1009,8 +1031,9 @@ export function ListingForm({
           {...field('location')}
           value={locationName}
           onChange={e => setLocationName(e.target.value)}
-          placeholder="e.g. Waikato, around Cambridge"
+          placeholder="e.g. Cambridge, Waikato"
         />{issue('location')}
+        <small className="muted">A town or district is enough. We find it on the map when you save, so people searching nearby can see your listing.</small>
       </div>
 
       {/* Travel range */}
