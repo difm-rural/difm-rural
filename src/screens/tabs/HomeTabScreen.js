@@ -1,5 +1,6 @@
 import {notificationBody} from '../../../shared/notificationBody'
 import {notificationSide, sideTag} from '../../../shared/marketSide'
+import {rankOnTheGo} from '../../../shared/onTheGo'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
 import React, { useCallback, useState } from 'react'
 import {
@@ -14,7 +15,6 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
-import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded } from '../../lib/lifecycle'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import {
@@ -31,7 +31,7 @@ import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
-import { fetchActionableNextMoves } from '../../lib/nextMove'
+import { fetchActiveNextMoves } from '../../lib/nextMove'
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   const isPrimary = variant === 'primary'
@@ -57,12 +57,13 @@ export default function HomeTabScreen({ navigation }) {
   const [userId, setUserId]             = useState(null)
   const [profile, setProfile]           = useState(null)
   const [notifications, setNotifications] = useState([])
-  const [summary, setSummary]           = useState({})
   const [connections, setConnections]   = useState([])
   const [invitedJobs, setInvitedJobs]   = useState([])
   const [seasonalReminders, setSeasonalReminders] = useState([])
   const [seasonalExpanded, setSeasonalExpanded] = useState(false)
-  const [nextMoves, setNextMoves]         = useState([])
+  // Everything in flight with a next move; "Needs attention" is the subset
+  // that needs your action, "On the go" ranks them all.
+  const [activeMoves, setActiveMoves]     = useState([])
   const [loading, setLoading]           = useState(true)
   const [refreshing, setRefreshing]     = useState(false)
 
@@ -87,60 +88,23 @@ export default function HomeTabScreen({ navigation }) {
       .single()
     setProfile(prof)
 
-    const isRequester = true              // everyone can request
     const isProvider  = canProvide(prof)  // providing is additive
 
-    const [notifs, counts, conns, invited, reminders, actionable] = await Promise.all([
+    const [notifs, conns, invited, reminders, active] = await Promise.all([
       fetchNotifications(8),
-      fetchSummary(user.id, isRequester, isProvider),
       fetchConnectionsForRequester(user.id),
       isProvider ? fetchInvitedJobsForProvider(user.id) : Promise.resolve([]),
       fetchSeasonalReminders(),
-      fetchActionableNextMoves(user.id, isProvider),
+      fetchActiveNextMoves(user.id, isProvider),
     ])
     setNotifications(notifs)
-    setSummary(counts)
     setConnections(conns)
     setInvitedJobs(invited)
     setSeasonalReminders(reminders)
-    setNextMoves(actionable)
+    setActiveMoves(active)
     reminders.forEach(reminder => recordSeasonalEvent(reminder.id, 'impression'))
     setLoading(false)
     setRefreshing(false)
-  }
-
-  async function fetchSummary(uid, isRequester, isProvider) {
-    const activeBookingStatuses = BOOKING_ACTIVE_STATUSES
-    const tasks = []
-
-    tasks.push(isRequester
-      ? supabase.from('jobs').select('id', { count: 'exact', head: true })
-          .eq('requester_id', uid).in('status', JOB_ACTIVE_STATUSES)
-      : Promise.resolve({ count: 0 }))
-    tasks.push(isRequester
-      ? supabase.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('requester_id', uid).in('status', activeBookingStatuses)
-      : Promise.resolve({ count: 0 }))
-    // Anyone can place an offer, so always look for offers to track (not just
-    // provider accounts).
-    tasks.push(
-      supabase.from('bids').select('id, jobs!inner(status)')
-        .eq('provider_id', uid).in('status', ['pending', 'accepted']))
-    tasks.push(isProvider
-      ? supabase.from('bookings').select('id', { count: 'exact', head: true })
-          .eq('provider_id', uid).in('status', activeBookingStatuses)
-      : Promise.resolve({ count: 0 }))
-
-    const [jobsRes, reqBookingsRes, bidsRes, provBookingsRes] = await Promise.all(tasks)
-
-    const bids = bidsRes.data || []
-    return {
-      activeJobs:      jobsRes.count || 0,
-      reqBookings:     reqBookingsRes.count || 0,
-      pendingBids:     bids.filter(b => b.jobs?.status === 'open').length,
-      jobsDoing:       bids.filter(b => isJobAwarded(b.jobs?.status)).length,
-      provBookings:    provBookingsRes.count || 0,
-    }
   }
 
   function onRefresh() {
@@ -168,6 +132,8 @@ export default function HomeTabScreen({ navigation }) {
   const isProvider  = canProvide(profile)
   const firstName   = profile?.full_name?.split(' ')[0] || 'there'
   const unread      = notifications.filter(n => !n.read)
+  const nextMoves   = activeMoves.filter(item => item.nextMove.needsAction)
+  const onTheGo     = rankOnTheGo(activeMoves.map(item => ({ ...item, needsAction: item.nextMove.needsAction })))
   const nextMoveKeys = new Set(nextMoves.map(item => `${item.entityType}:${item.entityId}`))
   const remainingNotifications = unread.filter(notification => {
     // An outstanding booking/job action does not replace a new chat message.
@@ -184,28 +150,9 @@ export default function HomeTabScreen({ navigation }) {
     ...nextMoves.map(item => ({ ...item, _kind: 'nextMove' })),
     ...remainingNotifications.map(item => ({ ...item, _kind: 'notification' })),
   ].slice(0, 5)
-  const totalActive = (summary.activeJobs || 0) + (summary.reqBookings || 0)
-    + (summary.pendingBids || 0) + (summary.jobsDoing || 0) + (summary.provBookings || 0)
-
-  // Three stat tiles for the "Your activity" row (mock-style): posts you've made,
-  // offers you've placed, and everything active/booked.
-  const activityTiles = [
-    { label: 'Active jobs posted', count: summary.activeJobs || 0, target: 'Activity' },
-    { label: 'Offers on open jobs', count: summary.pendingBids || 0, target: 'Activity' },
-    { label: 'Work & requests', count: (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0), target: 'Activity' },
-  ]
-  const visibleTiles = activityTiles.filter(t => t.count > 0)
+  const totalActive = onTheGo.total
   // Nothing on the go at all → show only the "No active work yet" empty state.
   const nothingAtAll = totalActive === 0 && seasonalReminders.length === 0
-  // One-line "all caught up" summary: first non-zero of posts / offers / work.
-  const workActive = (summary.jobsDoing || 0) + (summary.reqBookings || 0) + (summary.provBookings || 0)
-  const statusSummary = (summary.activeJobs || 0) > 0
-    ? `${summary.activeJobs} job${summary.activeJobs === 1 ? '' : 's'} posted`
-    : (summary.pendingBids || 0) > 0
-      ? `${summary.pendingBids} offer${summary.pendingBids === 1 ? '' : 's'} waiting`
-      : workActive > 0
-        ? `${workActive} in progress`
-        : null
 
   function openAttentionItem(item) {
     if (item._kind === 'notification') {
@@ -331,24 +278,7 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         )}
 
-        {attention.length === 0 ? (
-          nothingAtAll ? null : (
-          /* Compact "all caught up" row — replaces Needs attention + activity tiles */
-          <TouchableOpacity
-            style={styles.statusRow}
-            onPress={() => navigation.getParent()?.navigate('Activity')}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel={`All caught up${statusSummary ? '. ' + statusSummary : ''}. View activity`}>
-            <Icon name="checkmark-circle" size={20} color={colors.success} />
-            <Text style={styles.statusText} numberOfLines={1}>
-              <Text style={styles.statusStrong}>All caught up</Text>
-              {statusSummary ? <Text style={styles.statusMuted}>{` · ${statusSummary}`}</Text> : null}
-            </Text>
-            <Text style={styles.statusLink}>Activity ›</Text>
-          </TouchableOpacity>
-          )
-        ) : (
+        {attention.length > 0 && (
           <>
           {/* Needs attention — unread notifications */}
           <View style={styles.section}>
@@ -409,28 +339,70 @@ export default function HomeTabScreen({ navigation }) {
               )
             })}
           </View>
-
-          {/* Active work summary — only tiles with a count */}
-          {visibleTiles.length > 0 && (
-            <View style={styles.activitySection}>
-              <Text style={styles.activityHeading}>Your activity</Text>
-              <View style={styles.statRow}>
-                {visibleTiles.map(t => (
-                  <TouchableOpacity
-                    key={t.label}
-                    style={styles.statTile}
-                    onPress={() => navigation.getParent()?.navigate(t.target)}
-                    activeOpacity={0.75}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t.count} ${t.label}`}>
-                    <Text style={styles.statNumber}>{t.count}</Text>
-                    <Text style={styles.statLabel}>{t.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
           </>
+        )}
+
+        {/* On the go — what's in flight, by name, with whose turn it is (replaces the count tiles) */}
+        {onTheGo.total > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>On the go</Text>
+              <TouchableOpacity
+                onPress={() => navigation.getParent()?.navigate('Activity')}
+                accessibilityRole="button"
+                accessibilityLabel={`View all ${onTheGo.total} in Activity`}>
+                <Text style={styles.sectionLink}>View all ›</Text>
+              </TouchableOpacity>
+            </View>
+            {onTheGo.shown.map((item, i) => {
+              const side = item.entityType === 'job' ? 'job' : 'listing'
+              const mine = item.viewerRole === (side === 'job' ? 'requester' : 'provider')
+              const urgent = item.nextMove.badgeTone === 'attention'
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.notifRow, i < onTheGo.shown.length - 1 && styles.notifRowBorder]}
+                  onPress={() => openAttentionItem({ ...item, _kind: 'nextMove' })}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title}. ${item.nextMove.badge}`}>
+                  <View style={[styles.notifIconCircle, { backgroundColor: side === 'job' ? colors.jobFill : colors.listingFill }]}>
+                    <Icon name={side === 'job' ? 'briefcase-outline' : 'pricetag-outline'} size={17} color={side === 'job' ? colors.jobIcon : colors.listingIcon} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.sideTag, { color: side === 'job' ? colors.jobInk : colors.listingInk }]}>
+                      {(mine ? 'YOUR ' : '') + (side === 'job' ? 'JOB' : 'LISTING')}
+                    </Text>
+                    <Text style={styles.nextMoveTitle} numberOfLines={1}>{item.title}</Text>
+                  </View>
+                  <View style={[styles.turnBadge, urgent && styles.turnBadgeUrgent]}>
+                    <Text style={[styles.turnBadgeText, urgent && styles.turnBadgeTextUrgent]} numberOfLines={1}>
+                      {item.nextMove.badgeShort || item.nextMove.badge}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+            {onTheGo.more > 0 && (
+              <Text style={styles.onTheGoMore}>+{onTheGo.more} more in Activity</Text>
+            )}
+          </View>
+        )}
+
+        {/* All caught up — only when nothing is on the go and nothing needs attention */}
+        {attention.length === 0 && onTheGo.total === 0 && !nothingAtAll && (
+          <TouchableOpacity
+            style={styles.statusRow}
+            onPress={() => navigation.getParent()?.navigate('Activity')}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="All caught up. View activity">
+            <Icon name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={styles.statusText} numberOfLines={1}>
+              <Text style={styles.statusStrong}>All caught up</Text>
+            </Text>
+            <Text style={styles.statusLink}>Activity ›</Text>
+          </TouchableOpacity>
         )}
 
         {nothingAtAll && (
@@ -501,6 +473,11 @@ export default function HomeTabScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  turnBadge:           { flexShrink: 0, maxWidth: 150, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#f5f5f5' },
+  turnBadgeUrgent:     { backgroundColor: '#fff3e0' },
+  turnBadgeText:       { fontSize: 12, fontWeight: '800', color: '#616161' },
+  turnBadgeTextUrgent: { color: '#9a5b00' },
+  onTheGoMore:         { fontSize: 12, color: colors.textMuted, marginTop: 8 },
   screen: { flex: 1, backgroundColor: colors.background },
 
   header: {

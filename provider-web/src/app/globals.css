@@ -235,6 +235,9 @@ a.row:hover { background: var(--sage); }
 .home-attention .row { display: flex; align-items: center; gap: 12px; }
 .home-attention .row-main { flex: 1; }
 .home-attention .row-snippet { white-space: normal; }
+.home-onthego { margin-top: 16px; }
+.home-onthego .work-badge { margin-top: 3px; }
+.home-onthego-more { margin: 8px 0 0; font-size: 12px; }
 .home-clear { display: flex; align-items: center; gap: 10px; color: var(--forest); font-size: 14px; line-height: 1.6; }
 /* Compact "all caught up" status row (replaces attention card + tiles) */
 .home-status { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 16px; }
