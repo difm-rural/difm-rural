@@ -10,6 +10,8 @@ import {listingMoneyError} from '@shared/postingMoney'
 import {listingDateError,nzToday} from '@shared/postingDates'
 import {createPublicAreaCache,lookupPublicArea} from '@shared/publicJobArea'
 import {PHOTO_MAX,resizePhoto} from '@/lib/resize-photo'
+import {removeThumbnails,uploadThumbnail} from '@/lib/photo-thumbs'
+import {removedThumbPaths} from '@shared/photos'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
 import { useState, useEffect, useRef } from 'react'
@@ -482,6 +484,8 @@ export function ListingForm({
       if (upErr) { failed += 1; continue }
       const { data: { publicUrl } } = supabase.storage.from('service-photos').getPublicUrl(path)
       finalUrls.push(publicUrl)
+      // 400px card thumbnail next to it; a failure never blocks the listing.
+      await uploadThumbnail(supabase, 'service-photos', path, p)
     }
 
     // 3. Write services.photos. For an existing row (edit, or a NEW row already created on
@@ -496,6 +500,8 @@ export function ListingForm({
         .eq('id', serviceId)
         .eq('provider_id', userId)
       if (pErr) { setError('Saved, but couldn’t update photos — retry.'); return }
+      // Edit: tidy the thumbnails of photos that were removed.
+      if (mode === 'edit') await removeThumbnails(supabase, 'service-photos', removedThumbPaths(listing?.photos, finalUrls, 'service-photos'))
     }
 
 

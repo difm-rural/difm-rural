@@ -1,0 +1,22 @@
+'use client'
+/* eslint-disable @next/next/no-img-element -- Member photos from storage. */
+import { useState, type ImgHTMLAttributes } from 'react'
+import { fallbackImageSrc, thumbUrl } from '@shared/photos'
+
+// A card / list photo: loads the small "_thumb" copy of an uploaded photo and,
+// if that fails (photos uploaded before thumbnails existed have none), falls
+// back to the full photo once — never loops. Detail pages and galleries use a
+// plain <img> with the full photo instead.
+export function ThumbImg({ src, ...props }: Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & { src: string }) {
+  // Keyed by src so a different photo starts again from its thumbnail.
+  return <ThumbImgFor key={src} src={src} {...props} />
+}
+
+function ThumbImgFor({ src, onError, ...props }: Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & { src: string }) {
+  const [current, setCurrent] = useState(() => thumbUrl(src))
+  return <img {...props} src={current} onError={event => {
+    const next = fallbackImageSrc(current, src)
+    if (next) setCurrent(next)
+    onError?.(event)
+  }} />
+}

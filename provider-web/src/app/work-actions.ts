@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireProvider } from '@/lib/auth'
 import { JOB_EDITOR_COLUMNS, jobInput, jobOwnerActions, validId, type JobSeed } from '@/lib/job-input'
 import { validateFlowFeedback } from '@shared/flowFeedback'
+import { removedThumbPaths } from '@shared/photos'
 import { parseNzDate } from '@shared/dates'
 import type { ActionState } from '@/components/action-form'
 import { offerInput } from '@/lib/offer-input'
@@ -49,6 +50,9 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   if(editing){
     const {data:rows,error}=await supabase.from('jobs').update({...input.value,category:await resolveCategory(),...areaPatch}).eq('id',id).eq('requester_id',user.id).eq('status','open').select('id')
     if(error || !rows?.length)return {error:'Could not save. The job may have changed or been accepted. Your changes remain in the form; refresh its status before retrying.'}
+    // Tidy the card thumbnails of photos removed in this edit (missing ones are fine).
+    const removed=removedThumbPaths(current?.photos,input.value.photos,'job-photos')
+    if(removed.length){try{await supabase.storage.from('job-photos').remove(removed)}catch{/* ignore */}}
   }else if(invite){
     const result=await supabase.rpc('create_invited_job',{p_job_id:id,p_details:{...input.value,category:await resolveCategory(),area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,repeated_from_job_id:source || null},p_provider_id:invite,p_public:data.get('also_public')==='on'})
     if(result.error)return {error:'Could not create the job and invitation. Your draft is kept. Check that this person is a previous provider and try again.'}

@@ -38,6 +38,8 @@ function harness(storage,seed){
   if(name==='@/components/navigation-link')return {default:'a'}
   if(name==='@/lib/job-input')return {SCHEDULES:{flexible:'Flexible',specific:'Specific date',range:'Date range'},MATERIALS:{none:'None'},ACCESS:{}}
   if(name==='@/lib/supabase/client'||name==='../../work-actions')return {}
+  if(name==='@/lib/photo-thumbs')return {uploadThumbnail:async()=>true,removeThumbnails:async()=>{}}
+  if(name==='@shared/photos')return {removedThumbPaths:()=>[],thumbUrl:url=>url,fallbackImageSrc:()=>null}
   if(name==='@/lib/resize-photo')return {PHOTO_MAX:1600,AVATAR_MAX:512,resizePhoto:async file=>file}
   if(name==='lucide-react')return {LoaderCircle:()=>null}
   throw Error(name)

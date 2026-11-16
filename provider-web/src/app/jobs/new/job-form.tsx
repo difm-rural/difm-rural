@@ -9,6 +9,7 @@ import {hasJobDraftChanges,readJobDraft} from '@shared/jobDraft'
 import {FieldFeedback,invalidField} from '@/components/field-feedback'
 import {runSubmission} from '@shared/submission'
 import {PHOTO_MAX,resizePhoto} from '@/lib/resize-photo'
+import {uploadThumbnail} from '@/lib/photo-thumbs'
 import {LoaderCircle} from 'lucide-react'
 import {moneyInputError,MAX_POSTING_AMOUNT} from '@shared/postingMoney'
 import {editorScheduleType,jobScheduleError,nzCalendarDay,nzToday} from '@shared/postingDates'
@@ -91,6 +92,8 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
    // Longest side at most 1600px, as a JPEG.
    const blob=await resizePhoto(file,PHOTO_MAX)
    const path=jobId+'/'+userId+'/'+crypto.randomUUID()+'.jpg',result=await client.storage.from('job-photos').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:false});if(result.error)throw result.error
+   // 400px card thumbnail next to it; a failure never blocks the photo.
+   await uploadThumbnail(client,'job-photos',path,blob)
    const url=client.storage.from('job-photos').getPublicUrl(path).data.publicUrl;setDraft(d=>({...d,photos:[...d.photos,url]}))
   }}catch{setError('Could not upload a photo. Photos already shown are kept. Check your connection and try the remaining photos again.')}finally{setBusy(false)}
  }

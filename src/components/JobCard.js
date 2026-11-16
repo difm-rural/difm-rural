@@ -7,6 +7,7 @@ import { stripPlusCode, coarseSuburb } from '../lib/location'
 import { categoryImage } from '../lib/categoryImages'
 import { categoryVisual } from './JobServiceCard'
 import Icon from './Icon'
+import ThumbImage from './ThumbImage'
 
 function postedAgo(createdAt) {
   if (!createdAt) return 'recently'
@@ -54,7 +55,7 @@ export default function JobCard({ job, onPress, style, isWatched, onWatchToggle,
       accessibilityLabel={`${job.title}, ${job.category}${offered ? ', offer sent' : ''}`}>
 
       {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={styles.thumb} />
+        <ThumbImage uri={photoUrl} style={styles.thumb} />
       ) : catImg ? (
         <Image source={catImg} style={styles.thumb} resizeMode="cover" />
       ) : (

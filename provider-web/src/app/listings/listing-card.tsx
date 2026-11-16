@@ -1,5 +1,6 @@
 import Link from '@/components/navigation-link'
 import {listingCardCopy} from '@shared/listingCardCopy'
+import {ThumbImg} from '@/components/thumb-img'
 // Reusable listing card — a CSS reproduction of the RN JobServiceCard browse card
 // (src/components/JobServiceCard.js). Literal rgba/positions are copied from RN for
 // fidelity; the surrounding chrome uses provider-web's own tokens. Pure/presentational
@@ -38,8 +39,7 @@ export function CardImage({
   return (
     <div className="lcard-img">
       {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt={category ? category+' photo' : 'Listing photo'} />
+        <ThumbImg src={photoUrl} alt={category ? category+' photo' : 'Listing photo'} />
       ) : (
         <div className="lcard-placeholder">
           <ImageIcon size={22} />
