@@ -4,16 +4,15 @@ import Button from './Button'
 import Icon from './Icon'
 import { colors } from '../theme/tokens'
 
-// "Mark complete" for an accepted JOB. The only required tick is that the work
-// is finished. Payment is flexible: if it's already marked as taken care of we
-// just show that; otherwise an optional, never pre-ticked box lets the provider
-// say so now — or leave it and invoice later.
+// "Mark complete" for an accepted JOB. The Mark complete button is the
+// confirmation — nothing has to be ticked. Payment is flexible: if it's already
+// marked as taken care of we just show that; otherwise an optional, never
+// pre-ticked box lets the provider say so now — or leave it and invoice later.
 export default function MarkCompleteSheet({ visible, otherFirstName, paymentSortedByline, busy, error, onClose, onConfirm }) {
-  const [finished, setFinished] = useState(false)
   const [paymentSorted, setPaymentSorted] = useState(false)
 
   useEffect(() => {
-    if (visible) { setFinished(false); setPaymentSorted(false) }
+    if (visible) setPaymentSorted(false)
   }, [visible])
 
   return (
@@ -26,9 +25,7 @@ export default function MarkCompleteSheet({ visible, otherFirstName, paymentSort
               <Icon name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.body}>This closes the job and invites {otherFirstName} to leave a review.</Text>
-
-          <Tick checked={finished} onToggle={() => setFinished(v => !v)} label="The work is finished" />
+          <Text style={styles.body}>Marking complete closes this job and invites {otherFirstName} to leave a review. Payment can be sorted before or after — cash, bank transfer or invoice, whatever you agreed.</Text>
 
           {paymentSortedByline ? (
             <View style={styles.sortedRow}>
@@ -50,7 +47,7 @@ export default function MarkCompleteSheet({ visible, otherFirstName, paymentSort
               title="Mark complete"
               onPress={() => onConfirm({ paymentSorted: !paymentSortedByline && paymentSorted })}
               loading={busy}
-              disabled={!finished}
+              disabled={busy}
               style={styles.action}
             />
           </View>

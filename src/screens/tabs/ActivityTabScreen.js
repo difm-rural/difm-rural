@@ -491,10 +491,10 @@ export default function ActivityTabScreen({ navigation }) {
     else load()
   }
 
-  function completeBooking(bookingId) {
+  function completeBooking(bookingId, requesterName) {
     Alert.alert(
-      'Before you mark this complete',
-      'Check the work is finished and payment has been sorted or agreed with the requester. This closes the booking and invites them to leave a review.',
+      'Mark this booking complete?',
+      `Marking complete closes this booking and invites ${String(requesterName || '').replace('—', '').trim().split(/\s+/)[0] || 'the requester'} to leave a review. Sort payment with them as agreed — cash, bank transfer or invoice.`,
       [
         { text: 'Not yet', style: 'cancel' },
         {
@@ -790,7 +790,7 @@ export default function ActivityTabScreen({ navigation }) {
                   onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: 'provider' })}
                   onConfirm={() => confirmBooking(b)}
                   onDecline={() => declineBooking(b.id)}
-                  onReady={() => completeBooking(b.id)}
+                  onReady={() => completeBooking(b.id, b.requesterName)}
                   onConfirmCancellation={() => confirmCancellation(b.id)}
                   onDismiss={() => dismissProviderBooking(b)}
                 />

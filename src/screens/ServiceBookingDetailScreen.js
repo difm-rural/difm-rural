@@ -298,8 +298,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
   function markReady() {
     Alert.alert(
-      'Before you mark this complete',
-      'Check the work is finished and payment has been sorted or agreed with the requester. This closes the booking and invites them to leave a review.',
+      'Mark this booking complete?',
+      `Marking complete closes this booking and invites ${otherUser?.full_name?.trim().split(/\s+/)[0] || 'the requester'} to leave a review. Sort payment with them as agreed — cash, bank transfer or invoice.`,
       [
         { text: 'Not yet', style: 'cancel' },
         {
