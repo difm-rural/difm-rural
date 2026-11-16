@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Activity, ChevronRight, GitBranch, LayoutDashboard, LogOut, Megaphone, MessageSquareHeart, ShieldCheck, UsersRound } from 'lucide-react'
+import { Activity, ChevronRight, GitBranch, HeartPulse, LayoutDashboard, LogOut, Megaphone, MessageSquareHeart, ShieldCheck, UsersRound } from 'lucide-react'
 
 const navigation = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/operations', label: 'Operations', icon: Activity },
+  { href: '/marketplace-health', label: 'Marketplace Health', icon: HeartPulse },
   { href: '/funnel', label: 'Funnel', icon: GitBranch },
   { href: '/providers', label: 'Provider supply', icon: UsersRound },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
