@@ -3,14 +3,14 @@ import {formatDateTime as nzDateTime} from '@shared/formatting'
 import Link from '@/components/navigation-link'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ImagePlus, MapPin, Send, X } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { attachment, canReadConversation, workManageHref, type ChatMessage, type ConversationRef } from '@/lib/messaging'
+import { createClient, refreshRealtimeAuth } from '@/lib/supabase/client'
+import { attachment, canReadConversation, matchesConversation, workManageHref, type ChatMessage, type ConversationRef } from '@/lib/messaging'
+import { liveChannel, showThreadLive } from '@/lib/realtime'
 import type { ConversationContext } from '@/lib/messaging-data'
 import { readConversation, sendChatMessage } from './actions'
 
 export function Conversation({context,compact=false,heading}:{context:ConversationContext;compact?:boolean;heading?:string}){
-  const router=useRouter(),[text,setText]=useState(''),[sending,setSending]=useState(false),[error,setError]=useState(''),[readError,setReadError]=useState('')
+  const [text,setText]=useState(''),[sending,setSending]=useState(false),[error,setError]=useState(''),[readError,setReadError]=useState('')
   const [local,setLocal]=useState<ChatMessage[]>([]),[file,setFile]=useState<File|null>(null)
   const [location,setLocation]=useState<{latitude:number;longitude:number}|null>(null),[locating,setLocating]=useState(false)
   const [photoPreview,setPhotoPreview]=useState('')
@@ -35,6 +35,27 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
     return ()=>{window.removeEventListener('focus',markRead);document.removeEventListener('visibilitychange',markRead)}
   },[markRead])
   useEffect(()=>{if(nearBottom.current)endRef.current?.scrollIntoView({block:'nearest'})},[messages.length])
+  // Live: new messages in this thread appear in place, like the app's chat —
+  // INSERTs on the thread's table for its job / listing / booking, keeping only
+  // messages between the two of you (a listing has many enquirers). Reading is
+  // handled by markRead above once the newest incoming message changes. While
+  // this is open, web-alerts skips its page refresh for this thread's messages;
+  // its 15s poll stays as the backup.
+  useEffect(()=>{
+    // Also while read-only: a closed arrangement can still receive a last message.
+    const client=createClient()
+    const table=ref.kind==='booking'?'service_booking_messages':'messages'
+    const column=ref.kind==='booking'?'booking_id':ref.kind==='listing'?'service_id':'job_id'
+    const stopLive=showThreadLive({kind:ref.kind,id:ref.id})
+    const stopChannel=liveChannel(client,'thread-'+ref.kind+'-'+ref.id,channel=>channel.on('postgres_changes',
+      {event:'INSERT',schema:'public',table,filter:column+'=eq.'+ref.id},
+      payload=>{
+        const message=payload.new as ChatMessage
+        if(!message?.id || !matchesConversation(message,ref,context.userId))return
+        setLocal(rows=>rows.some(m=>m.id===message.id)?rows:[...rows,message])
+      }),{refreshAuth:()=>refreshRealtimeAuth(client)})
+    return ()=>{stopChannel();stopLive()}
+  },[ref,context.userId])
   useEffect(()=>{
     if(!file)return
     const url=URL.createObjectURL(file)
@@ -61,7 +82,7 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
       const result=await sendChatMessage(ref,content,attempt.current!.id)
       if(result.error || !result.message)throw new Error(result.error || 'Your message could not be sent.')
       nearBottom.current=true;setLocal(rows=>rows.some(m=>m.id===result.message!.id)?rows:[...rows,result.message!])
-      setText('');setFile(null);setLocation(null);uploaded.current=null;attempt.current=null;router.refresh()
+      setText('');setFile(null);setLocation(null);uploaded.current=null;attempt.current=null
     }catch(e){setError(e instanceof Error?e.message:'Could not send. Your draft has been kept. Please try again.')}
     finally{busyRef.current=false;setSending(false)}
   }
