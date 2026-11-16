@@ -21,6 +21,8 @@ function normalizeAsset(asset) {
     base64:   asset.base64 || null,
     mimeType: asset.mimeType || 'image/jpeg',
     fileName: asset.fileName || `job-photo-${Date.now()}.jpg`,
+    width:    asset.width || null,
+    height:   asset.height || null,
   }
 }
 

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { uploadThumbnail } from './photoThumbs'
 
 // Decodes a base64 image string to an ArrayBuffer for Supabase storage upload.
 function base64ToArrayBuffer(base64) {
@@ -51,6 +52,8 @@ export async function uploadJobPhotos(jobId, photos = []) {
       if (!error) {
         const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path)
         urls.push(publicUrl)
+        // 400px card thumbnail next to it; a failure never blocks the job.
+        await uploadThumbnail(supabase, 'job-photos', path, typeof photo === 'string' ? { uri } : photo)
       }
     } catch { /* skip failed photo */ }
   }

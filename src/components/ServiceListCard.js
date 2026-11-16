@@ -1,6 +1,7 @@
 import {listingCardCopy} from '../../shared/listingCardCopy'
 import {LISTING_KINDS} from '../../shared/listingPricing'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
+import ThumbImage from './ThumbImage'
 import React from 'react'
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -52,7 +53,7 @@ export default function ServiceListCard({ item, onPress }) {
       accessibilityLabel={`${item.title} by ${providerName}`}>
 
       {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={styles.thumb} resizeMode="cover" />
+        <ThumbImage uri={photoUrl} style={styles.thumb} resizeMode="cover" />
       ) : catImg ? (
         <Image source={catImg} style={styles.thumb} resizeMode="cover" />
       ) : (

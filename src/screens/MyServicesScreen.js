@@ -1,4 +1,5 @@
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
+import ThumbImage from '../components/ThumbImage'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
@@ -50,7 +51,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView }) {
     <View style={[styles.row, !service.is_active && styles.rowInactive]}>
       {photoUrl && (
         <TouchableOpacity style={styles.rowPhotoWrap} onPress={() => onView(service)} accessibilityRole="button" accessibilityLabel={`View listing: ${service.title}`}>
-          <Image source={{ uri: photoUrl }} style={styles.rowPhoto} resizeMode="cover" />
+          <ThumbImage uri={photoUrl} style={styles.rowPhoto} resizeMode="cover" />
           {!!service.card_headline && (
             <View style={[
               styles.cardMessage,

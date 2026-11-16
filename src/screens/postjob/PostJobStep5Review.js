@@ -20,6 +20,8 @@ import { trackEvent } from '../../lib/analytics'
 import { trackCategoryInterest } from '../../lib/preferences'
 import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
+import { removeThumbnails } from '../../lib/photoThumbs'
+import { removedThumbPaths } from '../../../shared/photos'
 import { inferJobCategory } from '../../lib/categorize'
 import { CATEGORIES, isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
@@ -281,6 +283,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       setUploadStatus('Uploading photos...')
       const finalUrls = await uploadJobPhotos(editJob.id, photos)
       await supabase.from('jobs').update({ photos: finalUrls }).eq('id', editJob.id)
+      await removeThumbnails(supabase, 'job-photos', removedThumbPaths(editJob.photos, finalUrls, 'job-photos'))
 
       setUploadStatus('Saved')
       resetJobData()

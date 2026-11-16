@@ -6,11 +6,12 @@ import {readFile} from 'node:fs/promises'
 import {createRequire} from 'node:module'
 import vm from 'node:vm'
 import * as pricing from '../shared/listingPricing.ts'
+import * as photos from '../shared/photos.ts'
 const require=createRequire(import.meta.url),webRequire=createRequire(new URL('../provider-web/package.json',import.meta.url)),ts=require('typescript')
 const React=webRequire('react'),{renderToStaticMarkup}=webRequire('react-dom/server'),jsx=webRequire('react/jsx-runtime')
 const Link=({children,...props})=>React.createElement('a',props,children)
 async function load(file,extra={}){
- const source=await readFile(new URL('../provider-web/src/app/listings/'+file,import.meta.url),'utf8')
+ const source=await readFile(new URL((file.startsWith('../')?'../provider-web/src/components/'+file.slice(3):'../provider-web/src/app/listings/'+file),import.meta.url),'utf8')
  const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  const module={exports:{}}
  vm.runInNewContext(compiled,{exports:module.exports,require(name){
@@ -20,6 +21,7 @@ async function load(file,extra={}){
   if(name==='@/components/navigation-link')return {default:Link}
   if(name==='lucide-react')return new Proxy({},{get:()=>()=>React.createElement('svg')})
   if(name==='@shared/listingPricing')return pricing
+  if(name==='@shared/photos')return photos
   if(name==='next/navigation')return {useRouter:()=>({refresh(){}})}
   if(name==='@/lib/supabase/client')return {createClient:()=>({})}
   if(name in extra)return extra[name]
@@ -27,7 +29,8 @@ async function load(file,extra={}){
  }})
  return module.exports
 }
-const cards=await load('listing-card.tsx'),{ManageCard}=await load('manage-card.tsx',{'./listing-card':cards})
+const thumb=await load('../thumb-img.tsx')
+const cards=await load('listing-card.tsx',{'@/components/thumb-img':thumb}),{ManageCard}=await load('manage-card.tsx',{'./listing-card':cards})
 const id='2b8f6b59-b9f3-41a6-9816-55a7dfecf1f4'
 test('live, paused and closed own listings expose a card link and explicit View listing action',()=>{
  for(const status of [{is_active:true,closed_at:null},{is_active:false,closed_at:null},{is_active:false,closed_at:'2026-11-03T00:00:00Z'}]){
@@ -65,4 +68,13 @@ test('listing edit and delete controls have visible text and distinct accessible
  assert.match(html,/> Edit<\/a>/)
  assert.match(html,/> Delete<\/button>/)
  assert.doesNotMatch(html,/aria-label=""/)
+})
+
+test('listing cards show the small thumbnail of an uploaded photo; artwork-free cards unchanged',()=>{
+ const full='https://opagkgfxmjqmnvhrcris.supabase.co/storage/v1/object/public/service-photos/svc/1_0.jpg'
+ const html=renderToStaticMarkup(React.createElement(cards.ListingCard,{data:{title:'Example',photoUrl:full}}))
+ assert.match(html,/src="https:\/\/[^"]+\/service-photos\/svc\/1_0_thumb\.jpg"/)
+ assert.ok(!html.includes('1_0.jpg"'),'cards do not load the full photo first')
+ const preview=renderToStaticMarkup(React.createElement(cards.ListingCard,{data:{title:'Draft',photoUrl:'blob:http://localhost/abc'}}))
+ assert.match(preview,/src="blob:http:\/\/localhost\/abc"/,'a local preview is shown as it is')
 })

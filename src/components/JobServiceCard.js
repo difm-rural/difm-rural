@@ -10,6 +10,7 @@ import { stripPlusCode } from '../lib/location'
 import { availabilityDisplay } from '../lib/providerAvailability'
 import { categoryImage } from '../lib/categoryImages'
 import Icon from './Icon'
+import ThumbImage from './ThumbImage'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 export const CARD_WIDTH    = 155
@@ -182,7 +183,7 @@ export default function JobServiceCard({
       {/* ── Image area ──────────────────────────────────────────────────────── */}
       <View style={styles.imageBox}>
         {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={styles.photo} resizeMode="cover" />
+          <ThumbImage uri={photoUrl} style={styles.photo} resizeMode="cover" />
         ) : catImg ? (
           <Image source={catImg} style={styles.photo} resizeMode="cover" />
         ) : (

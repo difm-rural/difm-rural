@@ -36,6 +36,8 @@ import AddressAutocomplete from '../components/AddressAutocomplete'
 import { existingListingPin, listingLocationFields } from '../lib/listingLocation'
 import { lookUpListingPin } from '../lib/listingPin'
 import { PHOTO_MAX, shrinkPhoto } from '../lib/shrinkPhoto'
+import { removeThumbnails, uploadThumbnail } from '../lib/photoThumbs'
+import { removedThumbPaths } from '../../shared/photos'
 import { newJobId } from '../lib/draftId'
 import { CATEGORIES, LISTING_CATEGORIES } from '../lib/categories'
 import { categoryImage } from '../lib/categoryImages'
@@ -68,6 +70,8 @@ function normalizePickedAsset(asset) {
     base64: asset.base64 || null,
     mimeType: asset.mimeType || 'image/jpeg',
     fileName: asset.fileName || `service-photo-${Date.now()}.jpg`,
+    width: asset.width || null,
+    height: asset.height || null,
   }
 }
 
@@ -843,6 +847,8 @@ export default function CreateServiceScreen({ navigation, route }) {
         } else {
           const { data: { publicUrl } } = supabase.storage.from('service-photos').getPublicUrl(path)
           urls.push(publicUrl)
+          // 400px card thumbnail next to it; a failure never blocks the listing.
+          await uploadThumbnail(supabase, 'service-photos', path, photo)
         }
       } catch (error) {
         failed += 1
@@ -977,8 +983,11 @@ export default function CreateServiceScreen({ navigation, route }) {
 
     let serviceForRoute = createdService
     let photoProblem = ''
+    // The listing's photos once saved (null = unchanged), to tidy removed thumbnails.
+    let savedPhotos = photos.length === 0 ? [] : null
     if (photos.length > 0) {
       const { urls, failed, firstError } = await uploadPhotos(createdService.id)
+      if (urls.length > 0) savedPhotos = urls
       if (urls.length > 0) {
         const { data: updatedService } = await supabase
           .from('services')
@@ -992,6 +1001,10 @@ export default function CreateServiceScreen({ navigation, route }) {
       if (failed > 0) {
         photoProblem = `${failed} photo${failed === 1 ? '' : 's'} did not upload${firstError ? ` (${firstError})` : ''}. Edit the listing to add ${failed === 1 ? 'it' : 'them'} again.`
       }
+    }
+
+    if (isEditing && savedPhotos) {
+      await removeThumbnails(supabase, 'service-photos', removedThumbPaths(editingService.photos, savedPhotos, 'service-photos'))
     }
 
     function leavePublishScreen() {
