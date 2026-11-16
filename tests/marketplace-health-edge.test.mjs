@@ -13,7 +13,6 @@ function setup({ isAdmin = true, user = { id: 'admin' }, claimStatus = 'claimed'
     ['SUPABASE_URL', 'http://fixture.invalid'],
     ['SUPABASE_ANON_KEY', 'public-key'],
     ['SUPABASE_SERVICE_ROLE_KEY', 'worker-key'],
-    ['MARKETPLACE_HEALTH_CRON_SECRET', 'fixture-secret'],
   ])
   const calls = []
   const logs = []
@@ -22,7 +21,7 @@ function setup({ isAdmin = true, user = { id: 'admin' }, claimStatus = 'claimed'
   let handler
   runInNewContext(script, {
     Deno: { env: { get: name => env.get(name) }, serve: fn => { handler = fn } },
-    Response, TextEncoder, Uint8Array, crypto,
+    Response,
     AbortSignal: { any: AbortSignal.any, timeout: ms => { budget = ms; return deadline.signal } },
     console: { error: message => logs.push(JSON.parse(message)) },
     fetch: async (_url, init) => { init.signal.throwIfAborted(); return new Response() },
@@ -67,22 +66,20 @@ test('method, authentication and authorisation fail before worker access', async
   assert.equal((await send({})).status, 401)
   assert.equal((await send({ Authorization: 'Bearer invalid' })).status, 401)
   assert.equal((await send({ Authorization: 'Bearer valid' })).status, 403)
-  assert.equal((await send({ 'x-marketplace-health-secret': 'wrong' })).status, 401)
   assert.deepEqual(calls, [])
 })
 
-test('both execution paths keep claims and report data out of responses', async () => {
+test('only the manual path is available and claim data stays server-side', async () => {
   const { send, calls } = setup()
   const admin = await send({ Authorization: 'Bearer valid' })
-  const cron = await send({ 'x-marketplace-health-secret': 'fixture-secret' })
+  const cron = await send({ Authorization: 'Bearer valid', 'x-marketplace-health-secret': 'fixture-secret' })
   assert.deepEqual(await admin.json(), { status: 'succeeded' })
-  assert.deepEqual(await cron.json(), { status: 'succeeded' })
-  assert.equal(cron.headers.get('Cache-Control'), 'no-store')
+  assert.equal(cron.status, 403)
+  assert.deepEqual(await cron.json(), { status: 'scheduling_disabled' })
+  assert.equal(admin.headers.get('Cache-Control'), 'no-store')
   assert.deepEqual(calls, [
     ['marketplace_health_claim', { p_source: 'manual' }],
     ['marketplace_health_finish', { p_day: '2026-11-16', p_source: 'manual', p_claim: 'claim' }],
-    ['marketplace_health_claim', { p_source: 'scheduled' }],
-    ['marketplace_health_finish', { p_day: '2026-11-16', p_source: 'scheduled', p_claim: 'claim' }],
   ])
 })
 

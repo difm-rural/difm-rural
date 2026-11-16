@@ -2,7 +2,21 @@
 
 Reviewed 16 November 2026 (Pacific/Auckland). Candidate is the local Phase 1 work on `listing-pins`, based on `deb481e`. The Phase 1 files were uncommitted during this review. Production checks used the linked project, read-only catalog and aggregate queries, and a migration dry run. The access probe used a local Next.js build and a loopback Supabase mock.
 
-## Recommendation — NO-GO
+## Controlled production deployment outcome — stopped after SQL
+
+16 November 2026 (Pacific/Auckland). The owner accepted the backup risk and deferred Docker-based testing for this manual-only rollout. The release was pinned at `c616c6c9a8630337483f90fadacc0f318db5c9da`, one local commit ahead of `origin/main` at `9a83a336fc12fedd98b8a7c05ac9be8bf7d2d6b9`. The release tree was clean at the migration step and contained only Marketplace Health files. The Vercel admin production deployment was already on the same base commit. No release commit was pushed.
+
+| Stage | Outcome |
+|---|---|
+| Preflight | The linked dry run listed only `20261116100000_marketplace_health.sql`. All 219 Node tests passed, including the four Edge tests. The previously reported eight listing failures did not recur. PostgreSQL 17 fixtures passed, and the production-mode admin Webpack build and direct request tests passed against offline font fixtures and a loopback Supabase mock. |
+| Production SQL | Applied and verified migration `20261116100000`. The reporting schema and three public RPCs exist. The private runs table has RLS enabled, zero client policies, and no direct application-role grants. Only `service_role` can execute claim and finish. Only `authenticated` can execute history, with its admin check. The restrictive authenticated profile INSERT policy is present. The fingerprint of 462 pre-existing marketplace definitions matched before and after, excluding the approved new policy and reporting objects. There were zero report runs and zero matching Cron jobs. |
+| Edge Function | Automatic approval review rejected deployment with `--no-verify-jwt` before command execution because it disables the production gateway JWT check. The function's own caller checks remain in source. No Edge Function or secret was deployed or changed in this rollout. |
+| Admin console | Held after the Edge stop. No Vercel deployment was triggered. Production page and signed-in access checks remain pending. |
+| Manual report | Held. No manual report was run and there are no production counts, exception comparisons, or end-to-end latency and response-size figures. The local synthetic SQL fixture produced 2,616 signals and 1,221,741 JSON bytes in 81.2 ms. |
+
+**Current decision — stop the remaining rollout.** Keep the reviewed SQL in place with scheduling disabled. For the manual-only release, prefer a gateway-JWT-enabled deployment after verifying that production admin access tokens are supported by that gate. Treat enabling the independent scheduler path as a separate decision. The alternative is explicit approval for the reviewed configuration with gateway JWT verification disabled and authorization enforced inside the function, subject to automatic review. Continue with production admin and non-admin checks and one manual report only after the Edge deployment is approved and verified.
+
+## Prior readiness assessment — NO-GO before risk acceptance
 
 Keep the release on hold until an isolated local Supabase integration rehearsal passes with the real Auth, PostgREST, Edge Runtime, Vault, pg_net and Cron services. The owner accepted the lack of production backups and the risk of production data loss. Backup availability is no longer a release prerequisite. The candidate now suppresses the unreliable offer-acceptance count, protects admin profile inserts and bounds Edge HTTP execution.
 
