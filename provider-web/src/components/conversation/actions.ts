@@ -11,8 +11,9 @@ export async function sendChatMessage(ref:ConversationRef,content:string,id:stri
     if(!/^[0-9a-f-]{36}$/i.test(id) || !content.trim() || content.length>10000)return {error:'Add a message of up to 1,000 characters.'}
     const parsed=attachment(content)
     if(parsed.type==='photo'){
-      const root=process.env.NEXT_PUBLIC_SUPABASE_URL+'/storage/v1/object/public/job-photos/'+ref.id+'/'+user.id+'/'
-      if(!parsed.url.startsWith(root))return {error:'Please choose a photo to upload again.'}
+      const bucket=process.env.NEXT_PUBLIC_SUPABASE_URL+'/storage/v1/object/public/job-photos/'
+      // The sender's own folder for this conversation (and the older layout).
+      if(![bucket+user.id+'/'+ref.id+'/',bucket+ref.id+'/'+user.id+'/'].some(root=>parsed.url.startsWith(root)))return {error:'Please choose a photo to upload again.'}
     }else if(parsed.type==='location'){
       if(parsed.latitude===null || parsed.longitude===null)return {error:'The location could not be read. Please choose Share location again.'}
     }else if(content.trim().length>1000)return {error:'Keep your message to 1,000 characters or fewer.'}

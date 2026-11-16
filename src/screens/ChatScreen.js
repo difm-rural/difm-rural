@@ -232,7 +232,8 @@ export default function ChatScreen({ route, navigation }) {
     const coords  = await getCurrentLocation()
     // Scaled to 1600px and saved as JPEG (it is uploaded as image/jpeg).
     const uri     = (await shrinkPhoto(result.assets[0], PHOTO_MAX, { jpeg: true })).uri
-    const path    = `${chatId}/progress_${Date.now()}.jpg`
+    // Under the sender's own folder — storage only allows uploads there.
+    const path    = `${currentUserId}/${chatId}/progress_${Date.now()}.jpg`
 
     let photoUrl = ''
     try {

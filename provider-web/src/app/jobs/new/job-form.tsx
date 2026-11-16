@@ -91,7 +91,8 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   try{const client=createClient();for(const file of chosen){
    // Longest side at most 1600px, as a JPEG.
    const blob=await resizePhoto(file,PHOTO_MAX)
-   const path=jobId+'/'+userId+'/'+crypto.randomUUID()+'.jpg',result=await client.storage.from('job-photos').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:false});if(result.error)throw result.error
+   // Under the uploader's own folder (<user id>/<job id>/) — storage only allows uploads there.
+   const path=userId+'/'+jobId+'/'+crypto.randomUUID()+'.jpg',result=await client.storage.from('job-photos').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:false});if(result.error)throw result.error
    // 400px card thumbnail next to it; a failure never blocks the photo.
    await uploadThumbnail(client,'job-photos',path,blob)
    const url=client.storage.from('job-photos').getPublicUrl(path).data.publicUrl;setDraft(d=>({...d,photos:[...d.photos,url]}))
