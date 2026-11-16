@@ -18,7 +18,7 @@ function harness(patch={}){
  const state=[],refs=[],calls=[];let index=0,refIndex=0,tree
  const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>state[i]=typeof value==='function'?value(state[i]):value]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(){},useMemo:fn=>fn()}
  const module={exports:{}}
- const modules={'@shared/listingPricing':pricing,'@shared/categories':categories,'@shared/postingDates':dates,'@shared/postingMoney':money,'@shared/travelRange':travel,'@shared/submission':submission}
+ const modules={'@shared/listingPricing':pricing,'@shared/categories':categories,'@shared/postingDates':dates,'@shared/postingMoney':money,'@shared/travelRange':travel,'@shared/submission':submission,'@shared/publicJobArea':{createPublicAreaCache:()=>async()=>null,lookupPublicArea:async()=>null},'@/lib/resize-photo':{resizePhoto:async file=>file}}
  vm.runInNewContext(compiled,{exports:module.exports,require(name){
  if(name==='@shared/postingText')return postingText
  if(name==='@shared/formatting')return formatting

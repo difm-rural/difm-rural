@@ -33,7 +33,10 @@ import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
-import { existingListingPin, listingLocationFields, lookUpListingPin } from '../lib/listingLocation'
+import { existingListingPin, listingLocationFields } from '../lib/listingLocation'
+import { lookUpListingPin } from '../lib/listingPin'
+import { shrinkPhoto } from '../lib/shrinkPhoto'
+import { newJobId } from '../lib/draftId'
 import { CATEGORIES, LISTING_CATEGORIES } from '../lib/categories'
 import { categoryImage } from '../lib/categoryImages'
 import {
@@ -163,6 +166,9 @@ async function edgeFunctionErrorMessage(error, fallback) {
 
 export default function CreateServiceScreen({ navigation, route }) {
   const publishingRef = useRef(false)
+  // A new listing is inserted under its own id, so a retried publish (the first
+  // attempt landed but its response was lost) can't create a duplicate.
+  const draftIdRef = useRef(newJobId())
   const insets = useSafeAreaInsets()
   const [keyboardVisible, setKeyboardVisible] = useState(false)
   const formScrollRef = useRef(null)
@@ -278,6 +284,7 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   // Re-initialise a NEW listing to a fresh draft. Never touches the editing path.
   function resetDraft() {
+    draftIdRef.current = newJobId()
     setCreationMode('kind')
     setKind('service')
     setStep(1)
@@ -368,8 +375,12 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   function normalizeCategory(value) {
     if (!value) return ''
-    const found = CATEGORIES.find(cat => cat.toLowerCase() === String(value).toLowerCase())
-    return found || 'Other'
+    // Only a category that exists for this kind of listing. An unrecognised one
+    // falls back to the catch-all for services, or is left for the provider to
+    // choose — never a name that no browse filter matches.
+    const allowed = LISTING_CATEGORIES[kind] || CATEGORIES
+    const found = allowed.find(cat => cat.toLowerCase() === String(value).toLowerCase())
+    return found || (allowed.includes('General Rural Help') ? 'General Rural Help' : '')
   }
 
   function addAddOn() {
@@ -780,7 +791,10 @@ export default function CreateServiceScreen({ navigation, route }) {
       const result = fromCamera
         ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.7, allowsEditing: true })
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
-      if (!result.canceled) setPhotos(prev => [...prev, normalizePickedAsset(result.assets[0])])
+      if (!result.canceled) {
+        const picked = await shrinkPhoto(result.assets[0])
+        setPhotos(prev => [...prev, normalizePickedAsset(picked)])
+      }
     } catch (error) {
       Alert.alert('Photo unavailable', error?.message || `Could not open the ${fromCamera ? 'camera' : 'photo library'}.`)
     }
@@ -944,9 +958,16 @@ export default function CreateServiceScreen({ navigation, route }) {
         .update(payload)
         .eq('id', editingService.id)
         .eq('provider_id', user.id)
-      : supabase.from('services').insert(payload)
+      : supabase.from('services').insert({ ...payload, id: draftIdRef.current })
 
-    const { data: createdService, error } = await query.select().single()
+    let { data: createdService, error } = await query.select().single()
+    // The id already exists: an earlier attempt at this same listing got through.
+    // It is ours, so carry on with it instead of publishing a second copy.
+    if (!isEditing && error?.code === '23505') {
+      const { data: existing } = await supabase
+        .from('services').select().eq('id', draftIdRef.current).eq('provider_id', user.id).maybeSingle()
+      if (existing) { createdService = existing; error = null }
+    }
 
     if (error) {
       setSubmitting(false)
@@ -955,6 +976,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     }
 
     let serviceForRoute = createdService
+    let photoProblem = ''
     if (photos.length > 0) {
       const { urls, failed, firstError } = await uploadPhotos(createdService.id)
       if (urls.length > 0) {
@@ -966,8 +988,9 @@ export default function CreateServiceScreen({ navigation, route }) {
           .single()
         serviceForRoute = updatedService || { ...createdService, photos: urls }
       }
+      // Reported in the one confirmation below, not as a second alert on top of it.
       if (failed > 0) {
-        Alert.alert('Some photos did not upload', firstError || `${failed} photo${failed === 1 ? '' : 's'} could not be uploaded.`)
+        photoProblem = `${failed} photo${failed === 1 ? '' : 's'} did not upload${firstError ? ` (${firstError})` : ''}. Edit the listing to add ${failed === 1 ? 'it' : 'them'} again.`
       }
     }
 
@@ -996,7 +1019,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       })
     }
 
-    Alert.alert(isEditing ? 'Listing updated!' : 'Listing published!', isEditing ? 'Your listing has been updated.' : 'Your listing is now live.', [
+    Alert.alert(isEditing ? 'Listing updated!' : 'Listing published!', (isEditing ? 'Your listing has been updated.' : 'Your listing is now live.') + (photoProblem ? `\n\n${photoProblem}` : ''), [
       { text: 'OK', onPress: leavePublishScreen },
     ])
     return true
@@ -1656,7 +1679,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         />
         </View>
         {attempted && !locationName.trim() && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter the listing location.</Text>}
-        <Text style={styles.locationHelp}>{locationPin ? 'Map location selected — this listing can appear in nearby searches.' : 'Choose a suggestion to add a map location for nearby searches. You can also enter the location manually.'} This listing location is public; choose a town if you prefer not to show an exact address.</Text>
+        <Text style={styles.locationHelp}>{locationPin ? 'Map location selected — this listing can appear in nearby searches.' : 'Choose a suggestion, or just type your town — we find it on the map when you publish, so people searching nearby can see your listing.'} This listing location is public; choose a town if you prefer not to show an exact address.</Text>
 
         <Text style={styles.fieldLabel}>Travel range <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput

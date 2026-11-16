@@ -9,6 +9,7 @@ import {travelRangeError,travelRangeValue} from '@shared/travelRange'
 import {listingMoneyError} from '@shared/postingMoney'
 import {listingDateError,nzToday} from '@shared/postingDates'
 import {createPublicAreaCache,lookupPublicArea} from '@shared/publicJobArea'
+import {resizePhoto} from '@/lib/resize-photo'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
@@ -459,10 +460,12 @@ export function ListingForm({
     for (let i = 0; i < photos.length; i++) {
       const p = photos[i]
       if (typeof p === 'string') { finalUrls.push(p); continue }
-      const path = `${serviceId}/${crypto.randomUUID()}_${i}.${fileExt(p)}`
+      // Scaled down first (longest side 1600px) — quicker to upload and to browse.
+      const photo = await resizePhoto(p)
+      const path = `${serviceId}/${crypto.randomUUID()}_${i}.${photo === p ? fileExt(p) : 'jpg'}`
       const { error: upErr } = await supabase.storage
         .from('service-photos')
-        .upload(path, p, { contentType: p.type || 'image/jpeg', upsert: false })
+        .upload(path, photo, { contentType: photo.type || p.type || 'image/jpeg', upsert: false })
       if (upErr) { failed += 1; continue }
       const { data: { publicUrl } } = supabase.storage.from('service-photos').getPublicUrl(path)
       finalUrls.push(publicUrl)
