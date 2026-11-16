@@ -74,7 +74,8 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
           // Longest side at most 1600px, as a JPEG (the original if it can't be decoded).
           const photo=await resizePhoto(file,PHOTO_MAX)
           const client=createClient(),type=photo.type||file.type,ext=type==='image/png'?'png':type==='image/webp'?'webp':'jpg'
-          const path=context.id+'/'+context.userId+'/'+crypto.randomUUID()+'.'+ext
+          // Under the sender's own folder — storage only allows uploads there.
+          const path=context.userId+'/'+context.id+'/'+crypto.randomUUID()+'.'+ext
           const {error:uploadError}=await client.storage.from('job-photos').upload(path,photo,{contentType:type,upsert:false})
           if(uploadError)throw new Error('The photo could not be uploaded. Check your connection and try again.')
           url=client.storage.from('job-photos').getPublicUrl(path).data.publicUrl;uploaded.current={file,url}

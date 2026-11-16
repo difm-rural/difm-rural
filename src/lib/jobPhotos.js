@@ -32,9 +32,16 @@ export function toStorablePhoto(photo) {
 
 // Uploads any local photos to the job-photos bucket and returns the full list
 // of public URLs (already-remote photos are passed through unchanged).
+//
+// Stored under the uploader's own folder: <user id>/<job id>/<file> — storage
+// only lets you add photos to your own folder.
 export async function uploadJobPhotos(jobId, photos = []) {
   const localPhotos = photos.filter(p => !isRemotePhoto(p))
   const urls = photos.filter(isRemotePhoto)
+  if (!localPhotos.length) return urls
+  const { data: { session } } = await supabase.auth.getSession()
+  const userId = session?.user?.id
+  if (!userId) return urls
   for (let i = 0; i < localPhotos.length; i++) {
     try {
       const photo    = localPhotos[i]
@@ -42,7 +49,7 @@ export async function uploadJobPhotos(jobId, photos = []) {
       if (!uri) continue
       const mimeType = typeof photo === 'string' ? 'image/jpeg' : (photo.mimeType || 'image/jpeg')
       const ext      = (photo.fileName || uri)?.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg'
-      const path     = `${jobId}/${Date.now()}_${i}.${ext}`
+      const path     = `${userId}/${jobId}/${Date.now()}_${i}.${ext}`
       const fileData = photo.base64
         ? base64ToArrayBuffer(photo.base64)
         : await (await fetch(uri)).arrayBuffer()
