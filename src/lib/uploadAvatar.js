@@ -1,6 +1,6 @@
 import { Alert } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
+import { AVATAR_MAX, shrinkPhoto } from './shrinkPhoto'
 import { supabase } from './supabase'
 
 export async function pickAndUploadAvatar(userId, useCamera) {
@@ -20,11 +20,8 @@ export async function pickAndUploadAvatar(userId, useCamera) {
 
     if (result.canceled) return null
 
-    const resized = await manipulateAsync(
-      result.assets[0].uri,
-      [{ resize: { width: 400, height: 400 } }],
-      { compress: 0.8, format: SaveFormat.JPEG }
-    )
+    // Square crop from the picker, scaled to at most 512px, always JPEG.
+    const resized = await shrinkPhoto(result.assets[0], AVATAR_MAX, { jpeg: true })
 
     const response    = await fetch(resized.uri)
     const blob        = await response.blob()

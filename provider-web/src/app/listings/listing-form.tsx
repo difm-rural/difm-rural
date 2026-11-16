@@ -9,7 +9,7 @@ import {travelRangeError,travelRangeValue} from '@shared/travelRange'
 import {listingMoneyError} from '@shared/postingMoney'
 import {listingDateError,nzToday} from '@shared/postingDates'
 import {createPublicAreaCache,lookupPublicArea} from '@shared/publicJobArea'
-import {resizePhoto} from '@/lib/resize-photo'
+import {PHOTO_MAX,resizePhoto} from '@/lib/resize-photo'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
 import { useState, useEffect, useRef } from 'react'
@@ -474,7 +474,7 @@ export function ListingForm({
       if (typeof item === 'string') { finalUrls.push(item); continue }
       const p = item.file
       // Scaled down first (longest side 1600px) — quicker to upload and to browse.
-      const photo = await resizePhoto(p)
+      const photo = await resizePhoto(p, PHOTO_MAX)
       const path = `${serviceId}/${crypto.randomUUID()}_${i}.${photo === p ? fileExt(p) : 'jpg'}`
       const { error: upErr } = await supabase.storage
         .from('service-photos')

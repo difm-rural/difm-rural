@@ -8,6 +8,7 @@ import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '@share
 import {hasJobDraftChanges,readJobDraft} from '@shared/jobDraft'
 import {FieldFeedback,invalidField} from '@/components/field-feedback'
 import {runSubmission} from '@shared/submission'
+import {PHOTO_MAX,resizePhoto} from '@/lib/resize-photo'
 import {LoaderCircle} from 'lucide-react'
 import {moneyInputError,MAX_POSTING_AMOUNT} from '@shared/postingMoney'
 import {editorScheduleType,jobScheduleError,nzCalendarDay,nzToday} from '@shared/postingDates'
@@ -87,10 +88,9 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   if(chosen.some(f=>!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>8*1024*1024)){setError('Use JPG, PNG or WebP photos smaller than 8 MB each.');return}
   setBusy(true);setError('')
   try{const client=createClient();for(const file of chosen){
-   const bitmap=await createImageBitmap(file),scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale)
-   const ctx=canvas.getContext('2d');if(!ctx){bitmap.close();throw new Error('Photo unavailable')}ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close()
-   const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Photo unavailable')),'image/jpeg',.85))
-   const path=jobId+'/'+userId+'/'+crypto.randomUUID()+'.jpg',result=await client.storage.from('job-photos').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(result.error)throw result.error
+   // Longest side at most 1600px, as a JPEG.
+   const blob=await resizePhoto(file,PHOTO_MAX)
+   const path=jobId+'/'+userId+'/'+crypto.randomUUID()+'.jpg',result=await client.storage.from('job-photos').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:false});if(result.error)throw result.error
    const url=client.storage.from('job-photos').getPublicUrl(path).data.publicUrl;setDraft(d=>({...d,photos:[...d.photos,url]}))
   }}catch{setError('Could not upload a photo. Photos already shown are kept. Check your connection and try the remaining photos again.')}finally{setBusy(false)}
  }
