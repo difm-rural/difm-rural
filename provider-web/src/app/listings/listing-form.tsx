@@ -12,7 +12,7 @@ import {createPublicAreaCache,lookupPublicArea} from '@shared/publicJobArea'
 import {resizePhoto} from '@/lib/resize-photo'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoaderCircle, ImagePlus, X } from 'lucide-react'
 import {
@@ -76,6 +76,13 @@ const STEPS = ['Listing details', 'Pricing', 'Photos', 'Location & availability'
 const MAX_PHOTOS = 4
 
 // Extension for a picked File, mirroring RN's mime→ext map (uploadPhotos).
+// A listing photo: an uploaded URL, or a picked file with its preview URL.
+type PhotoItem = string | { file: File; url: string }
+const photoSrc = (p: PhotoItem) => (typeof p === 'string' ? p : p.url)
+function revokePreviews(items: PhotoItem[]) {
+  for (const p of items) if (typeof p !== 'string') URL.revokeObjectURL(p.url)
+}
+
 function fileExt(file: File): string {
   const byType: Record<string, string> = {
     'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
@@ -223,8 +230,11 @@ export function ListingForm({
   const [availMode, setAvailMode] = useState<'now' | 'from'>(initialAvailFrom ? 'from' : 'now')
   const [availableFrom, setAvailableFrom] = useState(initialAvailFrom)
 
-  // Photos (C1) — array mixing existing URL strings (edit) with newly-picked File objects.
-  const [photos, setPhotos] = useState<(string | File)[]>(
+  // Photos (C1) — existing URL strings (edit) and newly picked files. A picked
+  // file carries its own blob: preview URL, made once when it is picked and
+  // revoked only when that photo leaves the list (removed, replaced, unmount) —
+  // never by a re-render, so a thumbnail on screen can't break.
+  const [photos, setPhotos] = useState<PhotoItem[]>(
     Array.isArray(listing?.photos) ? [...listing!.photos!] : [],
   )
 
@@ -236,24 +246,26 @@ export function ListingForm({
   // a duplicate. On edit it starts as the existing id.
   const [savedId, setSavedId] = useState<string | null>(mode === 'edit' ? (listing?.id ?? null) : null)
 
-  // Thumbnail srcs: existing URLs as-is, Files as blob: object URLs (revoked on change/unmount).
-  const photoPreviews = useMemo(
-    () => photos.map(p => (typeof p === 'string' ? p : URL.createObjectURL(p))),
-    [photos],
-  )
-  useEffect(() => () => {
-    photoPreviews.forEach(u => { if (u.startsWith('blob:')) URL.revokeObjectURL(u) })
-  }, [photoPreviews])
+  const photoPreviews = photos.map(photoSrc)
+  // Revoke what's left when the form goes away (read in cleanup, not render).
+  const photosRef = useRef(photos)
+  useEffect(() => { photosRef.current = photos }, [photos])
+  useEffect(() => () => revokePreviews(photosRef.current), [])
 
   function addPhotoFiles(files: FileList | null) {
-    if (!files) return
-    setPhotos(ps => {
-      const room = MAX_PHOTOS - ps.length
-      if (room <= 0) return ps
-      return [...ps, ...Array.from(files).slice(0, room)]
-    })
+    // Copy now: the input's FileList is live and is emptied when the input is
+    // cleared straight after this call — before a state updater would run.
+    const picked = Array.from(files ?? []).slice(0, Math.max(0, MAX_PHOTOS - photos.length))
+    if (!picked.length) return
+    const added = picked.map(file => ({ file, url: URL.createObjectURL(file) }))
+    setPhotos(ps => [...ps, ...added])
   }
-  const removePhoto = (i: number) => setPhotos(ps => ps.filter((_, idx) => idx !== i))
+  // Replace the whole list, releasing the previews of picked files that drop out.
+  function replacePhotos(next: PhotoItem[]) {
+    revokePreviews(photos.filter(p => !next.includes(p)))
+    setPhotos(next)
+  }
+  const removePhoto = (i: number) => replacePhotos(photos.filter((_, idx) => idx !== i))
 
   const cfg = kind ? KIND_PRICING[kind] : null
 
@@ -280,7 +292,7 @@ export function ListingForm({
     setCardStyle('bottom')
     setAvailMode('now')
     setAvailableFrom('')
-    setPhotos([])
+    replacePhotos([])
   }
 
   // Add-on row handlers
@@ -458,8 +470,9 @@ export function ListingForm({
     const finalUrls: string[] = []
     let failed = 0
     for (let i = 0; i < photos.length; i++) {
-      const p = photos[i]
-      if (typeof p === 'string') { finalUrls.push(p); continue }
+      const item = photos[i]
+      if (typeof item === 'string') { finalUrls.push(item); continue }
+      const p = item.file
       // Scaled down first (longest side 1600px) — quicker to upload and to browse.
       const photo = await resizePhoto(p)
       const path = `${serviceId}/${crypto.randomUUID()}_${i}.${photo === p ? fileExt(p) : 'jpg'}`
@@ -490,7 +503,7 @@ export function ListingForm({
     // set in state (so a retry re-uploads only what's re-added, not the already-saved ones)
     // and keep the provider on the form with a notice instead of silently dropping them.
     if (failed > 0) {
-      setPhotos(finalUrls)
+      replacePhotos(finalUrls)
       setError(`Listing saved, but ${failed} photo${failed === 1 ? '' : 's'} couldn’t upload. Add again to retry.`)
       return
     }
@@ -929,7 +942,7 @@ export function ListingForm({
         {photos.length > 0 && (
           <div className="lform-photos">
             {photos.map((p, i) => (
-              <div className="lform-photo" key={i}>
+              <div className="lform-photo" key={photoPreviews[i] + ':' + i}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoPreviews[i]} alt={`Listing photo ${i + 1}`} />
                 {i === 0 && <span className="lform-photo-badge">Card image</span>}
