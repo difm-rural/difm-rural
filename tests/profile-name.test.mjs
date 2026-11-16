@@ -18,6 +18,7 @@ function harness(){
   if(name==='@shared/categories')return {CATEGORY_CAPABILITIES:{},ALL_CAPABILITIES:[]}
   if(name==='@/components/navigation-link')return {default:'a'}
   if(name==='@/lib/supabase/client'||name==='../actions')return {}
+  if(name==='@/lib/resize-photo')return {PHOTO_MAX:1600,AVATAR_MAX:512,resizePhoto:async file=>file}
   throw Error(name)
  }})
  const render=()=>{i=0;r=0;tree=module.exports.ProfileForm({userId:'test',profile:{full_name:'Paul',region:'Waitoki',latitude:null,longitude:null}})}

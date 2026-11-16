@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
+import { shrinkPhoto } from '../../lib/shrinkPhoto'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -79,7 +80,10 @@ export default function PostJobStep3Details({ navigation, route }) {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return }
     try {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
-      if (!result.canceled) setPhotos(prev => [...prev, normalizeAsset(result.assets[0])])
+      if (!result.canceled) {
+        const picked = await shrinkPhoto(result.assets[0])
+        setPhotos(prev => [...prev, normalizeAsset(picked)])
+      }
     } catch { Alert.alert('Photo library unavailable', 'Could not open photos.') }
   }
 
@@ -89,7 +93,10 @@ export default function PostJobStep3Details({ navigation, route }) {
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return }
     try {
       const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
-      if (!result.canceled) setPhotos(prev => [...prev, normalizeAsset(result.assets[0])])
+      if (!result.canceled) {
+        const taken = await shrinkPhoto(result.assets[0])
+        setPhotos(prev => [...prev, normalizeAsset(taken)])
+      }
     } catch { Alert.alert('Camera unavailable', 'Could not open the camera.') }
   }
 

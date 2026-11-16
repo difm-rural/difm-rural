@@ -1,5 +1,6 @@
 'use client'
 import { useActionState, useState, useEffect, useRef } from 'react'
+import {AVATAR_MAX,resizePhoto} from '@/lib/resize-photo'
 import {publicNameError,PUBLIC_NAME_MAX} from '@shared/profileName'
 import Link from '@/components/navigation-link'
 import { CATEGORY_CAPABILITIES, ALL_CAPABILITIES } from '@shared/categories'
@@ -23,13 +24,10 @@ export function ProfileForm({profile,userId}:{profile:OwnProfile;userId:string})
     if(!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>8*1024*1024){setError('Choose a JPG, PNG or WebP photo smaller than 8 MB.');return}
     setUploading(true);setError('')
     try{
-      const bitmap=await createImageBitmap(file),scale=Math.min(1,600/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas')
-      canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale))
-      const context=canvas.getContext('2d');if(!context){bitmap.close();throw new Error('Photo resizing unavailable')}
-      context.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close()
-      const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not resize this photo.')),'image/jpeg',.85))
+      // Longest side at most 512px, as a JPEG.
+      const blob=await resizePhoto(file,AVATAR_MAX)
       const client=createClient(),path=userId+'/'+crypto.randomUUID()+'.jpg'
-      const {error:uploadError}=await client.storage.from('avatars').upload(path,blob,{contentType:'image/jpeg',upsert:false})
+      const {error:uploadError}=await client.storage.from('avatars').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:false})
       if(uploadError)throw uploadError
       setAvatar(client.storage.from('avatars').getPublicUrl(path).data.publicUrl)
     }catch{setError('Could not upload this photo. Try a different photo or check your connection. Your current profile photo has not changed.')}

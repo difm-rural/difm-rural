@@ -35,6 +35,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
+import { AVATAR_MAX, shrinkPhoto } from '../lib/shrinkPhoto'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
@@ -248,7 +249,7 @@ export default function ProfileScreen({ navigation }) {
       aspect: [1, 1],
       quality: 0.7,
     })
-    if (!result.canceled) await uploadAvatar(result.assets[0].uri)
+    if (!result.canceled) await uploadAvatar(result.assets[0])
   }
 
   async function pickFromLibrary() {
@@ -263,14 +264,16 @@ export default function ProfileScreen({ navigation }) {
       aspect: [1, 1],
       quality: 0.7,
     })
-    if (!result.canceled) await uploadAvatar(result.assets[0].uri)
+    if (!result.canceled) await uploadAvatar(result.assets[0])
   }
 
-  async function uploadAvatar(uri) {
+  async function uploadAvatar(asset) {
     if (!userId) return
     setUploadingAvatar(true)
     try {
       const path = `avatars/${userId}/avatar.jpg`
+      // At most 512px, always JPEG (it is stored as avatar.jpg, image/jpeg).
+      const { uri } = await shrinkPhoto(asset, AVATAR_MAX, { jpeg: true })
       const response = await fetch(uri)
       const blob = await response.blob()
 

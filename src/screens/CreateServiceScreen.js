@@ -35,7 +35,7 @@ import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
 import { existingListingPin, listingLocationFields } from '../lib/listingLocation'
 import { lookUpListingPin } from '../lib/listingPin'
-import { shrinkPhoto } from '../lib/shrinkPhoto'
+import { PHOTO_MAX, shrinkPhoto } from '../lib/shrinkPhoto'
 import { newJobId } from '../lib/draftId'
 import { CATEGORIES, LISTING_CATEGORIES } from '../lib/categories'
 import { categoryImage } from '../lib/categoryImages'
@@ -792,7 +792,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], base64: true, quality: 0.7, allowsEditing: true })
         : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], base64: true, quality: 0.7 })
       if (!result.canceled) {
-        const picked = await shrinkPhoto(result.assets[0])
+        const picked = await shrinkPhoto(result.assets[0], PHOTO_MAX)
         setPhotos(prev => [...prev, normalizePickedAsset(picked)])
       }
     } catch (error) {

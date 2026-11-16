@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
+import { PHOTO_MAX, shrinkPhoto } from '../lib/shrinkPhoto'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
@@ -229,7 +230,8 @@ export default function ChatScreen({ route, navigation }) {
     if (result.canceled) return
 
     const coords  = await getCurrentLocation()
-    const uri     = result.assets[0].uri
+    // Scaled to 1600px and saved as JPEG (it is uploaded as image/jpeg).
+    const uri     = (await shrinkPhoto(result.assets[0], PHOTO_MAX, { jpeg: true })).uri
     const path    = `${chatId}/progress_${Date.now()}.jpg`
 
     let photoUrl = ''
