@@ -14,9 +14,11 @@ import * as submission from '../shared/submission.ts'
 const require=createRequire(import.meta.url),ts=require('typescript')
 const source=await readFile(new URL('../provider-web/src/app/listings/listing-form.tsx',import.meta.url),'utf8')
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
-function harness(patch={}){
- const state=[],refs=[],calls=[];let index=0,refIndex=0,tree
- const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>state[i]=typeof value==='function'?value(state[i]):value]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(){},useMemo:fn=>fn()}
+// defer: queue state updates until the next render, as React does (an updater
+// runs later, not inside the event handler).
+function harness(patch={},{defer=false}={}){
+ const state=[],refs=[],calls=[],pending=[];let index=0,refIndex=0,tree
+ const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;const apply=value=>{state[i]=typeof value==='function'?value(state[i]):value};return [state[i],value=>defer?pending.push(()=>apply(value)):apply(value)]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(){},useMemo:fn=>fn()}
  const module={exports:{}}
  const modules={'@shared/listingPricing':pricing,'@shared/categories':categories,'@shared/postingDates':dates,'@shared/postingMoney':money,'@shared/travelRange':travel,'@shared/submission':submission,'@shared/publicJobArea':{createPublicAreaCache:()=>async()=>null,lookupPublicArea:async()=>null},'@/lib/resize-photo':{resizePhoto:async file=>file}}
  vm.runInNewContext(compiled,{exports:module.exports,require(name){
@@ -34,11 +36,11 @@ function harness(patch={}){
  throw Error(name)
  },URL,Date,console})
  const props={mode:'edit',userId:'test-user',listing:{id:'test-listing',kind:'service',title:'Move a container',category:'Transport & Delivery',description:'Local test',location_name:'Waitoki',pricing_type:'fixed',rate:50,photos:[],pricing_add_ons:[],pricing_variants:[],...patch}}
- function render(){index=0;refIndex=0;tree=module.exports.ListingForm(props)}
+ function render(){while(pending.length)pending.shift()();index=0;refIndex=0;tree=module.exports.ListingForm(props)}
  function nodes(node=tree){if(!node||typeof node!=='object')return [];return [node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]}
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).filter(c=>c!==undefined).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
  render()
- return {calls,nodes,change(id,value){nodes().find(n=>n.props?.id===id).props.onChange({target:{value}});render()},heading:()=>text(nodes().find(n=>n.type==='h2'&&n.props.tabIndex===-1)),click(label){const button=nodes().find(n=>n.type==='button'&&text(n)===label);assert.ok(button,label);button.props.onClick();render()},rate(value){nodes().find(n=>n.props?.id==='lf-rate').props.onChange({target:{value}});render()},alert:()=>text(nodes().find(n=>n.props?.role==='alert'))}
+ return {calls,nodes,render,change(id,value){nodes().find(n=>n.props?.id===id).props.onChange({target:{value}});render()},heading:()=>text(nodes().find(n=>n.type==='h2'&&n.props.tabIndex===-1)),click(label){const button=nodes().find(n=>n.type==='button'&&text(n)===label);assert.ok(button,label);button.props.onClick();render()},rate(value){nodes().find(n=>n.props?.id==='lf-rate').props.onChange({target:{value}});render()},alert:()=>text(nodes().find(n=>n.props?.role==='alert'))}
 }
 test('negative rate stays at Pricing with a validation message instead of advancing or fetching RSC',()=>{
  const h=harness();h.click('Next');assert.equal(h.heading(),'Pricing')
@@ -89,4 +91,70 @@ test('rate preview only renders valid prices, including the new exact limit',()=
   h.rate(rate);assert.equal(preview(),undefined)
  }
  h.rate('1000000.00');assert.ok(preview());h.click('Next');assert.equal(h.heading(),'Photos')
+})
+
+// ---- Photos: picked files show as thumbnails ----
+// The browser's FileList is live: clearing the input (value = '') right after
+// onChange empties it. Reproduce that, so a deferred read would see nothing.
+function pickEvent(files){
+ let items=[...files]
+ const list={get length(){return items.length},item:i=>items[i],[Symbol.iterator]:function*(){yield* items}}
+ files.forEach((_,i)=>Object.defineProperty(list,i,{get:()=>items[i]}))
+ return {target:{files:list,set value(v){if(v==='')items=[]},get value(){return items.length?'picked.jpg':''}}}
+}
+function photoHarness(){
+ const created=[],revoked=[]
+ const realCreate=URL.createObjectURL,realRevoke=URL.revokeObjectURL
+ URL.createObjectURL=blob=>{const url='blob:test/'+created.length;created.push(url);return url}
+ URL.revokeObjectURL=url=>{revoked.push(url)}
+ const h=harness({},{defer:true})
+ const input=()=>h.nodes().find(n=>n.type==='input'&&n.props?.type==='file')
+ const pick=files=>{const e=pickEvent(files);input().props.onChange(e);h.render()}
+ const thumbs=()=>h.nodes().filter(n=>n.type==='img'&&/^Listing photo \d+$/.test(String(n.props?.alt))).map(n=>n.props.src)
+ const editThumbs=()=>h.nodes().filter(n=>n.props?.className==='lform-photo'&&n.props.children?.some?.(c=>c?.props?.className==='lform-photo-remove'))
+ const restore=()=>{URL.createObjectURL=realCreate;URL.revokeObjectURL=realRevoke}
+ return {h,pick,thumbs,editThumbs,created,revoked,restore}
+}
+const photo=name=>new File(['x'],name,{type:'image/jpeg'})
+test('picking one photo shows its thumbnail even though the input is cleared straight away',()=>{
+ const p=photoHarness()
+ try{
+  p.pick([photo('a.jpg')])
+  assert.equal(p.editThumbs().length,1)
+  assert.ok(p.thumbs().every(src=>src==='blob:test/0'))
+ }finally{p.restore()}
+})
+test('picking three photos shows three thumbnails, each with one preview URL',()=>{
+ const p=photoHarness()
+ try{
+  p.pick([photo('a.jpg'),photo('b.jpg'),photo('c.jpg')])
+  assert.equal(p.editThumbs().length,3)
+  assert.deepEqual(p.created,['blob:test/0','blob:test/1','blob:test/2'])
+  p.h.render();p.h.render()
+  assert.equal(p.created.length,3,'re-rendering makes no new URLs')
+  assert.deepEqual(p.revoked,[],'and revokes none')
+ }finally{p.restore()}
+})
+test('re-picking the same file adds it again, and the 4-photo cap holds',()=>{
+ const p=photoHarness()
+ try{
+  const same=photo('same.jpg')
+  p.pick([same]);p.pick([same])
+  assert.equal(p.editThumbs().length,2)
+  p.pick([photo('b.jpg'),photo('c.jpg'),photo('d.jpg')])
+  assert.equal(p.editThumbs().length,4,'only room for two more')
+  assert.equal(p.created.length,4,'no URL made for a photo that did not fit')
+ }finally{p.restore()}
+})
+test('removing a photo drops its thumbnail and revokes only its URL',()=>{
+ const p=photoHarness()
+ try{
+  p.pick([photo('a.jpg'),photo('b.jpg'),photo('c.jpg')])
+  const remove=p.h.nodes().find(n=>n.type==='button'&&n.props?.['aria-label']==='Remove photo 2')
+  remove.props.onClick();p.h.render()
+  assert.equal(p.editThumbs().length,2)
+  assert.deepEqual(p.revoked,['blob:test/1'])
+  const shown=p.editThumbs().map(t=>t.props.children.find(c=>c?.type==='img').props.src)
+  assert.deepEqual(shown,['blob:test/0','blob:test/2'])
+ }finally{p.restore()}
 })
