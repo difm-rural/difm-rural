@@ -14,9 +14,9 @@ import { colors } from '../theme/tokens'
 
 const METHOD_LABELS = {
   bank_transfer: 'Bank transfer',
-  cash: 'Cash on the day',
+  cash: 'Cash',
   invoice: "I'll send an invoice",
-  agreed: 'Already agreed',
+  agreed: 'Arrange directly',
 }
 
 // One-step job confirmation: arrival time + how to get paid, posted together via
@@ -35,7 +35,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   // Requested day first; otherwise the offer date (a past one falls back to today).
   const initialDay = days.preselect || availableFrom
   const [start, setStart] = useState(() => defaultStartForDate(initialDay))
-  const [choice, setChoice] = useState('')
+  const [choice, setChoice] = useState('agreed')
   const [acct, setAcct] = useState('')
   const [acctNo, setAcctNo] = useState('')
   const [reference, setReference] = useState('Payment for ' + (jobTitle || 'the job'))
@@ -46,12 +46,12 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   useEffect(() => {
     if (!visible) return
     setStart(defaultStartForDate(initialDay))
-    setChoice(''); setAcct(''); setAcctNo('')
+    setChoice('agreed'); setAcct(''); setAcctNo('')
     setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
   }, [visible, initialDay, jobTitle])
 
   const isPast = start.getTime() <= Date.now()
-  const paymentMessage = choice === 'bank_transfer'
+  const paymentMessage = choice === 'bank_transfer' && acct.trim() && acctNo.trim()
     ? `Please pay by bank transfer.\nAccount name: ${acct || '—'}\nAccount number: ${acctNo || '—'}\nReference: ${reference || '—'}`
     : ''
   const noteText = note.trim()
@@ -64,8 +64,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     + `\n${paymentLine(amount, pricingType, choice)}`
     + (noteText ? `\nNote: ${noteText}` : '')
     + (paymentMessage ? `\n\n${paymentMessage}` : '')
-  const bankIncomplete = choice === 'bank_transfer' && (!acct.trim() || !acctNo.trim())
-  const blocked = isPast || !choice || bankIncomplete || busy
+  const blocked = isPast || busy
 
   async function confirm() {
     if (blocked) return
@@ -101,7 +100,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
       <Text style={styles.section}>When will you arrive?</Text>
       <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} />
 
-      <Text style={styles.section}>How would you like to be paid?</Text>
+      <Text style={styles.section}>Payment method (optional)</Text>
       <View style={styles.options}>
         {Object.entries(METHOD_LABELS).map(([id, label]) => (
           <TouchableOpacity

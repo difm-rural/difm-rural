@@ -11,83 +11,32 @@ function check(name: string, got: unknown, expected: unknown) {
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 const future = iso(new Date(Date.now() + 7 * 86400000))
-const past = iso(new Date(Date.now() - 7 * 86400000))
 const futureWeekday = new Date(future + 'T12:00:00').toLocaleDateString('en-NZ', { weekday: 'long' })
 
 // helper: pick just the fields we assert on
 const pick = (m: ReturnType<typeof jobNextMove>) => m && { label: m.label, detail: m.detail, needsAction: m.needsAction, tone: m.tone, actionLabel: m.actionLabel }
 
-// ---- Provider, accepted/in_progress ----
-check('provider · not confirmed → confirm job',
-  pick(jobNextMove({ status: 'accepted' }, 'provider', {})),
-  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
-
-check('provider · arrival set but no method → still confirm',
-  pick(jobNextMove({ status: 'accepted' }, 'provider', { hasArrival: true, paymentMethod: null })),
-  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
-
-check('provider · method set but no arrival → still confirm',
+// Confirmation and the next work action stay independent of payment.
+const paid = '2026-11-09T00:00:00Z'
+for (const viewer of ['requester', 'provider']) {
+  for (const status of ['accepted', 'in_progress']) {
+    for (const hasArrival of [true, false]) {
+      const job = { status, scheduled_date: future }
+      check(`${viewer} · ${status} · payment does not change work status (${hasArrival})`,
+        jobNextMove(job, viewer, { hasArrival, paymentSortedAt: paid }),
+        jobNextMove(job, viewer, { hasArrival, paymentSortedAt: null }))
+    }
+  }
+}
+check('provider · no arrival → confirm',
   pick(jobNextMove({ status: 'accepted' }, 'provider', { hasArrival: false, paymentMethod: 'cash' })),
-  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
-
-check('provider · method set, no schedule → complete the work',
-  pick(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash' })),
+  { label: 'Waiting on you', detail: 'Confirm your arrival time', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
+check('provider · arrival exists without payment method → complete work',
+  pick(jobNextMove({ status: 'accepted' }, 'provider', { hasArrival: true })),
   { label: 'Waiting on you', detail: 'Complete the work, then mark it complete', needsAction: false, tone: 'active', actionLabel: 'View job' })
-
-check('provider · method set, future schedule wins',
-  pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'bank_transfer' })),
-  { label: `Scheduled for ${futureWeekday}`, detail: 'You are booked for this job', needsAction: false, tone: 'scheduled', actionLabel: null })
-
-check('provider · payment sorted → mark complete',
-  pick(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: '2026-11-09T00:00:00Z' })),
-  { label: 'Waiting on you', detail: "Payment's sorted — mark the job complete when you're done", needsAction: true, tone: 'active', actionLabel: 'View job' })
-
-check('provider · payment sorted beats a future schedule',
-  pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'bank_transfer', paymentSortedAt: '2026-11-09T00:00:00Z' })),
-  { label: 'Waiting on you', detail: "Payment's sorted — mark the job complete when you're done", needsAction: true, tone: 'active', actionLabel: 'View job' })
-
-check('provider · in_progress, not confirmed → confirm job',
-  pick(jobNextMove({ status: 'in_progress' }, 'provider', {})),
-  { label: 'Waiting on you', detail: 'Confirm the job — arrival time and how to get paid', needsAction: true, tone: 'attention', actionLabel: 'Confirm job' })
-
-// ---- Requester, accepted/in_progress ----
-check('requester · not confirmed → they will confirm',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', {})),
-  { label: 'Waiting on the provider', detail: "They'll confirm the arrival time and how to pay", needsAction: false, tone: 'waiting', actionLabel: null })
-
-check('requester · method set but no arrival → waiting to confirm',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { hasArrival: false, paymentMethod: 'cash' })),
-  { label: 'Waiting on the provider', detail: "They'll confirm the arrival time and how to pay", needsAction: false, tone: 'waiting', actionLabel: null })
-
-const calm = (label: string, detail: string) => ({ label, detail, needsAction: false, tone: 'scheduled', actionLabel: null })
-
-check('requester · bank, not sorted, past schedule → pay as agreed, never needsAction',
-  pick(jobNextMove({ status: 'accepted', scheduled_date: past }, 'requester', { paymentMethod: 'bank_transfer' })),
-  calm('Job confirmed', 'Pay as agreed'))
-
-check('requester · invoice → pay as agreed',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'invoice' })),
-  calm('Job confirmed', 'Pay as agreed'))
-
-check('requester · agreed → pay as agreed',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'agreed' })),
-  calm('Job confirmed', 'Pay as agreed'))
-
-check('requester · cash → pay on the day',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash' })),
-  calm('Job confirmed', 'Pay on the day'))
-
-check('requester · not sorted, future schedule → schedule label',
-  pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'requester', { paymentMethod: 'bank_transfer' })),
-  calm(`Scheduled for ${futureWeekday}`, 'Pay as agreed'))
-
-check('requester · payment sorted → waiting on provider',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash', paymentSortedAt: '2026-11-09T00:00:00Z' })),
-  { label: 'Waiting on the provider', detail: "They'll mark the job complete", needsAction: false, tone: 'waiting', actionLabel: null })
-
-check('requester · payment sorted uses the provider first name',
-  pick(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'invoice', paymentSortedAt: '2026-11-09T00:00:00Z', otherName: 'Sam Rata' })),
-  { label: 'Waiting on Sam', detail: "They'll mark the job complete", needsAction: false, tone: 'waiting', actionLabel: null })
+check('requester · confirmed work, future arrival stays scheduled',
+  pick(jobNextMove({ status: 'accepted', scheduled_date: future }, 'requester', { hasArrival: true, paymentSortedAt: paid })),
+  { label: `Scheduled for ${futureWeekday}`, detail: "They'll mark the job complete", needsAction: false, tone: 'scheduled', actionLabel: null })
 
 // ---- Regression: untouched branches ----
 check('open · requester with offers',
@@ -116,7 +65,7 @@ check('badge · requester waits for confirmation', badge(jobNextMove({ status: '
 check('badge · requester, no name → role word', badge(jobNextMove({ status: 'accepted' }, 'requester', {})), ['Waiting on the provider to confirm', 'muted'])
 
 // Jobs · confirmed
-check('badge · provider, payment sorted', badge(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: sorted })), ['Waiting on you to complete', 'attention'])
+check('badge · provider, payment sorted', badge(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: sorted })), ['Waiting on you to complete', 'muted'])
 check('badge · provider, scheduled ahead', badge(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'cash' })), ['Waiting on you to complete', 'muted'])
 check('badge · provider, doing the work', badge(jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash' })), ['Waiting on you to complete', 'muted'])
 check('badge · requester, payment sorted', badge(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash', paymentSortedAt: sorted, otherName: 'Sam' })), ['Waiting on Sam to complete', 'muted'])
@@ -186,7 +135,6 @@ check('short · the full badge is still there for wide headers', jobNextMove({ s
 for (const m of [
   jobNextMove({ status: 'open' }, 'requester', { bidCount: 1 }),
   jobNextMove({ status: 'accepted' }, 'provider', {}),
-  jobNextMove({ status: 'accepted' }, 'provider', { paymentMethod: 'cash', paymentSortedAt: sorted }),
   bookingNextMove({ status: 'pending', ...quote }, 'provider'),
   bookingNextMove({ status: 'cancellation_requested', ...fixed }, 'provider'),
 ]) check(`short · needsAction is always Your turn · ${m!.badge}`, [m!.needsAction, m!.badgeShort], [true, 'Your turn'])

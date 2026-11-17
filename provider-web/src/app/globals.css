@@ -792,3 +792,5 @@ a.row:hover { background: var(--sage); }
 .sidebar-user strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sidebar-user .sidebar-signout { display:flex; flex:0 0 100%; align-items:center; justify-content:center; gap:8px; min-height:44px; margin-left:0; border:1px solid #ffffff40; border-radius:8px; }
 .sidebar-signout span { color:inherit; font-size:12px; font-weight:650; }
+
+.payment-ack-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }

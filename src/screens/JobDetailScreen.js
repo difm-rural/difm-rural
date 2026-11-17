@@ -32,12 +32,14 @@ import { useUser } from '../context/UserContext'
 import { recordJobProviderView } from '../lib/listingPerformance'
 import WorkScheduleCard from '../components/WorkScheduleCard'
 import ArrivalWindowModal from '../components/ArrivalWindowModal'
-import JobPaymentHandoff, { paymentSortedByline } from '../components/JobPaymentHandoff'
+import JobPaymentHandoff from '../components/JobPaymentHandoff'
+import { paymentAcknowledgementAvailable } from '../../shared/paymentAcknowledgement'
 import MarkCompleteSheet from '../components/MarkCompleteSheet'
 import ConfirmJobSheet from '../components/ConfirmJobSheet'
 import {
   addWorkToPhoneCalendar,
   fetchWorkSchedule,
+  formatArrivalWindow,
   saveArrivalWindow,
   arrivalErrorMessage,
   sendRunningLate,
@@ -545,7 +547,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const needsProviderOptIn = !isJobOwner && job.status === 'open' && !!profile && !canProvideJobs
   const isAcceptedProvider = !isJobOwner && myBid?.status === 'accepted'
   // Confirmed once the provider has set BOTH the arrival time and how to be paid.
-  const jobConfirmed = isAcceptedProvider && !!workSchedule?.arrival_start_at && !!myBid?.payment_method
+  const jobConfirmed = isAcceptedProvider && !!workSchedule?.arrival_start_at
   // Hidden-location job seen by anyone who isn't the owner or the accepted
   // provider: show the suburb only and no navigation, so location stays discreet.
   const discreetHouseSit = job.hide_exact_location && !isJobOwner && !isAcceptedProvider
@@ -596,17 +598,10 @@ export default function JobDetailScreen({ route, navigation }) {
       setCompleteVisible(true)
     }
 
-    // "The work is finished" is the only required tick. If the provider also
-    // ticked the optional payment box, record that first; unticked completes
-    // anyway (invoice later).
-    async function completeJob({ paymentSorted }) {
+    async function completeJob() {
       if (completing) return
       setCompleting(true); setCompleteError('')
       try {
-        if (paymentSorted && myBid?.id) {
-          const { error: payError } = await supabase.rpc('mark_job_payment_sorted', { p_bid: myBid.id, p_undo: false })
-          if (payError) { setCompleteError('Could not record the payment. Try again, or untick it and mark complete.'); return }
-        }
         const { error } = await markJobComplete(job.id)
         if (error) {
           setCompleteError(error.message || 'Could not update. Please try again.')
@@ -672,9 +667,8 @@ export default function JobDetailScreen({ route, navigation }) {
     // than the bare status; completed / cancelled keep their status word.
     const providerMove = jobNextMove(job, 'provider', {
       otherName: requesterProfile?.full_name,
-      paymentMethod: myBid?.payment_method,
-      paymentSortedAt: myBid?.payment_sorted_at,
       hasArrival: !!workSchedule?.arrival_start_at,
+      arrivalAt: workSchedule?.arrival_start_at,
     })
 
     return (
@@ -751,6 +745,12 @@ export default function JobDetailScreen({ route, navigation }) {
           ) : null}
 
           {isCompleted && <ReceivedReview review={receivedReview} fromLabel="requester" />}
+          {isCompleted && workSchedule?.arrival_start_at && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Confirmed arrival</Text>
+              <Text style={styles.detailValue}>{formatArrivalWindow(workSchedule)}</Text>
+            </View>
+          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Job details</Text>
@@ -782,22 +782,16 @@ export default function JobDetailScreen({ route, navigation }) {
             ) : null}
           </View>
 
-          {jobConfirmed && job.status === 'accepted' && myBid?.id ? (
+          {isAcceptedProvider && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && myBid?.id ? (
             <JobPaymentHandoff
-              viewerRole="provider"
-              jobId={job.id}
-              jobTitle={job.title}
               bidId={myBid.id}
               method={myBid.payment_method || null}
-              amount={myBid.amount}
-              pricingType={myBid.pricing_type}
               sortedAt={myBid.payment_sorted_at || null}
               sortedBy={myBid.payment_sorted_by || null}
-              paymentMessageId={myBid.payment_message_id || null}
-              otherFirstName={requesterFirstName}
-              counterpartId={job.requester_id}
-              currentUserId={currentUser?.id}
-              availableFrom={myBid.available_from || null}
+              requesterId={job.requester_id}
+              providerId={currentUser?.id}
+              canUpdate={paymentAcknowledgementAvailable(job.status, myBid.status, isAcceptedProvider)}
+              canEditMethod={jobConfirmed && ['accepted', 'in_progress'].includes(job.status)}
               onChanged={fetchData}
             />
           ) : null}
@@ -870,12 +864,6 @@ export default function JobDetailScreen({ route, navigation }) {
         <MarkCompleteSheet
           visible={completeVisible}
           otherFirstName={requesterFirstName}
-          paymentSortedByline={myBid?.payment_sorted_at ? paymentSortedByline({
-            sortedAt: myBid.payment_sorted_at,
-            sortedBy: myBid.payment_sorted_by,
-            currentUserId: currentUser?.id,
-            otherFirstName: requesterFirstName,
-          }) : null}
           busy={completing}
           error={completeError}
           onClose={() => { if (!completing) setCompleteVisible(false) }}
@@ -1140,6 +1128,27 @@ export default function JobDetailScreen({ route, navigation }) {
             style={{ marginBottom: 16 }}
             accessibilityLabel="Manage this job"
           />
+        )}
+
+        {isJobOwner && acceptedBid && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && (
+          <>
+            {workSchedule?.arrival_start_at && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Job confirmed</Text>
+                <Text style={styles.detailValue}>{formatArrivalWindow(workSchedule)}</Text>
+              </View>
+            )}
+            <JobPaymentHandoff
+              bidId={acceptedBid.id}
+              method={acceptedBid.payment_method}
+              sortedAt={acceptedBid.payment_sorted_at}
+              sortedBy={acceptedBid.payment_sorted_by}
+              requesterId={job.requester_id}
+              providerId={acceptedBid.provider_id}
+              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner)}
+              onChanged={fetchData}
+            />
+          </>
         )}
 
         {/* Requester: completed — leave / edit the provider review */}

@@ -1,5 +1,4 @@
 import { ActionForm } from '@/components/action-form'
-import { formatDate as nzDate } from '@shared/formatting'
 import { manageArrangement } from '@/app/activity/actions'
 import type { WorkAction } from '@/lib/activity-policy'
 
@@ -20,7 +19,7 @@ const ACTIONS: Record<Exclude<WorkAction,'review'>,{label:string;detail:string}>
   relist:{label:'Relist grazing',detail:'Make this grazing listing available again. The completed arrangement and its reviews remain in History.'},
 }
 
-export function ManageActions({kind,id,actions,otherFirst,bidId,paymentSortedAt,paymentSortedByName}:{kind:'job'|'booking';id:string;actions:WorkAction[];otherFirst:string;bidId?:string|null;paymentSortedAt?:string|null;paymentSortedByName?:string}){
+export function ManageActions({kind,id,actions,otherFirst}:{kind:'job'|'booking';id:string;actions:WorkAction[];otherFirst:string}){
   const list=actions.filter((a):a is Exclude<WorkAction,'review'>=>a!=='review')
   if(!list.length)return null
   return <section className="card" id="manage"><h2>{kind==='job'?'Manage this job':'Manage this booking'}</h2><p className="muted">Choose an action to see what will happen before confirming.</p>
@@ -28,15 +27,12 @@ export function ManageActions({kind,id,actions,otherFirst,bidId,paymentSortedAt,
       <ActionForm action={manageArrangement} label={ACTIONS[intent].label}>
         <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/><input type="hidden" name="intent" value={intent}/>
         <p>{intent==='complete'&&kind==='job'
-          ? `Marking complete closes this job and invites ${otherFirst} to leave a review. Payment can be sorted before or after — cash, bank transfer or invoice, whatever you agreed.`
+          ? `Marking complete closes this job and invites ${otherFirst} to leave a review.`
           : intent==='complete'
           ? `Marking complete closes this booking and invites ${otherFirst} to leave a review. Sort payment with them as agreed — cash, bank transfer or invoice.`
           : (intent==='close_grazing'||intent==='relist_grazing')
           ? `Before completing, make sure grazing payment has been sorted or agreed. ${ACTIONS[intent].detail}`
           : ACTIONS[intent].detail}</p>
-        {intent==='complete'&&kind==='job'&&(paymentSortedAt
-          ? <p className="account-current">Payment all taken care of ✓ ({paymentSortedByName || otherFirst}, {nzDate(paymentSortedAt)})</p>
-          : bidId&&<><input type="hidden" name="bid_id" value={bidId}/><label className="activity-confirm"><input type="checkbox" name="payment_sorted"/> Payment&apos;s all taken care of <span className="muted">(optional — leave unticked if you&apos;re invoicing later)</span></label></>)}
         {['cancel','withdraw','request_cancel'].includes(intent) && <><label className="lform-field">Reason *<select name="reason" required defaultValue=""><option value="" disabled>Choose a reason</option>{['No longer needed','Found someone else','Budget has changed','Posted by mistake','Provider not responding','Other'].map(r=><option key={r}>{r}</option>)}</select></label><label className="lform-field">Additional details (optional)<textarea name="note" rows={3}/></label></>}
         {intent!=='complete'&&<label className="activity-confirm"><input type="checkbox" required/> {(intent==='close_grazing'||intent==='relist_grazing')?'The work is finished and payment has been sorted or agreed.':`I confirm I want to ${ACTIONS[intent].label.toLowerCase()}.`}</label>}
       </ActionForm>

@@ -8,7 +8,7 @@ import {nzCalendarDay,type JobSchedule} from '@shared/postingDates'
 import {arrivalDayChoices,arrivalDayNote} from '@shared/requestedDate'
 import {confirmJob,changeJobArrival,setJobPaymentMethod} from '../../work-actions'
 
-const METHOD_LABELS:Record<string,string>={bank_transfer:'Bank transfer',cash:'Cash on the day',invoice:"I'll send an invoice",agreed:'Already agreed'}
+const METHOD_LABELS:Record<string,string>={bank_transfer:'Bank transfer',cash:'Cash',invoice:"I'll send an invoice",agreed:'Arrange directly'}
 // The RPCs post the "Payment: $150 by …" line themselves; only bank details ride along.
 const bankMessage=(choice:string,acct:string,acctNo:string,reference:string)=>choice==='bank_transfer'
   ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
@@ -38,23 +38,23 @@ function RequestedDays({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;
 
 // Provider card for an accepted job: one step to confirm arrival + payment, then
 // a summary with "Change time" / "Change payment".
-export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availableFrom,arrivalStart,method,amount,pricingType}:{
- bidId:string;jobId:string;jobTitle:string;requesterFirst:string;schedule:JobSchedule;availableFrom:string|null;arrivalStart:string|null;method:string|null;amount:number|null;pricingType:string|null}){
+export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availableFrom,arrivalStart,amount,pricingType}:{
+ bidId:string;jobId:string;jobTitle:string;requesterFirst:string;schedule:JobSchedule;availableFrom:string|null;arrivalStart:string|null;amount:number|null;pricingType:string|null}){
  const router=useRouter()
- const confirmed=!!arrivalStart&&!!method
+ const confirmed=!!arrivalStart
 
  // ── Confirm form (not yet confirmed) ──
  const [state,submit,pending]=useActionState(confirmJob,{error:''})
  // Start on the requested day when there is one (today or later); otherwise the offer date.
  const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay:availableFrom}).preselect||availableFrom)))
- const [choice,setChoice]=useState('')
+ const [choice,setChoice]=useState('agreed')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  const [note,setNote]=useState('')
  useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
 
  if(confirmed){
   return <section className="card payment-card">
-   <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong> · {paymentLine(amount,pricingType,method)}</p>
+   <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong></p>
    <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom}/></details>
    <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>
@@ -62,13 +62,12 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
 
  const arrivalDate=new Date(arrival)
  const isPast=!Number.isNaN(arrivalDate.getTime())&&arrivalDate.getTime()<=Date.now()
- const bankIncomplete=choice==='bank_transfer'&&(!acct.trim()||!acctNo.trim())
- const message=bankMessage(choice,acct,acctNo,reference)
+ const message=acct.trim()&&acctNo.trim()?bankMessage(choice,acct,acctNo,reference):''
  const noteText=note.trim()
  // Mirrors the message confirm_job posts, including how the day relates to the one asked for.
  const dayNote=arrivalDayNote(schedule,Number.isNaN(arrivalDate.getTime())?null:nzCalendarDay(arrivalDate))
  const preview=`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}${dayNote.suffix}.`+(dayNote.line?`\n${dayNote.line}`:'')+`\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
- const blocked=isPast||!choice||bankIncomplete||Number.isNaN(arrivalDate.getTime())
+ const blocked=isPast||Number.isNaN(arrivalDate.getTime())
 
  return <form action={submit} className="card payment-card lform">
   <h3>Confirm the job</h3>
@@ -80,7 +79,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
    <RequestedDays schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
    <label className="lform-field">Expected arrival<input type="datetime-local" value={arrival} onChange={e=>setArrival(e.target.value)} required/></label>
    {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
-   <p className="payment-substep">How would you like to be paid?</p>
+   <p className="payment-substep">Payment method (optional)</p>
    <div className="payment-options">{Object.entries(METHOD_LABELS).map(([id,label])=>
     <button key={id} type="button" className={'lform-kind'+(choice===id?' active':'')} onClick={()=>setChoice(id)}>{label}</button>)}</div>
    {choice==='bank_transfer'&&<div className="payment-sub">
@@ -118,8 +117,7 @@ function ChangePayment({bidId,jobId,jobTitle,requesterFirst,amount,pricingType}:
  const [choice,setChoice]=useState('')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
- const message=bankMessage(choice,acct,acctNo,reference)
- const bankIncomplete=choice==='bank_transfer'&&(!acct.trim()||!acctNo.trim())
+ const message=acct.trim()&&acctNo.trim()?bankMessage(choice,acct,acctNo,reference):''
  return <form action={submit} className="lform">
   <input type="hidden" name="bid_id" value={bidId}/><input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="method" value={choice}/><input type="hidden" name="message" value={message}/>
   <div className="payment-options">{Object.entries(METHOD_LABELS).map(([id,label])=>
@@ -131,6 +129,6 @@ function ChangePayment({bidId,jobId,jobTitle,requesterFirst,amount,pricingType}:
   </div>}
   {choice&&<div className="account-current"><strong>Message to {requesterFirst}</strong><p className="work-description">{paymentLine(amount,pricingType,choice)}{message?`\n\n${message}`:''}</p></div>}
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
-  <button className="lform-save" disabled={!choice||bankIncomplete||pending}>{pending?'Sending…':'Update payment'}</button>
+  <button className="lform-save" disabled={!choice||pending}>{pending?'Sending…':'Update payment'}</button>
  </form>
 }

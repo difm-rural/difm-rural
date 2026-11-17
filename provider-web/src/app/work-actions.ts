@@ -124,7 +124,7 @@ export async function setJobPaymentMethod(_:ActionState,data:FormData):Promise<A
 // Provider: confirm the job — arrival time + how to get paid, in one step.
 export async function confirmJob(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase}=await requireProvider()
- const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),arrival=text(data,'arrival'),method=text(data,'method'),message=text(data,'message'),note=text(data,'note')
+ const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),arrival=text(data,'arrival'),method=text(data,'method')||'agreed',message=text(data,'message'),note=text(data,'note')
  if(!validId(bidId))return failed()
  if(!['bank_transfer','cash','invoice','agreed'].includes(method))return {error:'Choose how you would like to be paid.'}
  if(note.length>500)return {error:'Keep the note to 500 characters.'}
@@ -158,11 +158,15 @@ export async function markJobPaymentSorted(_:ActionState,data:FormData):Promise<
  const {supabase}=await requireProvider()
  const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),undo=data.get('undo')==='true'
  if(!validId(bidId))return failed()
- const {error}=await supabase.rpc('mark_job_payment_sorted',{p_bid:bidId,p_undo:undo})
- if(error)return {error:'Could not update. Refresh and try again.'}
+ try {
+  const {error}=await supabase.rpc('mark_job_payment_sorted',{p_bid:bidId,p_undo:undo})
+  if(error)throw error
+ } catch {
+  return {error:'Could not update the payment acknowledgement. Please try again.'}
+ }
  if(validId(jobId))revalidatePath('/jobs/'+jobId)
  revalidatePath('/activity');revalidatePath('/')
- return {error:'',success:undo?'Payment marked as not sorted yet.':'Payment all taken care of.'}
+ return {error:'',success:undo?'Payment acknowledgement removed.':'Payment marked as sorted.'}
 }
 export async function jobQuestion(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),questionId=text(data,'question_id'),content=text(data,questionId?'answer':'question')

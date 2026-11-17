@@ -23,21 +23,14 @@ vm.runInNewContext(code,{exports:module.exports,require(name){
 const render=props=>renderToStaticMarkup(React.createElement(module.exports.ManageActions,{id:'work-1',otherFirst:'Sam',...props}))
 const requiredTicks=html=>(html.match(/<input type="checkbox" required=""/g)||[]).length
 
-test('marking a job complete needs no required tick; the optional payment box is never pre-ticked',()=>{
- const html=render({kind:'job',actions:['complete'],bidId:'bid-1'})
- assert.equal(requiredTicks(html),0)
- assert.doesNotMatch(html,/The work is finished/)
- assert.match(html,/Marking complete closes this job and invites Sam to leave a review\. Payment can be sorted before or after/)
- assert.match(html,/<input type="checkbox" name="payment_sorted"\/> Payment(&#x27;|')s all taken care of/)
- assert.doesNotMatch(html,/name="payment_sorted" checked/)
- assert.match(html,/<button>Mark complete<\/button>/)
-})
-
-test('an already-sorted payment shows who sorted it, with no payment box',()=>{
- const html=render({kind:'job',actions:['complete'],bidId:'bid-1',paymentSortedAt:'2026-11-12T00:00:00Z',paymentSortedByName:'You'})
- assert.match(html,/Payment all taken care of ✓ \(You, 12 Nov 2026\)/)
- assert.doesNotMatch(html,/name="payment_sorted"/)
- assert.equal(requiredTicks(html),0)
+test('completion is offered without payment fields, regardless of acknowledgement',()=>{
+ for (const paymentSortedAt of [null, '2026-11-12T00:00:00Z']) {
+  const html=render({kind:'job',actions:['complete'],paymentSortedAt})
+  assert.equal(requiredTicks(html),0)
+  assert.match(html,/Marking complete closes this job and invites Sam to leave a review/)
+  assert.doesNotMatch(html,/payment|name="bid_id"/i)
+  assert.match(html,/<button>Mark complete<\/button>/)
+ }
 })
 
 test('marking a booking complete needs no required tick either',()=>{

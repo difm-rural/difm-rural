@@ -1,44 +1,69 @@
 'use client'
-import {useActionState,useEffect,useRef} from 'react'
-import {useRouter} from 'next/navigation'
-import {formatDate as nzDate} from '@shared/formatting'
-import {paymentLine} from '@shared/offers'
-import {markJobPaymentSorted} from '../../work-actions'
 
-// The one payment control both sides see once the job is confirmed: a single
-// "Payment all taken care of" button, then who marked it and when, with Undo.
-export function PaymentSorted({bidId,jobId,sortedAt,sortedByName,otherFirst}:{
- bidId:string;jobId:string;sortedAt:string|null;sortedByName:string;otherFirst:string}){
- const router=useRouter()
- const [state,submit,pending]=useActionState(markJobPaymentSorted,{error:''})
- const statusRef=useRef<HTMLParagraphElement>(null)
- useEffect(()=>{if(state.success){statusRef.current?.focus();router.refresh()}},[state.success,router])
+import { useActionState, useEffect, useId, useRef, type FormEvent } from 'react'
+import { paymentAcknowledgement as copy } from '@shared/paymentAcknowledgement'
+import { markJobPaymentSorted } from '../../work-actions'
 
- if(sortedAt)return <div className="payment-sorted">
-  <p className="home-clear" role="status" tabIndex={-1} ref={statusRef}>Payment all taken care of · {sortedByName}, {nzDate(sortedAt)}</p>
-  <form action={submit} onSubmit={e=>{if(!window.confirm(`Mark payment as not sorted? ${otherFirst} will be told.`))e.preventDefault()}}>
-   <input type="hidden" name="bid_id" value={bidId}/><input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="undo" value="true"/>
-   <button className="text-link" disabled={pending}>{pending?'Saving…':'Undo'}</button></form>
-  {state.error&&<p className="form-error" role="alert">{state.error}</p>}
- </div>
+export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canUpdate }: {
+  bidId: string
+  jobId: string
+  sortedAt: string | null
+  actor: 'requester' | 'provider' | null
+  methodLabel?: string
+  canUpdate: boolean
+}) {
+  const [state, submit, pending] = useActionState(markJobPaymentSorted, { error: '' })
+  const dialog = useRef<HTMLDialogElement>(null)
+  const feedback = useRef<HTMLParagraphElement>(null)
+  const submitting = useRef(false)
+  const titleId = useId()
+  const detailId = useId()
 
- return <div className="payment-sorted">
-  <form action={submit}><input type="hidden" name="bid_id" value={bidId}/><input type="hidden" name="job_id" value={jobId}/>
-   <button className="lform-save" disabled={pending}>{pending?'Saving…':'Payment all taken care of'}</button></form>
-  {state.error&&<p className="form-error" role="alert">{state.error}</p>}
- </div>
-}
+  useEffect(() => {
+    submitting.current = false
+    if (state.success || state.error) feedback.current?.focus()
+  }, [state])
 
-// Requester-side payment card: what was agreed and how to pay, then the shared
-// "Payment all taken care of" control.
-export function PaymentRequester({bidId,jobId,method,amount,pricingType,providerFirst,bankDetails,sortedAt,sortedByName}:{
- bidId:string;jobId:string;method:string;amount:number|null;pricingType:string|null;providerFirst:string;bankDetails:string|null;sortedAt:string|null;sortedByName:string}){
- return <section className="card payment-card">
-  {!sortedAt&&<>
-   <h3>{paymentLine(amount,pricingType,method)}</h3>
-   {method==='bank_transfer'&&bankDetails&&<div className="account-current"><p className="work-description">{bankDetails}</p></div>}
-   {method==='bank_transfer'&&<p className="muted">Only pay the account {providerFirst} sent in this conversation. Rural Connections never asks for payment.</p>}
-  </>}
-  <PaymentSorted bidId={bidId} jobId={jobId} sortedAt={sortedAt} sortedByName={sortedByName} otherFirst={providerFirst}/>
- </section>
+  function startSubmission(event: FormEvent<HTMLFormElement>, undo = false) {
+    if (submitting.current || pending || !canUpdate) {
+      event.preventDefault()
+      return
+    }
+    submitting.current = true
+    if (undo) dialog.current?.close()
+  }
+
+  return (
+    <section className="card payment-card">
+      <h2>Payment</h2>
+      {sortedAt && <p><strong>{copy.sorted}</strong></p>}
+      <p>{sortedAt ? copy.sortedDetail : copy.reminder}</p>
+      {sortedAt && actor && <p>Marked by the {actor}.</p>}
+      {methodLabel && <p>Agreed method: {methodLabel}</p>}
+      {canUpdate && (sortedAt ? (
+        <button type="button" className="lform-cancel payment-ack-button" disabled={pending} onClick={() => dialog.current?.showModal()}>
+          {pending ? 'Saving…' : copy.undo}
+        </button>
+      ) : (
+        <form action={submit} onSubmit={startSubmission}>
+          <input type="hidden" name="bid_id" value={bidId} />
+          <input type="hidden" name="job_id" value={jobId} />
+          <button type="submit" className="lform-save payment-ack-button" disabled={pending}>{pending ? 'Saving…' : copy.mark}</button>
+        </form>
+      ))}
+      <dialog ref={dialog} className="publishing-location-dialog" aria-labelledby={titleId} aria-describedby={detailId}>
+        <h2 id={titleId}>{copy.undoTitle}</h2>
+        <p id={detailId}>{copy.undoDetail}</p>
+        <form action={submit} onSubmit={event => startSubmission(event, true)} className="lform-actions">
+          <input type="hidden" name="bid_id" value={bidId} />
+          <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="undo" value="true" />
+          <button type="button" autoFocus className="lform-cancel payment-ack-button" onClick={() => dialog.current?.close()}>Cancel</button>
+          <button type="submit" className="lform-save payment-ack-button" disabled={pending}>{copy.undoConfirm}</button>
+        </form>
+      </dialog>
+      {state.success && <p className="home-clear" role="status" tabIndex={-1} ref={feedback}>{state.success}</p>}
+      {state.error && <p className="form-error" role="alert" tabIndex={-1} ref={feedback}>{state.error}</p>}
+    </section>
+  )
 }

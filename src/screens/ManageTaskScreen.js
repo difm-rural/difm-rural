@@ -24,6 +24,7 @@ import SideHeader from '../components/SideHeader'
 import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
 import JobPaymentHandoff from '../components/JobPaymentHandoff'
+import { paymentAcknowledgementAvailable } from '../../shared/paymentAcknowledgement'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
 import { fetchInvitesForJob, inviteStatusLabel } from '../lib/invites'
@@ -170,7 +171,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function fetchAcceptedBid() {
     const { data: bidData } = await supabase
       .from('bids')
-      .select('id, provider_id, amount, pricing_type, materials, payment_method, payment_details_sent_at, payment_sorted_at, payment_sorted_by, payment_message_id')
+      .select('id, provider_id, amount, pricing_type, materials, payment_method, payment_sorted_at, payment_sorted_by')
       .eq('job_id', job.id)
       .eq('status', 'accepted')
       .single()
@@ -189,10 +190,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         pricingType: bidData.pricing_type,
         materials: bidData.materials,
         paymentMethod: bidData.payment_method || null,
-        paymentDetailsSentAt: bidData.payment_details_sent_at || null,
         paymentSortedAt: bidData.payment_sorted_at || null,
         paymentSortedBy: bidData.payment_sorted_by || null,
-        paymentMessageId: bidData.payment_message_id || null,
       })
     }
     setLoadingBid(false)
@@ -332,16 +331,15 @@ export default function ManageTaskScreen({ navigation, route }) {
   const budgetText = job.price_type === 'fixed' ? `${nzMoney(job.price)}` : 'Open to offers'
   const isTaskOwner = !!currentUserId && job.requester_id === currentUserId
   const isAcceptedProvider = !!currentUserId && !!acceptedBid?.providerId && acceptedBid.providerId === currentUserId
-  // Confirmed once the provider has set BOTH the arrival time and how to be paid.
-  const jobConfirmed = !!workSchedule?.arrival_start_at && !!acceptedBid?.paymentMethod
+  const jobConfirmed = !!workSchedule?.arrival_start_at
   const isAwarded = isJobAwarded(job.status)
   const nextMove = jobNextMove(job, isAcceptedProvider ? 'provider' : 'requester', {
     otherName: isAcceptedProvider ? requesterProfile?.full_name : acceptedBid?.providerName,
     bidCount: Math.max(bidCount || 0, bids.length),
     unansweredQuestionCount: questionCount,
     hasPendingBid: !isTaskOwner && !isAcceptedProvider,
-    paymentMethod: acceptedBid?.paymentMethod,
-    paymentSortedAt: acceptedBid?.paymentSortedAt,
+    hasArrival: jobConfirmed,
+    arrivalAt: workSchedule?.arrival_start_at,
   })
 
   function ensureTaskOwner() {
@@ -571,7 +569,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             (isTaskOwner && !jobConfirmed) ? (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Waiting on {otherPartyFirstName}</Text>
-                <Text style={styles.waitBody}>{otherPartyFirstName} will confirm the arrival time and how to pay.</Text>
+                <Text style={styles.waitBody}>{otherPartyFirstName} will confirm the arrival time.</Text>
               </View>
             ) : (
               <WorkScheduleCard
@@ -589,21 +587,15 @@ export default function ManageTaskScreen({ navigation, route }) {
             )
           ) : null}
 
-          {isTaskOwner && jobConfirmed && job.status === 'accepted' && acceptedBid?.bidId ? (
+          {isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && acceptedBid?.bidId ? (
             <JobPaymentHandoff
-              viewerRole="requester"
-              jobId={job.id}
-              jobTitle={job.title}
               bidId={acceptedBid.bidId}
               method={acceptedBid.paymentMethod}
-              amount={acceptedBid.bidAmount}
-              pricingType={acceptedBid.pricingType}
               sortedAt={acceptedBid.paymentSortedAt}
               sortedBy={acceptedBid.paymentSortedBy}
-              paymentMessageId={acceptedBid.paymentMessageId}
-              otherFirstName={otherPartyFirstName}
-              counterpartId={acceptedBid.providerId}
-              currentUserId={currentUserId}
+              requesterId={job.requester_id}
+              providerId={acceptedBid.providerId}
+              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner)}
               onChanged={fetchAcceptedBid}
             />
           ) : null}
