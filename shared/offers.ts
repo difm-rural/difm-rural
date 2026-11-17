@@ -1,7 +1,12 @@
-import {formatMoney as nzMoney} from './formatting.js'
+import {formatMoney as nzMoney,formatWorkDate} from './formatting.js'
+import {parseNzDate} from './dates'
 // Shared vocabulary + formatting for provider offers (bids), so the offer form
 // and every place that displays an offer read the same. Mirrors the service
 // pricing model (see CreateServiceScreen / lib pricing).
+
+export function formatOfferAvailability(value: unknown): string {
+  return formatWorkDate(parseNzDate(value))
+}
 
 // Pricing basis the provider chooses for their offer.
 export const OFFER_PRICING_TYPES = [

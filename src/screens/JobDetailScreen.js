@@ -1,6 +1,7 @@
 import {jobMapTarget} from '../../shared/jobMapTarget'
+import {formatOfferAvailability} from '../../shared/offers'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
-import {formatNzDateOnly,toLocalIsoDate} from '../../shared/dates'
+import {toLocalIsoDate} from '../../shared/dates'
 import {offerDefaultDay, requestedLabel} from '../../shared/requestedDate'
 import { localDate } from '../lib/quickPickDates'
 import React, { useEffect, useRef, useState } from 'react'
@@ -110,6 +111,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const savingArrivalRef = useRef(false)
   const completingRef = useRef(false)
   const acceptingOfferRef = useRef(false)
+  const [acceptingBidId, setAcceptingBidId] = useState(null)
 
   // Requester-side: review the provider after provider-led completion.
   const [providerReview, setProviderReview] = useState(undefined)
@@ -492,6 +494,7 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   async function handleAcceptBid(bid) {
+    if (acceptingOfferRef.current) return
     Alert.alert('Accept Offer', `Accept offer of ${nzMoney(bid.amount)} from ${bid.profiles?.full_name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -499,6 +502,7 @@ export default function JobDetailScreen({ route, navigation }) {
         onPress: async () => {
           if (acceptingOfferRef.current) return
           acceptingOfferRef.current = true
+          setAcceptingBidId(bid.id)
           try {
             const { error } = await acceptBid(job, bid)
             if (error) {
@@ -507,13 +511,15 @@ export default function JobDetailScreen({ route, navigation }) {
               return
             }
             trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
-            Alert.alert('Offer accepted', 'The provider can now confirm the arrival time.', [
-              { text: 'OK', onPress: () => navigation.goBack() },
-            ])
+            setJob(current => ({ ...current, status: 'accepted' }))
+            setBids(current => current.map(offer => offer.id === bid.id ? { ...offer, status: 'accepted' } : offer))
+            Alert.alert('Offer accepted.', 'The provider can now confirm the arrival time.')
+            void fetchData().catch(() => {})
           } catch (error) {
             Alert.alert('Could not accept offer', error?.message || 'Please try again.')
           } finally {
             acceptingOfferRef.current = false
+            setAcceptingBidId(null)
           }
         },
       },
@@ -707,7 +713,7 @@ export default function JobDetailScreen({ route, navigation }) {
 
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
-              <Text style={styles.category}>{job.category}</Text>
+              <Text style={styles.category}>Category: {job.category}</Text>
               <View style={[styles.acceptedBadge, isCancelled && styles.cancelledBadge]}>
                 <Text style={[styles.acceptedBadgeText, isCancelled && styles.cancelledBadgeText]}>
                   {providerMove?.badge || jobStatusLabel(job.status)}
@@ -715,7 +721,7 @@ export default function JobDetailScreen({ route, navigation }) {
               </View>
             </View>
             <Text style={styles.title}>{job.title}</Text>
-            <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {jobLocation(job)}</Text>
+            <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> Location: {jobLocation(job)}</Text>
             {isCancelled ? (
               <View style={styles.cancelBox}>
                 <Text style={styles.cancelBoxTitle}>This job was cancelled by the requester</Text>
@@ -791,7 +797,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Location</Text>
-              <Text style={styles.detailValue}>{jobLocation(job)}</Text>
+              <Text style={styles.detailValue}>Location: {jobLocation(job)}</Text>
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Budget</Text>
@@ -1024,7 +1030,7 @@ export default function JobDetailScreen({ route, navigation }) {
         accessibilityRole="button" accessibilityLabel="Set availability date">
         <Text style={styles.availabilityBtnText}>
           <Icon name="calendar-outline" size={14} color={colors.textSecondary} /> {availableFrom
-            ? `Available from ${formatNzDateOnly(toLocalIsoDate(availableFrom))}`
+            ? `Available from ${formatOfferAvailability(toLocalIsoDate(availableFrom))}`
             : 'Set availability date (optional)'}
         </Text>
         {availableFrom && (
@@ -1090,7 +1096,7 @@ export default function JobDetailScreen({ route, navigation }) {
         {/* Job card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.category}>{job.category}</Text>
+            <Text style={styles.category}>Category: {job.category}</Text>
             <Text style={styles.price}>
               {jobBudget(job)}
             </Text>
@@ -1143,7 +1149,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> {discreetHouseSit ? (coarseSuburb(job.location_area || job.location_name) || job.location_area || 'Area shared privately') : jobLocation(job)}</Text>
+          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> Location: {discreetHouseSit ? (coarseSuburb(job.location_area || job.location_name) || job.location_area || 'Area shared privately') : jobLocation(job)}</Text>
           {(discreetHouseSit || (job.hide_exact_location && !job.location_name)) ? (
             <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
           ) : null}
@@ -1320,7 +1326,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   )}
                   {myBid?.message ? <Text style={styles.myBidMessage}>{myBid.message}</Text> : null}
                   {myBid?.available_from && (
-                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {formatNzDateOnly(myBid.available_from)}</Text>
+                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {formatOfferAvailability(myBid.available_from)}</Text>
                   )}
                   {myBid?.estimated_duration && (
                     <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
@@ -1425,7 +1431,7 @@ export default function JobDetailScreen({ route, navigation }) {
                 )}
                 {bid.message ? <Text style={styles.bidMessage}>{bid.message}</Text> : null}
                 {bid.available_from && (
-                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {formatNzDateOnly(bid.available_from)}</Text>
+                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {formatOfferAvailability(bid.available_from)}</Text>
                 )}
                 {bid.estimated_duration && (
                   <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>
@@ -1437,7 +1443,8 @@ export default function JobDetailScreen({ route, navigation }) {
                 {bid.status === 'pending' && job.status === 'open' && (
                   <Button
                     icon="checkmark"
-                    title="Accept This Offer"
+                    title={acceptingBidId === bid.id ? 'Saving…' : 'Accept This Offer'}
+                    disabled={!!acceptingBidId}
                     onPress={() => handleAcceptBid(bid)}
                     style={{ marginTop: 4 }}
                     accessibilityLabel={`Accept offer from ${bid.profiles?.full_name}`}

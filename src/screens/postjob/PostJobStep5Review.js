@@ -148,7 +148,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   useEffect(() => {
     if (shownCategory) return
     let active = true
-    inferJobCategory(title, description).then(found => { if (active) setSuggestion({ title, description, category: found }) })
+    inferJobCategory(title, description).then(found => { if (active) setSuggestion({ title, description, ...found }) })
     return () => { active = false }
   }, [title, description, shownCategory])
   // Guards against a double-tap posting the job twice. A ref (not state)
@@ -178,7 +178,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   const rows = [
     { label: 'Location',    value: locationSummary, popCount: 3 },
     { label: 'Category', value: shownCategory || 'Choosing from your title and details…',
-      onEdit: () => setCategoryPicker(true), editLabel: 'Change' },
+      onEdit: () => { if (!submittingRef.current) setCategoryPicker(true) }, editLabel: 'Change' },
     { label: 'Title',       value: title,           popCount: 4 },
     { label: 'When',        value: scheduleDisplay, popCount: 4 },
     { label: 'Budget',      value: budgetDisplay,   popCount: 1 },
@@ -196,6 +196,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   ].filter(Boolean)
 
   function handleBack() {
+    if (submittingRef.current) return
     navigation.goBack()
   }
 
@@ -207,15 +208,16 @@ export default function PostJobStep5Review({ navigation, route }) {
   }
 
   function handleEditRow(popCount) {
+    if (submittingRef.current) return
     navigation.pop(popCount)
   }
 
   async function handleSubmit() {
     // Claim the submit synchronously, before any await, so a second tap during
-    // the auth + category-inference pause can't start a second insert.
+    // the auth and location checks can't start a second insert.
     if (submittingRef.current || !shownCategory) return
     await runSubmission(submittingRef,submitJob,
-      ()=>setUploadStatus(isEditMode?'Saving…':'Posting…'),()=>setUploadStatus(''),
+      ()=>setUploadStatus(isEditMode?'Saving changes…':'Posting job…'),()=>setUploadStatus(''),
       ()=>Alert.alert('Could not save job','Your changes are kept. Check your connection and try again.'))
   }
 
@@ -230,7 +232,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     if(dateError){setUploadStatus('');Alert.alert('Check the job dates',dateError);return}
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!await confirmPublishingLocation({ latitude, longitude, area: locationArea || jobAddress, kind: 'job' }, user?.id, () => handleEditRow(3))) { setUploadStatus(''); return }
+    if (!await confirmPublishingLocation({ latitude, longitude, area: locationArea || jobAddress, kind: 'job' }, user?.id, () => navigation.pop(3))) { setUploadStatus(''); return }
 
     // Category is auto-detected from the title + details (keep any existing one
     // on edit). Falls back to 'General Rural Help' if the AI call is unavailable.
@@ -439,6 +441,8 @@ export default function PostJobStep5Review({ navigation, route }) {
                   numberOfLines={row.label === 'Description' ? 4 : 2}>
                   {row.value}
                 </Text>
+                {row.label === 'Category' && !category?.trim() && !houseSit && suggestedCategory && suggestion?.suggested
+                  ? <Text style={styles.categoryHelp}>Suggested from your description. Change if needed.</Text> : null}
               </View>
               {row.onEdit !== null && (
                 <TouchableOpacity
@@ -514,6 +518,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       </Modal>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        {!!uploadStatus && <Text style={styles.postingStatus} accessibilityLiveRegion="polite">{uploadStatus}</Text>}
         <View style={styles.footerBtns}>
           <TouchableOpacity
             style={styles.backBtn}
@@ -666,6 +671,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingHorizontal: 16,
   },
+  postingStatus:    { color: colors.textPrimary, marginBottom: 8, fontWeight: '600' },
   footerBtns:        { flexDirection: 'row', gap: 10 },
   // Neutral so it doesn't compete with the primary green "Post job".
   backBtn:           { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minHeight: 52 },

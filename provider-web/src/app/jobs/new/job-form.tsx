@@ -16,7 +16,7 @@ import {moneyInputError,MAX_POSTING_AMOUNT} from '@shared/postingMoney'
 import {editorScheduleType,jobScheduleError,nzCalendarDay,nzToday} from '@shared/postingDates'
 import {usePublishingLocationWarning} from '@/components/publishing-location-warning'
 import type {FormEvent} from 'react'
-import { useState, useRef, useEffect, useActionState, useCallback } from 'react'
+import { startTransition, useState, useRef, useEffect, useActionState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from '@/components/navigation-link'
 import { SCHEDULES, MATERIALS, ACCESS, type JobSeed } from '@/lib/job-input'
@@ -30,24 +30,30 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
  const initial:Draft={also_public:false,category:seed?.category || '',title:seed?.title || '',description:seed?.description || '',price_type:seed?.price_type || 'open',price:seed?.price==null?'':String(seed.price),location:seed?.location_name || '',area:seed?.location_area || '',location_note:seed?.location_note || '',hide_exact_location:seed?.hide_exact_location ?? true,latitude:seed?.latitude==null?'':String(seed.latitude),longitude:seed?.longitude==null?'':String(seed.longitude),schedule_type:editorScheduleType(seed||{}),scheduled_date:nzCalendarDay(seed?.scheduled_date) || '',date_from:seed?.date_from || '',date_to:seed?.date_to || '',materials_type:seed?.materials_type || 'none',access_conditions:seed?.access_conditions || [],photos:seed?.photos || []}
  const [baseline]=useState(initial)
  const [draft,setDraft]=useState(initial),[step,setStep]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[jobId,setJobId]=useState(mode==='edit'?seed!.id:''),[saved,setSaved]=useState<{draft:Draft;id:string}|null>(null),[ready,setReady]=useState(false)
- const [suggestion,setSuggestion]=useState<{title:string;description:string;category:string}|null>(null)
+ const [suggestion,setSuggestion]=useState<{title:string;description:string;category:string;fromDescription:boolean}|null>(null)
  const {title,description,category}=draft
  const suggestedCategory=suggestion?.title===title&&suggestion.description===description?suggestion.category:''
  const selectedCategory=category||suggestedCategory
  useEffect(()=>{
   if(step!==4||category||suggestedCategory)return
   let active=true
-  const apply=(category:string)=>{if(active)setSuggestion({title,description,category})}
+  const apply=(category:string,fromDescription=false)=>{if(active)setSuggestion({title,description,category,fromDescription})}
   const controller=new AbortController()
   const fallback='General Rural Help'
   if(/house.?sit/i.test(title))apply('Property & House Sitting')
   else void createClient().functions.invoke('categorize-job',{body:{title,description},signal:controller.signal,timeout:8000})
-    .then(({data,error})=>apply(!error&&CATEGORIES.includes(data?.category)?data.category:fallback),()=>apply(fallback))
+    .then(({data,error})=>{
+      if(!error&&CATEGORIES.includes(data?.category))apply(data.category,true)
+      else apply(fallback)
+    },()=>apply(fallback))
   return ()=>{active=false;controller.abort()}
  },[step,category,suggestedCategory,title,description])
- const [state,action,pending]=useActionState(mode==='edit'?editJob:postJob,{error:''})
+ const [state,action,pending]=useActionState(async (previous:{error:string;jobId?:string},data:FormData)=>{
+  try{return await (mode==='edit'?editJob:postJob)(previous,data)}
+  catch{return {error:'Could not confirm that the job was saved. Your changes are kept. Please try again.'}}
+ },{error:''})
  const heading=useRef<HTMLHeadingElement>(null),router=useRouter(),key='rural-job:'+userId+':'+mode+':'+(seed?.id || 'new')+':'+(inviteProvider?.id || 'public')
- const locationWarning=usePublishingLocationWarning(userId),checkingLocation=useRef(false),locationApproved=useRef(false)
+ const locationWarning=usePublishingLocationWarning(userId),submissionLock=useRef(false)
  const steps=['The job','Location','Details & photos','Budget','Review']
  useEffect(()=>{
   let active=true
@@ -70,7 +76,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
    else sessionStorage.removeItem(key)
   }catch{}
  },[draft,jobId,key,ready,saved,baseline,state.jobId])
- useEffect(()=>{if(state.error){checkingLocation.current=false;Promise.resolve().then(()=>setSubmitting(false))}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'?edited=1':'?posted=1'));router.refresh()}},[state,key,router,mode])
+ useEffect(()=>{if(state.error){submissionLock.current=false;setSubmitting(false)}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'?edited=1':'?posted=1'))}},[state,key,router,mode])
  useEffect(()=>{heading.current?.focus();heading.current?.scrollIntoView({block:'start'})},[step])
  const set=<K extends keyof Draft>(name:K,value:Draft[K])=>setDraft(d=>({...d,[name]:value}))
  function stepIssues(index:number):Record<string,string>{
@@ -125,23 +131,23 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   setDraft(current => ({...current,latitude:String(lat),longitude:String(lng)}))
  }, [])
  const scheduleLabel=draft.schedule_type==='specific'?nzDate(draft.scheduled_date):draft.schedule_type==='range'?nzDate(draft.date_from)+' – '+nzDate(draft.date_to):SCHEDULES[draft.schedule_type as keyof typeof SCHEDULES]
+ const postingStatus=state.jobId?'Saved. Opening your job…':mode==='edit'?'Saving changes…':'Posting job…'
  async function reviewSubmit(e:FormEvent<HTMLFormElement>){
-  if(step<4){e.preventDefault();next();return}
-  if(locationApproved.current){locationApproved.current=false;return}
   e.preventDefault()
+  if(step<4){next();return}
   const submitter = (e.nativeEvent as SubmitEvent).submitter
   if (submitter?.id !== 'job-review-submit') return
-  if(checkingLocation.current||pending||busy||submitting||!selectedCategory)return
+  if(submissionLock.current||pending||busy||submitting||!ready||saved||!selectedCategory)return
   for(let i=0;i<4;i++){const issue=validStep(i);if(issue){setAttempted(true);setError(issue);setStep(i);return}}
-  const form=e.currentTarget
-  await runSubmission(checkingLocation,async()=>{
+  const data=new FormData(e.currentTarget)
+  await runSubmission(submissionLock,async()=>{
    if(!await locationWarning.check({latitude:draft.latitude,longitude:draft.longitude,area:draft.area,kind:'job'})){setStep(1);return false}
-   locationApproved.current=true;form.requestSubmit();return true
+   startTransition(()=>action(data))
+   return true
   },()=>{setSubmitting(true);setError('')},()=>setSubmitting(false),()=>setError('Could not save the job. Your changes are kept. Check your connection and try again.'))
  }
- return <form noValidate action={action} className="lform" aria-busy={submitting||pending} onSubmit={reviewSubmit}>
+ return <form noValidate className="lform" onSubmit={reviewSubmit}>
   {locationWarning.prompt}
-  {(submitting||pending)&&<p className="muted" role="status">{state.jobId?'Saved. Opening your job…':mode==='edit'?'Saving changes…':'Posting job…'}</p>}
   {saved&&<div className="card"><h2>Resume your draft?</h2><p>A draft is saved in this browser tab. It has not been published.</p><div className="lform-actions"><button type="button" className="lform-save" onClick={()=>{setDraft({...initial,...saved.draft});setJobId(mode==='edit'?seed!.id:saved.id);setSaved(null)}}>Resume draft</button><button type="button" className="lform-cancel" onClick={()=>{setSaved(null);try{sessionStorage.removeItem(key)}catch{}}}>Discard saved draft</button></div></div>}
   {inviteProvider&&<section className="card work-detail"><h2>Invite {inviteProvider.name}</h2><p>This job will be visible only to you and this provider unless you choose the public board.</p><label className="account-setting"><input type="checkbox" disabled={pending||busy||submitting} checked={draft.also_public} onChange={e=>set('also_public',e.target.checked)}/>Also put this job on the public Jobs board</label></section>}
   {mode==='repeat'&&<p className="account-current">This is a new copy. Choose fresh dates before posting. The original job, offers, messages and reviews stay unchanged.</p>}
@@ -150,7 +156,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   <p className="eyebrow">Step {step+1} of 5</p><h2 tabIndex={-1} ref={heading}>{steps[step]}</h2>
   <input type="hidden" name="job_id" value={jobId}/>{inviteProvider&&<input type="hidden" name="invite_provider_id" value={inviteProvider.id}/>}{mode==='repeat'&&<input type="hidden" name="repeated_from_job_id" value={seed?.id}/>}
   {Object.entries(draft).map(([name,value])=>(name==='category'||name==='schedule_type'&&step===0)?null:Array.isArray(value)?value.map((v,i)=><input type="hidden" name={name} value={v} key={name+i}/>):typeof value==='boolean'?<input type="hidden" key={name} name={name} value={value?'on':'off'}/>:<input type="hidden" key={name} name={name} value={value}/>)}
-  <fieldset disabled={pending||busy||submitting||!ready||!!saved} className="work-fieldset">
+  <fieldset disabled={pending||busy||submitting||!ready||!!saved} aria-busy={submitting||pending} className="work-fieldset">
   {step===0&&<div className="lform-step"><label className="lform-field">Job title *<input maxLength={POSTING_TITLE_MAX} {...field('title')} value={draft.title} onChange={e=>set('title',e.target.value)} placeholder="e.g. Repair the back paddock fence"/>{issue('title')}<small className="muted">{draft.title.length} / {POSTING_TITLE_MAX} characters</small></label>
    <label className="lform-field">When do you need it done?<select name="schedule_type" autoComplete="off" {...field('schedule_type')} value={draft.schedule_type} onChange={e=>set('schedule_type',e.target.value)}>{!Object.hasOwn(SCHEDULES,draft.schedule_type)&&<option value={draft.schedule_type}>Saved timing needs review</option>}{Object.entries(SCHEDULES).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select>{issue('schedule_type')}</label>
    {draft.schedule_type==='specific'&&<label className="lform-field">Preferred date *<DateInput type="date" min={mode==='edit'&&draft.scheduled_date===seed?.scheduled_date?undefined:nzToday()} {...field('scheduled_date')} value={draft.scheduled_date} onChange={e=>set('scheduled_date',e.target.value)}/>{issue('scheduled_date')}</label>}
@@ -175,9 +181,10 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
     {!selectedCategory&&<option value="" disabled>Choosing a category…</option>}
     {selectedCategory&&!CATEGORIES.includes(selectedCategory)&&<option value={selectedCategory}>{selectedCategory}</option>}
     {CATEGORIES.map(value=><option key={value} value={value}>{value}</option>)}
-   </select></label><p>{draft.area || 'No public area added'}</p><p className="work-description">{draft.description}</p><p>{draft.price_type==='open'?'Open to offers':"Budget: "+nzMoney(draft.price)+''}</p><p>{scheduleLabel}</p><p>{MATERIALS[draft.materials_type as keyof typeof MATERIALS]}</p>{draft.access_conditions.length>0&&<p>Site access: {draft.access_conditions.map(a=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}<p>{draft.hide_exact_location?'Private location (shared with accepted provider)':'Public exact location'}: {draft.location || 'To be arranged'}{draft.latitude?' · GPS included':''}</p>{draft.location_note&&<p className="work-description">Location note: {draft.location_note}</p>}<div className="lform-photos">{draft.photos.map((url,i)=><div className="lform-photo" key={url}><img src={url} alt={'Job photo '+(i+1)}/></div>)}</div><p>{mode==='edit'?'Your changes update the existing job.':inviteProvider?'This invites '+inviteProvider.name+(draft.also_public?' and publishes the job on the public board.':' to a private job. Only you and this provider can view it.'):'Your job will be published to the Jobs board. Review offers before choosing who does the work.'}</p>{mode==='edit'&&<p className="muted">Existing visibility and recurrence settings are preserved. Moving the job location clears its previous mapped area.</p>}</article>}
+   </select></label>{!category&&suggestion?.fromDescription&&suggestedCategory&&<p className="muted">Suggested from your description. Change if needed.</p>}<p>{draft.area || 'No public area added'}</p><p className="work-description">{draft.description}</p><p>{draft.price_type==='open'?'Open to offers':"Budget: "+nzMoney(draft.price)+''}</p><p>{scheduleLabel}</p><p>{MATERIALS[draft.materials_type as keyof typeof MATERIALS]}</p>{draft.access_conditions.length>0&&<p>Site access: {draft.access_conditions.map(a=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}<p>{draft.hide_exact_location?'Private location (shared with accepted provider)':'Public exact location'}: {draft.location || 'To be arranged'}{draft.latitude?' · GPS included':''}</p>{draft.location_note&&<p className="work-description">Location note: {draft.location_note}</p>}<div className="lform-photos">{draft.photos.map((url,i)=><div className="lform-photo" key={url}><img src={url} alt={'Job photo '+(i+1)}/></div>)}</div><p>{mode==='edit'?'Your changes update the existing job.':inviteProvider?'This invites '+inviteProvider.name+(draft.also_public?' and publishes the job on the public board.':' to a private job. Only you and this provider can view it.'):'Your job will be published to the Jobs board. Review offers before choosing who does the work.'}</p>{mode==='edit'&&<p className="muted">Existing visibility and recurrence settings are preserved. Moving the job location clears its previous mapped area.</p>}</article>}
   </fieldset>
   {(error||(!submitting&&state.error))&&<p role="alert" className="form-error">{error||state.error}</p>}{busy&&<p role="status">Working… Please wait.</p>}
+  <p className="muted" role="status">{submitting||pending?postingStatus:null}</p>
   <div className="lform-actions lform-wizard-actions"><Link href={seed?'/jobs/'+seed.id:'/jobs'} className="lform-cancel" aria-disabled={submitting||pending} onClick={e=>{if(submitting||pending)e.preventDefault()}}>{mode==='edit'?'Cancel editing':'Cancel'}</Link>{step>0&&<button type="button" className="lform-cancel" disabled={pending||busy||submitting||!!saved} onClick={()=>{setError('');setStep(s=>s-1)}}>Back</button>}{step<4?<button type="button" className="lform-save" disabled={pending||busy||submitting||!ready||!!saved} key="next" onClick={next}>Next</button>:<button key="review-submit" id="job-review-submit" type="submit" className="lform-save" disabled={pending||busy||submitting||!ready||!!saved||!selectedCategory}>{(pending||submitting)&&<LoaderCircle size={16} className="spin" aria-hidden="true"/>}{pending||submitting?(mode==='edit'?'Saving changes…':'Posting job…'):mode==='edit'?'Save changes':inviteProvider?'Post job & send invitation':mode==='repeat'?'Post repeated job':'Post job'}</button>}</div><p className="muted">Drafts are stored in this tab when browser storage is available. Closing the tab may remove them.</p>
  </form>
 }

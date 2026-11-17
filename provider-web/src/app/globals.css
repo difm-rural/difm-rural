@@ -421,7 +421,7 @@ a.row:hover { background: var(--sage); }
 /* Star rating picker — no-JS radio group, amber (#FFD700) to match mobile StarRating */
 .star-input { border: 0; margin: 0; padding: 0; min-width: 0; }
 .star-input-row { display: flex; flex-wrap: wrap; gap: 2px; }
-.star-input input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.star-input input { position: absolute; width: 1px; height: 1px; margin: 0; clip-path: inset(50%); }
 .star-input label {
   position: relative; cursor: pointer; min-width: 44px; min-height: 44px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -430,9 +430,11 @@ a.row:hover { background: var(--sage); }
 .star-input label:has(input:checked),
 .star-input label:has(~ label input:checked) { color: #986000; }
 .star-input input:checked + span { color: #986000; }
+.star-input label > span { display: grid; place-items: center; width: 100%; min-height: 44px; border-radius: inherit; }
 .star-input label:has(input:checked) { background: var(--sage); box-shadow: inset 0 0 0 1px currentColor; }
 .star-input label:hover { background: var(--sage); }
-.star-input label:has(input:focus-visible) { outline: 2px solid var(--forest); outline-offset: -2px; }
+.star-input input:focus-visible + span { outline: 3px solid var(--forest-deep); outline-offset: -3px; }
+.star-input-value { margin: 4px 0 0; }
 /* Post-job "Job posted" confirmation + ease rating (above a freshly posted job). */
 .post-feedback { display: grid; gap: 14px; }
 .post-feedback-head { display: flex; align-items: flex-start; gap: 12px; }

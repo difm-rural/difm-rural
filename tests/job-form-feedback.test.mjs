@@ -10,13 +10,16 @@ import * as jobDraft from '../shared/jobDraft.ts'
 import * as dates from '../shared/postingDates.ts'
 import * as money from '../shared/postingMoney.ts'
 import * as categories from '../shared/categories.ts'
+import {runSubmission} from '../shared/submission.ts'
 const require=createRequire(import.meta.url),ts=require('typescript')
 const source=await readFile(new URL('../provider-web/src/app/jobs/new/job-form.tsx',import.meta.url),'utf8')
 const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
-function harness(storage,seed){
- const state=[],refs=[],effects=[],dependencies=[];let index=0,refIndex=0,effectIndex=0,tree
+function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}})}={}){
+ const state=[],refs=[],effects=[],dependencies=[],cleanups=[],submissions=[],destinations=[]
+ let index=0,refIndex=0,effectIndex=0,tree,actionState={error:''}
+ const router={push:path=>destinations.push(path)}
  const jsx=(type,props)=>({type,props})
- const react={useCallback:fn=>fn,useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>state[i]=typeof value==='function'?value(state[i]):value]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(fn,deps){if(!storage)return;const i=effectIndex++;if(!dependencies[i]||deps.some((value,n)=>value!==dependencies[i][n])){dependencies[i]=deps;effects.push(fn)}},useActionState:()=>[{error:''},()=>{},false]}
+ const react={startTransition:fn=>fn(),useCallback:fn=>fn,useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>state[i]=typeof value==='function'?value(state[i]):value]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(fn,deps){if(!storage)return;const i=effectIndex++;if(!dependencies[i]||deps.some((value,n)=>value!==dependencies[i][n])){dependencies[i]=deps;effects.push(()=>{cleanups[i]?.();cleanups[i]=fn()})}},useActionState:()=>[actionState,data=>submissions.push(data),false]}
  const module={exports:{}}
  vm.runInNewContext(code,{exports:module.exports,require(name){
   if(name==='@shared/publicArea')return publicArea
@@ -31,25 +34,34 @@ function harness(storage,seed){
   if(name==='@shared/postingDates')return dates
   if(name==='@shared/postingMoney')return money
   if(name==='@shared/categories')return categories
-  if(name==='@shared/submission')return {}
+  if(name==='@shared/submission')return {runSubmission}
   if(name==='@/components/field-feedback')return {FieldFeedback:()=>null,invalidField:(name,message)=>({id:name,'aria-invalid':message?true:undefined,'aria-describedby':message?name+'-error':undefined})}
-  if(name==='@/components/publishing-location-warning')return {usePublishingLocationWarning:()=>({prompt:null})}
-  if(name==='next/navigation')return {useRouter:()=>({})}
+  if(name==='@/components/publishing-location-warning')return {usePublishingLocationWarning:()=>({prompt:null,check})}
+  if(name==='next/navigation')return {useRouter:()=>router}
   if(name==='@/components/navigation-link')return {default:'a'}
   if(name==='@/lib/job-input')return {SCHEDULES:{flexible:'Flexible',specific:'Specific date',range:'Date range'},MATERIALS:{none:'None'},ACCESS:{}}
-  if(name==='@/lib/supabase/client'||name==='../../work-actions')return {}
+  if(name==='@/lib/supabase/client')return {createClient:()=>({functions:{invoke:suggest}})}
+  if(name==='../../work-actions')return {}
   if(name==='@/lib/photo-thumbs')return {uploadThumbnail:async()=>true,removeThumbnails:async()=>{}}
   if(name==='@shared/photos')return {removedThumbPaths:()=>[],thumbUrl:url=>url,fallbackImageSrc:()=>null}
   if(name==='@/lib/resize-photo')return {PHOTO_MAX:1600,AVATAR_MAX:512,resizePhoto:async file=>file}
   if(name==='lucide-react')return {LoaderCircle:()=>null}
   throw Error(name)
- },Date,console,sessionStorage:storage,crypto:{randomUUID:()=> 'test-job-id'},document:{querySelector:()=>null}})
+ },Date,console,AbortController,FormData:class {constructor(fields){Object.assign(this,fields)}},sessionStorage:storage,crypto:{randomUUID:()=> 'test-job-id'},document:{querySelector:()=>null}})
  const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new'});effects.splice(0).forEach(fn=>fn())}
  const nodes=(node=tree)=>!node||typeof node!=='object'?[]:[node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
  const click=label=>{nodes().find(n=>n.type==='button'&&text(n)===label).props.onClick();render()}
  const change=(id,value)=>{nodes().find(n=>n.props?.id===id).props.onChange({target:{value}});render()}
- render();return {nodes,click,change,async flush(){await Promise.resolve();render()},hasResume:()=>nodes().some(n=>n.type==='h2'&&text(n)==='Resume your draft?')}
+ function submit(){
+  const fields=Object.fromEntries(nodes().filter(n=>n.type==='input'&&n.props.type==='hidden').map(n=>[n.props.name,n.props.value]))
+  const result=tree.props.onSubmit({preventDefault(){},nativeEvent:{submitter:{id:'job-review-submit'}},currentTarget:fields})
+  render()
+  return result
+ }
+ render();return {nodes,click,change,submit,text,submissions,destinations,render,
+  result(value){actionState=value;render();render()},
+  async flush(){await Promise.resolve();render()},hasResume:()=>nodes().some(n=>n.type==='h2'&&text(n)==='Resume your draft?')}
 }
 test('job validation names and highlights every missing field, and clears corrected fields',()=>{
  const h=harness();h.click('Next')
@@ -145,4 +157,70 @@ test('older missing-type date records select Specific; explicit Flexible stays F
  assert.equal(inferred.nodes().find(n=>n.props?.id==='job-schedule_type').props.value,'specific')
  const flexible=harness(undefined,{...datedJob,schedule_type:'flexible'})
  assert.equal(flexible.nodes().find(n=>n.props?.id==='job-schedule_type').props.value,'flexible')
+})
+
+function reachReview(h){
+ h.change('job-title','Repair a drain');h.click('Next')
+ h.change('job-area','Waitoki');h.click('Next')
+ h.change('job-description','Clear the blocked drain.');h.click('Next')
+ h.click('Next')
+}
+
+test('Post job immediately goes busy, ignores duplicate submits and keeps the draft for retry',async()=>{
+ let allow
+ const location=new Promise(resolve=>{allow=resolve})
+ const h=harness(storageWith(),undefined,{check:()=>location})
+ await h.flush()
+ reachReview(h)
+ await h.flush()
+ const button=()=>h.nodes().find(node=>node.props.id==='job-review-submit')
+ const started=h.submit()
+ assert.equal(button().props.disabled,true)
+ assert.match(h.text(button()),/Posting job…/)
+ assert.ok(h.nodes().some(node=>node.props.role==='status'&&h.text(node)==='Posting job…'))
+ await h.submit()
+ assert.equal(h.submissions.length,0)
+ allow(true)
+ await started
+ await h.submit()
+ assert.equal(h.submissions.length,1)
+ assert.equal(h.submissions[0].job_id,'test-job-id')
+ assert.equal(h.submissions[0].title,'Repair a drain')
+ assert.equal(h.destinations.length,0)
+ h.result({error:'The server could not save the job.'})
+ assert.equal(button().props.disabled,false)
+ assert.ok(h.nodes().some(node=>node.props.role==='alert'&&h.text(node)==='The server could not save the job.'))
+ await h.submit()
+ assert.equal(h.submissions.length,2)
+ assert.deepEqual({...h.submissions[1]},{...h.submissions[0]})
+ h.result({error:'',jobId:'test-job-id'})
+ assert.equal(button().props.disabled,true)
+ assert.ok(h.nodes().some(node=>node.props.role==='status'&&h.text(node)==='Saved. Opening your job…'))
+ assert.deepEqual(h.destinations,['/jobs/test-job-id?posted=1'])
+})
+
+test('Review labels the automatic category, persists the override and does not suggest again',async()=>{
+ let calls=0
+ const storage=storageWith()
+ const h=harness(storage,undefined,{suggest:async()=>{calls++;return {data:{category:'Water & Drainage'}}}})
+ await h.flush()
+ reachReview(h)
+ await h.flush()
+ const helper='Suggested from your description. Change if needed.'
+ const category=()=>h.nodes().find(node=>node.type==='select')
+ assert.equal(category().props.value,'Water & Drainage')
+ assert.ok(h.nodes().some(node=>node.props.children===helper))
+ category().props.onChange({target:{value:'Fencing & Gates'}})
+ h.render()
+ assert.equal(category().props.value,'Fencing & Gates')
+ assert.ok(!h.nodes().some(node=>node.props.children===helper))
+ h.click('3. Details & photos')
+ h.change('job-description','Clear the drain near the fence.')
+ h.click('5. Review')
+ await h.flush()
+ assert.equal(calls,1)
+ assert.equal(category().props.value,'Fencing & Gates')
+ assert.equal(JSON.parse(storage.getItem(draftKey)).draft.category,'Fencing & Gates')
+ await h.submit()
+ assert.equal(h.submissions[0].category,'Fencing & Gates')
 })

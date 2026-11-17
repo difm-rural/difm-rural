@@ -1,4 +1,4 @@
-import { formatNzDateOnly } from '../../shared/dates'
+import { formatOfferAvailability } from '../../shared/offers'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -103,6 +103,8 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [providerReview, setProviderReview] = useState(undefined)
   const [receivedReview, setReceivedReview] = useState(undefined)
   const reviewInFlight = useRef(false)
+  const acceptingOfferRef = useRef(false)
+  const [acceptingBidId, setAcceptingBidId] = useState(null)
   const arrivalInFlight = useRef(false)
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
@@ -242,6 +244,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   async function acceptBid(bid) {
+    if (acceptingOfferRef.current) return
     const provName = bid.provider?.full_name || 'this provider'
     Alert.alert(
       'Accept offer?',
@@ -251,15 +254,24 @@ export default function ManageTaskScreen({ navigation, route }) {
         {
           text: 'Accept',
           onPress: async () => {
-            const { error } = await apiAcceptBid(job, bid)
-            if (error) {
-              Alert.alert('Could not accept offer', error.message)
-              if (error.code === 'stale') { resyncJob(); fetchBids() }
-              return
+            if (acceptingOfferRef.current) return
+            acceptingOfferRef.current = true
+            setAcceptingBidId(bid.id)
+            try {
+              const { error } = await apiAcceptBid(job, bid)
+              if (error) {
+                Alert.alert('Could not accept offer', error.message)
+                if (error.code === 'stale') { resyncJob(); fetchBids() }
+                return
+              }
+              setJob(prev => ({ ...prev, status: 'accepted' }))
+              Alert.alert('Offer accepted.', `${provName} has been notified.`)
+            } catch {
+              Alert.alert('Could not accept offer', 'Refresh to check whether the offer was accepted before trying again.')
+            } finally {
+              acceptingOfferRef.current = false
+              setAcceptingBidId(null)
             }
-            Alert.alert('Offer accepted!', `${provName} has been notified.`, [
-              { text: 'OK', onPress: () => setJob(prev => ({ ...prev, status: 'accepted' })) },
-            ])
           },
         },
       ]
@@ -947,7 +959,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                     {!!bid.available_from && (
                       <View style={styles.bidMetaRow}>
                         <Icon name="calendar-outline" size={13} color={colors.textMuted} />
-                        <Text style={styles.bidMeta}>Available from: {formatNzDateOnly(bid.available_from)}</Text>
+                        <Text style={styles.bidMeta}>Available from: {formatOfferAvailability(bid.available_from)}</Text>
                       </View>
                     )}
                     {!!bid.estimated_duration && (
@@ -965,9 +977,11 @@ export default function ManageTaskScreen({ navigation, route }) {
                     <TouchableOpacity
                       style={styles.acceptBidBtn}
                       onPress={() => acceptBid(bid)}
+                      disabled={!!acceptingBidId}
+                      accessibilityState={{ disabled: !!acceptingBidId, busy: acceptingBidId === bid.id }}
                       accessibilityRole="button"
                       accessibilityLabel={`Accept offer from ${provName}`}>
-                      <Text style={styles.acceptBidBtnText}>Accept offer</Text>
+                      <Text style={styles.acceptBidBtnText}>{acceptingBidId === bid.id ? 'Saving…' : 'Accept offer'}</Text>
                     </TouchableOpacity>
                   </View>
                 )

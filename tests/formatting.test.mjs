@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {formatMoney,formatDate,formatDateTime,formatDateLabel} from '../shared/formatting.js'
 import {formatRate,addOnDisplay} from '../shared/listingPricing.ts'
-import {formatOfferAmount} from '../shared/offers.ts'
+import {formatOfferAmount,formatOfferAvailability} from '../shared/offers.ts'
 test('NZ money groups thousands, preserves cents and omits the NZD suffix',()=>{
  assert.equal(formatMoney(100000000),'$100,000,000')
  assert.equal(formatMoney('1250.5'),'$1,250.50')
@@ -26,4 +26,11 @@ test('free rates are explicit without hiding minimum charges or quote-required p
  assert.equal(formatRate('fixed',0),'Free')
  assert.equal(formatRate('hourly',0,null,150),'Minimum $150')
  assert.equal(formatRate('quote_required',0),'Quote required')
+})
+
+test('offer availability shows the NZ weekday without shifting the stored calendar date',()=>{
+ assert.equal(formatOfferAvailability('2026-11-20'),'Fri 20 Nov 2026')
+ assert.equal(formatOfferAvailability('20/11/2026'),'Fri 20 Nov 2026')
+ assert.equal(formatOfferAvailability('2026-11-19T11:00:00Z'),'—')
+ assert.equal(formatOfferAvailability('2026-02-30'),'—')
 })

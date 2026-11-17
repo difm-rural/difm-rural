@@ -79,6 +79,9 @@ export default function ReviewModal({
               )
             })}
           </View>
+          <Text style={styles.ratingValue} accessibilityLiveRegion="polite">
+            {rating ? `${rating} of 5 stars` : 'No rating selected'}
+          </Text>
 
           <TextInput
             style={styles.commentInput}
@@ -140,8 +143,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 18,
+    marginBottom: 4,
   },
+  ratingValue: { color: colors.textSecondary, textAlign: 'center', marginBottom: 14 },
   starButton: {
     flex: 1,
     maxWidth: 52,

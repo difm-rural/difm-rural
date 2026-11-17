@@ -64,7 +64,12 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
     if(lookupError)return failed()
     if(!existing){
       const {error}=await supabase.from('jobs').insert({...input.value,category:await resolveCategory(),area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,id,requester_id:user.id,status:'open',visibility:'public',recurrence_frequency:'one_time',repeated_from_job_id:source || null})
-      if(error)return failed()
+      if(error){
+        if(error.code!=='23505')return failed()
+        // Two requests for this draft can both miss the first lookup.
+        const {data:created,error:retryError}=await supabase.from('jobs').select('id').eq('id',id).eq('requester_id',user.id).maybeSingle()
+        if(retryError||!created)return failed()
+      }
     }
   }
   for(const path of ['/','/jobs','/jobs/'+id,'/activity','/activity/job/'+id+'/manage'])revalidatePath(path)
@@ -206,14 +211,20 @@ export async function sendOffer(_: ActionState, data: FormData): Promise<ActionS
 export async function acceptOffer(_: ActionState, data: FormData): Promise<ActionState> {
   const { supabase, user } = await requireProvider()
   const id=text(data,'offer_id')
-  const { data: bid, error } = await supabase.from('bids').select('id,job_id').eq('id',id).single()
-  if(error || !bid) return failed()
-  const {data:job}=await supabase.from('jobs').select('requester_id,status').eq('id',bid.job_id).single()
-  if(!job || job.requester_id !== user.id || job.status !== 'open') return {error:'This job is no longer accepting offers.'}
-  const result=await supabase.rpc('accept_job_offer',{p_offer_id:id})
-  if(result.error) return failed()
+  let jobId:string
+  try{
+    const {data:bid,error}=await supabase.from('bids').select('id,job_id').eq('id',id).single()
+    if(error||!bid)return {error:'Could not load this offer. Refresh and try again.'}
+    const {data:job,error:jobError}=await supabase.from('jobs').select('requester_id,status').eq('id',bid.job_id).single()
+    if(jobError)return {error:'Could not load this job. Refresh and try again.'}
+    if(!job||job.requester_id!==user.id||job.status!=='open')return {error:'This job is no longer accepting offers.'}
+    const result=await supabase.rpc('accept_job_offer',{p_offer_id:id})
+    if(result.error)throw result.error
+    jobId=bid.job_id
+  }catch{return {error:'Could not confirm that the offer was accepted. Refresh to check before trying again.'}}
   revalidatePath('/')
-  redirect('/jobs/'+bid.job_id)
+  revalidatePath('/jobs/'+jobId)
+  redirect('/jobs/'+jobId+'?accepted=1')
 }
 
 export async function requestBooking(_:ActionState,data:FormData):Promise<ActionState>{

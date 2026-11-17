@@ -1,5 +1,4 @@
 import {jobMapTarget} from '@shared/jobMapTarget'
-import {formatNzDateOnly} from '@shared/dates'
 import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate,formatWorkDateTime as nzDateTime} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
@@ -12,7 +11,7 @@ import { LiveRefresh } from '@/components/live-refresh'
 import { acceptOffer, changeOffer, jobQuestion, removeJob } from '../../work-actions'
 import { statusLabel, jobBoardStatusLabel } from '@/lib/work'
 import { SCHEDULES, MATERIALS, ACCESS, jobOwnerActions } from '@/lib/job-input'
-import { formatOfferAmount, OFFER_MATERIALS_LABELS } from '@shared/offers'
+import { formatOfferAmount, formatOfferAvailability, OFFER_MATERIALS_LABELS } from '@shared/offers'
 import { OfferForm } from './offer-form'
 import { saveWatchedJob } from '../../discovery-actions'
 import { ShareJob } from './share-job'
@@ -26,9 +25,9 @@ import { PaymentSorted } from './payment-requester'
 import { agreedPaymentMethodLabels, paymentAcknowledgementActor, paymentAcknowledgementAvailable } from '@shared/paymentAcknowledgement'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
-export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string}>}){
+export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string;accepted?:string}>}){
  const {id}=await params
- const {thread,reviewed,posted,edited}=await searchParams
+ const {thread,reviewed,posted,edited,accepted}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
@@ -114,7 +113,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  if(awarded&&acceptedProviderId)timeline.push('Offer accepted')
  if(job.status==='completed')timeline.push('Completed')
 
- const detailsCard=<article className="card work-detail"><p>{job.category} · {job.location_area || job.location_name || 'Location to be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
+ const detailsCard=<article className="card work-detail">{job.category&&<p>Category: {job.category}</p>}<p>Location: {job.location_area || job.location_name || 'To be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
    ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'Budget '+nzMoney(job.price):'open to offers')}</p></>
    : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}<p>{schedule}</p><p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
    {job.location_name&&<p>Property location: {job.location_name}</p>}{job.location_note&&<p className="work-description">Location note: {job.location_note}</p>}
@@ -123,14 +122,14 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {job.materials_type&&<p>Materials: {MATERIALS[job.materials_type as keyof typeof MATERIALS] || job.materials_type}</p>}
    {job.access_conditions?.length>0&&<p>Site access: {job.access_conditions.map((a:string)=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}
    {job.photos?.length>0&&<div className="job-photo-grid">{job.photos.map((url:string,i:number)=><a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a>)}</div>}
-   <p className="muted">Rural Connections doesn&apos;t handle payments — you&apos;ll arrange it together once an offer is accepted.</p>
+   {!paymentCard&&<p className="muted">Arrange payment directly with the other person. Rural Connections doesn&apos;t handle or verify payments.</p>}
   </article>
 
  const qaSection=<section className="card"><h2 id="questions" tabIndex={-1} style={{scrollMarginTop:96}}>Questions & answers</h2><p className="muted">Questions and answers are public. Keep phone numbers, exact addresses and other private details out of them.</p>{questionError?<p role="alert">Could not load questions. Refresh to try again.</p>:<>{!questions?.length&&<p>No questions yet.</p>}{questions?.map(q=><article className="work-offer" key={q.id} id={'question-'+q.id} tabIndex={-1} style={{scrollMarginTop:96}}><h3>{names.get(q.asker_id) || 'Community member'} asks</h3><p className="work-description">{q.question}</p>{q.answer&&<div className="account-current"><strong>Requester&apos;s answer</strong><p className="work-description">{q.answer}</p></div>}{own&&job.status==='open'&&<details className="activity-action"><summary>{q.answer?'Edit answer':'Answer question'}</summary><ActionForm action={jobQuestion} label="Save answer"><input type="hidden" name="job_id" value={id}/><input type="hidden" name="question_id" value={q.id}/><label className="lform-field">Public answer<textarea name="answer" rows={3} maxLength={2000} required defaultValue={q.answer || ''}/></label></ActionForm></details>}</article>)}{canAskQuestion&&<ActionForm action={jobQuestion} label="Post question"><input type="hidden" name="job_id" value={id}/><label className="lform-field">Your question{job.visibility==='public'&&<small id="question-visibility" className="muted">Your question and the reply are visible to anyone who can view this job</small>}<textarea aria-describedby={job.visibility==='public'?'question-visibility':undefined} name="question" rows={3} maxLength={2000} required/></label></ActionForm>}</>}</section>
 
  const offersSection=offerError?<p role="alert" className="card">Could not load offers. Refresh to try again.</p>:<section className="card" id="offer"><h2>{own?'Offers':myOffer?'Your offer':'Send an offer'}</h2>
    {own&&!offers?.length&&<p className="muted">Offers will appear here when people respond.</p>}
-   {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<><Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link> · </>:null}{formatOfferAmount(b.amount,b.pricing_type)}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{(b.line_items?.length>1||b.line_items?.some((item:{label:string})=>item.label))&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}{b.line_items.length>1?': '+nzMoney(item.amount):''}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {formatNzDateOnly(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
+   {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<><Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link> · </>:null}{formatOfferAmount(b.amount,b.pricing_type)}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{(b.line_items?.length>1||b.line_items?.some((item:{label:string})=>item.label))&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}{b.line_items.length>1?': '+nzMoney(item.amount):''}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {formatOfferAvailability(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
     {own&&job.status==='open'&&b.status!=='rejected'&&<Link className="card-link" href={'/jobs/'+id+'?thread='+b.provider_id+'#offer-'+b.id}>Message {names.get(b.provider_id)?.trim().split(/\s+/)[0] || 'this provider'}</Link>}
     {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary>Accept this offer</summary><ActionForm action={acceptOffer} label="Accept offer"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p><label className="account-setting"><input type="checkbox" required/>I agree to accept this offer.</label></ActionForm></details>:<>
      <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'} schedule={jobSchedule}/></details>
@@ -145,6 +144,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
 
  const mainColumn=<>
   {posted==='1'&&own&&<><p className="home-clear" role="status">Job posted.</p><PostFeedback jobId={id}/></>}
+  {accepted==='1'&&own&&job.status==='accepted'&&acceptedOffer&&<p className="home-clear" role="status">Offer accepted.</p>}
   {edited==='1'&&own&&<p className="home-clear" role="status">Job changes saved.</p>}
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
   {confirmationCard}

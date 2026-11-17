@@ -38,6 +38,7 @@ export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canU
       <h2>Payment</h2>
       {sortedAt && <p><strong>{copy.sorted}</strong></p>}
       <p>{sortedAt ? copy.sortedDetail : copy.reminder}</p>
+      <p className="muted">Rural Connections doesn&apos;t handle or verify payments.</p>
       {sortedAt && actor && <p>Marked by the {actor}.</p>}
       {methodLabel && <p>Agreed method: {methodLabel}</p>}
       {canUpdate && (sortedAt ? (

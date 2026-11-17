@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises'
 import {createRequire} from 'node:module'
 import vm from 'node:vm'
 import * as arrivalTime from '../shared/arrivalTime.ts'
+import * as formatting from '../shared/formatting.js'
 import {formatWorkDate,formatWorkDateTime} from '../shared/formatting.js'
 import * as dates from '../shared/dates.ts'
 import * as offers from '../shared/offers.ts'
@@ -165,10 +166,14 @@ test('Auckland weekdays and times survive midnight, month boundaries and both of
 })
 
 test('review star targets contain individually named, ascending native radios',async()=>{
- const {StarRatingInput}=compile(await source('../provider-web/src/components/star-rating-input.tsx'),{})
+ let value
+ const {StarRatingInput}=compile(await source('../provider-web/src/components/star-rating-input.tsx'),{react:{
+  useState:initial=>[value??=initial,next=>{value=next}],
+ }})
  const changes=[]
  const picker=nodes(StarRatingInput({rating:3,onRating:value=>changes.push(value)}))
  const labels=picker.filter(node=>node.type==='label')
+ assert.ok(picker.some(node=>node.props.role==='status'&&node.props.children==='3 of 5 stars'))
  assert.equal(labels.length,5)
  for (const [index,label] of labels.entries()) {
   const value=index+1
@@ -180,19 +185,27 @@ test('review star targets contain individually named, ascending native radios',a
   radio.props.onChange()
  }
  assert.deepEqual(changes,[1,2,3,4,5])
+ nodes(StarRatingInput({})).find(node=>node.props.value===4).props.onChange()
+ assert.ok(nodes(StarRatingInput({})).some(node=>node.props.role==='status'&&node.props.children==='4 of 5 stars'))
+ const css=await source('../provider-web/src/app/globals.css')
+ assert.match(css,/\.star-input input \{[^}]*clip-path: inset\(50%\)/)
+ assert.match(css,/\.star-input input:focus-visible \+ span \{[^}]*outline: 3px/)
 })
 
 test('posting keeps a validated explicit category and only suggests when it is absent',async()=>{
  const categories=['Fencing & Gates','Property & House Sitting','General Rural Help']
  const saved=[]
- let classified=0
+ let classified=0,collision=false,verifiedOwnedDraft=false
  const {postJob}=compile(await source('../provider-web/src/app/work-actions.ts'),{
   '@shared/categories':{CATEGORIES:categories},
   'next/navigation':{},'next/cache':{revalidatePath(){}},
   '@/lib/auth':{requireProvider:async()=>({user:{id:'requester'},supabase:{
    from:()=>({
-    select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:null})})})}),
-    insert:async payload=>{saved.push(payload);return {}},
+    select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:verifiedOwnedDraft?{id:'job'}:null})})})}),
+    insert:async payload=>{
+     if(collision){verifiedOwnedDraft=true;return {error:{code:'23505'}}}
+     saved.push(payload);return {}
+    },
    }),
    functions:{invoke:async()=>{classified++;return {data:{category:'Fencing & Gates'}}}},
   }})},
@@ -212,6 +225,10 @@ test('posting keeps a validated explicit category and only suggests when it is a
  assert.equal((await postJob({error:''},data)).jobId,'job')
  assert.equal(saved[1].category,'Fencing & Gates')
  assert.equal(classified,1)
+ collision=true
+ data.set('category','Fencing & Gates')
+ assert.equal((await postJob({error:''},data)).jobId,'job')
+ assert.equal(saved.length,2)
 })
 
 test('confirmation only returns the saved arrival and success after the RPC succeeds',async()=>{
@@ -243,6 +260,69 @@ test('confirmation only returns the saved arrival and success after the RPC succ
   p_bid:'bid',p_arrival:arrival,p_method:'bank_transfer',p_message:'Bank details',p_note:'Arrival note',
  }))
  assert.deepEqual(paths,['/jobs/job','/activity','/'])
+})
+
+test('accepting an offer keeps the existing RPC and navigates to feedback only on success',async()=>{
+ let rpcError={message:'Offer no longer available'}, redirectPath, owner='requester'
+ const calls=[], revalidated=[]
+ const {acceptOffer}=compile(await source('../provider-web/src/app/work-actions.ts'),{
+  '@shared/categories':{},
+  'next/navigation':{redirect(path){redirectPath=path;throw Error('redirect')}},
+  'next/cache':{revalidatePath:path=>revalidated.push(path)},
+  '@/lib/auth':{requireProvider:async()=>({user:{id:'requester'},supabase:{
+   from:table=>({select:()=>({eq:()=>({single:async()=>({data:table==='bids'?{id:'offer',job_id:'job'}:{requester_id:owner,status:'open'}})})})}),
+   rpc:async(name,payload)=>{calls.push([name,payload.p_offer_id]);return {error:rpcError}},
+  }})},
+  '@/lib/job-input':{},'@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+ })
+ const data=new FormData()
+ data.set('offer_id','offer')
+ assert.match((await acceptOffer({error:''},data)).error,/Could not confirm/)
+ assert.equal(redirectPath,undefined)
+ assert.deepEqual(revalidated,[])
+ owner='other'
+ assert.match((await acceptOffer({error:''},data)).error,/no longer accepting/)
+ assert.equal(calls.length,1)
+ owner='requester'
+ rpcError=null
+ await assert.rejects(acceptOffer({error:''},data),/redirect/)
+ assert.equal(redirectPath,'/jobs/job?accepted=1')
+ assert.deepEqual(revalidated,['/','/jobs/job'])
+ assert.deepEqual(calls,[['accept_job_offer','offer'],['accept_job_offer','offer']])
+})
+
+test('posted job displays separate category and location labels and verified acceptance feedback',async()=>{
+ const job={id:'job',requester_id:'requester',title:'Repair a drain',category:'Water & Drainage',location_area:'Waitoki',status:'accepted',schedule_type:'flexible'}
+ const bid={id:'offer',status:'accepted',provider_id:'provider',available_from:'2026-11-20'}
+ const rows={jobs_public:job,bids:[bid]}
+ let userId='requester'
+ const {default:JobPage}=compile(await source('../provider-web/src/app/jobs/[id]/page.tsx'),new Proxy({
+  '@shared/jobMapTarget':{jobMapTarget:()=>null},'@shared/formatting':formatting,
+  '@shared/nextMove':{jobNextMove:()=>null},'@shared/offers':offers,
+  '@shared/paymentAcknowledgement':{paymentAcknowledgementActor:()=>null,paymentAcknowledgementAvailable:()=>true,agreedPaymentMethodLabels:{}},
+  '@/components/navigation-link':{default:'a'},'@/lib/work':{statusLabel:x=>x,jobBoardStatusLabel:x=>x},
+  '@/lib/job-input':{SCHEDULES:{},jobOwnerActions:()=>({})},
+  '@/lib/activity-policy':{workRole:()=> 'requester',workActions:()=>[]},
+  '@/lib/messaging-data':{loadConversation:async()=>null},
+  '@/lib/auth':{requireProvider:async()=>({user:{id:userId},supabase:{
+   from(table){
+    return {select(){return this},eq(){return this},order(){return this},in(){return this},
+     async maybeSingle(){return {data:rows[table]??null}},
+     then(resolve){return Promise.resolve({data:rows[table]??[]}).then(resolve)},
+    }
+   },
+  }})},
+ },{has:()=>true,get:(target,name)=>target[name]??{}}))
+ const render=()=>JobPage({params:{id:'job'},searchParams:{accepted:'1'}}).then(nodes)
+ const tree=await render()
+ function content(node){return [node.props.children].flat(Infinity).filter(value=>typeof value==='string').join('')}
+ for(const label of ['Category: Water & Drainage','Location: Waitoki','Available from: Fri 20 Nov 2026','Offer accepted.'])
+  assert.ok(tree.some(node=>node.type==='p'&&content(node)===label),label)
+ userId='provider'
+ assert.ok(!(await render()).some(node=>node.props.role==='status'&&content(node)==='Offer accepted.'))
+ userId='requester'
+ job.status='open'
+ assert.ok(!(await render()).some(node=>node.props.role==='status'&&content(node)==='Offer accepted.'))
 })
 
 test('review submission checks eligibility, redirects after a write and reports failed writes',async()=>{
