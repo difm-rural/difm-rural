@@ -1,24 +1,18 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { stripTypeScriptTypes } from 'node:module'
+import { bookingNextMove } from '../shared/nextMove.ts'
 const read = async path => await readFile(new URL(path, import.meta.url), 'utf8')
 const moduleFromSource = source => import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 globalThis.completionLifecycle = await moduleFromSource(await read('../src/lib/lifecycle.js'))
 globalThis.completionClient = {}
 const replacements = source => source
-  .replace("import { bookingPricingType } from './listingEstimate'",`import { bookingPricingType } from '${new URL('../shared/listingEstimate.ts',import.meta.url).href}'`)
   .replace("import { supabase } from './supabase'", 'const supabase = globalThis.completionClient')
   .replace("import { JOB_STATUS, JOB_ACTIVE_STATUSES } from './lifecycle'", 'const { JOB_STATUS, JOB_ACTIVE_STATUSES } = globalThis.completionLifecycle')
   .replace("import { BOOKING_STATUS, isBookingWithdrawable } from './lifecycle'", 'const { BOOKING_STATUS, isBookingWithdrawable } = globalThis.completionLifecycle')
   .replace("import { saveReview } from './reviews'", 'const saveReview = () => {}')
 const { markJobComplete } = await moduleFromSource(replacements(await read('../src/lib/jobActions.js')))
 const { markBookingReady } = await moduleFromSource(replacements(await read('../src/lib/bookingActions.js')))
-// The pure next-step logic lives in shared/nextMove.ts (src/lib/nextMove.js only
-// re-exports it and adds data fetching), so load it from there.
-const { bookingNextMove } = await moduleFromSource(stripTypeScriptTypes((await read('../shared/nextMove.ts'))
-  .replace("import { bookingPricingType } from './listingEstimate'",`import { bookingPricingType } from '${new URL('../shared/listingEstimate.ts',import.meta.url).href}'`)))
-
 test('accepted grazing directs both parties to ongoing arrangements rather than completion', () => {
   for (const role of ['provider', 'requester']) {
     for (const status of ['confirmed', 'in_progress']) {

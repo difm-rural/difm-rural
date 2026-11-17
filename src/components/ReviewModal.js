@@ -3,6 +3,7 @@ import {
   Keyboard,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -54,7 +55,8 @@ export default function ReviewModal({
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
-        <View style={[styles.sheet, { marginBottom: kbHeight }]}>
+        <ScrollView style={[styles.sheet, { marginBottom: kbHeight }]} contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled" accessibilityViewIsModal>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
@@ -66,9 +68,10 @@ export default function ReviewModal({
                   key={value}
                   style={styles.starButton}
                   onPress={() => setRating(value)}
-                  accessibilityRole="button"
+                  disabled={saving}
+                  accessibilityRole="radio"
                   accessibilityLabel={`${value} star${value === 1 ? '' : 's'}`}
-                  accessibilityState={{ selected }}>
+                  accessibilityState={{ checked: value === rating, disabled: !!saving }}>
                   <Text style={[styles.star, selected && styles.starSelected]}>
                     {selected ? '★' : '☆'}
                   </Text>
@@ -102,13 +105,14 @@ export default function ReviewModal({
             <Button
               title="Submit review"
               onPress={handleSubmit}
-              disabled={!rating}
+            disabled={!rating || saving}
               loading={saving}
               style={{ flex: 1 }}
               accessibilityLabel="Submit review"
             />
           </View>
-        </View>
+          {saving ? <Text accessibilityLiveRegion="polite">Saving your review. Please wait.</Text> : null}
+        </ScrollView>
       </View>
     </Modal>
   )
@@ -124,6 +128,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    flexGrow: 0,
+  },
+  content: {
     padding: 22,
     paddingBottom: 34,
   },
@@ -136,7 +143,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   starButton: {
-    width: 46,
+    flex: 1,
+    maxWidth: 52,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',

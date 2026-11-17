@@ -2,11 +2,11 @@
 import {useSubmitGuard} from '@/components/action-form'
 import {useActionState,useEffect,useState} from 'react'
 import {useRouter} from 'next/navigation'
-import {formatDateTime as nzDateTime} from '@shared/formatting'
+import {formatWorkDateTime as nzDateTime} from '@shared/formatting'
 import {paymentLine} from '@shared/offers'
-import {toLocalIsoDate} from '@shared/dates'
-import {nzCalendarDay,type JobSchedule} from '@shared/postingDates'
+import {nzToday,type JobSchedule} from '@shared/postingDates'
 import {arrivalDayChoices,arrivalDayNote} from '@shared/requestedDate'
+import {arrivalInputValue,parseArrivalInput} from '@shared/arrivalTime'
 import {confirmJob,changeJobArrival,setJobPaymentMethod} from '../../work-actions'
 
 const METHOD_LABELS:Record<string,string>={bank_transfer:'Bank transfer',cash:'Cash',invoice:"I'll send an invoice",agreed:'Arrange directly'}
@@ -15,17 +15,15 @@ const bankMessage=(choice:string,acct:string,acctNo:string,reference:string)=>ch
   ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
   : ''
 
-function toLocal(d:Date){const p=(n:number)=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
-
 function ArrivalFields({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;offerDay:string|null;arrival:string;onPick:(value:string)=>void}){
- const days=arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay})
+ const days=arrivalDayChoices(schedule,{today:nzToday(),offerDay})
  const [day,time='']=arrival.split('T')
  return <>
   <p className="muted requested-date">Requested: <strong>{days.requestedLabel}</strong></p>
   {days.chips.length>0&&<div className="payment-options">{days.chips.map(chip=>
    <button key={chip.day} type="button" aria-pressed={day===chip.day} className={'lform-kind'+(day===chip.day?' active':'')} onClick={()=>onPick(chip.day+'T'+time)}>{chip.label}</button>)}</div>}
   <label className="lform-field">Arrival date<input type="date" lang="en-NZ" required value={day} onChange={e=>onPick(e.target.value+'T'+time)}/></label>
-  <label className="lform-field">Arrival time<input type="time" required value={time} onChange={e=>onPick(day+'T'+e.target.value)}/></label>
+  <label className="lform-field">Arrival time (New Zealand time)<input type="time" required value={time} onChange={e=>onPick(day+'T'+e.target.value)}/></label>
  </>
 }
 
@@ -33,46 +31,43 @@ function ArrivalFields({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;
 // a summary with "Change time" / "Change payment".
 export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availableFrom,arrivalStart,amount,pricingType}:{
  bidId:string;jobId:string;jobTitle:string;requesterFirst:string;schedule:JobSchedule;availableFrom:string|null;arrivalStart:string|null;amount:number|null;pricingType:string|null}){
- const router=useRouter()
- const confirmed=!!arrivalStart
-
  // ── Confirm form (not yet confirmed) ──
  const [state,submit,pending]=useActionState(confirmJob,{error:''})
  const guardSubmit=useSubmitGuard(state,pending)
- // Start on the requested day when there is one (today or later); otherwise the offer date.
- const [arrival,setArrival]=useState(()=>(arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay:availableFrom}).preselect || toLocalIsoDate(new Date()))+'T')
+ const confirmedArrival=arrivalStart || state.arrivalStart
+ const [arrival,setArrival]=useState(()=>(arrivalDayChoices(schedule,{today:nzToday(),offerDay:availableFrom}).preselect || '')+'T')
  const [choice,setChoice]=useState('agreed')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  const [note,setNote]=useState('')
- useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
-
- if(confirmed){
+ if(confirmedArrival){
   return <section className="card payment-card">
    {state.success&&<p className="home-clear" role="status">{state.success}</p>}
-   <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong></p>
-   <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom} arrivalStart={arrivalStart!}/></details>
+   <p><strong>Arriving around {nzDateTime(confirmedArrival)}</strong></p>
+   <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom} arrivalStart={confirmedArrival}/></details>
    <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>
  }
 
- const arrivalDate=new Date(arrival)
- const isPast=!Number.isNaN(arrivalDate.getTime())&&arrivalDate.getTime()<=Date.now()
+ const arrivalDate=parseArrivalInput(arrival)
+ const isPast=!!arrivalDate&&arrivalDate.getTime()<=Date.now()
+ const invalidTime=!!arrival.split('T')[0]&&!!arrival.split('T')[1]&&!arrivalDate
  const message=acct.trim()&&acctNo.trim()?bankMessage(choice,acct,acctNo,reference):''
  const noteText=note.trim()
  // Mirrors the message confirm_job posts, including how the day relates to the one asked for.
- const dayNote=arrivalDayNote(schedule,Number.isNaN(arrivalDate.getTime())?null:nzCalendarDay(arrivalDate))
- const preview=(Number.isNaN(arrivalDate.getTime())?'Choose an arrival time to complete this preview.':`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}${dayNote.suffix}.`)+(dayNote.line?`\n${dayNote.line}`:'')+`\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
- const blocked=isPast||Number.isNaN(arrivalDate.getTime())
+ const dayNote=arrivalDayNote(schedule,arrivalDate?arrival.slice(0,10):null)
+ const preview=(!arrivalDate?'Choose an arrival date and time to complete this preview.':`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}${dayNote.suffix}.`)+(dayNote.line?`\n${dayNote.line}`:'')+`\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
+ const blocked=isPast||!arrivalDate
 
  return <form action={submit} onSubmit={guardSubmit} aria-busy={pending} className="card payment-card lform">
   <h3>Confirm the job</h3>
   <input type="hidden" name="bid_id" value={bidId}/><input type="hidden" name="job_id" value={jobId}/>
-  <input type="hidden" name="arrival" value={Number.isNaN(arrivalDate.getTime())?'':arrivalDate.toISOString()}/>
+  <input type="hidden" name="arrival" value={arrivalDate?.toISOString() || ''}/>
   <input type="hidden" name="method" value={choice}/><input type="hidden" name="message" value={message}/>
   <fieldset disabled={pending} className="work-fieldset">
    <p className="payment-substep">When will you arrive?</p>
    <ArrivalFields schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
    {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
+   {invalidTime&&<p className="form-error" role="alert">Choose a valid New Zealand arrival time.</p>}
    <p className="payment-substep">Payment method (optional)</p>
    <div className="payment-options">{Object.entries(METHOD_LABELS).map(([id,label])=>
     <button key={id} type="button" className={'lform-kind'+(choice===id?' active':'')} onClick={()=>setChoice(id)}>{label}</button>)}</div>
@@ -93,16 +88,17 @@ function ChangeTime({jobId,schedule,availableFrom,arrivalStart}:{jobId:string;sc
  const router=useRouter()
  const [state,submit,pending]=useActionState(changeJobArrival,{error:''})
  const guardSubmit=useSubmitGuard(state,pending)
- const [arrival,setArrival]=useState(()=>toLocal(new Date(arrivalStart)))
+ const [arrival,setArrival]=useState(()=>arrivalInputValue(new Date(arrivalStart)))
  useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
- const d=new Date(arrival),isPast=!Number.isNaN(d.getTime())&&d.getTime()<=Date.now()
+ const d=parseArrivalInput(arrival,arrivalStart),isPast=!!d&&d.getTime()<=Date.now()
  return <form action={submit} onSubmit={guardSubmit} aria-busy={pending} className="lform">
-  <input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="arrival" value={Number.isNaN(d.getTime())?'':d.toISOString()}/>
+  <input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="arrival" value={d?.toISOString() || ''}/>
   <fieldset disabled={pending} className="work-fieldset"><ArrivalFields schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/></fieldset>
   {state.success&&<p className="home-clear" role="status">{state.success}</p>}
   {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
+  {!d&&arrival.split('T').every(Boolean)&&<p className="form-error" role="alert">Choose a valid New Zealand arrival time.</p>}
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
-  <button className="lform-save" disabled={isPast||pending||Number.isNaN(d.getTime())}>{pending?'Saving…':'Update time'}</button>
+  <button className="lform-save" disabled={isPast||pending||!d}>{pending?'Saving…':'Update time'}</button>
  </form>
 }
 

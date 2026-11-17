@@ -1,4 +1,4 @@
-import {formatMoney as nzMoney,formatDate as nzDate} from '../../../shared/formatting.js'
+import {formatMoney as nzMoney,formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {publicAreaError} from '../../../shared/publicArea'
 import {localityFromAddress} from '../../../shared/locality'
 import {postingTextError} from '../../../shared/postingText'
@@ -57,7 +57,7 @@ const ACCESS_LABELS = {
 
 function formatDate(iso) {
   if (!iso) return null
-  return nzDate(new Date(iso))
+  return nzDate(iso)
 }
 
 function AuthSheet({ onDismiss, onLogin }) {
@@ -140,16 +140,17 @@ export default function PostJobStep5Review({ navigation, route }) {
   const [mapFailed,     setMapFailed]     = useState(false)
   // The category is chosen automatically from the title + details. Work it out
   // on arrival so it can be shown — and corrected — before posting.
-  const [detectedCategory, setDetectedCategory] = useState('')
+  const [suggestion, setSuggestion] = useState(null)
   const [categoryPicker,   setCategoryPicker]   = useState(false)
   const houseSit = isHouseSitting(title)
+  const suggestedCategory = suggestion && suggestion.title === title && suggestion.description === description ? suggestion.category : ''
+  const shownCategory = category?.trim() || (houseSit ? 'Property & House Sitting' : suggestedCategory)
   useEffect(() => {
-    if (houseSit || (category && category.trim())) return
+    if (shownCategory) return
     let active = true
-    inferJobCategory(title, description).then(found => { if (active) setDetectedCategory(found || '') })
+    inferJobCategory(title, description).then(found => { if (active) setSuggestion({ title, description, category: found }) })
     return () => { active = false }
-  }, [])
-  const shownCategory = houseSit ? 'Property & House Sitting' : (category && category.trim()) || detectedCategory
+  }, [title, description, shownCategory])
   // Guards against a double-tap posting the job twice. A ref (not state)
   // because setState is async — a second tap can fire before the re-render
   // disables the button, which is exactly how duplicates got created.
@@ -177,8 +178,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   const rows = [
     { label: 'Location',    value: locationSummary, popCount: 3 },
     { label: 'Category', value: shownCategory || 'Choosing from your title and details…',
-      // House-sitting is set by the title; anything else can be corrected here.
-      onEdit: houseSit ? null : () => setCategoryPicker(true), editLabel: 'Change' },
+      onEdit: () => setCategoryPicker(true), editLabel: 'Change' },
     { label: 'Title',       value: title,           popCount: 4 },
     { label: 'When',        value: scheduleDisplay, popCount: 4 },
     { label: 'Budget',      value: budgetDisplay,   popCount: 1 },
@@ -213,7 +213,7 @@ export default function PostJobStep5Review({ navigation, route }) {
   async function handleSubmit() {
     // Claim the submit synchronously, before any await, so a second tap during
     // the auth + category-inference pause can't start a second insert.
-    if (submittingRef.current) return
+    if (submittingRef.current || !shownCategory) return
     await runSubmission(submittingRef,submitJob,
       ()=>setUploadStatus(isEditMode?'Saving…':'Posting…'),()=>setUploadStatus(''),
       ()=>Alert.alert('Could not save job','Your changes are kept. Check your connection and try again.'))
@@ -234,11 +234,7 @@ export default function PostJobStep5Review({ navigation, route }) {
 
     // Category is auto-detected from the title + details (keep any existing one
     // on edit). Falls back to 'General Rural Help' if the AI call is unavailable.
-    const resolvedCategory = isHouseSitting(title)
-      ? 'Property & House Sitting'
-      : (category && category.trim())
-        ? category
-        : detectedCategory || await inferJobCategory(title, description)
+    const resolvedCategory = shownCategory
 
     const payload = {
       title,
@@ -280,7 +276,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         .from('jobs').update(payload).eq('id', editJob.id).eq('requester_id', user.id).eq('status', 'open').select('id').maybeSingle()
       if (error || !data) {
         setUploadStatus('')
-        Alert.alert('Could not save job changes', error?.message || 'The job is no longer editable. Your draft is still here.')
+        Alert.alert('Could not save job changes', error?.message || 'The job is no longer editable. Your changes are still in this form.')
         return
       }
 
@@ -530,7 +526,7 @@ export default function PostJobStep5Review({ navigation, route }) {
             title={submitLabel}
             onPress={handleSubmit}
             loading={!!uploadStatus}
-            disabled={!!uploadStatus}
+            disabled={!!uploadStatus || !shownCategory}
             style={{ flex: 1 }}
             accessibilityLabel={submitLabel}
           />

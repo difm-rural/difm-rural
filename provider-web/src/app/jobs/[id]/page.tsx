@@ -1,6 +1,6 @@
 import {jobMapTarget} from '@shared/jobMapTarget'
 import {formatNzDateOnly} from '@shared/dates'
-import {formatMoney as nzMoney,formatDate as nzDate,formatDateTime as nzDateTime} from '@shared/formatting'
+import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate,formatWorkDateTime as nzDateTime} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
@@ -47,7 +47,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const mapTarget=jobMapTarget(job)
  // What the requester asked for — shown on the offer, confirm and change-time forms.
  const jobSchedule={schedule_type:job.schedule_type,scheduled_date:job.scheduled_date,date_from:job.date_from,date_to:job.date_to}
- const schedule=job.schedule_type==='range'?nzDate(job.date_from)+' – '+nzDate(job.date_to):job.schedule_type==='specific'?nzDate(job.scheduled_date):SCHEDULES[job.schedule_type as keyof typeof SCHEDULES] || 'Flexible timing'
+ const schedule=job.schedule_type==='range'?formatWorkDate(job.date_from)+' – '+formatWorkDate(job.date_to):job.schedule_type==='specific'?formatWorkDate(job.scheduled_date):SCHEDULES[job.schedule_type as keyof typeof SCHEDULES] || 'Flexible timing'
 
  // ─── Workspace state ────────────────────────────────────────────────────────
  const acceptedOffer=offers?.find(b=>b.status==='accepted')

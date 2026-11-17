@@ -1,27 +1,20 @@
-import { Fragment, useId } from 'react'
-
-// A no-JS 5-star picker that works inside the server-rendered ActionForm.
-// Radios are rendered high-to-low (5→1) and laid out row-reverse so the
-// `~` sibling selector can fill stars left-to-right on hover/check — the
-// same visual language as the mobile ReviewModal's StarRating.
 export function StarRatingInput({ initial, rating, onRating }: { initial?: number | null; rating?: number; onRating?: (value:number) => void }) {
-  const group = useId()
   return (
     <fieldset className="star-input">
       <legend className="sr-only">Rating *</legend>
       <div className="star-input-row">
-        {[5, 4, 3, 2, 1].map((n, i) => (
-          <Fragment key={n}>
+        {[1, 2, 3, 4, 5].map(n => (
+          <label key={n}>
             <input
               type="radio"
-              id={`${group}-rating-${n}`}
+              aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
               name="rating"
               value={n}
-              required={i === 0}
+              required={n === 1}
               {...(onRating ? {checked:rating===n,onChange:()=>onRating(n)} : {defaultChecked:initial===n})}
             />
-            <label htmlFor={`${group}-rating-${n}`} aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}>★</label>
-          </Fragment>
+            <span aria-hidden="true">★</span>
+          </label>
         ))}
       </div>
     </fieldset>

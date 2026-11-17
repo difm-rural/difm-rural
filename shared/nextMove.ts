@@ -6,6 +6,7 @@
 // keeps the data-fetching fetchActionableNextMoves. provider-web imports
 // jobNextMove from '@shared/nextMove'.
 import { bookingPricingType } from './listingEstimate'
+import { nzCalendarDay, nzToday } from './postingDates'
 
 export type NextMove = {
   label: string
@@ -44,16 +45,10 @@ function firstName(name: string | null | undefined, fallback: string): string {
   return value ? value.split(/\s+/)[0] : fallback
 }
 
-function parseDate(value: string | null | undefined): Date | null {
-  if (!value) return null
-  const date = new Date(String(value).length <= 10 ? `${value}T12:00:00` : value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
 function scheduledLabel(item: Scheduleable | null | undefined): string | null {
-  const date = parseDate(item?.scheduled_date || item?.date_from)
-  if (!date || date < new Date(new Date().setHours(0, 0, 0, 0))) return null
-  const day = date.toLocaleDateString('en-NZ', { weekday: 'long' })
+  const date = nzCalendarDay(item?.scheduled_date || item?.date_from)
+  if (!date || date < nzToday()) return null
+  const day = new Date(date + 'T00:00:00Z').toLocaleDateString('en-NZ', { weekday: 'long', timeZone: 'UTC' })
   return `Scheduled for ${day}`
 }
 

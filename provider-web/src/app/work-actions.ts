@@ -14,6 +14,15 @@ import { pricingRevision, pricingSnapshot, bookingResponseActions } from '@/lib/
 const text = (data: FormData, name: string) => String(data.get(name) || '').trim()
 const failed = (): ActionState => ({ error: 'Could not save. Check your connection, refresh this page and try again.' })
 
+async function inferJobCategory(supabase: Awaited<ReturnType<typeof requireProvider>>['supabase'], title: string, description: string): Promise<string> {
+  if (/house.?sit/i.test(title)) return 'Property & House Sitting'
+  try {
+    const {data,error}=await supabase.functions.invoke('categorize-job',{body:{title,description},timeout:8000})
+    if(!error&&CATEGORIES.includes(data?.category))return data.category
+  }catch{/* Classification is optional. */}
+  return 'General Rural Help'
+}
+
 export async function postJob(_: ActionState, data: FormData): Promise<ActionState & {jobId?:string}> {
   return saveJob(data,false)
 }
@@ -31,19 +40,12 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   const input=jobInput(data,{userId:user.id,jobId:id,baseUrl:process.env.NEXT_PUBLIC_SUPABASE_URL || '',existingPhotos:current?.photos || [],existingAccess:current?.access_conditions || [],existingSchedule:editing?current:null})
   if(!input.ok)return {error:input.error}
   const job = input.value
+  const category=text(data,'category')
+  if(category&&!CATEGORIES.includes(category))return {error:'Choose an existing job category.'}
   async function resolveCategory() {
-    const { title, description } = job
-    if (/house.?sit/i.test(title)) return 'Property & House Sitting'
+    if(category)return category
     if (current?.category?.trim()) return current.category
-    try {
-      const { data, error } = await supabase.functions.invoke('categorize-job', {
-        body: { title, description },
-      })
-      if (!error && CATEGORIES.includes(data?.category)) return data.category
-    } catch {
-      // Classification should never prevent posting.
-    }
-    return 'General Rural Help'
+    return inferJobCategory(supabase,job.title,job.description)
   }
   const moved=!!current && (input.value.location_name!==current.location_name || input.value.latitude!==current.latitude || input.value.longitude!==current.longitude)
   const areaPatch=moved?{area_polygon:null,area_hectares:null}:{}
@@ -122,7 +124,7 @@ export async function setJobPaymentMethod(_:ActionState,data:FormData):Promise<A
 }
 
 // Provider: confirm the job — arrival time + how to get paid, in one step.
-export async function confirmJob(_:ActionState,data:FormData):Promise<ActionState>{
+export async function confirmJob(_:ActionState,data:FormData):Promise<ActionState & {arrivalStart?:string}>{
  const {supabase}=await requireProvider()
  const bidId=text(data,'bid_id'),jobId=text(data,'job_id'),arrival=text(data,'arrival'),method=text(data,'method')||'agreed',message=text(data,'message'),note=text(data,'note')
  if(!validId(bidId))return failed()
@@ -135,7 +137,7 @@ export async function confirmJob(_:ActionState,data:FormData):Promise<ActionStat
  if(error)return {error:'Could not confirm the job. Refresh and try again.'}
  if(validId(jobId))revalidatePath('/jobs/'+jobId)
  revalidatePath('/activity');revalidatePath('/')
- return {error:'',success:'Job confirmed. The requester has been notified.'}
+ return {error:'',success:'Job confirmed.',arrivalStart:when.toISOString()}
 }
 
 // Provider: change just the arrival time later (reuses the arrival RPC).

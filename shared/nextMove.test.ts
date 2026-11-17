@@ -143,6 +143,9 @@ for (const m of [
 check('heading · "Waiting on you" repeats the badge → dropped', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'provider', {})), null)
 check('heading · "Waiting on Sam" repeats the badge → dropped', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam' })), null)
 check('heading · schedule line is kept', nextMoveHeading(jobNextMove({ status: 'accepted', scheduled_date: future }, 'provider', { paymentMethod: 'cash' })), `Scheduled for ${futureWeekday}`)
+check('confirmed timestamp uses the Auckland weekday even when it is still the previous UTC day',
+  jobNextMove({ status: 'accepted' }, 'provider', { hasArrival: true, arrivalAt: '2099-11-18T21:00:00Z' })?.label,
+  new Date('2099-11-19T00:00:00Z').toLocaleDateString('en-NZ', { weekday: 'long', timeZone: 'UTC' }).replace(/^/, 'Scheduled for '))
 check('heading · "Job confirmed" is kept', nextMoveHeading(jobNextMove({ status: 'accepted' }, 'requester', { paymentMethod: 'cash' })), 'Job confirmed')
 check('heading · "No response yet" is kept', nextMoveHeading(jobNextMove({ status: 'open' }, 'requester', {})), 'No response yet')
 check('heading · no move', nextMoveHeading(null), null)

@@ -21,6 +21,22 @@ export function formatDateTime(value) {
   const parsed = dateValue(value)
   return parsed ? formatDate(value) + ', ' + parsed.date.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone: parsed.timeZone }) : '—'
 }
+export function formatWorkDate(value) {
+  const parsed = dateValue(value)
+  if (!parsed) return '—'
+  const weekday = parsed.date.toLocaleDateString('en-NZ', { weekday: 'short', timeZone: parsed.timeZone })
+  return weekday + ' ' + formatDate(value)
+}
+export function formatWorkDateTime(value) {
+  const parsed = dateValue(value)
+  if (!parsed) return '—'
+  const parts = new Intl.DateTimeFormat('en-NZ', {
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZone: parsed.timeZone,
+  }).formatToParts(parsed.date)
+  const part = type => parts.find(p => p.type === type)?.value
+  const period = part('dayPeriod').replace(/\./g, '').toLowerCase()
+  return `${formatWorkDate(value)}, ${part('hour')}:${part('minute')} ${period}`
+}
 export function formatDateLabel(value) {
   return typeof value==='string' && /^\d{4}-\d{2}-\d{2}(?:T|$)/.test(value) ? formatDate(value) : String(value??'')
 }

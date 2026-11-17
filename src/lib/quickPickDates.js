@@ -1,3 +1,17 @@
+import { toLocalIsoDate } from '../../shared/dates'
+import { arrivalInputValue, parseArrivalInput } from '../../shared/arrivalTime'
+
+// Native controls use Date objects in the device timezone. These adapters
+// keep the displayed clock fields separate from the saved Auckland instant.
+export function arrivalPickerDate(instant) {
+  return localDate(arrivalInputValue(instant))
+}
+
+export function arrivalPickerInstant(value, saved) {
+  const time = [value.getHours(), value.getMinutes()].map(part => String(part).padStart(2, '0')).join(':')
+  return parseArrivalInput(toLocalIsoDate(value) + 'T' + time, saved)
+}
+
 function startOfDay(date) {
   const day = new Date(date)
   day.setHours(0, 0, 0, 0)
@@ -23,6 +37,10 @@ export function defaultStartForDate(suggestedDate, now = new Date()) {
     return picked
   }
   return next
+}
+
+export function arrivalPickerSeed(day) {
+  return startForDay(day, { now: arrivalPickerDate(new Date()) })
 }
 
 export function quickPickDays({ now = new Date(), minimumDate = now, arrival = false } = {}) {
@@ -79,5 +97,9 @@ export function startForDay(day, { keepTimeFrom = null, now = new Date() } = {})
     kept.setHours(keepTimeFrom.getHours(), keepTimeFrom.getMinutes(), 0, 0)
     if (kept.getTime() > now.getTime()) return kept
   }
-  return defaultStartForDate(day, now)
+  const seed = defaultStartForDate(day, now)
+  const selected = localDate(day)
+  if (!selected) return seed
+  selected.setHours(seed.getHours(), seed.getMinutes(), 0, 0)
+  return selected
 }

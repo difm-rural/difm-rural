@@ -37,23 +37,41 @@ export async function manageArrangement(_:ActionState,data:FormData):Promise<Act
 }
 
 export async function reviewArrangement(_:ActionState,data:FormData):Promise<ActionState>{
+  const started=performance.now()
   const {supabase,user}=await requireProvider()
+  const authenticated=performance.now()
   const kind=value(data,'kind'),id=value(data,'id'),rating=Number(value(data,'rating')),comment=value(data,'comment')
   if(!['job','booking'].includes(kind) || !Number.isInteger(rating) || rating<1 || rating>5)return {error:'Choose a rating from 1 to 5.'}
+  let checked=authenticated
+  let written=authenticated
   try{
-    const work=await loadActivityWork(supabase,kind as 'job'|'booking',id)
+    const column=kind==='job'?'job_id':'booking_id'
+    const [work,{data:reviews,error:loadError}]=await Promise.all([
+      loadActivityWork(supabase,kind as 'job'|'booking',id),
+      supabase.from('reviews').select('id,reviewer_role').eq(column,id).eq('reviewer_id',user.id),
+    ])
+    checked=written=performance.now()
     if(!work || !workActions(work,user.id).includes('review'))return {error:'Reviews are available to the participants after the arrangement is completed.'}
     const role=workRole(work,user.id)!,other=role==='provider'?work.requesterId:work.providerId
-    const column=kind==='job'?'job_id':'booking_id'
-    const {data:existing,error:loadError}=await supabase.from('reviews').select('id').eq(column,id).eq('reviewer_id',user.id).eq('reviewer_role',role).maybeSingle()
     if(loadError)throw loadError
+    const matching=reviews?.filter(review=>review.reviewer_role===role) || []
+    if(matching.length>1)throw new Error('Multiple reviews for participant role')
+    const existing=matching[0]
     const payload={job_id:kind==='job'?id:null,booking_id:kind==='booking'?id:null,reviewer_id:user.id,reviewee_id:other,reviewer_role:role,reviewee_role:role==='provider'?'requester':'provider',rating,comment:comment || null,updated_at:new Date().toISOString()}
     const result=existing?await supabase.from('reviews').update(payload).eq('id',existing.id).eq('reviewer_id',user.id).select('id'):await supabase.from('reviews').insert(payload).select('id')
+    written=performance.now()
     if(result.error)throw result.error
     if(!result.data?.length)return {error:'Your review could not be saved. Refresh and try again.'}
-    revalidatePath('/activity');revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath('/jobs/'+id);revalidatePath('/bookings/'+id)
+    revalidatePath('/activity');revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath((kind==='job'?'/jobs/':'/bookings/')+id)
     if(other)revalidatePath('/people/'+other+'/reviews')
-  }catch{return {error:'Could not save your review. Your existing review is unchanged. Refresh and try again.'}}
+  }catch{return {error:'Could not confirm that your review was saved. Refresh to check before trying again.'}}
+  finally{
+    const end=performance.now()
+    if(end-started>=5000)console.warn('Slow review action', {
+      kind, authMs:Math.round(authenticated-started), lookupMs:Math.round(checked-authenticated),
+      writeMs:Math.round(written-checked), remainingMs:Math.round(end-written),
+    })
+  }
   // redirect() throws, so it must sit outside the try/catch.
   redirect((kind==='job'?'/jobs/':'/bookings/')+encodeURIComponent(id)+'?reviewed=1#reviews')
 }

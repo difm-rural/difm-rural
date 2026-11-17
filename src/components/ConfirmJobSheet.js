@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
-import ArrivalWhen, { timeLabel } from './ArrivalWhen'
+import ArrivalWhen from './ArrivalWhen'
 import FullScreenSheet from './FullScreenSheet'
-import { formatDate as nzDate } from '../../shared/formatting.js'
-import { toLocalIsoDate } from '../../shared/dates'
-import { nzCalendarDay } from '../../shared/postingDates'
-import { arrivalDayChoices, arrivalDayNote, dayLabel } from '../../shared/requestedDate'
-import { defaultStartForDate } from '../lib/quickPickDates'
+import { formatWorkDateTime } from '../../shared/formatting.js'
+import { nzCalendarDay, nzToday } from '../../shared/postingDates'
+import { arrivalDayChoices, arrivalDayNote } from '../../shared/requestedDate'
+import { arrivalPickerInstant, arrivalPickerSeed } from '../lib/quickPickDates'
 import { supabase } from '../lib/supabase'
 import { paymentLine } from '../../shared/offers'
 import Button from './Button'
@@ -31,10 +30,9 @@ const METHOD_LABELS = {
 // Full screen: "When" is one collapsed row (ArrivalWhen), then payment, note and
 // the message preview; Confirm job stays pinned above the keyboard.
 export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, job, availableFrom, amount, pricingType, onClose, onConfirmed }) {
-  const days = arrivalDayChoices(job, { today: toLocalIsoDate(new Date()), offerDay: availableFrom })
-  // Requested day first; otherwise the offer date (a past one falls back to today).
-  const initialDay = days.preselect || availableFrom
-  const [start, setStart] = useState(() => defaultStartForDate(initialDay))
+  const initialDay = arrivalDayChoices(job, { today: nzToday(), offerDay: availableFrom }).preselect
+  const [start, setStart] = useState(() => arrivalPickerSeed(initialDay))
+  const [daySelected, setDaySelected] = useState(!!initialDay)
   const [timeSelected, setTimeSelected] = useState(false)
   const submitting = useRef(false)
   const [choice, setChoice] = useState('agreed')
@@ -47,29 +45,31 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
 
   useEffect(() => {
     if (!visible) return
-    setStart(defaultStartForDate(initialDay))
+    setStart(arrivalPickerSeed(initialDay))
+    setDaySelected(!!initialDay)
     setTimeSelected(false)
     setChoice('agreed'); setAcct(''); setAcctNo('')
     setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
   }, [visible, initialDay, jobTitle])
 
-  const isPast = start.getTime() <= Date.now()
+  const arrival = daySelected && timeSelected ? arrivalPickerInstant(start) : null
+  const isPast = arrival && arrival.getTime() <= Date.now()
   const paymentMessage = choice === 'bank_transfer' && acct.trim() && acctNo.trim()
     ? `Please pay by bank transfer.\nAccount name: ${acct || '—'}\nAccount number: ${acctNo || '—'}\nReference: ${reference || '—'}`
     : ''
   const noteText = note.trim()
   // Mirrors the message confirm_job posts, including how the day relates to
   // the one the requester asked for.
-  const arrivalDay = nzCalendarDay(start)
+  const arrivalDay = nzCalendarDay(arrival)
   const dayNote = arrivalDayNote(job, arrivalDay)
-  const preview = (timeSelected
-    ? `Confirmed: I'll be there around ${arrivalDay ? dayLabel(arrivalDay) : nzDate(start)}, ${timeLabel(start)}${dayNote.suffix}.`
-    : 'Choose an arrival time to complete this preview.')
+  const preview = (arrival
+    ? `Confirmed: I'll be there around ${formatWorkDateTime(arrival)}${dayNote.suffix}.`
+    : 'Choose an arrival date and time to complete this preview.')
     + (dayNote.line ? `\n${dayNote.line}` : '')
     + `\n${paymentLine(amount, pricingType, choice)}`
     + (noteText ? `\nNote: ${noteText}` : '')
     + (paymentMessage ? `\n\n${paymentMessage}` : '')
-  const blocked = !timeSelected || isPast || busy
+  const blocked = !arrival || isPast || busy
 
   async function confirm() {
     if (blocked || submitting.current) return
@@ -78,7 +78,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     try {
       const { error: rpcError } = await supabase.rpc('confirm_job', {
         p_bid: bidId,
-        p_arrival: start.toISOString(),
+        p_arrival: arrival.toISOString(),
         p_method: choice,
         p_message: paymentMessage,
         p_note: noteText || null,
@@ -89,7 +89,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
           : (rpcError.message || 'Could not confirm. Pull to refresh and try again.'))
         return
       }
-      onConfirmed?.()
+      onConfirmed?.({ arrival_start_at: arrival.toISOString(), arrival_end_at: new Date(arrival.getTime() + 30 * 60000).toISOString() })
     } catch (e) {
       setError(e?.message || 'Could not confirm. Pull to refresh and try again.')
     } finally {
@@ -105,7 +105,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
       onClose={onClose}
       footer={<Button title="Confirm job" onPress={confirm} loading={busy} disabled={blocked} />}>
       <Text style={styles.section}>When will you arrive?</Text>
-      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
+      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} daySelected={daySelected} onDaySelected={setDaySelected} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
 
       <Text style={styles.section}>Payment method (optional)</Text>
       <View style={styles.options}>

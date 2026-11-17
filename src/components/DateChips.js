@@ -10,11 +10,11 @@ import { colors } from '../theme/tokens'
 //                    "Use requested date · Sat 15" (see shared/requestedDate.ts)
 //   quickPicks     — false hides the usual Today / Tomorrow / … chips
 //   wrap           — chips wrap onto rows instead of scrolling sideways
-export default function DateChips({ value, minimumDate, arrival, requestedLabel, chips = [], quickPicks = true, wrap = false, onSelect, onOpen }) {
+export default function DateChips({ value, now, minimumDate, arrival, requestedLabel, chips = [], quickPicks = true, wrap = false, onSelect, onOpen }) {
   const selectedDay = toLocalIsoDate(value)
   const leading = chips.map(({ day, label }) => ({ key: day, date: localDate(day), label }))
   const usual = quickPicks
-    ? quickPickDays({ minimumDate, arrival })
+    ? quickPickDays({ now, minimumDate, arrival })
         .map(({ date, label }) => ({ key: toLocalIsoDate(date), date, label }))
         .filter(({ key }) => !leading.some(chip => chip.key === key))
     : []

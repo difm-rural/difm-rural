@@ -4,7 +4,8 @@ import DateChips, { Chip } from './DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from './NativeDateTimePicker'
 import { toLocalIsoDate } from '../../shared/dates'
 import { arrivalDayChoices, arrivalDayMatch, dayLabel } from '../../shared/requestedDate'
-import { quickPickTimes, selectedQuickPickHour, startForDay } from '../lib/quickPickDates'
+import { arrivalPickerDate, arrivalPickerInstant, quickPickTimes, selectedQuickPickHour, startForDay } from '../lib/quickPickDates'
+import { nzToday } from '../../shared/postingDates'
 import { colors } from '../theme/tokens'
 
 export function timeLabel(date) {
@@ -20,7 +21,7 @@ export function timeLabel(date) {
 //   job              — the job's requested schedule (optional)
 //   offerDay         — the date on the provider's own offer (optional)
 //   resetKey         — changes when the sheet reopens, to start collapsed again
-export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, timeSelected = true, onTimeSelected }) {
+export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, daySelected = true, onDaySelected, timeSelected = true, onTimeSelected }) {
   const [expanded, setExpanded] = useState(false)
   const [picked, setPicked] = useState({ day: false, time: false })
   const [picker, setPicker] = useState(null)
@@ -30,14 +31,19 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
   }, [resetKey])
 
   const day = toLocalIsoDate(value)
-  const days = job ? arrivalDayChoices(job, { today: toLocalIsoDate(new Date()), offerDay }) : null
-  const requested = !!job && arrivalDayMatch(job, day) === 'match'
-  const times = quickPickTimes({ day: value })
-  const selectedHour = timeSelected ? selectedQuickPickHour(value) : null
-  const isPast = timeSelected && value.getTime() <= Date.now()
+  const now = arrivalPickerDate(new Date())
+  const days = job ? arrivalDayChoices(job, { today: nzToday(), offerDay }) : null
+  const requested = daySelected && !!job && arrivalDayMatch(job, day) === 'match'
+  const times = quickPickTimes({ day: value, now })
+  const selectedHour = timeSelected ? selectedQuickPickHour(value, now) : null
+  const instant = timeSelected ? arrivalPickerInstant(value) : null
+  const isPast = daySelected && instant && instant.getTime() <= Date.now()
+  const dayText = daySelected ? dayLabel(day) : 'Choose a day'
+  const timeText = instant ? timeLabel(instant) : timeSelected ? 'Choose a valid time' : 'Choose a time'
 
   // Choosing the second of the two (day, time) closes the section.
   function mark(part) {
+    if (part === 'day') onDaySelected?.(true)
     const next = { ...picked, [part]: true }
     if (next.day && next.time) {
       setExpanded(false); setPicked({ day: false, time: false }); setPicker(null)
@@ -47,8 +53,10 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
   }
 
   function applyDay(date) {
-    const next = startForDay(date, { keepTimeFrom: timeSelected ? value : null })
-    if (timeSelected && (next.getHours() !== value.getHours() || next.getMinutes() !== value.getMinutes())) onTimeSelected?.(false)
+    const next = startForDay(date, { keepTimeFrom: timeSelected ? value : null, now })
+    const chosen = arrivalPickerInstant(next)
+    if (timeSelected && (!chosen || chosen.getTime() <= Date.now() ||
+        next.getHours() !== value.getHours() || next.getMinutes() !== value.getMinutes())) onTimeSelected?.(false)
     onChange(next)
   }
   function applyTime(time) {
@@ -64,7 +72,7 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
     return {
       value,
       mode,
-      minimumDate: mode === 'date' ? new Date() : undefined,
+      minimumDate: mode === 'date' ? now : undefined,
       // Android's dialog returns one final choice. The iOS spinner reports every
       // scroll, so there the choice only counts when Done is pressed.
       onSelect: selected => {
@@ -90,10 +98,10 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
     return (
       <View>
         <TouchableOpacity style={styles.summary} onPress={() => setExpanded(true)} accessibilityRole="button"
-          accessibilityLabel={`Arriving ${dayLabel(day)}${requested ? ', the requested day' : ''}, ${timeSelected ? timeLabel(value) : 'choose a time'}. Change`}>
+          accessibilityLabel={`Arriving ${dayText}${requested ? ', the requested day' : ''}, ${timeText}. Change`}>
           <Text style={styles.summaryText}>
             <Text style={styles.summaryLead}>Arriving: </Text>
-            {dayLabel(day)}{requested ? ' (requested)' : ''} · {timeSelected ? timeLabel(value) : 'Choose a time'}
+            {dayText}{requested ? ' (requested)' : ''} · {timeText}
           </Text>
           <Text style={styles.change}>Change</Text>
         </TouchableOpacity>
@@ -107,7 +115,7 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
       <View style={styles.expandedHead}>
         <Text style={styles.summaryText}>
           <Text style={styles.summaryLead}>Arriving: </Text>
-          {dayLabel(day)}{requested ? ' (requested)' : ''} · {timeSelected ? timeLabel(value) : 'Choose a time'}
+          {dayText}{requested ? ' (requested)' : ''} · {timeText}
         </Text>
         <TouchableOpacity onPress={() => { setExpanded(false); setPicked({ day: false, time: false }); setPicker(null) }}
           accessibilityRole="button" accessibilityLabel="Done choosing the arrival time">
@@ -116,15 +124,15 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
       </View>
 
       <Text style={styles.label}>Day</Text>
-      <DateChips value={value} arrival wrap requestedLabel={days?.requestedLabel} chips={days?.chips} quickPicks={days?.quickPicks}
+      <DateChips value={daySelected ? value : null} now={now} arrival wrap requestedLabel={days?.requestedLabel} chips={days?.chips} quickPicks={days?.quickPicks}
         onSelect={chooseDay} onOpen={() => openPicker('date')} />
 
-      <Text style={styles.label}>Time</Text>
+      <Text style={styles.label}>Time (New Zealand time)</Text>
       <View style={styles.wrap}>
         {times.map(({ hour, label, date }) => (
           <Chip key={hour} label={label} selected={hour === selectedHour} onPress={() => chooseTime(date)} />
         ))}
-        <Chip label={timeSelected && selectedHour === null ? `Other time · ${timeLabel(value)}` : 'Other time…'}
+        <Chip label={timeSelected && selectedHour === null ? `Other time · ${timeText}` : 'Other time…'}
           selected={timeSelected && selectedHour === null} onPress={() => openPicker('time')} />
       </View>
       {isPast ? <Text style={styles.error}>Pick a time later today</Text> : null}

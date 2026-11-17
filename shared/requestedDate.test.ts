@@ -41,7 +41,7 @@ check('chips · specific → "Use requested date", pre-selected, quick picks fol
 
 check('chips · specific requested for today still counts', days({ schedule_type: 'specific', scheduled_date: today }).preselect, today)
 
-check('chips · range → its days, first pre-selected, no quick picks', days(range), {
+check('chips · range → its days, requires a choice, no quick picks', days(range), {
   requestedLabel: '15–18 Nov',
   chips: [
     { day: '2026-11-15', label: 'Sun 15', kind: 'range' },
@@ -49,7 +49,7 @@ check('chips · range → its days, first pre-selected, no quick picks', days(ra
     { day: '2026-11-17', label: 'Tue 17', kind: 'range' },
     { day: '2026-11-18', label: 'Wed 18', kind: 'range' },
   ],
-  preselect: '2026-11-15',
+  preselect: null,
   quickPicks: false,
 })
 
@@ -62,8 +62,8 @@ check('chips · long range is capped at 7 days', longRange.chips.length, 7)
 check('chips · long range last chip', longRange.chips[6].day, '2026-11-21')
 
 for (const [name, job] of [['flexible', flexible], ['asap', asap], ['no schedule', {}]] as const) {
-  check(`chips · ${name} → only the usual quick picks`, days(job, { offerDay: '2026-11-20' }),
-    { requestedLabel: requestedLabel(job, today), chips: [], preselect: null, quickPicks: true })
+  check(`chips · ${name} → offer chip and usual quick picks`, days(job, { offerDay: '2026-11-20' }),
+    { requestedLabel: requestedLabel(job, today), chips: [{day:'2026-11-20',label:'You offered · Fri 20',kind:'offer'}], preselect: null, quickPicks: true })
 }
 
 check('chips · passed specific → shown as passed, not offered or pre-selected', days(passedSpecific), {

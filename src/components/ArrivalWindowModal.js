@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text } from 'react-native'
 import ArrivalWhen, { timeLabel } from './ArrivalWhen'
 import FullScreenSheet from './FullScreenSheet'
-import { defaultStartForDate } from '../lib/quickPickDates'
+import { arrivalPickerDate, arrivalPickerInstant, arrivalPickerSeed } from '../lib/quickPickDates'
+import { nzCalendarDay, nzToday } from '../../shared/postingDates'
+import { arrivalDayChoices } from '../../shared/requestedDate'
 import Button from './Button'
 import { colors } from '../theme/tokens'
 
@@ -14,8 +16,8 @@ export { timeLabel }
 const ARRIVAL_GRACE_MIN = 30
 
 function initialStart(schedule, suggestedDate) {
-  if (schedule?.arrival_start_at) return new Date(schedule.arrival_start_at)
-  return defaultStartForDate(suggestedDate)
+  if (schedule?.arrival_start_at) return arrivalPickerDate(new Date(schedule.arrival_start_at))
+  return arrivalPickerSeed(suggestedDate)
 }
 
 // "Change time" for confirmed work. Same full-screen layout and collapsed
@@ -30,23 +32,27 @@ export default function ArrivalWindowModal({
   onClose,
   onSave,
 }) {
-  const [start, setStart] = useState(() => initialStart(schedule, suggestedDate))
+  const initialDay = job ? arrivalDayChoices(job, { today: nzToday(), offerDay }).preselect : nzCalendarDay(suggestedDate)
+  const [start, setStart] = useState(() => initialStart(schedule, initialDay))
+  const [daySelected, setDaySelected] = useState(!!(schedule?.arrival_start_at || initialDay))
 
   const [timeSelected, setTimeSelected] = useState(!!schedule?.arrival_start_at)
 
   useEffect(() => {
     if (!visible) return
-    setStart(initialStart(schedule, suggestedDate))
+    setStart(initialStart(schedule, initialDay))
+    setDaySelected(!!(schedule?.arrival_start_at || initialDay))
     setTimeSelected(!!schedule?.arrival_start_at)
-  }, [visible, schedule?.arrival_start_at, suggestedDate])
+  }, [visible, schedule?.arrival_start_at, initialDay])
 
-  const isPast = start.getTime() <= Date.now()
+  const arrival = daySelected ? arrivalPickerInstant(start, schedule?.arrival_start_at) : null
+  const isPast = arrival && arrival.getTime() <= Date.now()
 
   function handleSave() {
-    if (!timeSelected || isPast || saving) return
+    if (!timeSelected || !arrival || isPast || saving) return
     // The expected finish is filled in server-side; we only send arrival + a
     // short grace as the end.
-    onSave(start, new Date(start.getTime() + ARRIVAL_GRACE_MIN * 60 * 1000))
+    onSave(arrival, new Date(arrival.getTime() + ARRIVAL_GRACE_MIN * 60 * 1000))
   }
 
   return (
@@ -54,12 +60,13 @@ export default function ArrivalWindowModal({
       visible={visible}
       title="Confirm arrival time"
       onClose={onClose}
-      footer={<Button title="Confirm time" onPress={handleSave} loading={saving} disabled={!timeSelected || isPast} />}>
+      footer={<Button title="Confirm time" onPress={handleSave} loading={saving} disabled={!timeSelected || !arrival || isPast} />}>
       <Text style={styles.body}>
         This becomes the shared time for calendar events, reminders and completion prompts.
       </Text>
       <Text style={styles.section}>When will you arrive?</Text>
-      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={offerDay} resetKey={visible} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
+      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={offerDay} resetKey={visible}
+        daySelected={daySelected} onDaySelected={setDaySelected} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
     </FullScreenSheet>
   )
 }

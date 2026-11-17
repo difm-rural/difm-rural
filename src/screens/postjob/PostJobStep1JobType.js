@@ -1,11 +1,13 @@
-import {formatDate as nzDate} from '../../../shared/formatting.js'
+import {formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
-import {editorScheduleType,jobScheduleError} from '../../../shared/postingDates'
+import {editorScheduleType,jobScheduleError,nzCalendarDay,nzToday} from '../../../shared/postingDates'
 import React, { useEffect, useState } from 'react'
 import {
   Keyboard, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
+import {toLocalIsoDate} from '../../../shared/dates'
+import {localDate} from '../../lib/quickPickDates'
 import DateChips from '../../components/DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from '../../components/NativeDateTimePicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -26,11 +28,11 @@ const SCHEDULE_OPTIONS = [
 ]
 
 function formatDate(d) {
-  return nzDate(d)
+  return nzDate(toLocalIsoDate(d))
 }
 
 function formatShort(d) {
-  return d ? nzDate(d) : ''
+  return d ? formatDate(d) : ''
 }
 
 export default function PostJobStep1JobType({ navigation, route }) {
@@ -46,18 +48,18 @@ export default function PostJobStep1JobType({ navigation, route }) {
   const [title,          setTitle]          = useState(editJob?.title           || jobData.title || prefill?.title || '')
   const [scheduleType,   setScheduleType]   = useState(editJob ? editorScheduleType(editJob) : jobData.scheduleType)
   const [scheduledDate,  setScheduledDate]  = useState(() => {
-    if (editJob?.scheduled_date) return new Date(editJob.scheduled_date)
-    if (jobData.scheduledDate)   return new Date(jobData.scheduledDate)
+    if (editJob?.scheduled_date) return localDate(nzCalendarDay(editJob.scheduled_date))
+    if (jobData.scheduledDate)   return localDate(nzCalendarDay(jobData.scheduledDate))
     return null
   })
   const [dateFrom,       setDateFrom]       = useState(() => {
-    if (editJob?.date_from) return new Date(editJob.date_from)
-    if (jobData.dateFrom)   return new Date(jobData.dateFrom)
+    if (editJob?.date_from) return localDate(nzCalendarDay(editJob.date_from))
+    if (jobData.dateFrom)   return localDate(nzCalendarDay(jobData.dateFrom))
     return null
   })
   const [dateTo,         setDateTo]         = useState(() => {
-    if (editJob?.date_to) return new Date(editJob.date_to)
-    if (jobData.dateTo)   return new Date(jobData.dateTo)
+    if (editJob?.date_to) return localDate(nzCalendarDay(editJob.date_to))
+    if (jobData.dateTo)   return localDate(nzCalendarDay(jobData.dateTo))
     return null
   })
   // Which date is being picked: 'date' | 'from' | 'to'. Uses the same picker as
@@ -65,8 +67,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
   const [picker, setPicker] = useState(null)
 
   function pickerOptions(which) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = localDate(nzToday())
     if (which === 'from') {
       return {
         value: dateFrom || today, mode: 'date', minimumDate: today,
@@ -137,7 +138,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
     updateJobData(mapped)
     setTitle(mapped.title || '')
     setScheduleType(mapped.scheduleType || '')
-    setScheduledDate(mapped.scheduledDate ? new Date(mapped.scheduledDate) : null)
+    setScheduledDate(mapped.scheduledDate ? localDate(nzCalendarDay(mapped.scheduledDate)) : null)
     navigation.setParams({ aiSeed: undefined })
   }, [route.params?.aiSeed])
 
@@ -157,13 +158,13 @@ export default function PostJobStep1JobType({ navigation, route }) {
     updateJobData({
       title,
       scheduleType,
-      scheduledDate: scheduledDate ? scheduledDate.toISOString() : null,
-      dateFrom: dateFrom ? dateFrom.toISOString() : null,
-      dateTo:   dateTo   ? dateTo.toISOString()   : null,
+      scheduledDate: toLocalIsoDate(scheduledDate),
+      dateFrom: toLocalIsoDate(dateFrom),
+      dateTo:   toLocalIsoDate(dateTo),
     })
   }, [title, scheduleType, scheduledDate, dateFrom, dateTo])
 
-  const scheduleError=jobScheduleError({schedule_type:scheduleType,scheduled_date:scheduledDate,date_from:dateFrom,date_to:dateTo},isRepeatMode?null:editJob)
+  const scheduleError=jobScheduleError({schedule_type:scheduleType,scheduled_date:toLocalIsoDate(scheduledDate),date_from:toLocalIsoDate(dateFrom),date_to:toLocalIsoDate(dateTo)},isRepeatMode?null:editJob)
 
   const [attempted,setAttempted]=useState(false)
   function canProceed() {
@@ -250,7 +251,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
                   {opt.id === 'specific' && scheduleType === 'specific' && (
                     <View style={styles.scheduleSub}>
-                      <DateChips value={scheduledDate} wrap onSelect={setScheduledDate} onOpen={() => openPicker('date')} />
+                      <DateChips value={scheduledDate} now={localDate(nzToday())} wrap onSelect={setScheduledDate} onOpen={() => openPicker('date')} />
                       <TouchableOpacity style={styles.datePicker} onPress={() => openPicker('date')} accessibilityRole="button"
                         accessibilityLabel={scheduledDate ? `Date: ${formatDate(scheduledDate)}. Change` : 'Select a date'}>
                         <Text style={scheduledDate ? styles.datePickerValue : styles.datePickerPlaceholder}>

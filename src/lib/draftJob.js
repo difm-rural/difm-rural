@@ -1,9 +1,10 @@
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
+import {nzCalendarDay,nzToday} from '../../shared/postingDates'
 // AI job assistant — turn a natural spoken/typed description into a job draft.
 import { supabase } from './supabase'
 
 export async function draftJobFromText(text) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = nzToday()
   const { data, error } = await supabase.functions.invoke('draft-job-from-text', {
     body: { text, today },
   })
@@ -24,11 +25,7 @@ export function draftToJobData(draft) {
     price = String(Math.round((Number(draft.budget_low) + Number(hi)) / 2))
   }
 
-  let scheduledDate = null
-  if (draft.schedule_type === 'specific' && draft.scheduled_date) {
-    const d = new Date(draft.scheduled_date)
-    if (!isNaN(d.getTime())) scheduledDate = d.toISOString()
-  }
+  const scheduledDate = draft.schedule_type === 'specific' ? nzCalendarDay(draft.scheduled_date) : null
 
   return {
     title:        draft.title || '',

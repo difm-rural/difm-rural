@@ -11,8 +11,8 @@ export function useSubmitGuard(state: ActionState, blocked: boolean) {
   }
 }
 
-export function ActionForm({ action, label, children, disabled=false, pendingLabel='Saving…' }: {
-  action: (state: ActionState, data: FormData) => Promise<ActionState>; label: string; children?: ReactNode; disabled?:boolean; pendingLabel?:string
+export function ActionForm({ action, label, children, disabled=false, pendingLabel='Saving…', pendingMessage }: {
+  action: (state: ActionState, data: FormData) => Promise<ActionState>; label: string; children?: ReactNode; disabled?:boolean; pendingLabel?:string; pendingMessage?:string
 }) {
   const [state, submit, pending] = useActionState(action, { error: '' })
   const guardSubmit = useSubmitGuard(state, pending || disabled)
@@ -20,5 +20,6 @@ export function ActionForm({ action, label, children, disabled=false, pendingLab
     {state.error && <p className="form-error" role="alert">{state.error}</p>}
     {state.success && <p className="home-clear" role="status">{state.success}</p>}
     <button className="lform-save" disabled={pending || disabled}>{pending ? pendingLabel : label}</button>
+    {pendingMessage && <p className="muted" role="status">{pending ? pendingMessage : ''}</p>}
   </form>
 }

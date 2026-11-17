@@ -73,8 +73,8 @@ export function requestedLabel(job: JobSchedule | null | undefined, today?: stri
 // The day chips for choosing an arrival day, driven by what was requested:
 //   specific (today or later) → "Use requested date · Sat 15", pre-selected; the
 //                               usual quick picks follow.
-//   range                     → the days in the range from today on (max 7),
-//                               first one pre-selected; no quick picks.
+//   range                     → the days in the range from today on (max 7);
+//                               preselect only a single-day request.
 //   flexible / asap / passed  → no special chips; the usual quick picks.
 //   offer later than asked    → an extra "You offered · Mon 17", not pre-selected.
 export function arrivalDayChoices(
@@ -94,12 +94,12 @@ export function arrivalDayChoices(
     for (let count = 0; day <= requested.to && count < MAX_RANGE_CHIPS; count += 1, day = addDays(day, 1)) {
       chips.push({ day, label: shortDayLabel(day), kind: 'range' })
     }
-    preselect = chips[0].day
+    if (requested.from === requested.to) preselect = requested.from
     quickPicks = false
   }
 
   const offer = nzCalendarDay(offerDay)
-  if (offer && requested.to !== null && offer > requested.to && offer >= today && !chips.some(chip => chip.day === offer)) {
+  if (offer && offer >= today && (requested.to === null || offer > requested.to) && !chips.some(chip => chip.day === offer)) {
     chips.push({ day: offer, label: `You offered · ${shortDayLabel(offer)}`, kind: 'offer' })
   }
 

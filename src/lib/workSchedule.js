@@ -1,4 +1,4 @@
-import {formatDate} from '../../shared/formatting.js'
+import {formatWorkDateTime} from '../../shared/formatting.js'
 import { Alert, Platform } from 'react-native'
 import { supabase } from './supabase'
 
@@ -49,15 +49,7 @@ export async function sendRunningLate({ jobId, bookingId, minutes }) {
 // start), plus the expected finish when set.
 export function formatArrivalWindow(schedule) {
   if (!schedule?.arrival_start_at) return ''
-  const start = new Date(schedule.arrival_start_at)
-  const time = value => value.toLocaleTimeString('en-NZ', {
-    hour: 'numeric', minute: '2-digit', timeZone: 'Pacific/Auckland',
-  })
-  const nzDay = value => value.toLocaleDateString('en-NZ', {
-    timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit',
-  })
-  const sameDay = nzDay(start) === nzDay(new Date())
-  return sameDay ? `Expected around ${time(start)}` : `Expected ${formatDate(start)}, around ${time(start)}`
+  return `Expected around ${formatWorkDateTime(schedule.arrival_start_at)}`
 }
 
 // The arrival RPC rejects a past time with a message containing "future"; show a

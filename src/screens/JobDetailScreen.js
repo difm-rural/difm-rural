@@ -116,6 +116,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [providerReviewVisible, setProviderReviewVisible] = useState(false)
   const [savingProviderReview, setSavingProviderReview] = useState(false)
   const [workSchedule, setWorkSchedule] = useState(null)
+  const justConfirmed = useRef(null)
   const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
   const [confirmJobVisible, setConfirmJobVisible] = useState(false)
   const [completeVisible, setCompleteVisible] = useState(false)
@@ -187,7 +188,9 @@ export default function JobDetailScreen({ route, navigation }) {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(profileData)
     const schedule = await fetchWorkSchedule({ jobId: currentJob.id })
-    setWorkSchedule(schedule)
+    const confirmed = justConfirmed.current
+    setWorkSchedule(schedule || (confirmed?.jobId === currentJob.id ? confirmed.arrival : null))
+    if (schedule && confirmed?.jobId === currentJob.id) justConfirmed.current = null
 
     const { data: bidsData } = await supabase
       .from('bids')
@@ -907,7 +910,9 @@ export default function JobDetailScreen({ route, navigation }) {
           amount={myBid?.amount}
           pricingType={myBid?.pricing_type}
           onClose={() => setConfirmJobVisible(false)}
-          onConfirmed={() => {
+          onConfirmed={arrival => {
+            justConfirmed.current = { jobId: job.id, arrival }
+            setWorkSchedule(arrival)
             setConfirmJobVisible(false)
             fetchData()
             Alert.alert('Job confirmed', `${requesterFirstName} has been notified.`)

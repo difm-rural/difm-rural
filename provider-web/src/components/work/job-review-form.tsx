@@ -9,7 +9,7 @@ export function JobReviewForm({id,rating:initialRating,comment:initialComment,ed
 }){
   const [rating,setRating]=useState(initialRating ?? 0)
   const [comment,setComment]=useState(initialComment ?? '')
-  return <ActionForm action={reviewArrangement} label={editing?'Save review changes':'Submit review'} pendingLabel={editing?'Saving changes…':'Posting review…'}>
+  return <ActionForm action={reviewArrangement} label={editing?'Save review changes':'Submit review'} pendingLabel={editing?'Saving changes…':'Posting review…'} pendingMessage="Saving your review. Please wait.">
     <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value="job"/>
     <StarRatingInput rating={rating} onRating={setRating}/>
     <label className="lform-field">Comments (optional)<textarea name="comment" rows={4} value={comment} onChange={event=>setComment(event.target.value)}/></label>
