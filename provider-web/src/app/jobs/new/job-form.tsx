@@ -1,6 +1,6 @@
 'use client'
 import {JobPhotoDraft,type PhotoSuggestion} from '@/components/job-photo-draft'
-import {JobTextDraft} from '@/components/job-text-draft'
+import {JobAiChoiceCopy,JobTextDraft,revealJobAiContent} from '@/components/job-text-draft'
 import {jobPhotoRequest,prepareJobPhoto} from '@/lib/job-primary-photo'
 import {JobAddressInput} from '@/components/job-address-input'
 import {JobLocationMap} from '@/components/job-location-map'
@@ -197,8 +197,10 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
    {mode==='new'&&<details className="job-ai-helper">
     <summary><span><strong>Use AI to help create my job</strong><small>{canUsePhoto?'Use a photo, speak or describe what you need.':'Speak or describe what you need.'}</small></span></summary>
     <div className="job-ai-options">
-     {canUsePhoto&&<details className="job-ai-photo">
-      <summary>Photo{primaryPhoto?' · selected':''}</summary>
+     {canUsePhoto&&<details className="job-ai-photo" onToggle={event=>{
+      if(event.currentTarget.open)revealJobAiContent(event.currentTarget.querySelector('.job-ai-panel'))
+     }}>
+      <summary className="job-ai-choice" aria-label={primaryPhoto?'Use a photo. Photo selected.':undefined}><JobAiChoiceCopy choice="Photo"/></summary>
       <div className="job-ai-panel">{photoEditor(true)}</div>
      </details>}
      <JobTextDraft onUse={applyPhotoSuggestion}/>

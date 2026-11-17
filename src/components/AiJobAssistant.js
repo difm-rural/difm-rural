@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Keyboard, Modal, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native'
 import { colors } from '../theme/tokens'
 import Icon from './Icon'
@@ -9,6 +9,23 @@ import Button from './Button'
 import { draftJobFromText, draftBudgetText } from '../lib/draftJob'
 
 const SCHEDULE_TEXT = { asap: 'As soon as possible', specific: 'On a specific day', flexible: 'Flexible timing' }
+const ASSISTANT_CHOICES = [
+  {label:'Speak', icon:'mic-outline', description:'Tell our Assistant what needs doing.'},
+  {label:'Describe', icon:'create-outline', description:'Write a few details and let AI prepare your job.'},
+]
+
+export function JobAiChoice({label, description, icon, onPress, expanded, hint}) {
+  return <TouchableOpacity style={styles.trigger} onPress={onPress} accessibilityRole="button"
+    accessibilityLabel={label + '. ' + description} accessibilityHint={hint}
+    accessibilityState={expanded === undefined ? undefined : {expanded}}>
+    <Icon name={icon} size={18} color={colors.primary} />
+    <View style={styles.triggerCopy}>
+      <Text style={styles.triggerText}>{label}</Text>
+      <Text style={styles.triggerDescription}>{description}</Text>
+    </View>
+    <Icon name={expanded ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textSecondary} />
+  </TouchableOpacity>
+}
 
 function DraftRow({ label, value, last }) {
   if (!value) return null
@@ -21,6 +38,7 @@ function DraftRow({ label, value, last }) {
 }
 
 export default function AiJobAssistant({ onUse }) {
+  const {height} = useWindowDimensions()
   const [mode, setMode] = useState(null)
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -76,19 +94,13 @@ export default function AiJobAssistant({ onUse }) {
 
   return (
     <>
-      {['Speak', 'Describe'].map(choice => <TouchableOpacity key={choice}
-        style={styles.trigger}
-        onPress={() => setMode(choice)}
-        accessibilityRole="button"
-        accessibilityLabel={choice === 'Speak' ? 'Speak with the AI assistant' : 'Describe your job to the AI assistant'}>
-        <Icon name={choice === 'Speak' ? 'mic-outline' : 'create-outline'} size={18} color={colors.primary} />
-        <Text style={styles.triggerText}>{choice}</Text>
-      </TouchableOpacity>)}
+      {ASSISTANT_CHOICES.map(choice => <JobAiChoice key={choice.label} {...choice}
+        onPress={() => setMode(choice.label)} />)}
 
       <Modal visible={mode !== null} animationType="slide" transparent onRequestClose={close}>
         <View style={styles.backdrop}>
           <TouchableOpacity style={styles.backdropTap} activeOpacity={1} onPress={close} accessibilityLabel="Close" />
-          <View style={[styles.sheet, { marginBottom: kbHeight }]}>
+          <View style={[styles.sheet, { marginBottom: kbHeight, maxHeight: Math.max(160,height-kbHeight-24) }]}>
               <View style={styles.sheetHeader}>
                 <Text style={styles.sheetTitle}>
                   <Icon name="sparkles" size={16} color={colors.primary} /> Describe your job
@@ -99,7 +111,7 @@ export default function AiJobAssistant({ onUse }) {
               </View>
 
               {!draft ? (
-                <View>
+                <ScrollView style={styles.sheetScroll} keyboardShouldPersistTaps="handled">
                   <Text style={styles.help}>
                     {mode === 'Speak' ? 'Tap the mic on your keyboard and describe what you need.' : 'Describe what you need in your own words.'}
                   </Text>
@@ -125,7 +137,7 @@ export default function AiJobAssistant({ onUse }) {
                     onPress={handleCreate}
                     accessibilityLabel="Create job draft"
                   />
-                </View>
+                </ScrollView>
               ) : (
                 <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                   <Text style={styles.help}>Here's what I put together. Review it, then continue to set the location and post.</Text>
@@ -155,12 +167,15 @@ const styles = StyleSheet.create({
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
     paddingHorizontal: 10,
     paddingVertical: 10,
     minHeight: 44,
   },
+  triggerCopy: {flex:1,gap:3},
   triggerText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  triggerDescription: {color:colors.textSecondary,fontSize:13,lineHeight:18},
+  sheetScroll: {flexShrink:1},
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   backdropTap: { flex: 1 },

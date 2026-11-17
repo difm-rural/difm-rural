@@ -611,16 +611,21 @@ a.row:hover { background: var(--sage); }
 .job-progress { display: grid; gap: 6px; }
 .job-progress p { margin: 0; }
 .job-progress progress { width: 100%; height: 5px; display: block; accent-color: var(--forest); }
-.job-basics { gap: 20px; }
-.job-ai-helper { border-radius: 12px; background: var(--paper); }
+.job-basics { gap: 20px; padding-bottom: 24px; }
+.job-basics :is(input,textarea,summary,button) { scroll-margin-bottom: 140px; }
+.job-ai-helper { border-radius: 12px; background: var(--sage); }
 .job-ai-helper > summary { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; cursor: pointer; }
 .job-ai-helper > summary::after { content: '＋'; color: var(--forest); }
 .job-ai-helper[open] > summary::after { content: '−'; }
-.job-ai-helper > summary small { display: block; margin-top: 4px; color: var(--muted); }
+.job-ai-helper > summary small { display: block; margin-top: 4px; color: var(--forest-deep); }
 .job-ai-options { display: grid; gap: 4px; padding: 0 16px 14px; min-width: 0; }
 .job-ai-helper summary::-webkit-details-marker { display: none; }
-.job-ai-choice, .job-ai-photo > summary { width: 100%; min-height: 44px; padding: 11px 10px; text-align: left; font: inherit; font-weight: 650; cursor: pointer; color: var(--forest-deep); }
-.job-ai-choice { border: 0; border-radius: 8px; background: transparent; }
+.job-ai-choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px; text-align: left; font: inherit; cursor: pointer; color: var(--forest-deep); border: 0; border-radius: 8px; background: transparent; }
+.job-ai-choice > svg { flex: none; }
+.job-ai-choice-copy { display: grid; flex: 1; gap: 3px; }
+.job-ai-choice-copy small { font-size: 13px; line-height: 1.4; }
+.job-ai-chevron { opacity: .72; }
+.job-ai-choice[aria-expanded="true"] .job-ai-chevron, .job-ai-photo[open] .job-ai-chevron { transform: rotate(90deg); }
 .job-ai-choice:hover, .job-ai-photo > summary:hover { background: white; }
 .job-ai-helper :is(summary,button):focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
 .job-ai-panel { display: grid; justify-items: start; gap: 12px; padding: 8px 10px; }

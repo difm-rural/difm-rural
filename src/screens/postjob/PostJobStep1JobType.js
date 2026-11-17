@@ -1,7 +1,7 @@
 import {formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
 import {editorScheduleType,jobScheduleError,nzCalendarDay,nzToday} from '../../../shared/postingDates'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Keyboard, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -11,7 +11,7 @@ import {localDate} from '../../lib/quickPickDates'
 import DateChips from '../../components/DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from '../../components/NativeDateTimePicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AiJobAssistant from '../../components/AiJobAssistant'
+import AiJobAssistant, { JobAiChoice } from '../../components/AiJobAssistant'
 import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
 import { photoToJobEnabled } from '../../lib/jobPrimaryPhoto'
 import { jobDraftCategory } from '../../../shared/categories'
@@ -71,7 +71,24 @@ export default function PostJobStep1JobType({ navigation, route }) {
   const [picker, setPicker] = useState(null)
   const [aiExpanded, setAiExpanded] = useState(false)
   const [photoExpanded, setPhotoExpanded] = useState(false)
+  const scroll = useRef(null)
+  const viewport = useRef(null)
+  const photoPanel = useRef(null)
+  const scrollY = useRef(0)
+  const revealPhoto = useRef(false)
   const canUsePhoto = photoToJobEnabled && route.name !== 'GuestPostJob' && !jobData.photos?.length
+
+  function showPhotoControls() {
+    if (!revealPhoto.current || !photoExpanded || !aiExpanded) return
+    revealPhoto.current=false
+    viewport.current?.measureInWindow((_x, top, _width, height) => {
+      photoPanel.current?.measureInWindow((_x, panelTop, _width, panelHeight) => {
+        const bottom=top+height-16
+        const hiddenHeight=panelTop+Math.min(panelHeight,150)-bottom
+        if (hiddenHeight>0) scroll.current?.scrollTo({y:scrollY.current+hiddenHeight,animated:true})
+      })
+    })
+  }
 
   function pickerOptions(which) {
     const today = localDate(nzToday())
@@ -214,8 +231,11 @@ export default function PostJobStep1JobType({ navigation, route }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
         enabled={Platform.OS === 'android'}>
-        <ScrollView
+        <View ref={viewport} collapsable={false} style={styles.flex1}>
+        <ScrollView ref={scroll}
           style={styles.scroll}
+          onScroll={event=>{scrollY.current=event.nativeEvent.contentOffset.y}}
+          scrollEventThrottle={16}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}
@@ -256,12 +276,11 @@ export default function PostJobStep1JobType({ navigation, route }) {
             </TouchableOpacity>
             <View style={aiExpanded ? styles.aiChoices : styles.hidden}>
               {canUsePhoto && <>
-                <TouchableOpacity style={styles.aiChoice} accessibilityRole="button"
-                  accessibilityState={{expanded:photoExpanded}} onPress={() => setPhotoExpanded(value => !value)}>
-                  <Icon name="camera-outline" size={18} color={colors.primary} />
-                  <Text style={styles.aiTitle}>Photo{jobData.primaryPhoto ? ' · selected' : ''}</Text>
-                </TouchableOpacity>
-                <View style={photoExpanded ? styles.photoPanel : styles.hidden}>
+                <JobAiChoice label="Use a photo" description="Take or choose a photo and add a few words if you like."
+                  icon="camera-outline" expanded={photoExpanded} hint={jobData.primaryPhoto ? 'Photo selected' : undefined}
+                  onPress={() => {revealPhoto.current=!photoExpanded;setPhotoExpanded(!photoExpanded)}} />
+                <View ref={photoPanel} collapsable={false} onLayout={showPhotoControls}
+                  style={photoExpanded ? styles.photoPanel : styles.hidden}>
                   <JobPrimaryPhotoDraft photo={jobData.primaryPhoto} required={jobData.primaryPhotoRequired}
                     onPhoto={primaryPhoto=>updateJobData({primaryPhoto,primaryPhotoRequired:true})}
                     onManual={()=>updateJobData({primaryPhoto:null,primaryPhotoRequired:false})}
@@ -352,6 +371,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
           </View>
         </ScrollView>
+        </View>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <Button
@@ -371,16 +391,15 @@ const styles = StyleSheet.create({
   screen:        { flex: 1, backgroundColor: '#f5f5f5' },
   flex1:         { flex: 1 },
   scroll:        { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24 },
+  scrollContent: { padding: 16, paddingBottom: 36 },
 
   card: { marginBottom: 18 },
   heading: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginBottom: 14 },
   aiHelper: { backgroundColor: colors.primaryLight, borderRadius: 12, marginBottom: 24 },
   aiToggle: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   aiTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
-  aiHint: { color: colors.textMuted, fontSize: 13, marginTop: 3 },
+  aiHint: { color: colors.textSecondary, fontSize: 13, lineHeight:18, marginTop: 3 },
   aiChoices: { paddingHorizontal: 14, paddingBottom: 14, gap: 6 },
-  aiChoice: { flexDirection: 'row', alignItems: 'center', padding: 10, gap: 8, minHeight: 44 },
   photoPanel: { paddingHorizontal: 8 },
   hidden: { display: 'none' },
   cardQuestion: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },

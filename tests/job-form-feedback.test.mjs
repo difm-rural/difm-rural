@@ -31,7 +31,7 @@ function harness(storage,seed,{
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='@/components/job-address-input')return {JobAddressInput:'job-address'}
   if(name==='@/components/job-photo-draft')return {JobPhotoDraft:'job-photo-draft'}
-  if(name==='@/components/job-text-draft')return {JobTextDraft:'job-text-draft'}
+  if(name==='@/components/job-text-draft')return {JobTextDraft:'job-text-draft',JobAiChoiceCopy:'job-ai-choice-copy'}
   if(name==='@/lib/job-primary-photo')return {prepareJobPhoto:async file=>file,jobPhotoRequest:uploadPhoto}
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
