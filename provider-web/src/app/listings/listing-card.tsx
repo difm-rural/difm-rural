@@ -7,7 +7,7 @@ import {ThumbImg} from '@/components/thumb-img'
 // (no hooks), so both the client form (C2 chooser) and the server listings page (C3)
 // can render it.
 import type { ReactNode } from 'react'
-import { ImageIcon } from 'lucide-react'
+import { categoryArtwork } from '@shared/categoryArtwork'
 
 export type CardStyle = 'bold' | 'bottom' | 'clean' | null | undefined
 
@@ -41,10 +41,9 @@ export function CardImage({
       {photoUrl ? (
         <ThumbImg src={photoUrl} alt={category ? category+' photo' : 'Listing photo'} />
       ) : (
-        <div className="lcard-placeholder">
-          <ImageIcon size={22} />
-          <span>{category || 'Listing'}</span>
-        </div>
+        // No photo: the category's artwork (an icon on its tint), as in the app.
+        // eslint-disable-next-line @next/next/no-img-element -- local category artwork.
+        <img src={categoryArtwork(category ?? null)} alt="" loading="lazy" />
       )}
       {photoUrl && head && (
         <div className={`lcard-msg${mod ? ' ' + mod : ''}`}>

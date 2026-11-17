@@ -43,6 +43,7 @@ function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{cate
   if(name==='@/lib/supabase/client')return {createClient:()=>({functions:{invoke:suggest}})}
   if(name==='../../work-actions')return {}
   if(name==='@/lib/photo-thumbs')return {uploadThumbnail:async()=>true,removeThumbnails:async()=>{}}
+  if(name==='@shared/categoryArtwork')return {categoryArtwork:()=>'/images/general.png'}
   if(name==='@shared/photos')return {removedThumbPaths:()=>[],thumbUrl:url=>url,fallbackImageSrc:()=>null}
   if(name==='@/lib/resize-photo')return {PHOTO_MAX:1600,AVATAR_MAX:512,resizePhoto:async file=>file}
   if(name==='lucide-react')return {LoaderCircle:()=>null}

@@ -7,6 +7,7 @@ import {createRequire} from 'node:module'
 import vm from 'node:vm'
 import * as pricing from '../shared/listingPricing.ts'
 import * as photos from '../shared/photos.ts'
+import * as artwork from '../shared/categoryArtwork.ts'
 const require=createRequire(import.meta.url),webRequire=createRequire(new URL('../provider-web/package.json',import.meta.url)),ts=require('typescript')
 const React=webRequire('react'),{renderToStaticMarkup}=webRequire('react-dom/server'),jsx=webRequire('react/jsx-runtime')
 const Link=({children,...props})=>React.createElement('a',props,children)
@@ -22,6 +23,7 @@ async function load(file,extra={}){
   if(name==='lucide-react')return new Proxy({},{get:()=>()=>React.createElement('svg')})
   if(name==='@shared/listingPricing')return pricing
   if(name==='@shared/photos')return photos
+  if(name==='@shared/categoryArtwork')return artwork
   if(name==='next/navigation')return {useRouter:()=>({refresh(){}})}
   if(name==='@/lib/supabase/client')return {createClient:()=>({})}
   if(name in extra)return extra[name]
