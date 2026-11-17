@@ -14,7 +14,7 @@ import {runSubmission} from '../shared/submission.ts'
 const require=createRequire(import.meta.url),ts=require('typescript')
 const source=await readFile(new URL('../provider-web/src/app/jobs/new/job-form.tsx',import.meta.url),'utf8')
 const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
-function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}})}={}){
+function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}}),jobExists=false}={}){
  const state=[],refs=[],effects=[],dependencies=[],cleanups=[],submissions=[],destinations=[]
  let index=0,refIndex=0,effectIndex=0,tree,actionState={error:''}
  const router={push:path=>destinations.push(path)}
@@ -40,7 +40,7 @@ function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{cate
   if(name==='next/navigation')return {useRouter:()=>router}
   if(name==='@/components/navigation-link')return {default:'a'}
   if(name==='@/lib/job-input')return {SCHEDULES:{flexible:'Flexible',specific:'Specific date',range:'Date range'},MATERIALS:{none:'None'},ACCESS:{}}
-  if(name==='@/lib/supabase/client')return {createClient:()=>({functions:{invoke:suggest}})}
+  if(name==='@/lib/supabase/client')return {createClient:()=>({functions:{invoke:suggest},from:()=>({select:()=>({eq:(column,value)=>({maybeSingle:async()=>({data:jobExists?{id:value}:null,error:null})})})})})}
   if(name==='../../work-actions')return {}
   if(name==='@/lib/photo-thumbs')return {uploadThumbnail:async()=>true,removeThumbnails:async()=>{}}
   if(name==='@shared/categoryArtwork')return {categoryArtwork:()=>'/images/general.png'}
@@ -170,10 +170,12 @@ function reachReview(h){
 test('Post job immediately goes busy, ignores duplicate submits and keeps the draft for retry',async()=>{
  let allow
  const location=new Promise(resolve=>{allow=resolve})
- const h=harness(storageWith(),undefined,{check:()=>location})
+ const storage=storageWith()
+ const h=harness(storage,undefined,{check:()=>location})
  await h.flush()
  reachReview(h)
  await h.flush()
+ assert.ok(storage.getItem(draftKey))
  const button=()=>h.nodes().find(node=>node.props.id==='job-review-submit')
  const started=h.submit()
  assert.equal(button().props.disabled,true)
@@ -188,7 +190,12 @@ test('Post job immediately goes busy, ignores duplicate submits and keeps the dr
  assert.equal(h.submissions[0].job_id,'test-job-id')
  assert.equal(h.submissions[0].title,'Repair a drain')
  assert.equal(h.destinations.length,0)
+ // The submitted snapshot owns the data now; success navigates server-side,
+ // so the stored draft is dropped at dispatch…
+ assert.equal(storage.getItem(draftKey),null)
  h.result({error:'The server could not save the job.'})
+ // …and restored the moment a failure comes back.
+ assert.equal(JSON.parse(storage.getItem(draftKey)).draft.title,'Repair a drain')
  assert.equal(button().props.disabled,false)
  assert.ok(h.nodes().some(node=>node.props.role==='alert'&&h.text(node)==='The server could not save the job.'))
  await h.submit()
@@ -198,6 +205,26 @@ test('Post job immediately goes busy, ignores duplicate submits and keeps the dr
  assert.equal(button().props.disabled,true)
  assert.ok(h.nodes().some(node=>node.props.role==='status'&&h.text(node)==='Saved. Opening your job…'))
  assert.deepEqual(h.destinations,['/jobs/test-job-id?posted=1'])
+})
+
+test('a saved draft that already became a job links to it instead of offering a repost',async()=>{
+ const storage=storageWith(JSON.stringify({id:'already-posted-job',draft:{title:'Fix the woolshed tap'}}))
+ const h=harness(storage,undefined,{jobExists:true})
+ await h.flush()
+ await h.flush()
+ assert.equal(h.hasResume(),false)
+ assert.ok(h.nodes().some(n=>n.type==='h2'&&h.text(n)==='Draft already posted'))
+ assert.ok(h.nodes().some(n=>n.props?.href==='/jobs/already-posted-job'))
+ assert.equal(storage.getItem(draftKey),null)
+})
+
+test('a saved draft with no matching job still offers to resume',async()=>{
+ const storage=storageWith(JSON.stringify({id:'unposted-draft',draft:{title:'Fix the woolshed tap'}}))
+ const h=harness(storage,undefined,{jobExists:false})
+ await h.flush()
+ await h.flush()
+ assert.equal(h.hasResume(),true)
+ assert.ok(!h.nodes().some(n=>n.type==='h2'&&h.text(n)==='Draft already posted'))
 })
 
 test('Review labels the automatic category, persists the override and does not suggest again',async()=>{

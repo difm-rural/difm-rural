@@ -73,7 +73,9 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
     }
   }
   for(const path of ['/','/jobs','/jobs/'+id,'/activity','/activity/job/'+id+'/manage'])revalidatePath(path)
-  return {error:'',jobId:id}
+  // Navigate from the server so success cannot be lost to a client remount or
+  // reload — the browser lands on the job page in the same response.
+  redirect('/jobs/'+id+(editing?'?edited=1':'?posted=1'))
 }
 
 // Records the post-job ease rating shown on the "Job posted" screen. Feedback is

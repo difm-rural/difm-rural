@@ -29,7 +29,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
  const [attempted,setAttempted]=useState(false),[furthest,setFurthest]=useState(0)
  const initial:Draft={also_public:false,category:seed?.category || '',title:seed?.title || '',description:seed?.description || '',price_type:seed?.price_type || 'open',price:seed?.price==null?'':String(seed.price),location:seed?.location_name || '',area:seed?.location_area || '',location_note:seed?.location_note || '',hide_exact_location:seed?.hide_exact_location ?? true,latitude:seed?.latitude==null?'':String(seed.latitude),longitude:seed?.longitude==null?'':String(seed.longitude),schedule_type:editorScheduleType(seed||{}),scheduled_date:nzCalendarDay(seed?.scheduled_date) || '',date_from:seed?.date_from || '',date_to:seed?.date_to || '',materials_type:seed?.materials_type || 'none',access_conditions:seed?.access_conditions || [],photos:seed?.photos || []}
  const [baseline]=useState(initial)
- const [draft,setDraft]=useState(initial),[step,setStep]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[jobId,setJobId]=useState(mode==='edit'?seed!.id:''),[saved,setSaved]=useState<{draft:Draft;id:string}|null>(null),[ready,setReady]=useState(false)
+ const [draft,setDraft]=useState(initial),[step,setStep]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[jobId,setJobId]=useState(mode==='edit'?seed!.id:''),[saved,setSaved]=useState<{draft:Draft;id:string}|null>(null),[ready,setReady]=useState(false),[postedDraft,setPostedDraft]=useState('')
  const [suggestion,setSuggestion]=useState<{title:string;description:string;category:string;fromDescription:boolean}|null>(null)
  const {title,description,category}=draft
  const suggestedCategory=suggestion?.title===title&&suggestion.description===description?suggestion.category:''
@@ -49,7 +49,9 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   return ()=>{active=false;controller.abort()}
  },[step,category,suggestedCategory,title,description])
  const [state,action,pending]=useActionState(async (previous:{error:string;jobId?:string},data:FormData)=>{
-  try{return await (mode==='edit'?editJob:postJob)(previous,data)}
+  // A successful save redirects from the server, which can resolve without a
+  // result — keep the previous state so the form stays locked until it unmounts.
+  try{return await (mode==='edit'?editJob:postJob)(previous,data) ?? previous}
   catch{return {error:'Could not confirm that the job was saved. Your changes are kept. Please try again.'}}
  },{error:''})
  const heading=useRef<HTMLHeadingElement>(null),router=useRouter(),key='rural-job:'+userId+':'+mode+':'+(seed?.id || 'new')+':'+(inviteProvider?.id || 'public')
@@ -62,7 +64,19 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
    setJobId(id=>id || crypto.randomUUID())
    try{
     const value=readJobDraft(sessionStorage.getItem(key),baseline)
-    if(value)setSaved(value)
+    if(value){
+     setSaved(value)
+     // The draft id becomes the job id, so an existing job means this draft
+     // already published (e.g. the tab reloaded mid-post) — don't offer to
+     // post it again.
+     if(mode!=='edit')try{
+      void createClient().from('jobs').select('id').eq('id',value.id).maybeSingle().then(({data,error})=>{
+       if(!active||error||!data)return
+       try{sessionStorage.removeItem(key)}catch{}
+       setSaved(null);setPostedDraft(value.id)
+      },()=>{})
+     }catch{}
+    }
     else sessionStorage.removeItem(key)
    }catch{} // Storage may be unavailable; the form still works.
    setReady(true)
@@ -76,7 +90,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
    else sessionStorage.removeItem(key)
   }catch{}
  },[draft,jobId,key,ready,saved,baseline,state.jobId])
- useEffect(()=>{if(state.error){submissionLock.current=false;setSubmitting(false)}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'?edited=1':'?posted=1'))}},[state,key,router,mode])
+ useEffect(()=>{if(state.error){submissionLock.current=false;setSubmitting(false);try{if(hasJobDraftChanges(draft,baseline))sessionStorage.setItem(key,JSON.stringify({draft,id:jobId}))}catch{}}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'?edited=1':'?posted=1'))}},[state,key,router,mode])  // eslint-disable-line react-hooks/exhaustive-deps -- draft/jobId are re-saved only at the moment a failure arrives
  useEffect(()=>{heading.current?.focus();heading.current?.scrollIntoView({block:'start'})},[step])
  const set=<K extends keyof Draft>(name:K,value:Draft[K])=>setDraft(d=>({...d,[name]:value}))
  function stepIssues(index:number):Record<string,string>{
@@ -142,12 +156,16 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider}:{us
   const data=new FormData(e.currentTarget)
   await runSubmission(submissionLock,async()=>{
    if(!await locationWarning.check({latitude:draft.latitude,longitude:draft.longitude,area:draft.area,kind:'job'})){setStep(1);return false}
+   // The form data is snapshotted, so drop the stored draft now: success
+   // navigates away server-side, and a failure re-saves it (state.error effect).
+   try{sessionStorage.removeItem(key)}catch{}
    startTransition(()=>action(data))
    return true
   },()=>{setSubmitting(true);setError('')},()=>setSubmitting(false),()=>setError('Could not save the job. Your changes are kept. Check your connection and try again.'))
  }
  return <form noValidate className="lform" onSubmit={reviewSubmit}>
   {locationWarning.prompt}
+  {postedDraft&&<div className="card"><h2>Draft already posted</h2><p>The draft saved in this tab was already published as a job — you don&apos;t need to post it again.</p><div className="lform-actions"><Link className="lform-save" href={'/jobs/'+postedDraft}>Open the job</Link><button type="button" className="lform-cancel" onClick={()=>setPostedDraft('')}>Start a new job</button></div></div>}
   {saved&&<div className="card"><h2>Resume your draft?</h2><p>A draft is saved in this browser tab. It has not been published.</p><div className="lform-actions"><button type="button" className="lform-save" onClick={()=>{setDraft({...initial,...saved.draft});setJobId(mode==='edit'?seed!.id:saved.id);setSaved(null)}}>Resume draft</button><button type="button" className="lform-cancel" onClick={()=>{setSaved(null);try{sessionStorage.removeItem(key)}catch{}}}>Discard saved draft</button></div></div>}
   {inviteProvider&&<section className="card work-detail"><h2>Invite {inviteProvider.name}</h2><p>This job will be visible only to you and this provider unless you choose the public board.</p><label className="account-setting"><input type="checkbox" disabled={pending||busy||submitting} checked={draft.also_public} onChange={e=>set('also_public',e.target.checked)}/>Also put this job on the public Jobs board</label></section>}
   {mode==='repeat'&&<p className="account-current">This is a new copy. Choose fresh dates before posting. The original job, offers, messages and reviews stay unchanged.</p>}

@@ -1,5 +1,6 @@
 'use client'
 import {useSubmitGuard} from '@/components/action-form'
+import {LoaderCircle} from 'lucide-react'
 import {useActionState,useEffect,useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {formatWorkDateTime as nzDateTime} from '@shared/formatting'
@@ -41,7 +42,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
  const [note,setNote]=useState('')
  if(confirmedArrival){
   return <section className="card payment-card">
-   {state.success&&<p className="home-clear" role="status">{state.success}</p>}
+   {state.success&&<p className="status-banner" role="status">{state.success}</p>}
    <p><strong>Arriving around {nzDateTime(confirmedArrival)}</strong></p>
    <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom} arrivalStart={confirmedArrival}/></details>
    <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
@@ -80,7 +81,8 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
    {choice&&<div className="account-current"><strong>Message to {requesterFirst}</strong><p className="work-description">{preview}</p></div>}
   </fieldset>
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
-  <button className="lform-save" disabled={blocked||pending}>{pending?'Confirming…':'Confirm job'}</button>
+  <p className="muted" role="status">{pending?'Confirming the job and sending your arrival message…':null}</p>
+  <button className="lform-save" disabled={blocked||pending}>{pending&&<LoaderCircle size={16} className="spin" aria-hidden="true"/>}{pending?'Confirming…':'Confirm job'}</button>
  </form>
 }
 

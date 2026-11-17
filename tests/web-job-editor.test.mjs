@@ -59,7 +59,8 @@ test('editing derives ownership from sign-in and refuses accepted or foreign job
 })
 test('post retries reuse the same owned job id without inserting a duplicate',async()=>{
  const supabase=client({jobs:{id,requester_id:me}});globalThis.__jobTestAuth={supabase,user:{id:me}}
- const result=await postJob({error:''},form({...valid,job_id:id}));assert.equal(result.jobId,id);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ await assert.rejects(postJob({error:''},form({...valid,job_id:id})),new RegExp('REDIRECT:/jobs/'+id+'\\?posted=1'))
+ assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
 })
 test('offer changes require a pending owned offer and open job before invoking guarded RPC',async()=>{
  let supabase=client({bids:{id,job_id:id,provider_id:'other',status:'pending'},jobs_public:{status:'open'}});globalThis.__jobTestAuth={supabase,user:{id:me}}
@@ -82,8 +83,7 @@ test('shared job links survive sign-in and external redirects are rejected',()=>
 
 test('invited posting uses one atomic RPC with private visibility by default',async()=>{
  const invite='00000000-0000-0000-0000-000000000003',supabase=client({});globalThis.__jobTestAuth={supabase,user:{id:me}}
- const result=await postJob({error:''},form({...valid,job_id:id,invite_provider_id:invite,requester_id:'forged',visibility:'public'}))
- assert.equal(result.jobId,id)
+ await assert.rejects(postJob({error:''},form({...valid,job_id:id,invite_provider_id:invite,requester_id:'forged',visibility:'public'})),new RegExp('REDIRECT:/jobs/'+id+'\\?posted=1'))
  const call=supabase.calls.find(c=>c[0]==='rpc');assert.equal(call[1],'create_invited_job');assert.equal(call[2].p_public,false);assert.equal(call[2].p_provider_id,invite);assert.equal('requester_id' in call[2].p_details,false)
  assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
  supabase.rpc=async()=>({error:new Error('Unavailable')})

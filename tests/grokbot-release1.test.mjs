@@ -116,6 +116,7 @@ test('new web arrival requires time; Change time retains the confirmed value',as
   '@shared/postingDates':{nzToday:()=> '2099-03-01'},
   '@shared/requestedDate':{arrivalDayChoices:()=>({preselect,requestedLabel:'7 March',chips:[]}),arrivalDayNote:()=>({})},
   '../../work-actions':{confirmJob(){},changeJobArrival(){},setJobPaymentMethod(){}},
+  'lucide-react':{LoaderCircle:()=>null},
  })
  const props={bidId:'bid',jobId:'job',jobTitle:'Fixture',requesterFirst:'Sam',schedule:{},availableFrom:null,amount:25,pricingType:'fixed'}
  const fields=tree=>{
@@ -129,14 +130,14 @@ test('new web arrival requires time; Change time retains the confirmed value',as
  assert.equal(date.props.value,'2099-03-07')
  assert.equal(time.props.value,'')
  assert.equal(time.props.required,true)
- assert.ok(fresh.some(node=>node.type==='button'&&node.props.children==='Confirm job'&&node.props.disabled))
+ assert.ok(fresh.some(node=>node.type==='button'&&[node.props.children].flat().includes('Confirm job')&&node.props.disabled))
  const saved=arrivalTime.parseArrivalInput('2099-03-07T11:35').toISOString()
  preselect=null
  state={error:'Could not confirm the job.'}
  const failed=nodes(ConfirmJob({...props,arrivalStart:null}))
  assert.equal(fields(failed).find(node=>node.props.type==='date').props.value,'')
  assert.ok(failed.some(node=>node.props.role==='alert'&&node.props.children===state.error))
- assert.ok(!failed.some(node=>node.props.role==='status'))
+ assert.ok(!failed.some(node=>node.props.role==='status'&&node.props.children))
  state={error:'',success:'Job confirmed.',arrivalStart:saved}
  const confirmedFromAction=nodes(ConfirmJob({...props,arrivalStart:null}))
  assert.ok(confirmedFromAction.some(node=>node.props.role==='status'&&node.props.children==='Job confirmed.'))
@@ -194,11 +195,11 @@ test('review star targets contain individually named, ascending native radios',a
 
 test('posting keeps a validated explicit category and only suggests when it is absent',async()=>{
  const categories=['Fencing & Gates','Property & House Sitting','General Rural Help']
- const saved=[]
+ const saved=[],redirects=[]
  let classified=0,collision=false,verifiedOwnedDraft=false
  const {postJob}=compile(await source('../provider-web/src/app/work-actions.ts'),{
   '@shared/categories':{CATEGORIES:categories},
-  'next/navigation':{},'next/cache':{revalidatePath(){}},
+  'next/navigation':{redirect(path){redirects.push(path);throw new Error('REDIRECT:'+path)}},'next/cache':{revalidatePath(){}},
   '@/lib/auth':{requireProvider:async()=>({user:{id:'requester'},supabase:{
    from:()=>({
     select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:verifiedOwnedDraft?{id:'job'}:null})})})}),
@@ -215,20 +216,21 @@ test('posting keeps a validated explicit category and only suggests when it is a
  const data=new FormData()
  data.set('job_id','job')
  data.set('category','Property & House Sitting')
- assert.equal((await postJob({error:''},data)).jobId,'job')
+ await assert.rejects(postJob({error:''},data),/REDIRECT:\/jobs\/job\?posted=1/)
  assert.equal(saved[0].category,'Property & House Sitting')
  assert.equal(classified,0)
  data.set('category','Invented category')
  assert.match((await postJob({error:''},data)).error,/existing job category/)
  assert.equal(saved.length,1)
  data.delete('category')
- assert.equal((await postJob({error:''},data)).jobId,'job')
+ await assert.rejects(postJob({error:''},data),/REDIRECT:\/jobs\/job\?posted=1/)
  assert.equal(saved[1].category,'Fencing & Gates')
  assert.equal(classified,1)
  collision=true
  data.set('category','Fencing & Gates')
- assert.equal((await postJob({error:''},data)).jobId,'job')
+ await assert.rejects(postJob({error:''},data),/REDIRECT:\/jobs\/job\?posted=1/)
  assert.equal(saved.length,2)
+ assert.equal(redirects.length,3)
 })
 
 test('confirmation only returns the saved arrival and success after the RPC succeeds',async()=>{
