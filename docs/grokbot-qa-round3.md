@@ -22,4 +22,19 @@ The regressions cover immediate posting progress before the location check resol
 
 ## Deployment recommendation
 
-Review before deployment. Interactive browser and physical-device checks remain open for the posting progress, acceptance transition, and keyboard and screen-reader rating interaction. Work was local and used fixture configuration. No production deployment, schema or RLS change, Marketplace Health change, or customer communication was performed.
+The candidate passed local review checks. Deployment and production verification results follow.
+
+## Deployment outcome
+
+Provider web is live and Expo preview is published for Android and iOS from commit `35978ad95a02f4c6e01c629ab06f34b64254f614`. The commit includes the deployed Release 1, Release 2, and Round 2 changes. The three prior release documentation edits remain intact in the working tree and were excluded.
+
+| Check | Result |
+|---|---|
+| Preflight | All 34 targeted and 267 repository tests passed. The provider web production Webpack build passed with the existing Account Help version-import warning. Android and iOS exports passed from the clean release checkout. The release included no Supabase migrations, RLS, dependency, or mobile runtime configuration changes. |
+| Provider web | [Vercel deployment `CBm1XGWodP5zNdH4W1prRW4gURdL`](https://vercel.com/rural-connections/difm-rural/CBm1XGWodP5zNdH4W1prRW4gURdL) succeeded. GitHub deployment record `7845031967` confirmed the release SHA. The Git integration also rebuilt public web and admin from the same commit. Their application source was unchanged. |
+| Expo | [Update group `f10364bf-175d-4936-a1cc-41a3ff49eebb`](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/f10364bf-175d-4936-a1cc-41a3ff49eebb) was verified on the active `preview` channel for Android and iOS, runtime `1.0.0`, at the exact clean release commit. |
+| Live browser | The approved requester saw the category suggestion explanation, chose a different category, and kept it after a failed test submit. The harness intercepted the write before it reached the server. With the request held, “Posting job…” was visible, the button was disabled, and two rapid clicks produced one request. The completed test job showed separate category and location labels and one payment disclaimer. A label click selected three stars, and ArrowRight selected four with the expected status text and visible three-pixel outline. The successful test session was ended and the disposable browser profiles were removed. |
+| Signed-in read checks | Both approved test accounts saw the NZ weekday and date on the completed test fixture's offer and the existing Payment and Undo controls. The approved requester had no committed accepted job on which to verify the acceptance banner. |
+| Production rollback | Existing approved-fixture smoke tests exercised job posting with a chosen category, offer creation and editing, acceptance, arrival confirmation, completion, review, and payment acknowledgement and Undo. Both transactions rolled back. Job, bid, review, message, notification, routine, and policy fingerprints matched across the runs. No customer communications were sent and no genuine customer records were modified. |
+
+The accepted-job banner and successful post navigation passed local regressions. Production verification tested the award in the rollback smoke and job posting feedback with a blocked browser write. A browser acceptance and successful posting transition on a dedicated fixture, screen-reader checks, and physical-device installation remain open. No production schema, RLS, Marketplace Health, or Cron changes were made, and no public app-store release was published.

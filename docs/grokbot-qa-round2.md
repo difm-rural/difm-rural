@@ -1,6 +1,6 @@
 # Grok Bot QA Round 2
 
-The fixes are implemented locally for authenticated provider web and Expo. Production and the two existing release documents were left as found.
+The fixes apply to authenticated provider web and Expo. The deployment and verification results are recorded below.
 
 ## Findings and fixes
 
@@ -34,3 +34,18 @@ Targeted coverage includes the Auckland weekday at a UTC day boundary, NZST and 
 - Local Expo exports passed for Android and iOS.
 
 Ready for review before deployment. Interactive browser keyboard and screen-reader checks, narrow-width and physical-device star testing, and a timed end-to-end review on an approved fixture remain open. Use a browser network trace alongside the new server timing fields if the review delay recurs.
+
+## Deployment outcome
+
+**Provider web deployed and Expo preview published.** Release commit `fc2148bd8183f48d9601bccb4a04d33554deeb93` includes the approved QA Round 2 changes. The unrelated Release 1 and Release 2 notes remain local and were excluded from both releases.
+
+| Check | Result |
+|---|---|
+| Preflight | All 262 repository tests passed. The targeted suites passed in UTC, Pacific/Auckland and America/Los_Angeles. The production Webpack build and clean-checkout Android and iOS exports passed. The existing Account Help version-import warning remains. There were no Supabase, dependency or runtime configuration changes in the release diff. |
+| Provider web | [Vercel deployment `CFr2WPr3hnPyG9acCRcQSwST7S14`](https://vercel.com/rural-connections/difm-rural/CFr2WPr3hnPyG9acCRcQSwST7S14) succeeded. GitHub deployment record `7844251421` confirmed the release SHA. The existing Git integration also rebuilt public web and admin, whose source was unchanged. |
+| Expo | [Update group `087bebc9-a876-459b-a83a-dd68b584748e`](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/087bebc9-a876-459b-a83a-dd68b584748e) was verified on the active `preview` channel for Android and iOS, runtime `1.0.0`, at the exact release SHA with a clean source tree. This was an over-the-air preview update. |
+| Signed-in web | Approved requester and provider sessions loaded the dashboard and completed test job. Both responses rendered five individually labelled rating controls, independent review status and the Payment and Undo controls. The requester wizard rendered the revised draft wording. The provider's offer form retained NZ date and Labour placeholder behaviour. These were authenticated HTTP checks of rendered content. |
+| Rollback-only production checks | A dedicated fixture stored a category override and the requested date, followed offer and award flow, confirmed an arrival at 10:00 am on Thursday 19 November in Auckland, completed and accepted a review. The existing payment smoke verified mark and Undo on accepted and completed jobs, outsider and status restrictions, and completion and review with payment unacknowledged. Both transactions rolled back. Before-and-after fingerprints matched for jobs, offers, reviews, messages, notifications, and the checked routine and policy definitions. No customer communications were sent. |
+| Review timing | The single production rollback review insert took **4.52 ms**, including its existing database trigger. This observation excludes browser, network, authentication, pre-write lookups, and redirect latency. It does not establish the cause of the earlier 20–30 second report. |
+
+Interactive production checks still outstanding are the rendered Thursday label on a suitable fixture, immediate confirmation feedback and date/time interaction, the category chooser across a real browser submit, clicking the five individual stars, and review feedback and end-to-end timing. The existing browser session could not be verified as an approved test account. Those behaviours were covered where possible by the local regressions and rollback or rendered-content checks above. Physical-device installation and accessibility checks remain outstanding. There were no schema, RLS, Cron, or Marketplace Health changes.

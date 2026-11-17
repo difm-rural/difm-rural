@@ -45,3 +45,12 @@ The dashboard used `accepted_at` to sort recent activity within its existing act
 - All 257 repository tests and the provider web production Webpack build with local fixture configuration passed. No migration, RLS change or deployment was needed for the correction.
 
 The SQL smoke verified persisted values within the test transaction and database authorisation. Interactive production checks for save and error feedback, arrival controls, device installation and accessibility remain open. Dashboard success and failure rendering were exercised by local regression tests.
+
+## Dashboard correction deployment
+
+Provider web deployed from `f4f3072e4ac1f4782d5a17cd1e6d767030db32f7`. [Vercel deployment `3pVjpZ574U4dsUDDpRDH2kgCRX4P`](https://vercel.com/rural-connections/difm-rural/3pVjpZ574U4dsUDDpRDH2kgCRX4P) succeeded, with GitHub deployment record `7841782091` tied to the same commit. The Git integration also rebuilt the public and admin projects from that commit. The only application source change in the commit was in provider web. The Release 2 documentation edit remains local and excluded. No Supabase or Expo deployment was performed.
+
+- All three dashboard regression tests and all 257 repository tests passed. The provider web production Webpack build passed with the existing Account Help version-import warning.
+- The approved requester and provider loaded the production dashboard without the activity warning. All three displayed provider job links matched jobs owned by or bid on by that provider. The requester had no in-flight job links. The dashboard continues to load offer job display fields from the privacy-masked view. The test did not target a specific invite-only fixture.
+- On the completed test job, both accounts saw independent review indicators and the Payment section with the Undo dialog. The provider offer form still showed the NZ date format and Labour example placeholder. Verification used authenticated reads and ended both test sessions. No marketplace records were modified.
+- The approved provider had no current accepted job, so live accepted-job display and timestamp ordering remain unverified. The local dashboard regression covers both, as well as the warning and partial activity on a simulated lookup failure.
