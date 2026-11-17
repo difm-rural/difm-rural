@@ -19,6 +19,8 @@ import { supabase } from '../../lib/supabase'
 import { trackEvent } from '../../lib/analytics'
 import { trackCategoryInterest } from '../../lib/preferences'
 import { staticMapUrl, staticMapPolygonUrl } from '../../lib/maps'
+import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
+import { jobPrimaryPhotoRequest } from '../../lib/jobPrimaryPhoto'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { removeThumbnails } from '../../lib/photoThumbs'
 import { removedThumbPaths } from '../../../shared/photos'
@@ -119,7 +121,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     category, title,
     scheduleType, scheduledDate,
     priceType, price,
-    photos = [],
+    photos = [], primaryPhoto, primaryPhotoRequired,
     description,
     materialsType,
     accessConditions = [],
@@ -264,6 +266,10 @@ export default function PostJobStep5Review({ navigation, route }) {
       recurrence_frequency: recurrenceFrequency || 'one_time',
     }
 
+    if (primaryPhotoRequired && (!user || !primaryPhoto || photos.length)) {
+      Alert.alert('Primary photo required', 'Sign in and choose one primary photo, or continue without a photo.')
+      return
+    }
     if (!user) {
       // Save photos with the draft so they survive the login round-trip.
       const pendingPhotos = (photos || []).map(toStorablePhoto)
@@ -305,12 +311,27 @@ export default function PostJobStep5Review({ navigation, route }) {
     // Insert under this session's own id. If an earlier attempt already landed
     // (its response was lost), the id clashes — that job is ours, so carry on
     // with it rather than posting a second copy.
-    let { data: newJob, error: insertError } = await supabase
+    let newJob, insertError
+    if (primaryPhotoRequired) {
+      setUploadStatus('Uploading primary photo…')
+      const {checksum}=await jobPrimaryPhotoRequest('job-primary-media',primaryPhoto,draftJobId)
+      const {data,error}=await supabase.functions.invoke('job-primary-media?action=publish',{
+        body:{draftId:draftJobId,checksum,details:payload,
+          providerId:isInvite?inviteProviderId:null,publicListing:visibility==='public'},
+        timeout:30000,
+      })
+      newJob=data?.id===draftJobId?{id:data.id}:null
+      insertError=error||(!newJob?new Error('Could not confirm that the job was posted.'):null)
+    } else {
+      const result = await supabase
       .from('jobs')
       .insert({ ...payload, ...(draftJobId ? { id: draftJobId } : {}), requester_id: user.id, status: 'open', visibility })
       .select('id')
       .single()
-    if (insertError?.code === '23505' && draftJobId) {
+      newJob=result.data
+      insertError=result.error
+    }
+    if (!primaryPhotoRequired && insertError?.code === '23505' && draftJobId) {
       const { data: existing } = await supabase
         .from('jobs').select('id').eq('id', draftJobId).eq('requester_id', user.id).maybeSingle()
       if (existing) { newJob = existing; insertError = null }
@@ -329,7 +350,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     }
 
     let inviteFailed = false
-    if (isInvite) {
+    if (isInvite && !primaryPhotoRequired) {
       const { error: inviteError } = await supabase
         .from('job_invites')
         .insert({ job_id: newJob.id, requester_id: user.id, provider_id: inviteProviderId })
@@ -457,7 +478,10 @@ export default function PostJobStep5Review({ navigation, route }) {
           ))}
         </View>
 
-        {photos.length === 0 && (
+        {primaryPhotoRequired&&<JobPrimaryPhotoDraft photo={primaryPhoto} required disabled={!!uploadStatus}
+          allowSuggestion={false} onPhoto={photo=>updateJobData({primaryPhoto:photo})}
+          onManual={()=>updateJobData({primaryPhoto:null,primaryPhotoRequired:false})}/>}
+        {!primaryPhotoRequired && photos.length === 0 && (
           <TouchableOpacity
             style={styles.photoReminder}
             onPress={() => handleEditRow(2)}

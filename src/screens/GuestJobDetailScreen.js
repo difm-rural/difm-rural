@@ -1,3 +1,4 @@
+import JobPrimaryImage, {showJobPrimaryMedia} from '../components/JobPrimaryImage'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useState } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -63,6 +64,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+        {showJobPrimaryMedia&&<JobPrimaryImage key={job.id} jobId={job.id} style={{width:'100%',height:200}}/>}
         <View style={styles.badgeRow}>
           <Text style={styles.category}>{job.category}</Text>
           <Text style={styles.price}>

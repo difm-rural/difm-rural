@@ -14,7 +14,10 @@ import {runSubmission} from '../shared/submission.ts'
 const require=createRequire(import.meta.url),ts=require('typescript')
 const source=await readFile(new URL('../provider-web/src/app/jobs/new/job-form.tsx',import.meta.url),'utf8')
 const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
-function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}}),jobExists=false}={}){
+function harness(storage,seed,{
+ check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}}),jobExists=false,
+ photoEnabled=false,uploadPhoto=async()=>({checksum:'a'.repeat(64)}),
+}={}){
  const state=[],refs=[],effects=[],dependencies=[],cleanups=[],submissions=[],destinations=[]
  let index=0,refIndex=0,effectIndex=0,tree,actionState={error:''}
  const router={push:path=>destinations.push(path)}
@@ -27,6 +30,8 @@ function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{cate
  if(name==='@shared/formatting')return formatting
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='@/components/job-address-input')return {JobAddressInput:'job-address'}
+  if(name==='@/components/job-photo-draft')return {JobPhotoDraft:'job-photo-draft'}
+  if(name==='@/lib/job-primary-photo')return {prepareJobPhoto:async file=>file,jobPhotoRequest:uploadPhoto}
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx}
@@ -48,7 +53,9 @@ function harness(storage,seed,{check=async()=>true,suggest=async()=>({data:{cate
   if(name==='@/lib/resize-photo')return {PHOTO_MAX:1600,AVATAR_MAX:512,resizePhoto:async file=>file}
   if(name==='lucide-react')return {LoaderCircle:()=>null}
   throw Error(name)
- },Date,console,AbortController,FormData:class {constructor(fields){Object.assign(this,fields)}},sessionStorage:storage,crypto:{randomUUID:()=> 'test-job-id'},document:{querySelector:()=>null}})
+ },Date,console,process:{env:{NEXT_PUBLIC_PHOTO_TO_JOB:photoEnabled?'true':'false'}},AbortController,
+ FormData:class {constructor(fields){Object.assign(this,fields)}set(key,value){this[key]=value}},
+ sessionStorage:storage,crypto:{randomUUID:()=> 'test-job-id'},document:{querySelector:()=>null}})
  const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new'});effects.splice(0).forEach(fn=>fn())}
  const nodes=(node=tree)=>!node||typeof node!=='object'?[]:[node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
@@ -251,4 +258,32 @@ test('Review labels the automatic category, persists the override and does not s
  assert.equal(JSON.parse(storage.getItem(draftKey)).draft.category,'Fencing & Gates')
  await h.submit()
  assert.equal(h.submissions[0].category,'Fencing & Gates')
+})
+
+test('photo posting requires an upload, retains a replacement on failure, and retries the same draft',async()=>{
+ const attempted=[]
+ const h=harness(storageWith(),undefined,{photoEnabled:true,uploadPhoto:async(endpoint,file,draft)=>{
+  attempted.push({endpoint,file,draft})
+  if(attempted.length===1)throw Error('Upload failed')
+  return {checksum:'b'.repeat(64)}
+ }})
+ await h.flush()
+ const pick=file=>{h.nodes().find(node=>node.type==='job-photo-draft').props.onFile(file);h.render()}
+ pick({name:'first.jpg'})
+ reachReview(h)
+ await h.flush()
+ pick(null)
+ await h.submit()
+ assert.equal(attempted.length,0)
+ assert.equal(h.submissions.length,0)
+ const replacement={name:'replacement.jpg'}
+ pick(replacement)
+ await h.submit()
+ h.render()
+ assert.equal(h.submissions.length,0)
+ assert.equal(h.nodes().find(node=>node.type==='job-photo-draft').props.file,replacement)
+ await h.submit()
+ assert.deepEqual(attempted,Array(2).fill({endpoint:'job-primary-media',file:replacement,draft:'test-job-id'}))
+ assert.equal(h.submissions[0].primary_photo_checksum,'b'.repeat(64))
+ assert.equal(h.submissions[0].primary_photo_required,'on')
 })

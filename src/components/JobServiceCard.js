@@ -1,3 +1,4 @@
+import JobPrimaryImage, {showJobPrimaryMedia} from './JobPrimaryImage'
 import {LISTING_KINDS} from '../../shared/listingPricing'
 import {listingCardCopy} from '../../shared/listingCardCopy'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
@@ -184,6 +185,8 @@ export default function JobServiceCard({
       <View style={styles.imageBox}>
         {photoUrl ? (
           <ThumbImage uri={photoUrl} style={styles.photo} resizeMode="cover" />
+        ) : !isService && showJobPrimaryMedia ? (
+          <JobPrimaryImage key={item.id} jobId={item.id} fallback={catImg} style={styles.photo} />
         ) : catImg ? (
           <Image source={catImg} style={styles.photo} resizeMode="cover" />
         ) : (

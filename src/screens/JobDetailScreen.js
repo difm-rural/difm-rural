@@ -1,3 +1,4 @@
+import JobPrimaryImage, {showJobPrimaryMedia} from '../components/JobPrimaryImage'
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatOfferAvailability} from '../../shared/offers'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
@@ -711,6 +712,7 @@ export default function JobDetailScreen({ route, navigation }) {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
         <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
+          {showJobPrimaryMedia&&!job.photos?.length&&<JobPrimaryImage key={job.id} jobId={job.id} style={{width:'100%',height:200}}/>}
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
               <Text style={styles.category}>Category: {job.category}</Text>
@@ -1124,6 +1126,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </View>
           ) : null}
 
+          {showJobPrimaryMedia&&!job.photos?.length&&<JobPrimaryImage key={job.id} jobId={job.id} style={{width:'100%',height:200}}/>}
           {job.photos?.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.photoStrip} style={styles.photoStripWrap}>

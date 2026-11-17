@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { shrinkPhoto } from '../../lib/shrinkPhoto'
+import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -44,6 +45,16 @@ function SummaryBar({ items }) {
 export default function PostJobStep3Details({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const { jobData, updateJobData } = usePostJob()
+  const checkPhoto=process.env.EXPO_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&route.params?.mode==='edit'&&!!route.params?.job?.id
+  const [privatePrimaryPhoto,setPrivatePrimaryPhoto]=useState(checkPhoto)
+  useEffect(()=>{
+    if(!checkPhoto)return
+    let active=true
+    supabase.rpc('owns_job_with_primary_media',{p_job:route.params.job.id}).then(({data,error})=>{
+      if(active&&!error)setPrivatePrimaryPhoto(data===true)
+    })
+    return ()=>{active=false}
+  },[checkPhoto,route.params?.job?.id])
 
   const [description,      setDescription]      = useState(jobData.description)
   const [photos,           setPhotos]           = useState(jobData.photos || [])
@@ -176,7 +187,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                   </TouchableOpacity>
                 </View>
               ))}
-              {photos.length < 6 && (
+              {!privatePrimaryPhoto && !jobData.primaryPhotoRequired && photos.length < 6 && (
                 <View style={styles.photoAddGroup}>
                   <TouchableOpacity
                     style={styles.photoAdd}

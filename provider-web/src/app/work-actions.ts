@@ -41,6 +41,10 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   if(!input.ok)return {error:input.error}
   const job = input.value
   const category=text(data,'category')
+  const primaryChecksum=text(data,'primary_photo_checksum')
+  const photoRequired=data.get('primary_photo_required')==='on'
+  if((photoRequired||primaryChecksum)&&(editing||source||job.photos.length||!photoRequired||!(/^[0-9a-f]{64}$/.test(primaryChecksum))))
+    return {error:'Choose and upload a primary photo before posting.'}
   if(category&&!CATEGORIES.includes(category))return {error:'Choose an existing job category.'}
   async function resolveCategory() {
     if(category)return category
@@ -55,6 +59,13 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
     // Tidy the card thumbnails of photos removed in this edit (missing ones are fine).
     const removed=removedThumbPaths(current?.photos,input.value.photos,'job-photos')
     if(removed.length){try{await supabase.storage.from('job-photos').remove(removed)}catch{/* ignore */}}
+  }else if(photoRequired){
+    const {data:published,error}=await supabase.functions.invoke<{id:string}>('job-primary-media?action=publish',{
+      body:{draftId:id,checksum:primaryChecksum,details:{...job,category:await resolveCategory()},
+        providerId:invite||null,publicListing:!invite||data.get('also_public')==='on'},
+      timeout:30000,
+    })
+    if(error||published?.id!==id)return {error:'Could not post the job with this photo. Your draft is kept. Try again.'}
   }else if(invite){
     const result=await supabase.rpc('create_invited_job',{p_job_id:id,p_details:{...input.value,category:await resolveCategory(),area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,repeated_from_job_id:source || null},p_provider_id:invite,p_public:data.get('also_public')==='on'})
     if(result.error)return {error:'Could not create the job and invitation. Your draft is kept. Check that this person is a previous provider and try again.'}

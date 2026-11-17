@@ -1,5 +1,6 @@
 import Link from '@/components/navigation-link'
 import {listingCardCopy} from '@shared/listingCardCopy'
+import {JobPrimaryImage} from '@/components/job-primary-image'
 import {ThumbImg} from '@/components/thumb-img'
 // Reusable listing card — a CSS reproduction of the RN JobServiceCard browse card
 // (src/components/JobServiceCard.js). Literal rgba/positions are copied from RN for
@@ -22,11 +23,13 @@ function styleMod(cardStyle: CardStyle): '' | 'bold' | 'clean' {
 // supporting line beneath (as RN's editor preview + detail hero show it), each 3-line clamp.
 export function CardImage({
   photoUrl,
+  jobId,
   category,
   headline,
   supporting,
   cardStyle,
 }: {
+  jobId?: string
   photoUrl?: string | null
   category?: string | null
   headline?: string | null
@@ -40,6 +43,8 @@ export function CardImage({
     <div className="lcard-img">
       {photoUrl ? (
         <ThumbImg src={photoUrl} alt={category ? category+' photo' : 'Listing photo'} />
+      ) : jobId&&process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true' ? (
+        <JobPrimaryImage key={jobId} jobId={jobId} fallback={categoryArtwork(category??null)}/>
       ) : (
         // No photo: the category's artwork (an icon on its tint), as in the app.
         // eslint-disable-next-line @next/next/no-img-element -- local category artwork.
@@ -58,6 +63,7 @@ export function CardImage({
 }
 
 export type ListingCardData = {
+  jobId?: string
   title?: string | null
   description?: string | null
   photoUrl?: string | null
@@ -81,6 +87,7 @@ export function ListingCard({ data, footer, href, ariaLabel }: { data: ListingCa
   const content = <>
       <CardImage
         photoUrl={data.photoUrl}
+        jobId={data.jobId}
         category={data.category}
         headline={copy.headline}
         supporting={copy.supporting}

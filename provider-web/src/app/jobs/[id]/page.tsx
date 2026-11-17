@@ -1,3 +1,4 @@
+import {JobPrimaryImage} from '@/components/job-primary-image'
 import {jobMapTarget} from '@shared/jobMapTarget'
 import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate,formatWorkDateTime as nzDateTime} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
@@ -121,6 +122,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {job.hide_exact_location&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}
    {job.materials_type&&<p>Materials: {MATERIALS[job.materials_type as keyof typeof MATERIALS] || job.materials_type}</p>}
    {job.access_conditions?.length>0&&<p>Site access: {job.access_conditions.map((a:string)=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}
+   {process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&!job.photos?.length&&<div className="job-photo-grid"><JobPrimaryImage key={id} jobId={id}/></div>}
    {job.photos?.length>0&&<div className="job-photo-grid">{job.photos.map((url:string,i:number)=><a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a>)}</div>}
    {!paymentCard&&<p className="muted">Arrange payment directly with the other person. Rural Connections doesn&apos;t handle or verify payments.</p>}
   </article>

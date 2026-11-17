@@ -388,6 +388,14 @@ deno_version = 2
 [functions.marketplace-health]
 verify_jwt = true
 
+# This media endpoint serves public jobs to guests and verifies supplied
+# user JWTs independently before authorizing protected reads or any upload.
+[functions.job-primary-media]
+verify_jwt = false
+
+[functions.draft-job-from-photo]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

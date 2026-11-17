@@ -16,6 +16,8 @@ const INITIAL_STATE = {
   areaHectares:     null,
   description:      '',
   photos:           [],
+  primaryPhoto:     null,
+  primaryPhotoRequired: false,
   priceType:        'fixed',
   price:            '',
   _editJobId:       null,

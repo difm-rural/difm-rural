@@ -1,11 +1,18 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const photoTestDeployment = process.env.VERCEL === '1' &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '') === 'https://opagkgfxmjqmnvhrcris.supabase.co';
+
 // Bundler mechanism (a), locked: widen turbopack.root to the repo root so this app
 // can import the shared, UI-free pricing/kind model from /shared via the @shared/*
 // tsconfig alias. See the note atop /shared/listingPricing.ts for why (b) (a
 // workspace package) was rejected. Trade-off: `next dev` watches the repo root.
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_PHOTO_TO_JOB: process.env.NEXT_PUBLIC_PHOTO_TO_JOB ?? String(photoTestDeployment),
+    NEXT_PUBLIC_JOB_PRIMARY_MEDIA: process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA ?? String(photoTestDeployment),
+  },
   async redirects() {
     return [
       {source:'/saved-searches',destination:'/account/interests',permanent:false},

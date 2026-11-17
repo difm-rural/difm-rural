@@ -11,6 +11,9 @@ import {localDate} from '../../lib/quickPickDates'
 import DateChips from '../../components/DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from '../../components/NativeDateTimePicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
+import { photoToJobEnabled } from '../../lib/jobPrimaryPhoto'
+import { CATEGORIES } from '../../lib/categories'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
@@ -205,6 +208,18 @@ export default function PostJobStep1JobType({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
+          {photoToJobEnabled && route.name !== 'GuestPostJob' && !isEditMode && !isRepeatMode && !jobData.photos?.length && (
+            <JobPrimaryPhotoDraft photo={jobData.primaryPhoto} required={jobData.primaryPhotoRequired}
+              onPhoto={primaryPhoto=>updateJobData({primaryPhoto,primaryPhotoRequired:true})}
+              onManual={()=>updateJobData({primaryPhoto:null,primaryPhotoRequired:false})}
+              onSuggestion={suggestion=>{
+                if(!title.trim())setTitle(suggestion.title)
+                updateJobData({
+                  description:jobData.description||suggestion.description,
+                  category:jobData.category||(CATEGORIES.includes(suggestion.category)?suggestion.category:''),
+                })
+              }}/>
+          )}
           {!!scheduleType && !!scheduleError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: 12 }}>{scheduleError}</Text>}
 
           <View style={styles.card}>

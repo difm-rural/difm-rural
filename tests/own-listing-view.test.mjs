@@ -28,12 +28,21 @@ async function load(file,extra={}){
   if(name==='@/lib/supabase/client')return {createClient:()=>({})}
   if(name in extra)return extra[name]
   throw Error(name)
- }})
+ },process:{env:{NEXT_PUBLIC_JOB_PRIMARY_MEDIA:'true'}}})
  return module.exports
 }
 const thumb=await load('../thumb-img.tsx')
-const cards=await load('listing-card.tsx',{'@/components/thumb-img':thumb}),{ManageCard}=await load('manage-card.tsx',{'./listing-card':cards})
+const primary=await load('../job-primary-image.tsx')
+const cards=await load('listing-card.tsx',{'@/components/thumb-img':thumb,'@/components/job-primary-image':primary}),{ManageCard}=await load('manage-card.tsx',{'./listing-card':cards})
 const id='2b8f6b59-b9f3-41a6-9816-55a7dfecf1f4'
+test('job cards use the authenticated image route while legacy cards keep their existing URL',()=>{
+ const card=props=>renderToStaticMarkup(React.createElement(cards.CardImage,props))
+ assert.match(card({jobId:id}),new RegExp('/job-media/'+id))
+ const legacy='https://fixture.test/storage/v1/object/public/job-photos/legacy.jpg'
+ const rendered=card({jobId:id,photoUrl:legacy})
+ assert.match(rendered,/legacy(?:_thumb)?\.jpg/)
+ assert.doesNotMatch(rendered,/\/job-media\//)
+})
 test('live, paused and closed own listings expose a card link and explicit View listing action',()=>{
  for(const status of [{is_active:true,closed_at:null},{is_active:false,closed_at:null},{is_active:false,closed_at:'2026-11-03T00:00:00Z'}]){
   const html=renderToStaticMarkup(React.createElement(ManageCard,{s:{id,title:'Container moving',kind:'service',pricing_type:'fixed',rate:50,photos:[],...status}}))
