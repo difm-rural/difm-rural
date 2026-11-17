@@ -210,7 +210,7 @@ test('posting keeps a validated explicit category and only suggests when it is a
    functions:{invoke:async()=>{classified++;return {data:{category:'Fencing & Gates'}}}},
   }})},
   '@/lib/job-input':{validId:value=>value==='job',jobInput:()=>({ok:true,value:{title:'Repair a gate',description:'Replace two hinges'}})},
-  '@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+  '@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
  })
  const data=new FormData()
  data.set('job_id','job')
@@ -243,7 +243,7 @@ test('confirmation only returns the saved arrival and success after the RPC succ
    return {error:fail?{}:null}
   }}})},
   '@/lib/job-input':{validId:()=>true},
-  '@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+  '@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
  })
  const data=new FormData()
  const arrival='2099-11-18T21:00:00.000Z'
@@ -273,7 +273,7 @@ test('accepting an offer keeps the existing RPC and navigates to feedback only o
    from:table=>({select:()=>({eq:()=>({single:async()=>({data:table==='bids'?{id:'offer',job_id:'job'}:{requester_id:owner,status:'open'}})})})}),
    rpc:async(name,payload)=>{calls.push([name,payload.p_offer_id]);return {error:rpcError}},
   }})},
-  '@/lib/job-input':{},'@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+  '@/lib/job-input':{},'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
  })
  const data=new FormData()
  data.set('offer_id','offer')

@@ -535,7 +535,6 @@ a.row:hover { background: var(--sage); }
 .lcard { width: 100%; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); }
 .lcard-img { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--canvas); overflow: hidden; }
 .lcard-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.lcard-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--sage); color: var(--forest); font-size: 11px; font-weight: 700; }
 /* Card message overlay. Base = RN 'bottom' treatment; .bold/.clean override, literal rgba. */
 .lcard-msg { position: absolute; left: 0; right: 0; bottom: 0; padding: 7px 8px; background: rgba(15,45,33,0.78); }
 .lcard-msg.bold { top: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; background: rgba(15,45,33,0.60); }

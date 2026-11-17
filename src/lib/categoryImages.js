@@ -1,30 +1,33 @@
-// Category placeholder illustrations (flat art, one per category), shown on job
-// & service cards when a listing has no photo of its own.
+// Category artwork (a flat icon on the category's tint), shown on job & service
+// cards when a listing has no photo of its own. Which picture a category uses
+// is in shared/categoryArtwork.ts; the files are drawn by
+// scripts/render-category-art.mjs into assets/categories/.
 //
-// Files live in assets/categories/ (see that folder's README). Keyed lowercase
-// to match the unified taxonomy / categoryVisual(). Any category without an
-// entry falls back to its coloured icon. require() paths must be static string
-// literals and the file must exist, or the bundle won't build.
-//
-// NOTE: files carry a .jpg extension but are PNG data — RN decodes by content,
-// so this renders fine.
-const CATEGORY_IMAGES = {
-  'fencing & gates':          require('../../assets/categories/fencing.jpg'),
-  'animals & farm sitting':   require('../../assets/categories/animals.jpg'),
-  'water & drainage':         require('../../assets/categories/water.jpg'),
-  'spraying & pest control':  require('../../assets/categories/spraying.jpg'),
-  'land & vegetation':        require('../../assets/categories/land.jpg'),
-  'cropping, hay & feed':     require('../../assets/categories/cropping.jpg'),
-  'earthworks & driveways':   require('../../assets/categories/earthworks.jpg'),
-  'machinery & repairs':      require('../../assets/categories/machinery.jpg'),
-  'buildings & maintenance':  require('../../assets/categories/buildings.jpg'),
-  'transport & delivery':     require('../../assets/categories/transport.jpg'),
-  'property & house sitting': require('../../assets/categories/property.jpg'),
-  'general rural help':       require('../../assets/categories/general.jpg'),
+// require() paths must be static string literals and the file must exist, or
+// the bundle won't build.
+import { categoryArtworkName } from '../../shared/categoryArtwork'
+
+const ARTWORK = {
+  fencing:    require('../../assets/categories/fencing.png'),
+  animals:    require('../../assets/categories/animals.png'),
+  water:      require('../../assets/categories/water.png'),
+  spraying:   require('../../assets/categories/spraying.png'),
+  land:       require('../../assets/categories/land.png'),
+  cropping:   require('../../assets/categories/cropping.png'),
+  earthworks: require('../../assets/categories/earthworks.png'),
+  machinery:  require('../../assets/categories/machinery.png'),
+  buildings:  require('../../assets/categories/buildings.png'),
+  transport:  require('../../assets/categories/transport.png'),
+  property:   require('../../assets/categories/property.png'),
+  general:    require('../../assets/categories/general.png'),
+  grazing:    require('../../assets/categories/grazing.png'),
+  hire:       require('../../assets/categories/hire.png'),
+  lease:      require('../../assets/categories/lease.png'),
+  'for-sale': require('../../assets/categories/for-sale.png'),
 }
 
-// Returns a require()'d image module for the category, or null to fall back to
-// the category icon.
+// A require()'d image module for the category (general rural help when the
+// category is unknown).
 export function categoryImage(category) {
-  return CATEGORY_IMAGES[String(category || '').toLowerCase()] || null
+  return ARTWORK[categoryArtworkName(category)] || ARTWORK.general
 }
