@@ -16,7 +16,7 @@ const source=await readFile(new URL('../provider-web/src/app/listings/listing-fo
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
 // defer: queue state updates until the next render, as React does (an updater
 // runs later, not inside the event handler).
-function harness(patch={},{defer=false}={}){
+function harness(patch={},{defer=false,supabase,mode='edit'}={}){
  const state=[],refs=[],calls=[],pending=[];let index=0,refIndex=0,tree
  const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;const apply=value=>{state[i]=typeof value==='function'?value(state[i]):value};return [state[i],value=>defer?pending.push(()=>apply(value)):apply(value)]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(){},useMemo:fn=>fn()}
  const module={exports:{}}
@@ -27,15 +27,17 @@ function harness(patch={},{defer=false}={}){
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='react')return react;if(name==='react/jsx-runtime')return {jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props}),Fragment:'fragment'}
  if(name in modules)return modules[name]
- if(name==='next/navigation')return {useRouter:()=>({push:()=>calls.push('navigate'),refresh:()=>calls.push('refresh')})}
- if(name==='@/lib/supabase/client')return {createClient:()=>({from:()=>{calls.push('database');throw Error('Unexpected database call')}})}
+ if(name==='next/navigation')return {useRouter:()=>({push:path=>calls.push('navigate:'+path),refresh:()=>calls.push('refresh')})}
+ if(name==='@/lib/supabase/client')return {createClient:()=>supabase??({from:()=>{calls.push('database');throw Error('Unexpected database call')}})}
  if(name==='@/components/publishing-location-warning')return {usePublishingLocationWarning:()=>({check:async()=>{calls.push('location');return true},prompt:null})}
  if(name==='@/components/field-feedback')return {FieldFeedback:()=>null,invalidField:(name,message)=>({id:name,'aria-invalid':message?true:undefined,'aria-describedby':message?name+'-error':undefined})}
  if(name==='./listing-card')return {ListingCard:()=>null,CardImage:()=>null}
  if(name==='lucide-react')return new Proxy({},{get:()=>()=>null})
  throw Error(name)
- },URL,Date,console})
- const props={mode:'edit',userId:'test-user',listing:{id:'test-listing',kind:'service',title:'Move a container',category:'Transport & Delivery',description:'Local test',location_name:'Waitoki',pricing_type:'fixed',rate:50,photos:[],pricing_add_ons:[],pricing_variants:[],...patch}}
+ },URL,Date,console,crypto:{randomUUID:()=>'new-listing-id'}})
+ const props=mode==='new'
+  ? {mode:'new',userId:'test-user'}
+  : {mode:'edit',userId:'test-user',listing:{id:'test-listing',kind:'service',title:'Move a container',category:'Transport & Delivery',description:'Local test',location_name:'Waitoki',pricing_type:'fixed',rate:50,photos:[],pricing_add_ons:[],pricing_variants:[],...patch}}
  function render(){while(pending.length)pending.shift()();index=0;refIndex=0;tree=module.exports.ListingForm(props)}
  function nodes(node=tree){if(!node||typeof node!=='object')return [];return [node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]}
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).filter(c=>c!==undefined).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
@@ -146,6 +148,68 @@ test('re-picking the same file adds it again, and the 4-photo cap holds',()=>{
   assert.equal(p.created.length,4,'no URL made for a photo that did not fit')
  }finally{p.restore()}
 })
+// ---- Publishing: one row per draft, and a confirmation on My listings ----
+// The services row for a NEW listing carries a client-chosen id, so a retry
+// after a lost insert response adopts the row it already created.
+function saveStub({insertError=null,ownedRow=null}={}){
+ const calls=[]
+ const client={
+  from(){
+   const q={
+    insert(payload){calls.push(['insert',payload]);return Promise.resolve({error:insertError})},
+    select(){return q},eq(){return q},
+    maybeSingle(){calls.push(['lookup']);return Promise.resolve({data:ownedRow,error:null})},
+    update(patch){calls.push(['update',patch]);return q},
+   }
+   return q
+  },
+ }
+ return {client,calls}
+}
+async function publishNewHireListing(stub){
+ const h=harness({},{mode:'new',supabase:stub.client})
+ h.click('Hire')
+ h.change('lf-title','Trailer hire')
+ h.click('Next')
+ h.rate('120')
+ h.click('Next')
+ h.click('Next')
+ h.change('lf-location','Waitoki')
+ h.click('Review listing')
+ const publish=h.nodes().find(n=>n.type==='button'&&[n.props.children].flat(Infinity).includes('Publish listing'))
+ assert.ok(publish,'Publish listing button')
+ await publish.props.onClick()
+ h.render()
+ return h
+}
+test('publishing a new listing creates one row and confirms on My listings',async()=>{
+ const stub=saveStub()
+ const h=await publishNewHireListing(stub)
+ assert.deepEqual(stub.calls.map(c=>c[0]),['insert'])
+ assert.equal(stub.calls[0][1].id,'new-listing-id')
+ assert.ok(h.calls.includes('navigate:/listings?published=1'))
+})
+test('a lost create response adopts the owned row instead of publishing a duplicate',async()=>{
+ const stub=saveStub({insertError:{code:'23505'},ownedRow:{id:'new-listing-id'}})
+ const h=await publishNewHireListing(stub)
+ // One insert attempt, then an ownership check — never a second insert.
+ assert.deepEqual(stub.calls.map(c=>c[0]),['insert','lookup'])
+ assert.ok(h.calls.includes('navigate:/listings?published=1'))
+ assert.equal(h.alert(),'')
+})
+test('a create that fails for another reason keeps the provider on the form',async()=>{
+ const stub=saveStub({insertError:{code:'08006'}})
+ const h=await publishNewHireListing(stub)
+ assert.deepEqual(stub.calls.map(c=>c[0]),['insert'])
+ assert.ok(!h.calls.some(call=>call.startsWith('navigate:/listings?')))
+ assert.match(h.alert(),/create/)
+})
+test('My listings announces a publish and an edit separately',async()=>{
+ const page=await readFile(new URL('../provider-web/src/app/listings/page.tsx',import.meta.url),'utf8')
+ assert.match(page,/published === '1'[\s\S]{0,120}Listing published\./)
+ assert.match(page,/saved === '1'[\s\S]{0,120}Listing changes saved\./)
+})
+
 test('removing a photo drops its thumbnail and revokes only its URL',()=>{
  const p=photoHarness()
  try{

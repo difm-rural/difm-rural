@@ -6,7 +6,8 @@ import { ManageCard, type Listing } from './manage-card'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ListingsPage() {
+export default async function ListingsPage({ searchParams }: { searchParams: Promise<{ published?: string; saved?: string }> }) {
+  const { published, saved } = await searchParams
   const { supabase, user, profile } = await requireProvider()
 
   // RLS also exposes everyone's active services, so filter to mine (incl. paused/closed).
@@ -32,6 +33,9 @@ export default async function ListingsPage() {
             <Link href="/listings/new" className="lform-save as-link"><Plus size={15} /> Create a listing</Link>
           </div>
         </header>
+
+        {published === '1' && <p className="status-banner" role="status">Listing published.</p>}
+        {saved === '1' && <p className="status-banner" role="status">Listing changes saved.</p>}
 
         {rows.length === 0 ? (
           <p className="empty">

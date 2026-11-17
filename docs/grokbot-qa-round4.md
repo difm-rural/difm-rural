@@ -11,6 +11,17 @@ Round 4 responds to the woolshed-tap run (16 minutes, completed with both 5-star
 | Fixed-price label | An offer heading showed "$120" with no pricing basis. Fixed-price offers now read "$120 · Fixed price" on the job page; hourly / per-unit / estimate already carried suffixes. The shared formatter is unchanged because the database `job_payment_line` mirrors it. | `provider-web/src/app/jobs/[id]/page.tsx` |
 | Arrival message date (migration, **not yet pushed**) | The confirmation chat message and arrival notifications said "Fri 20 Nov, 10:00am" while the preview and the rest of the job say "Fri 20 Nov 2026, 10:00 am". A migration updates `confirm_job` and `set_work_arrival_window` to `to_char(…, 'Dy FMDD Mon YYYY, FMHH12:MI am')`, matching `formatWorkDateTime`. Apply with `supabase db push` at the next release. | `supabase/migrations/20261117100000_arrival_message_full_date.sql` |
 
+## Listing wizard brought to the same standard
+
+A review of whether listings share the job posting process: the wizard *looks* the same (five steps, the same step validation, submission lock, publishing-location warning and busy treatment) but saves differently — the listing form writes the `services` row straight from the browser with supabase-js and then navigates client-side, rather than through a server action. It therefore never had the round-3 redirect regression, and it has no sessionStorage draft, so no resume prompt can go stale. Two weaker spots were closed:
+
+| Change | Finding and correction | Files |
+|---|---|---|
+| Duplicate listing on a lost response | The row id was only learned from the insert response (`.select('id').single()`), so if the insert committed but its response was lost, a retry inserted a **second listing**. The id is now chosen client-side before the insert (the job-draft pattern). On a uniqueness error the form confirms the row with that id belongs to the signed-in provider and treats it as success; any other error still keeps the provider on the form with their work intact. | `provider-web/src/app/listings/listing-form.tsx` |
+| No publish confirmation | Publishing landed on My listings with nothing to confirm it worked. Publishing now goes to `/listings?published=1` and an edit to `?saved=1`, which render "Listing published." / "Listing changes saved." in the same `status-banner` style as the job page. | `provider-web/src/app/listings/listing-form.tsx`, `provider-web/src/app/listings/page.tsx` |
+
+Four tests were added in `tests/listing-wizard.test.mjs`: a clean publish makes exactly one insert carrying the client-chosen id and lands on the confirmation; a lost response makes one insert then an ownership check and never a second insert; an unrelated failure neither navigates nor loses the form; and My listings announces publish and edit separately. The harness gained a `crypto` stub and an optional Supabase stub.
+
 ## Not addressed this round
 
 - **Category pick** ("Buildings & Maintenance" for a woolshed tap; "Water & Drainage" fits better) — the inference lives in the `categorize-job` edge function, which needs a prompt tweak and a production redeploy; flagged for a decision rather than changed silently.

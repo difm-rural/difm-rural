@@ -247,6 +247,10 @@ export function ListingForm({
   // a partial photo-upload failure keeps us on the form) UPDATEs it rather than inserting
   // a duplicate. On edit it starts as the existing id.
   const [savedId, setSavedId] = useState<string | null>(mode === 'edit' ? (listing?.id ?? null) : null)
+  // The row id for a NEW listing is chosen client-side (like job drafts), so a
+  // retry after a lost insert response finds the row it already created instead
+  // of inserting a duplicate.
+  const [draftId] = useState(() => crypto.randomUUID())
 
   const photoPreviews = photos.map(photoSrc)
   // Revoke what's left when the form goes away (read in cleanup, not render).
@@ -449,9 +453,9 @@ export function ListingForm({
     } else {
       // Create mirrors an RN create: payment_timing/materials always written (control
       // value when shown, RN default otherwise). B2b advanced columns are omitted so
-      // they take their DB defaults ([] / [] / null / null). .select('id') returns the
-      // new id for the photo path.
-      const { data, error: e } = await supabase.from('services').insert({
+      // they take their DB defaults ([] / [] / null / null).
+      const { error: e } = await supabase.from('services').insert({
+        id: draftId,
         provider_id: userId,
         kind,
         direction: 'offering',
@@ -459,9 +463,16 @@ export function ListingForm({
         ...base,
         payment_timing: cfg.showPayment ? paymentTiming : 'on_completion',
         materials: cfg.showMaterials ? materials : 'included',
-      }).select('id').single()
-      if (e || !data) { setError('Couldn’t create — retry.'); return }
-      serviceId = data.id as string
+      })
+      if (e) {
+        // The id can already exist when an earlier attempt's response was lost;
+        // only a row we own makes that a success.
+        if (e.code !== '23505') { setError('Couldn’t create — retry.'); return }
+        const { data: created, error: lookupError } = await supabase
+          .from('services').select('id').eq('id', draftId).eq('provider_id', userId).maybeSingle()
+        if (lookupError || !created) { setError('Couldn’t create — retry.'); return }
+      }
+      serviceId = draftId
       setSavedId(serviceId) // so a re-save (e.g. after partial photo failure) updates, not re-inserts
     }
 
@@ -515,7 +526,7 @@ export function ListingForm({
     }
 
     setSaveStatus('Saved. Opening My listings…')
-    router.push('/listings')
+    router.push(mode === 'edit' ? '/listings?saved=1' : '/listings?published=1')
     router.refresh()
     return true
   }
