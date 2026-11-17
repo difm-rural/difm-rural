@@ -1,6 +1,6 @@
 # Grok Bot UX improvements — Release 1
 
-Release 1 covers the non-payment findings for mobile and authenticated provider web. The work is local and ready for review.
+Release 1 covers the non-payment findings for mobile and authenticated provider web.
 
 | Area | Changes and affected files |
 |---|---|
@@ -18,4 +18,30 @@ Mobile uses native alerts, day and time chips and native date/time pickers. Web 
 - Provider web production Webpack build passed with local fixture configuration.
 - Expo exports passed for Android and iOS.
 
-Physical-device and interactive browser keyboard and screen-reader checks remain outstanding. This release preserves existing marketplace authorization, Supabase schema and RLS, and the payment acknowledgement and completion separation from Release 2. The job confirmation screens changed only their scheduling controls and save feedback. Marketplace Health, Cron and production deployments were outside this release.
+Physical-device and interactive browser keyboard and screen-reader checks remain outstanding. This release preserves existing marketplace authorization, Supabase schema and RLS, and the payment acknowledgement and completion separation from Release 2. The job confirmation screens changed only their scheduling controls and save feedback. Marketplace Health and Cron were outside this release.
+
+## Production deployment — 17 November 2026 (NZDT)
+
+**Deployed to provider web and Expo preview. The rollback-only write-path retest passed.**
+
+| Check | Outcome |
+|---|---|
+| Candidate | Commit `d7afcec1550fa1aa5b13364344ad8e18f6794a5d` includes the deployed Release 2 commit `15af7d8`. The unrelated local Release 2 documentation edit was excluded from the release commit and remained the only working-tree change during the Expo publish. This accounts for the EAS dirty marker. |
+| Preflight | All 254 repository tests, provider web production Webpack build, and Android and iOS exports passed again. The linked Supabase dry run was clean. No SQL or RLS change was applied. |
+| Vercel | Provider web production deployment `7841163046` succeeded for the release commit. |
+| Expo | Published Android and iOS update group `a105c3f4-4731-45f5-81a9-4ab437f11a07` to `preview`, runtime `1.0.0`. Public app stores were outside this rollout. |
+| Signed-in web smoke | Both dedicated participants opened the completed test job. Each saw independent review indicators, the Payment section, its action button and the Undo dialog. The test provider opened the empty offer form and their own job edit page. The live offer form had a DD/MM/YYYY field, the Labour example placeholder and no hourly guidance when fixed pricing was selected. These were read-only HTTP checks. |
+| Dashboard warning | Reproduced on the live provider dashboard. Its offer-job lookup selects `accepted_at` from `jobs_public`; that column exists on `jobs` but is absent from the view. PostgREST returned `42703` for the view lookup. The dashboard fix was excluded from Release 1. |
+| Rollback-only write smoke | The test stopped at its own offer-edit assertion because it compared `bids.available_from`, a text column in production, directly with a date. The RPC call had returned, but the assertion did not validate its result. The transaction aborted. A read-only follow-up found zero test job, edited offer or test notification rows. No genuine customer records were used for writes. |
+
+## Dashboard correction and production retest — 17 November 2026 (NZDT)
+
+The dashboard used `accepted_at` to sort recent activity within its existing action groups. The provider lookup requested the field from `jobs_public`, where it is absent. `provider-web/src/app/page.tsx` continues to read display fields from the masked view and reads only the award timestamp through an existing participant-authorised join. The join is limited to the signed-in provider's accepted bids for accepted jobs returned by the view. If the join yields no timestamp, ordering uses the remaining activity timestamps. A failed query still displays the warning and preserves activity that loaded successfully. This correction is local and awaits deployment review. The existing production build can still show the warning.
+
+- `tests/web-dashboard-activity.test.mjs` verifies the view query, award ordering, no warning on successful loads, fallback for an absent timestamp, and partial activity with a warning on a query error.
+- `tests/sql/release1-job-flow-rollback.sql` compares the stored offer date text with the expected date converted to text. The corrected test passed in isolated PostgreSQL and in production using the approved test accounts. It verified requester job posting and offer acceptance and provider offer submission, offer editing, arrival confirmation and completion.
+- The existing Release 2 rollback smoke verified payment acknowledgement and Undo for accepted and completed jobs, denial for a non-participant and for open and cancelled jobs, and completion and review while payment was unacknowledged. Release 2 payment source files were untouched.
+- Before-and-after production fingerprints matched for jobs, bids, reviews, notifications, messages, the checked routines and marketplace policies. Both test transactions rolled back. No customer communications were sent.
+- All 257 repository tests and the provider web production Webpack build with local fixture configuration passed. No migration, RLS change or deployment was needed for the correction.
+
+The SQL smoke verified persisted values within the test transaction and database authorisation. Interactive production checks for save and error feedback, arrival controls, device installation and accessibility remain open. Dashboard success and failure rendering were exercised by local regression tests.

@@ -36,21 +36,30 @@ export default async function HomePage() {
     loadSeasonalReminders(supabase),
   ])
   const offerIds = [...new Set((offers.data || []).map(o => o.job_id))]
-  const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status,requester_id,created_at,accepted_at,scheduled_date,date_from').in('id',offerIds) : {data:[],error:null}
+  const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status,requester_id,created_at,scheduled_date,date_from').in('id',offerIds) : {data:[],error:null}
+  const acceptedOfferIds = new Set((offers.data || []).filter(offer => offer.status === 'accepted').map(offer => offer.job_id))
+  const awardedJobIds = (offerJobs.data || []).filter(job => job.status === 'accepted' && acceptedOfferIds.has(job.id)).map(job => job.id)
   // ─── On the go: everything in flight, by name, with whose turn it is ─────────
   // Offers on your own jobs (how many are waiting, and the accepted one's payment
   // state) and unanswered questions — what each job's next move depends on.
   const ownJobs = jobs.data || []
   const ownIds = ownJobs.map(j => j.id), ownOpenIds = ownJobs.filter(j => j.status === 'open').map(j => j.id)
-  const [ownBids, ownQuestions] = await Promise.all([
+  const [ownBids, ownQuestions, awardTimes] = await Promise.all([
     ownIds.length ? supabase.from('bids').select('job_id,provider_id,status,created_at,payment_method,payment_sorted_at,payment_details_sent_at').in('job_id', ownIds).in('status', ['pending','accepted']) : Promise.resolve({data:[],error:null}),
     ownOpenIds.length ? supabase.from('job_questions').select('job_id').in('job_id', ownOpenIds).is('answer', null) : Promise.resolve({data:[],error:null}),
+    // Keep all job display data on the masked view. Only the winning provider
+    // needs the base job's acceptance timestamp for activity ordering.
+    awardedJobIds.length ? supabase.from('bids').select('job_id,job:jobs(accepted_at)')
+      .eq('provider_id', user.id).eq('status', 'accepted').in('job_id', awardedJobIds) : Promise.resolve({data:[],error:null}),
   ])
   const pendingCount = new Map<string,number>(), questionCount = new Map<string,number>()
   const acceptedOnOwn = new Map<string,{provider_id:string;created_at:string|null;payment_method:string|null;payment_sorted_at:string|null;payment_details_sent_at:string|null}>()
   ;(ownBids.data || []).forEach(bid => { if (bid.status === 'accepted') acceptedOnOwn.set(bid.job_id, bid); else pendingCount.set(bid.job_id, (pendingCount.get(bid.job_id) || 0) + 1) })
   ;(ownQuestions.data || []).forEach(q => questionCount.set(q.job_id, (questionCount.get(q.job_id) || 0) + 1))
   const offerJobById = new Map((offerJobs.data || []).map(j => [j.id, j]))
+  const acceptedAtByJob = new Map((awardTimes.data || []).map(({job_id,job}) => [
+    job_id, (Array.isArray(job) ? job[0] : job)?.accepted_at,
+  ]))
   const nameIds = [...new Set([
     ...[...acceptedOnOwn.values()].map(bid => bid.provider_id),
     ...(offerJobs.data || []).map(j => j.requester_id),
@@ -70,7 +79,7 @@ export default async function HomePage() {
     // Pending offers on open jobs, and accepted offers you're doing.
     if (!job || !((offer.status === 'pending' && job.status === 'open') || (offer.status === 'accepted' && job.status === 'accepted'))) continue
     const next = jobNextMove(job, 'provider', {otherName: names.get(job.requester_id), hasPendingBid: offer.status === 'pending', paymentMethod: offer.payment_method, paymentSortedAt: offer.payment_sorted_at})
-    if (next) goItems.push({key: 'offer:' + offer.id, side: 'job', own: false, title: job.title || 'Job', href: '/jobs/' + job.id, next, needsAction: next.needsAction, updatedAt: [offer.created_at, job.accepted_at, offer.payment_details_sent_at, offer.payment_sorted_at]})
+    if (next) goItems.push({key: 'offer:' + offer.id, side: 'job', own: false, title: job.title || 'Job', href: '/jobs/' + job.id, next, needsAction: next.needsAction, updatedAt: [offer.created_at, acceptedAtByJob.get(job.id), offer.payment_details_sent_at, offer.payment_sorted_at]})
   }
   for (const booking of bookings.data || []) {
     const providing = booking.provider_id === user.id
@@ -79,7 +88,7 @@ export default async function HomePage() {
     if (next) goItems.push({key: 'booking:' + booking.id, side: 'listing', own: providing, title: service?.title || 'Booking', href: '/bookings/' + booking.id, next, needsAction: next.needsAction, updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at]})
   }
   const onTheGo = rankOnTheGo(goItems)
-  const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions].some(r => r.error)
+  const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes].some(r => r.error)
   const total = onTheGo.total
   const name = profile?.full_name?.trim().split(/\s+/)[0] || 'there'
   const jobActions = [
