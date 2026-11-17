@@ -14,12 +14,12 @@ test('arrival chips hide Today once the buffered default crosses midnight', () =
   assert.equal(quickPickDays({ now: afterCutoff })[0].label, 'Today')
 })
 
-test('a future offer date selects its matching chip and keeps the 9 am default', () => {
+test('a future offer date selects its matching chip without a fixed 9 am picker seed', () => {
   const now = new Date(2026, 10, 11, 10)
   const selected = defaultStartForDate('2026-11-13', now)
   assert.equal(toLocalIsoDate(selected), '2026-11-13')
-  assert.equal(selected.getHours(), 9)
-  assert.equal(selected.getMinutes(), 0)
+  assert.equal(selected.getHours(), 10)
+  assert.equal(selected.getMinutes(), 30)
   const chip = quickPickDays({ now, arrival: true })
     .find(({ date }) => toLocalIsoDate(date) === toLocalIsoDate(selected))
   assert.equal(chip?.label, 'Fri 13')
@@ -59,10 +59,12 @@ test('past times are hidden today', () => {
   assert.deepEqual(quickPickTimes({ day: '2026-11-10', now: new Date(2026, 10, 11, 8) }), [])
 })
 
-test('the default time is 9 am on a future day and the next half hour today', () => {
+test('a native picker seed uses the next buffered half hour on a future day too', () => {
   const now = new Date(2026, 10, 11, 10, 5)
   const future = defaultStartForDate('2026-11-13', now)
-  assert.equal(selectedQuickPickHour(future, now), 9)
+  assert.equal(future.getHours(), 10)
+  assert.equal(future.getMinutes(), 30)
+  assert.equal(selectedQuickPickHour(future, now), null)
   const today = defaultStartForDate('2026-11-11', now)
   assert.equal(today.getHours(), 10)
   assert.equal(today.getMinutes(), 30)
@@ -85,7 +87,7 @@ test('changing day keeps an explicitly chosen time unless it has passed', () => 
   assert.equal(toToday.getHours(), 10)
   assert.equal(toToday.getMinutes(), 30)
   // No chosen time: the day's default.
-  assert.equal(startForDay('2026-11-14', { now }).getHours(), 9)
+  assert.equal(startForDay('2026-11-14', { now }).getHours(), 10)
 })
 
 import { newJobId } from '../src/lib/draftId.js'

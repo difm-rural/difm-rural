@@ -73,3 +73,8 @@ export function parseNzDate(input: unknown): string | null {
 
   return null
 }
+
+export function formatNzDateOnly(input: unknown): string {
+  const iso = parseNzDate(input)
+  return iso ? iso.split('-').reverse().join('/') : ''
+}

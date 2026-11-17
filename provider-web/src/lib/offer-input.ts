@@ -2,7 +2,7 @@ import { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS } from '@shared/offers'
 import { parseNzDate } from '@shared/dates'
 import { nzToday } from '@shared/postingDates'
 export type OfferDetails={amount:number;message:string;line_items:{label:string;amount:number}[];pricing_type:string;materials:string|null;available_from:string|null;estimated_duration:string|null}
-export function offerInput(data:FormData,providerMaterials:boolean){
+export function offerInput(data:FormData,providerMaterials:boolean,savedAvailable?:string|null){
  const text=(key:string)=>String(data.get(key) || '').trim(),labels=data.getAll('item_label').map(String),amounts=data.getAll('item_amount').map(String)
  if(!labels.length || labels.length>12 || labels.length!==amounts.length)return {ok:false as const,error:'Add between one and twelve price lines.'}
  const items=labels.map((label,i)=>({label:label.trim(),amount:Math.round(Number(amounts[i])*100)/100}))
@@ -11,7 +11,7 @@ export function offerInput(data:FormData,providerMaterials:boolean){
  const isoDate=date?parseNzDate(date):null
  if(amount<=0||amount>10000000||message.length>5000||duration.length>150)return {ok:false as const,error:'Use a positive offer amount, a message up to 5,000 characters and duration up to 150 characters.'}
  if(!OFFER_PRICING_TYPES.some(p=>p.id===pricing)||(providerMaterials&&!OFFER_MATERIALS_OPTIONS.some(m=>m.id===materials)))return {ok:false as const,error:'Choose a pricing basis and materials option.'}
- if(date&&!isoDate)return {ok:false as const,error:'Available from needs a real date, e.g. 11 Nov 2026.'}
- if(isoDate&&isoDate<nzToday())return {ok:false as const,error:"Available from can't be in the past."}
+ if(date&&!isoDate)return {ok:false as const,error:'Available from needs a real date, e.g. 11/11/2026.'}
+ if(isoDate&&isoDate!==savedAvailable&&isoDate<nzToday())return {ok:false as const,error:"Available from can't be in the past."}
  return {ok:true as const,value:{amount,message,line_items:items.map(i=>({...i,amount:Math.round(i.amount*100)/100})),pricing_type:pricing,materials:providerMaterials?materials:null,available_from:isoDate,estimated_duration:duration||null}}
 }

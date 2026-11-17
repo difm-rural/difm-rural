@@ -1,4 +1,5 @@
 'use client'
+import {useSubmitGuard} from '@/components/action-form'
 import {useActionState,useEffect,useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {formatDateTime as nzDateTime} from '@shared/formatting'
@@ -14,25 +15,17 @@ const bankMessage=(choice:string,acct:string,acctNo:string,reference:string)=>ch
   ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
   : ''
 
-function roundUpHalfHour(d:Date){const r=new Date(d);r.setSeconds(0,0);const m=r.getMinutes();if(m===0||m===30)return r;if(m<30)r.setMinutes(30);else{r.setMinutes(0);r.setHours(r.getHours()+1)}return r}
 function toLocal(d:Date){const p=(n:number)=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
-function defaultArrival(availableFrom?:string|null){
-  const now=new Date()
-  let base=now
-  if(availableFrom){const d=new Date(availableFrom+'T09:00:00');if(!Number.isNaN(d.getTime())&&d.toDateString()!==now.toDateString()&&d>now)base=d}
-  if(base.toDateString()===now.toDateString()){let r=roundUpHalfHour(now);if(r.getTime()-now.getTime()<=15*60*1000)r=new Date(r.getTime()+30*60*1000);return r}
-  const nine=new Date(base);nine.setHours(9,0,0,0);return nine
-}
 
-// "Requested: Sat 15 Nov" plus one-tap day chips (the requested date, the days
-// of a requested range, the date on the provider's own offer). A chip sets the
-// day and that day's default time; the datetime field stays for any other date.
-function RequestedDays({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;offerDay:string|null;arrival:string;onPick:(value:string)=>void}){
+function ArrivalFields({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;offerDay:string|null;arrival:string;onPick:(value:string)=>void}){
  const days=arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay})
+ const [day,time='']=arrival.split('T')
  return <>
   <p className="muted requested-date">Requested: <strong>{days.requestedLabel}</strong></p>
   {days.chips.length>0&&<div className="payment-options">{days.chips.map(chip=>
-   <button key={chip.day} type="button" aria-pressed={arrival.slice(0,10)===chip.day} className={'lform-kind'+(arrival.slice(0,10)===chip.day?' active':'')} onClick={()=>onPick(toLocal(defaultArrival(chip.day)))}>{chip.label}</button>)}</div>}
+   <button key={chip.day} type="button" aria-pressed={day===chip.day} className={'lform-kind'+(day===chip.day?' active':'')} onClick={()=>onPick(chip.day+'T'+time)}>{chip.label}</button>)}</div>}
+  <label className="lform-field">Arrival date<input type="date" lang="en-NZ" required value={day} onChange={e=>onPick(e.target.value+'T'+time)}/></label>
+  <label className="lform-field">Arrival time<input type="time" required value={time} onChange={e=>onPick(day+'T'+e.target.value)}/></label>
  </>
 }
 
@@ -45,8 +38,9 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
 
  // ── Confirm form (not yet confirmed) ──
  const [state,submit,pending]=useActionState(confirmJob,{error:''})
+ const guardSubmit=useSubmitGuard(state,pending)
  // Start on the requested day when there is one (today or later); otherwise the offer date.
- const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay:availableFrom}).preselect||availableFrom)))
+ const [arrival,setArrival]=useState(()=>(arrivalDayChoices(schedule,{today:toLocalIsoDate(new Date())!,offerDay:availableFrom}).preselect || toLocalIsoDate(new Date()))+'T')
  const [choice,setChoice]=useState('agreed')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  const [note,setNote]=useState('')
@@ -54,8 +48,9 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
 
  if(confirmed){
   return <section className="card payment-card">
+   {state.success&&<p className="home-clear" role="status">{state.success}</p>}
    <p><strong>Arriving around {nzDateTime(new Date(arrivalStart!))}</strong></p>
-   <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom}/></details>
+   <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom} arrivalStart={arrivalStart!}/></details>
    <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>
  }
@@ -66,18 +61,17 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
  const noteText=note.trim()
  // Mirrors the message confirm_job posts, including how the day relates to the one asked for.
  const dayNote=arrivalDayNote(schedule,Number.isNaN(arrivalDate.getTime())?null:nzCalendarDay(arrivalDate))
- const preview=`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}${dayNote.suffix}.`+(dayNote.line?`\n${dayNote.line}`:'')+`\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
+ const preview=(Number.isNaN(arrivalDate.getTime())?'Choose an arrival time to complete this preview.':`Confirmed: I'll be there around ${nzDateTime(arrivalDate)}${dayNote.suffix}.`)+(dayNote.line?`\n${dayNote.line}`:'')+`\n${paymentLine(amount,pricingType,choice)}`+(noteText?`\nNote: ${noteText}`:'')+(message?`\n\n${message}`:'')
  const blocked=isPast||Number.isNaN(arrivalDate.getTime())
 
- return <form action={submit} className="card payment-card lform">
+ return <form action={submit} onSubmit={guardSubmit} aria-busy={pending} className="card payment-card lform">
   <h3>Confirm the job</h3>
   <input type="hidden" name="bid_id" value={bidId}/><input type="hidden" name="job_id" value={jobId}/>
   <input type="hidden" name="arrival" value={Number.isNaN(arrivalDate.getTime())?'':arrivalDate.toISOString()}/>
   <input type="hidden" name="method" value={choice}/><input type="hidden" name="message" value={message}/>
   <fieldset disabled={pending} className="work-fieldset">
    <p className="payment-substep">When will you arrive?</p>
-   <RequestedDays schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
-   <label className="lform-field">Expected arrival<input type="datetime-local" value={arrival} onChange={e=>setArrival(e.target.value)} required/></label>
+   <ArrivalFields schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
    {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
    <p className="payment-substep">Payment method (optional)</p>
    <div className="payment-options">{Object.entries(METHOD_LABELS).map(([id,label])=>
@@ -95,16 +89,17 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
  </form>
 }
 
-function ChangeTime({jobId,schedule,availableFrom}:{jobId:string;schedule:JobSchedule;availableFrom:string|null}){
+function ChangeTime({jobId,schedule,availableFrom,arrivalStart}:{jobId:string;schedule:JobSchedule;availableFrom:string|null;arrivalStart:string}){
  const router=useRouter()
  const [state,submit,pending]=useActionState(changeJobArrival,{error:''})
- const [arrival,setArrival]=useState(()=>toLocal(defaultArrival(availableFrom)))
+ const guardSubmit=useSubmitGuard(state,pending)
+ const [arrival,setArrival]=useState(()=>toLocal(new Date(arrivalStart)))
  useEffect(()=>{if(state.success)router.refresh()},[state.success,router])
  const d=new Date(arrival),isPast=!Number.isNaN(d.getTime())&&d.getTime()<=Date.now()
- return <form action={submit} className="lform">
+ return <form action={submit} onSubmit={guardSubmit} aria-busy={pending} className="lform">
   <input type="hidden" name="job_id" value={jobId}/><input type="hidden" name="arrival" value={Number.isNaN(d.getTime())?'':d.toISOString()}/>
-  <RequestedDays schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
-  <label className="lform-field">Expected arrival<input type="datetime-local" value={arrival} onChange={e=>setArrival(e.target.value)} required/></label>
+  <fieldset disabled={pending} className="work-fieldset"><ArrivalFields schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/></fieldset>
+  {state.success&&<p className="home-clear" role="status">{state.success}</p>}
   {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
   <button className="lform-save" disabled={isPast||pending||Number.isNaN(d.getTime())}>{pending?'Saving…':'Update time'}</button>

@@ -1,10 +1,10 @@
 'use client'
-import {DateInput} from '@/components/date-input'
+import {useSubmitGuard} from '@/components/action-form'
 import {useState,useEffect,useRef,useActionState} from 'react'
 import {useRouter} from 'next/navigation'
 import Link from '@/components/navigation-link'
-import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,formatOfferAmount} from '@shared/offers'
-import {toLocalIsoDate} from '@shared/dates'
+import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,HOURLY_OFFER_GUIDANCE,initialOfferLines,formatOfferAmount} from '@shared/offers'
+import {formatNzDateOnly,toLocalIsoDate} from '@shared/dates'
 import type {JobSchedule} from '@shared/postingDates'
 import {offerDefaultDay,requestedLabel} from '@shared/requestedDate'
 import {sendOffer,changeOffer} from '../../work-actions'
@@ -15,7 +15,12 @@ export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string
  const [today]=useState(()=>toLocalIsoDate(new Date())!)
  const availableDefault=offer?(offer.available_from || ''):(offerDefaultDay(schedule,today) || '')
  const [state,submit,pending]=useActionState(offer?changeOffer:sendOffer,{error:''})
- const [items,setItems]=useState((offer?.line_items?.length?offer.line_items:[{label:'Labour',amount:offer?.amount || ''}]).map(i=>({...i,amount:String(i.amount)}))),[pricing,setPricing]=useState(offer?.pricing_type || 'fixed')
+ const [items,setItems]=useState(()=>initialOfferLines(offer)),[pricing,setPricing]=useState(offer?.pricing_type || 'fixed')
+ const [message,setMessage]=useState(offer?.message || '')
+ const [materials,setMaterials]=useState(offer?.materials || 'included')
+ const [available,setAvailable]=useState(()=>formatNzDateOnly(availableDefault))
+ const [duration,setDuration]=useState(offer?.estimated_duration || '')
+ const guardSubmit=useSubmitGuard(state,pending)
  const total=items.reduce((sum,i)=>sum+(Number(i.amount)||0),0)
  // On success the server has revalidated the job page; a refresh re-renders it
  // with the saved "Your offer" card in place of this form. Focus the status
@@ -23,16 +28,16 @@ export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string
  const statusRef=useRef<HTMLParagraphElement>(null)
  useEffect(()=>{if(state.success){statusRef.current?.focus();router.refresh()}},[state.success,router])
  if(state.success)return <div className="lform"><p className="home-clear" role="status" tabIndex={-1} ref={statusRef}>{state.success}</p><Link href="/activity" className="card-link">Track in Activity →</Link></div>
- return <form action={submit} className="lform"><fieldset disabled={pending} className="work-fieldset">
+ return <form action={submit} className="lform" aria-busy={pending} onSubmit={guardSubmit}><fieldset disabled={pending} className="work-fieldset">
   <input name="job_id" type="hidden" value={jobId}/>{offer&&<><input name="offer_id" type="hidden" value={offer.id}/><input name="intent" type="hidden" value="edit"/></>}
   <p className="muted">Your offer is private to you and the requester.</p><label className="lform-field">Pricing basis<select name="pricing_type" value={pricing} onChange={e=>setPricing(e.target.value)}>{OFFER_PRICING_TYPES.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
-  {items.map((item,i)=><div className="lform-repeat" key={i}><div className="lform-repeat-grid"><label className="lform-field">Price line {i+1}<input name="item_label" maxLength={120} value={item.label} required onChange={e=>setItems(items.map((v,n)=>n===i?{...v,label:e.target.value}:v))}/></label><label className="lform-field">Amount ($)<input name="item_amount" type="number" min="0" max="10000000" step="0.01" required value={item.amount} onChange={e=>setItems(items.map((v,n)=>n===i?{...v,amount:e.target.value}:v))}/></label></div>{items.length>1&&<button type="button" className="lform-repeat-remove" onClick={()=>setItems(items.filter((_,n)=>n!==i))}>Remove line {i+1}</button>}</div>)}
+  {items.map((item,i)=><div className="lform-repeat" key={i}><div className="lform-repeat-grid"><label className="lform-field">Price line {i+1}<input name="item_label" maxLength={120} placeholder="e.g. Labour" value={item.label} required onChange={e=>setItems(items.map((v,n)=>n===i?{...v,label:e.target.value}:v))}/></label><label className="lform-field">Amount ($)<input name="item_amount" type="number" min="0" max="10000000" step="0.01" required value={item.amount} onChange={e=>setItems(items.map((v,n)=>n===i?{...v,amount:e.target.value}:v))}/></label></div>{items.length>1&&<button type="button" className="lform-repeat-remove" onClick={()=>setItems(items.filter((_,n)=>n!==i))}>Remove line {i+1}</button>}</div>)}
   {items.length<12&&<button type="button" className="lform-add" onClick={()=>setItems([...items,{label:'',amount:''}])}>Add price line</button>}
-  <strong>Offer: {formatOfferAmount(total,pricing)}</strong><p className="muted">For hourly or per-unit pricing, these lines add up to the rate for one hour or unit. Agree the quantity and final amount directly.</p>
-  {providerMaterials&&<label className="lform-field">Materials pricing<select name="materials" defaultValue={offer?.materials || 'included'}>{OFFER_MATERIALS_OPTIONS.map(m=><option value={m.id} key={m.id}>{m.label}</option>)}</select></label>}
-  <label className="lform-field">Message (optional)<textarea name="message" maxLength={5000} rows={4} defaultValue={offer?.message || ''} placeholder="Explain how you can help and what your price includes."/></label>
+  <strong>Offer: {formatOfferAmount(total,pricing)}</strong>{pricing==='hourly'&&<p className="muted">{HOURLY_OFFER_GUIDANCE}</p>}
+  {providerMaterials&&<label className="lform-field">Materials pricing<select name="materials" value={materials} onChange={e=>setMaterials(e.target.value)}>{OFFER_MATERIALS_OPTIONS.map(m=><option value={m.id} key={m.id}>{m.label}</option>)}</select></label>}
+  <label className="lform-field">Message (optional)<textarea name="message" maxLength={5000} rows={4} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Explain how you can help and what your price includes."/></label>
   <p className="muted requested-date">Requested: <strong>{requestedLabel(schedule,today)}</strong></p>
-  <label className="lform-field">Available from (optional)<DateInput type="date" name="available_from" defaultValue={availableDefault}/></label><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} defaultValue={offer?.estimated_duration || ''} placeholder="e.g. Half a day"/></label>
+  <label className="lform-field">Available from (optional)<input name="available_from" value={available} onChange={e=>setAvailable(e.target.value)} placeholder="DD/MM/YYYY"/></label><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} value={duration} onChange={e=>setDuration(e.target.value)} placeholder="e.g. Half a day"/></label>
   <p className="muted">The requester will review your offer. Work is agreed when they accept.</p>
  </fieldset>
  {state.error&&<p className="form-error" role="alert">{state.error}</p>}

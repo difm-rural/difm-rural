@@ -12,7 +12,8 @@ export const EMAIL_STEP_ACTION='Continue'
 export function isPasswordAccount(email:string){return PASSWORD_LOGIN_EMAILS.includes(email.trim().toLowerCase())}
 export function isReviewAccount(email:string){return isPasswordAccount(email)}
 export function signInMethodHint(email:string){
- return isPasswordAccount(email)?'This account uses a password. Continue to enter it.':'Continue to receive an email sign-in code.'
+ if (!email.trim()) return 'Enter your email to see how to sign in.'
+ return isPasswordAccount(email)?'Continue to enter your password.':'Continue and we’ll email you a sign-in code.'
 }
 export function reviewSignInFailure(error:{code?:string;status?:number}|null){
   if(error?.status===429||error?.code==='over_request_rate_limit')return 'Too many sign-in attempts. Wait a minute and try again.'

@@ -1,1 +1,1 @@
-export { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, offerStatusLabel, formatOfferAmount } from '../../shared/offers'
+export { HOURLY_OFFER_GUIDANCE, initialOfferLines, OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, offerStatusLabel, formatOfferAmount } from '../../shared/offers'

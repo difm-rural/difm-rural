@@ -32,14 +32,18 @@ export default function ArrivalWindowModal({
 }) {
   const [start, setStart] = useState(() => initialStart(schedule, suggestedDate))
 
+  const [timeSelected, setTimeSelected] = useState(!!schedule?.arrival_start_at)
+
   useEffect(() => {
     if (!visible) return
     setStart(initialStart(schedule, suggestedDate))
+    setTimeSelected(!!schedule?.arrival_start_at)
   }, [visible, schedule?.arrival_start_at, suggestedDate])
 
   const isPast = start.getTime() <= Date.now()
 
   function handleSave() {
+    if (!timeSelected || isPast || saving) return
     // The expected finish is filled in server-side; we only send arrival + a
     // short grace as the end.
     onSave(start, new Date(start.getTime() + ARRIVAL_GRACE_MIN * 60 * 1000))
@@ -50,12 +54,12 @@ export default function ArrivalWindowModal({
       visible={visible}
       title="Confirm arrival time"
       onClose={onClose}
-      footer={<Button title="Confirm time" onPress={handleSave} loading={saving} disabled={isPast} />}>
+      footer={<Button title="Confirm time" onPress={handleSave} loading={saving} disabled={!timeSelected || isPast} />}>
       <Text style={styles.body}>
         This becomes the shared time for calendar events, reminders and completion prompts.
       </Text>
       <Text style={styles.section}>When will you arrive?</Text>
-      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={offerDay} resetKey={visible} />
+      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={offerDay} resetKey={visible} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
     </FullScreenSheet>
   )
 }

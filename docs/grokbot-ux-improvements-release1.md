@@ -1,0 +1,21 @@
+# Grok Bot UX improvements — Release 1
+
+Release 1 covers the non-payment findings for mobile and authenticated provider web. The work is local and ready for review.
+
+| Area | Changes and affected files |
+|---|---|
+| Job creation and editing | The mobile posting wizard checks that the edit actually updated a row before showing success, retains the draft on failure, and distinguishes a saved job from a failed photo save. The web wizard shows distinct post and edit confirmations on the saved job page. See `src/screens/postjob/PostJobStep5Review.js`, `provider-web/src/app/jobs/new/job-form.tsx` and `provider-web/src/app/jobs/[id]/page.tsx`. |
+| Offers | New lines start blank with an example placeholder, and hourly guidance appears only for hourly pricing. Saved line descriptions, rates and availability populate the edit form. Web keeps the form inputs when a save fails and accepts a saved past date on an edit without opening up past dates for new offers. Mobile checks that the pending offer still exists before confirming an edit. Both use DD/MM/YYYY for offer availability with the existing ISO date stored. The web and mobile views remove redundant headings or prices. See `shared/offers.ts`, `shared/dates.ts`, `src/lib/offers.js`, `src/screens/JobDetailScreen.js`, `src/screens/ManageTaskScreen.js`, and the provider web offer form, offer input parser, job page and server actions. |
+| Arrival and completion | New time proposals require a clock time chosen by the provider. A requested or offered day may still be preselected. A saved arrival opens at its existing time when edited. The provider gets feedback only after the operation succeeds, and an in-flight request is guarded against duplicate submission. The active requester next action counts pending offers rather than historical offers. See `src/lib/quickPickDates.js`, `src/components/ArrivalWhen.js`, `src/components/ArrivalWindowModal.js`, `src/components/ConfirmJobSheet.js`, both mobile job screens, and `provider-web/src/app/jobs/[id]/confirm-job.tsx`. |
+| Reviews | Completed jobs show separate status for the signed-in participant and the other actual participant. The web timeline no longer labels the job “Reviewed” when one review exists. Unavailable reads are distinguished from confirmed absence. The web job review form controls the rating and comment so a failed save keeps both. See `shared/jobReviewStatus.ts`, both mobile job screens, and the web job page, `reviews-section.tsx`, `job-review-form.tsx` and `star-rating-input.tsx`. |
+| Sign-in and accessibility | The shared sign-in hint distinguishes entering an email, the password step and the email-code step. Web job actions use native buttons and disclosure controls with visible keyboard focus. The shared web save form prevents duplicate submission. Mobile retains accessible button labels and native pickers and displays useful errors without closing failed forms. See `shared/reviewAccount.ts`, `provider-web/src/components/action-form.tsx`, `provider-web/src/app/globals.css` and the mobile flow files above. |
+
+Mobile uses native alerts, day and time chips and native date/time pickers. Web uses labelled fields, inline status/error feedback and native disclosures. Offer dates display consistently across clients, and arrival times continue to use the existing local input and storage conversion.
+
+## Verification
+
+- Full repository suite passed, 254 tests. New and updated coverage exercised offer defaults and retained inputs after failure, hourly guidance, NZ date parsing and display, saved offer dates, explicit arrival times and edit prefill, duplicate web submits, sign-in wording and independent review indicators. Existing job and offer lifecycle and Release 2 payment regression tests passed.
+- Provider web production Webpack build passed with local fixture configuration.
+- Expo exports passed for Android and iOS.
+
+Physical-device and interactive browser keyboard and screen-reader checks remain outstanding. This release preserves existing marketplace authorization, Supabase schema and RLS, and the payment acknowledgement and completion separation from Release 2. The job confirmation screens changed only their scheduling controls and save feedback. Marketplace Health, Cron and production deployments were outside this release.

@@ -11,19 +11,16 @@ export function localDate(value) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-// Today uses the next half hour, with the existing 15-minute buffer.
-// Future days start at 9 am.
+// Seed native time pickers from the next buffered half hour. New arrival
+// forms display no chosen time until the provider confirms a selection.
 export function defaultStartForDate(suggestedDate, now = new Date()) {
   const picked = startOfDay(localDate(suggestedDate) || now)
-  if (picked > startOfDay(now)) {
-    picked.setHours(9)
-    return picked
-  }
-
   const next = new Date(now)
   next.setMinutes(Math.ceil(next.getMinutes() / 30) * 30, 0, 0)
-  if (next.getTime() - now.getTime() <= 15 * 60 * 1000) {
-    return new Date(next.getTime() + 30 * 60 * 1000)
+  if (next.getTime() - now.getTime() <= 15 * 60 * 1000) next.setMinutes(next.getMinutes() + 30)
+  if (picked > startOfDay(now)) {
+    picked.setHours(next.getHours(), next.getMinutes())
+    return picked
   }
   return next
 }
@@ -75,8 +72,7 @@ export function selectedQuickPickHour(start, now = new Date()) {
 }
 
 // Moving to another day: keep a time the provider has explicitly chosen when it
-// is still ahead of now on that day; otherwise use the day's default (9 am, or
-// today's next half hour).
+// is still ahead of now on that day; otherwise use a picker seed.
 export function startForDay(day, { keepTimeFrom = null, now = new Date() } = {}) {
   if (keepTimeFrom) {
     const kept = startOfDay(localDate(day) || now)

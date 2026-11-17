@@ -276,13 +276,22 @@ export default function PostJobStep5Review({ navigation, route }) {
     }
 
     if (isEditMode && editJob) {
-      const { error } = await supabase
-        .from('jobs').update(payload).eq('id', editJob.id).eq('requester_id', user.id)
-      if (error) { setUploadStatus(''); Alert.alert('Error', error.message); return }
+      const { data, error } = await supabase
+        .from('jobs').update(payload).eq('id', editJob.id).eq('requester_id', user.id).eq('status', 'open').select('id').maybeSingle()
+      if (error || !data) {
+        setUploadStatus('')
+        Alert.alert('Could not save job changes', error?.message || 'The job is no longer editable. Your draft is still here.')
+        return
+      }
 
       setUploadStatus('Uploading photos...')
       const finalUrls = await uploadJobPhotos(editJob.id, photos)
-      await supabase.from('jobs').update({ photos: finalUrls }).eq('id', editJob.id)
+      const photoWrite = await supabase.from('jobs').update({ photos: finalUrls }).eq('id', editJob.id).select('id').maybeSingle()
+      if (photoWrite.error || !photoWrite.data || finalUrls.length < photos.length) {
+        setUploadStatus('')
+        Alert.alert('Some changes need attention', 'Job details were saved, but some photo changes could not be saved. Check your photos and try again.')
+        return
+      }
       await removeThumbnails(supabase, 'job-photos', removedThumbPaths(editJob.photos, finalUrls, 'job-photos'))
 
       setUploadStatus('Saved')
@@ -308,13 +317,16 @@ export default function PostJobStep5Review({ navigation, route }) {
         .from('jobs').select('id').eq('id', draftJobId).eq('requester_id', user.id).maybeSingle()
       if (existing) { newJob = existing; insertError = null }
     }
-    if (insertError) { setUploadStatus(''); Alert.alert('Error', insertError.message); return }
+    if (insertError) { setUploadStatus(''); Alert.alert('Could not post job', insertError.message); return }
 
+    let photosFailed = false
     if (photos.length > 0) {
       setUploadStatus('Uploading photos...')
       const finalUrls = await uploadJobPhotos(newJob.id, photos)
+      photosFailed = finalUrls.length < photos.length
       if (finalUrls.length > 0) {
-        await supabase.from('jobs').update({ photos: finalUrls }).eq('id', newJob.id)
+        const photoWrite = await supabase.from('jobs').update({ photos: finalUrls }).eq('id', newJob.id).select('id').maybeSingle()
+        photosFailed ||= !!photoWrite.error || !photoWrite.data
       }
     }
 
@@ -346,7 +358,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     navigation.replace('JobPosted', {
       jobId: newJob.id,
       title: successTitle,
-      body: successBody,
+      body: successBody + (photosFailed ? ' Some photos could not be saved. You can add them by editing the job.' : ''),
       returnTo: route.params?.origin,
     })
     return true

@@ -1,6 +1,6 @@
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
-import {toLocalIsoDate} from '../../shared/dates'
+import {formatNzDateOnly,toLocalIsoDate} from '../../shared/dates'
 import {offerDefaultDay, requestedLabel} from '../../shared/requestedDate'
 import { localDate } from '../lib/quickPickDates'
 import React, { useEffect, useRef, useState } from 'react'
@@ -12,7 +12,8 @@ import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
 import { jobNextMove } from '../lib/nextMove'
 import { markJobComplete, acceptBid } from '../lib/jobActions'
-import { OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
+import { HOURLY_OFFER_GUIDANCE, initialOfferLines, OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
+import { jobReviewStatus } from '../../shared/jobReviewStatus'
 import ReceivedReview from '../components/ReceivedReview'
 import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
@@ -101,13 +102,17 @@ export default function JobDetailScreen({ route, navigation }) {
   const [requesterProfile, setRequesterProfile] = useState(null)
   const [myInvite, setMyInvite] = useState(null)
   const [isWatched, setIsWatched] = useState(false)
-  const [requesterReview, setRequesterReview] = useState(null)
+  const [requesterReview, setRequesterReview] = useState(undefined)
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
-  const [receivedReview, setReceivedReview] = useState(null)
+  const [receivedReview, setReceivedReview] = useState(undefined)
+  const savingReviewRef = useRef(false)
+  const savingArrivalRef = useRef(false)
+  const completingRef = useRef(false)
+  const acceptingOfferRef = useRef(false)
 
   // Requester-side: review the provider after provider-led completion.
-  const [providerReview, setProviderReview] = useState(null)
+  const [providerReview, setProviderReview] = useState(undefined)
   const [providerReviewVisible, setProviderReviewVisible] = useState(false)
   const [savingProviderReview, setSavingProviderReview] = useState(false)
   const [workSchedule, setWorkSchedule] = useState(null)
@@ -120,7 +125,7 @@ export default function JobDetailScreen({ route, navigation }) {
 
   // Bid form state (Features 3 & 4)
   const [editingBid,        setEditingBid]        = useState(false)
-  const [lineItems,         setLineItems]         = useState([{ label: 'Labour', amount: '' }])
+  const [lineItems,         setLineItems]         = useState(initialOfferLines)
   const [bidMessage,        setBidMessage]        = useState('')
   const [availableFrom,     setAvailableFrom]     = useState(null)
   const [showDatePicker,    setShowDatePicker]    = useState(false)
@@ -153,16 +158,18 @@ export default function JobDetailScreen({ route, navigation }) {
   useEffect(() => { fetchData() }, [initialJob.id])
 
   useEffect(() => {
-    if (job.status !== 'completed' || !currentUser?.id || !myBid) return
+    if (job.status !== 'completed' || !currentUser?.id || myBid?.status !== 'accepted') return
     fetchRequesterReview()
-    fetchReceivedReview()
-  }, [job.status, currentUser?.id, myBid?.id])
+    fetchReceivedReview(job.requester_id, 'requester')
+  }, [job.status, currentUser?.id, myBid?.id, myBid?.status])
 
   useEffect(() => {
     const isOwner = currentUser?.id === job.requester_id
     if (!isOwner || job.status !== 'completed' || !currentUser?.id) return
     fetchProviderReview()
-  }, [job.status, currentUser?.id])
+    const providerId = bids.find(bid => bid.status === 'accepted')?.provider_id
+    if (providerId) fetchReceivedReview(providerId, 'provider')
+  }, [job.status, currentUser?.id, bids])
 
   async function fetchData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -207,16 +214,12 @@ export default function JobDetailScreen({ route, navigation }) {
     if (existingBid) {
       setAlreadyBid(true)
       setMyBid(existingBid)
-      if (existingBid.line_items?.length > 0) {
-        setLineItems(existingBid.line_items.map(li => ({ label: li.label || '', amount: String(li.amount || '') })))
-      } else if (existingBid.amount) {
-        setLineItems([{ label: 'Labour', amount: String(existingBid.amount) }])
-      }
+      setLineItems(initialOfferLines(existingBid))
       setBidMessage(existingBid.message || '')
       setEstimatedDuration(existingBid.estimated_duration || '')
       setBidPricingType(existingBid.pricing_type || 'fixed')
       setBidMaterials(existingBid.materials || 'included')
-      if (existingBid.available_from) setAvailableFrom(localDate(existingBid.available_from))
+      setAvailableFrom(localDate(existingBid.available_from))
     } else {
       setAlreadyBid(false)
       setMyBid(null)
@@ -279,16 +282,17 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   // The requester's review of me (the provider), shown on the completed job.
-  async function fetchReceivedReview() {
+  async function fetchReceivedReview(participantId, role) {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('reviews')
         .select('rating, comment')
         .eq('job_id', job.id)
         .eq('reviewee_id', currentUser.id)
-        .eq('reviewer_role', 'requester')
+        .eq('reviewer_id', participantId)
+        .eq('reviewer_role', role)
         .maybeSingle()
-      setReceivedReview(data || null)
+      setReceivedReview(error ? undefined : data || null)
     } catch { }
   }
 
@@ -302,6 +306,8 @@ export default function JobDetailScreen({ route, navigation }) {
   async function handleSubmitProviderReview({ rating, comment }) {
     const accepted = bids.find(b => b.status === 'accepted')
     if (!currentUser?.id || !accepted?.provider_id) return
+    if (savingReviewRef.current) return
+    savingReviewRef.current = true
     setSavingProviderReview(true)
     try {
       const review = await saveReview({
@@ -314,6 +320,7 @@ export default function JobDetailScreen({ route, navigation }) {
     } catch (error) {
       Alert.alert('Could not save review', error.message)
     } finally {
+      savingReviewRef.current = false
       setSavingProviderReview(false)
     }
   }
@@ -414,12 +421,13 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   async function handleUpdateBid() {
-    if (!myBid) return
+    if (!myBid || submittingBidRef.current) return
     const total = getBidTotal()
     if (!total || total <= 0) { Alert.alert('Missing Amount', 'Please enter an offer amount'); return }
+    submittingBidRef.current = true
     setLoading(true)
     try {
-      const { error } = await supabase.from('bids').update({
+      const { data, error } = await supabase.from('bids').update({
         amount:             total,
         message:            bidMessage,
         line_items:         buildLineItemsPayload(),
@@ -427,11 +435,11 @@ export default function JobDetailScreen({ route, navigation }) {
         estimated_duration: estimatedDuration || null,
         pricing_type:       bidPricingType,
         materials:          job.materials_type === 'provider' ? bidMaterials : null,
-      }).eq('id', myBid.id)
-      if (error) {
-        Alert.alert('Error', error.message)
+      }).eq('id', myBid.id).eq('status', 'pending').select('id').maybeSingle()
+      if (error || !data) {
+        Alert.alert('Could not update offer', error?.message || 'This offer has changed. Check the job before trying again.')
       } else {
-        Alert.alert('Offer updated!', 'Your offer has been updated.')
+        Alert.alert('Offer updated', 'Your changes have been saved.')
         setEditingBid(false)
         fetchData()
       }
@@ -439,6 +447,7 @@ export default function JobDetailScreen({ route, navigation }) {
       Alert.alert("Couldn't send offer", e?.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
+      submittingBidRef.current = false
     }
   }
 
@@ -485,16 +494,24 @@ export default function JobDetailScreen({ route, navigation }) {
       {
         text: 'Accept',
         onPress: async () => {
-          const { error } = await acceptBid(job, bid)
-          if (error) {
-            Alert.alert('Could not accept offer', error.message)
-            if (error.code === 'stale') fetchData()   // re-sync offers + status
-            return
+          if (acceptingOfferRef.current) return
+          acceptingOfferRef.current = true
+          try {
+            const { error } = await acceptBid(job, bid)
+            if (error) {
+              Alert.alert('Could not accept offer', error.message)
+              if (error.code === 'stale') fetchData()
+              return
+            }
+            trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
+            Alert.alert('Offer accepted', 'The provider can now confirm the arrival time.', [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ])
+          } catch (error) {
+            Alert.alert('Could not accept offer', error?.message || 'Please try again.')
+          } finally {
+            acceptingOfferRef.current = false
           }
-          trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
-          Alert.alert('Job awarded!', 'You can now chat with the provider.', [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ])
         },
       },
     ])
@@ -502,6 +519,8 @@ export default function JobDetailScreen({ route, navigation }) {
 
   async function handleSubmitRequesterReview({ rating, comment }) {
     if (!currentUser?.id || !job.requester_id) return
+    if (savingReviewRef.current) return
+    savingReviewRef.current = true
     setSavingReview(true)
     try {
       const review = await saveReview({
@@ -514,6 +533,7 @@ export default function JobDetailScreen({ route, navigation }) {
     } catch (error) {
       Alert.alert('Could not save review', error.message)
     } finally {
+      savingReviewRef.current = false
       setSavingReview(false)
     }
   }
@@ -599,7 +619,8 @@ export default function JobDetailScreen({ route, navigation }) {
     }
 
     async function completeJob() {
-      if (completing) return
+      if (completingRef.current) return
+      completingRef.current = true
       setCompleting(true); setCompleteError('')
       try {
         const { error } = await markJobComplete(job.id)
@@ -611,15 +632,18 @@ export default function JobDetailScreen({ route, navigation }) {
         trackEvent('job_marked_complete', { job_id: job.id })
         setCompleteVisible(false)
         setJob(prev => ({ ...prev, status: 'completed' }))
-        Alert.alert('Thanks!', `${requesterFirstName} has been notified and can now leave a review.`)
+        Alert.alert('Job completed', 'You and the requester can now leave a review.')
       } catch (e) {
         setCompleteError(e?.message || 'Could not update. Please try again.')
       } finally {
+        completingRef.current = false
         setCompleting(false)
       }
     }
 
     async function handleSaveArrivalWindow(start, end, expectedComplete) {
+      if (savingArrivalRef.current) return
+      savingArrivalRef.current = true
       setSavingArrival(true)
       try {
         const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
@@ -629,10 +653,11 @@ export default function JobDetailScreen({ route, navigation }) {
         }
         setWorkSchedule(data)
         setArrivalModalVisible(false)
-        Alert.alert('Arrival time confirmed', `${requesterFirstName} has been notified.`)
+        Alert.alert('Arrival time saved', `${requesterFirstName} has been notified.`)
       } catch (e) {
         Alert.alert("Couldn't save arrival time", e?.message || 'Something went wrong. Please try again.')
       } finally {
+        savingArrivalRef.current = false
         setSavingArrival(false)
       }
     }
@@ -744,7 +769,10 @@ export default function JobDetailScreen({ route, navigation }) {
             )
           ) : null}
 
-          {isCompleted && <ReceivedReview review={receivedReview} fromLabel="requester" />}
+          {isCompleted && <>
+            {jobReviewStatus(requesterReview === undefined ? undefined : !!requesterReview, receivedReview === undefined ? undefined : !!receivedReview, 'Requester').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
+            <ReceivedReview review={receivedReview} fromLabel="requester" />
+          </>}
           {isCompleted && workSchedule?.arrival_start_at && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Confirmed arrival</Text>
@@ -834,8 +862,8 @@ export default function JobDetailScreen({ route, navigation }) {
             <View style={styles.infoBoxBlue}>
               <Text style={styles.infoBoxBlueText}>
                 {otherBidCount > 0
-                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer of ${nzMoney(myBid.amount)} was the winning offer.`
-                  : `Your offer of ${nzMoney(myBid.amount)} was the only offer — you got it!`}
+                  ? `${otherBidCount} other offer${otherBidCount !== 1 ? 's were' : ' was'} not accepted. Your offer was selected.`
+                  : `Your offer was accepted.`}
               </Text>
             </View>
           )}
@@ -918,11 +946,12 @@ export default function JobDetailScreen({ route, navigation }) {
         ))}
       </View>
 
+      {bidPricingType === 'hourly' && <Text style={styles.offersHint}>{HOURLY_OFFER_GUIDANCE}</Text>}
       {lineItems.map((li, idx) => (
         <View key={idx} style={styles.lineItemRow}>
           <TextInput
             style={[styles.input, styles.lineItemLabel]}
-            placeholder="Description"
+            placeholder="e.g. Labour"
             value={li.label}
             onChangeText={v => updateLineItem(idx, 'label', v)}
             accessibilityLabel={`Line item ${idx + 1} description`}
@@ -990,7 +1019,7 @@ export default function JobDetailScreen({ route, navigation }) {
         accessibilityRole="button" accessibilityLabel="Set availability date">
         <Text style={styles.availabilityBtnText}>
           <Icon name="calendar-outline" size={14} color={colors.textSecondary} /> {availableFrom
-            ? `Available from ${nzDate(availableFrom)}`
+            ? `Available from ${formatNzDateOnly(toLocalIsoDate(availableFrom))}`
             : 'Set availability date (optional)'}
         </Text>
         {availableFrom && (
@@ -1154,7 +1183,9 @@ export default function JobDetailScreen({ route, navigation }) {
         {/* Requester: completed — leave / edit the provider review */}
         {isJobOwner && job.status === 'completed' && acceptedBid && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Review provider</Text>
+            <Text style={styles.sectionTitle}>Reviews</Text>
+            {jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview === undefined ? undefined : !!receivedReview, 'Provider').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
+            <ReceivedReview review={receivedReview} fromLabel="provider" />
             <Button
               title={providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
               onPress={() => setProviderReviewVisible(true)}
@@ -1284,7 +1315,7 @@ export default function JobDetailScreen({ route, navigation }) {
                   )}
                   {myBid?.message ? <Text style={styles.myBidMessage}>{myBid.message}</Text> : null}
                   {myBid?.available_from && (
-                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {nzDate(new Date(myBid.available_from))}</Text>
+                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {formatNzDateOnly(myBid.available_from)}</Text>
                   )}
                   {myBid?.estimated_duration && (
                     <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
@@ -1389,7 +1420,7 @@ export default function JobDetailScreen({ route, navigation }) {
                 )}
                 {bid.message ? <Text style={styles.bidMessage}>{bid.message}</Text> : null}
                 {bid.available_from && (
-                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {nzDate(new Date(bid.available_from))}</Text>
+                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {formatNzDateOnly(bid.available_from)}</Text>
                 )}
                 {bid.estimated_duration && (
                   <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>

@@ -794,3 +794,5 @@ a.row:hover { background: var(--sage); }
 .sidebar-signout span { color:inherit; font-size:12px; font-weight:650; }
 
 .payment-ack-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.work-page .activity-action > summary:focus-visible, .work-page button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }

@@ -1,3 +1,5 @@
+import {JobReviewForm} from './job-review-form'
+import {jobReviewStatus} from '@shared/jobReviewStatus'
 import {formatDate as nzDate} from '@shared/formatting'
 import Link from '@/components/navigation-link'
 import { ActionForm } from '@/components/action-form'
@@ -12,11 +14,13 @@ function stars(n:number){return '★'.repeat(n)+'☆'.repeat(5-n)}
 // The reviews block for a completed job or booking: the review you received, your
 // own review shown read-only (edit behind a toggle), and — before you've reviewed
 // — the form to leave one. Shared by the job and booking workspaces.
-export function ReviewsSection({kind,id,actions,personName,personId,received,ownReview,reviewError,justReviewed}:{
+export function ReviewsSection({kind,id,actions,personName,personId,received,ownReview,reviewError,justReviewed,otherReviewRole}:{
   kind:'job'|'booking';id:string;actions:WorkAction[];personName:string|null;personId?:string|null;
-  received?:WorkReview;ownReview?:WorkReview;reviewError:boolean;justReviewed?:boolean}){
+  received?:WorkReview;ownReview?:WorkReview;reviewError:boolean;justReviewed?:boolean;otherReviewRole?:string}){
   const firstName=personName?personName.trim().split(/\s+/)[0]:'the other person'
-  const reviewForm=(
+  const reviewForm=kind==='job'
+    ? <JobReviewForm key={ownReview?.id || 'new'} id={id} rating={ownReview?.rating} comment={ownReview?.comment} editing={!!ownReview}/>
+    : (
     <ActionForm key={ownReview?.id || 'new'} action={reviewArrangement} label={ownReview?'Save review changes':'Submit review'} pendingLabel={ownReview?'Saving changes…':'Posting review…'}>
       <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/>
       <StarRatingInput initial={ownReview?.rating}/>
@@ -28,7 +32,8 @@ export function ReviewsSection({kind,id,actions,personName,personId,received,own
     {justReviewed && <p className="home-clear" role="status">Thanks — your review is posted.</p>}
     {reviewError?<p role="alert">Could not load reviews. Refresh before adding or editing your review.</p>:<>
       {received && <article className="activity-received"><h3>{personName || 'Their'} review of you</h3><p><span aria-label={received.rating+' out of 5'}>{stars(received.rating)}</span> · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
-      {!received && <p className="muted">The other person has not left a review yet.</p>}
+      {kind==='job' && otherReviewRole && jobReviewStatus(!!ownReview,!!received,otherReviewRole).map(label=><p className="muted" key={label}>{label}</p>)}
+      {kind!=='job' && !received && <p className="muted">The other person has not left a review yet.</p>}
       {ownReview
         ? <article className="activity-received"><h3>Your review of {firstName}</h3>
             <p><span aria-label={ownReview.rating+' out of 5'}>{stars(ownReview.rating)}</span> · {nzDate(new Date(ownReview.created_at))}</p>

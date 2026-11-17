@@ -1,5 +1,6 @@
+import { formatNzDateOnly } from '../../shared/dates'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Image,
@@ -23,6 +24,7 @@ import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
 import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
+import { jobReviewStatus } from '../../shared/jobReviewStatus'
 import JobPaymentHandoff from '../components/JobPaymentHandoff'
 import { paymentAcknowledgementAvailable } from '../../shared/paymentAcknowledgement'
 import { loadReview, saveReview } from '../lib/reviews'
@@ -98,7 +100,10 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [bids, setBids] = useState([])
   const [loadingBids, setLoadingBids] = useState(false)
   const [currentUserId, setCurrentUserId] = useState(null)
-  const [providerReview, setProviderReview] = useState(null)
+  const [providerReview, setProviderReview] = useState(undefined)
+  const [receivedReview, setReceivedReview] = useState(undefined)
+  const reviewInFlight = useRef(false)
+  const arrivalInFlight = useRef(false)
   const [reviewVisible, setReviewVisible] = useState(false)
   const [savingReview, setSavingReview] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
@@ -164,9 +169,9 @@ export default function ManageTaskScreen({ navigation, route }) {
   }, [job.id, job.status])
 
   useEffect(() => {
-    if (job.status !== 'completed' || !currentUserId) return
-    fetchProviderReview()
-  }, [job.id, job.status, currentUserId])
+    if (job.status !== 'completed' || !currentUserId || currentUserId !== job.requester_id || !acceptedBid?.providerId) return
+    fetchProviderReview(acceptedBid.providerId)
+  }, [job.id, job.status, job.requester_id, currentUserId, acceptedBid?.providerId])
 
   async function fetchAcceptedBid() {
     const { data: bidData } = await supabase
@@ -272,7 +277,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     } catch { /* table may not exist yet */ }
   }
 
-  async function fetchProviderReview() {
+  async function fetchProviderReview(providerId) {
     try {
       const review = await loadReview({
         jobId: job.id,
@@ -280,6 +285,9 @@ export default function ManageTaskScreen({ navigation, route }) {
         reviewerRole: 'requester',
       })
       setProviderReview(review)
+      const { data, error } = await supabase.from('reviews').select('id')
+        .eq('job_id', job.id).eq('reviewee_id', currentUserId).eq('reviewer_id', providerId).eq('reviewer_role', 'provider').maybeSingle()
+      setReceivedReview(error ? undefined : !!data)
     } catch {
       // If reviews is not provisioned yet, the submit path will show the user-facing error.
     }
@@ -406,6 +414,8 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function handleSubmitReview({ rating, comment }) {
     if (!ensureTaskOwner()) return
     if (!currentUserId || !acceptedBid?.providerId) return
+    if (reviewInFlight.current) return
+    reviewInFlight.current = true
     setSavingReview(true)
     try {
       const review = await saveReview({
@@ -423,6 +433,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     } catch (error) {
       Alert.alert('Could not save review', error.message)
     } finally {
+      reviewInFlight.current = false
       setSavingReview(false)
     }
   }
@@ -442,16 +453,24 @@ export default function ManageTaskScreen({ navigation, route }) {
   }
 
   async function handleSaveArrivalWindow(start, end, expectedComplete) {
+    if (arrivalInFlight.current) return
+    arrivalInFlight.current = true
     setSavingArrival(true)
-    const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
-    setSavingArrival(false)
-    if (error) {
+    try {
+      const { data, error } = await saveArrivalWindow({ jobId: job.id, start, end, expectedComplete })
+      if (error) {
+        Alert.alert("Couldn't save arrival time", arrivalErrorMessage(error))
+        return
+      }
+      setWorkSchedule(data)
+      setArrivalModalVisible(false)
+      Alert.alert('Arrival time saved', 'The requester has been notified.')
+    } catch (error) {
       Alert.alert("Couldn't save arrival time", arrivalErrorMessage(error))
-      return
+    } finally {
+      arrivalInFlight.current = false
+      setSavingArrival(false)
     }
-    setWorkSchedule(data)
-    setArrivalModalVisible(false)
-    Alert.alert('Arrival time confirmed', 'The requester has been notified.')
   }
 
   function handleRunningLate() {
@@ -823,6 +842,8 @@ export default function ManageTaskScreen({ navigation, route }) {
           <SummaryRow icon="location-outline" label="Location"  value={job.location_name} />
           <SummaryRow icon="cash-outline" label="Budget"    value={budgetText} />
           <SummaryRow icon="calendar-outline" label="Posted"    value={timeAgo(job.created_at)} last />
+          {showCompletedActions && isTaskOwner && jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview, 'Provider')
+            .filter(Boolean).map(label => <Text key={label} style={styles.waitBody}>{label}</Text>)}
         </View>
 
         {/* Offered to — providers this job was privately offered to */}
@@ -926,7 +947,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                     {!!bid.available_from && (
                       <View style={styles.bidMetaRow}>
                         <Icon name="calendar-outline" size={13} color={colors.textMuted} />
-                        <Text style={styles.bidMeta}>Available from: {nzDate(new Date(bid.available_from))}</Text>
+                        <Text style={styles.bidMeta}>Available from: {formatNzDateOnly(bid.available_from)}</Text>
                       </View>
                     )}
                     {!!bid.estimated_duration && (

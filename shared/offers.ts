@@ -60,3 +60,9 @@ export function paymentLine(amount:number|string|null|undefined, pricingType:str
   const money = amount !== null && amount !== undefined && Number.isFinite(value) && value > 0 ? `${formatOfferAmount(value, pricingType)} ` : ''
   return `Payment: ${money}${PAYMENT_METHOD_PHRASES[method || ''] || 'as agreed'}`
 }
+export const HOURLY_OFFER_GUIDANCE = 'Enter the price for one hour of work.'
+
+export function initialOfferLines(offer?: { line_items?: { label: string; amount: number }[] | null; amount?: number | null }) {
+  if (offer?.line_items?.length) return offer.line_items.map(line => ({ label: line.label, amount: String(line.amount) }))
+  return [{ label: '', amount: offer?.amount == null ? '' : String(offer.amount) }]
+}

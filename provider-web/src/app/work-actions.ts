@@ -93,13 +93,13 @@ export async function removeJob(_:ActionState,data:FormData):Promise<ActionState
 }
 export async function changeOffer(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=text(data,'offer_id'),intent=text(data,'intent')
- const {data:offer,error}=await supabase.from('bids').select('id,job_id,status,provider_id').eq('id',id).eq('provider_id',user.id).single()
+ const {data:offer,error}=await supabase.from('bids').select('id,job_id,status,provider_id,available_from').eq('id',id).eq('provider_id',user.id).single()
  if(error || !offer || offer.status!=='pending')return {error:'This offer has changed. Refresh before trying again.'}
  const {data:job,error:jobError}=await supabase.from('jobs_public').select('status,materials_type').eq('id',offer.job_id).single()
  if(jobError || job?.status!=='open')return {error:'This job is no longer accepting changes to offers.'}
  if(!['edit','withdraw'].includes(intent))return {error:'Choose an offer action.'}
  if(intent==='withdraw' && data.get('confirmed')!=='on')return {error:'Confirm that you want to withdraw this offer.'}
- const input=intent==='edit'?offerInput(data,job.materials_type==='provider'):null
+ const input=intent==='edit'?offerInput(data,job.materials_type==='provider',offer.available_from):null
  if(input&&!input.ok)return {error:input.error}
  const result=intent==='edit'&&input?.ok?await supabase.rpc('update_pending_job_offer_details',{p_offer_id:id,p_details:input.value}):await supabase.rpc('change_pending_job_offer',{p_offer_id:id,p_intent:'withdraw',p_amount:null,p_message:null})
  if(result.error)return {error:'Could not change your offer. The job may have been accepted or closed. Refresh and try again.'}

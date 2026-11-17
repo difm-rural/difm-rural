@@ -47,7 +47,7 @@ test('typing the review address keeps the email action stable and explains the p
  assert.equal(primary().props.children,'Continue')
  h.field('email','tester@example.test');assert.equal(primary().props.children,'Continue')
  h.field('email',review.REVIEW_EMAIL);assert.equal(primary().props.children,'Continue')
- assert.match(h.nodes().find(n=>n.props?.id==='sign-in-method').props.children,/uses a password/)
+ assert.match(h.nodes().find(n=>n.props?.id==='sign-in-method').props.children,/Continue to enter your password/)
  assert.equal(h.nodes().find(n=>n.props?.id==='email').props['aria-describedby'],'sign-in-method')
  assert.equal(h.calls.length,0)
  await h.submit();assert.ok(h.nodes().some(n=>n.props?.id==='password'))

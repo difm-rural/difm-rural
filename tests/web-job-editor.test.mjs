@@ -110,3 +110,10 @@ test('job server rejects invalid public area text independently of form controls
  }
  assert.equal(jobInput(form({...valid,area:'Te Kūiti'}),context).ok,true)
 })
+
+test('an offer edit preserves its saved past date but cannot introduce another past date',()=>{
+ const values={item_label:['Travel'],item_amount:['25'],pricing_type:'fixed',available_from:'07/03/2020'}
+ assert.equal(offerInput(form(values),false,'2020-03-07').value.available_from,'2020-03-07')
+ assert.equal(offerInput(form(values),false).ok,false)
+ assert.equal(offerInput(form(values),false,'2020-03-06').ok,false)
+})

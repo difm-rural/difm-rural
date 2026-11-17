@@ -1,4 +1,5 @@
 import {jobMapTarget} from '@shared/jobMapTarget'
+import {formatNzDateOnly} from '@shared/dates'
 import {formatMoney as nzMoney,formatDate as nzDate,formatDateTime as nzDateTime} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
@@ -25,9 +26,9 @@ import { PaymentSorted } from './payment-requester'
 import { agreedPaymentMethodLabels, paymentAcknowledgementActor, paymentAcknowledgementAvailable } from '@shared/paymentAcknowledgement'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
-export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string}>}){
+export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string}>}){
  const {id}=await params
- const {thread,reviewed,posted}=await searchParams
+ const {thread,reviewed,posted,edited}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
@@ -78,7 +79,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    const {data:ws}=await supabase.from('work_schedules').select('arrival_start_at').eq('job_id',id).maybeSingle()
    workArrival=ws?.arrival_start_at || null
  }
- const next=nextRole?jobNextMove(job,nextRole,{otherName:nextOtherName,bidCount:own?(offerError?0:offers?.length||0):0,unansweredQuestionCount:own?(questions?.filter(q=>!q.answer).length||0):0,hasPendingBid:myOffer?.status==='pending',hasArrival:!!workArrival,arrivalAt:workArrival}):null
+ const next=nextRole?jobNextMove(job,nextRole,{otherName:nextOtherName,bidCount:own&&!offerError?offers?.filter(offer=>offer.status==='pending').length||0:0,unansweredQuestionCount:own?(questions?.filter(q=>!q.answer).length||0):0,hasPendingBid:myOffer?.status==='pending',hasArrival:!!workArrival,arrivalAt:workArrival}):null
  const confirmationCard=showPayment&&acceptedOffer&&isAcceptedProvider&&['accepted','in_progress'].includes(job.status)
    ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} schedule={jobSchedule} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>
    : showPayment&&workArrival
@@ -112,7 +113,6 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  if(own&&offers?.length)timeline.push(offers.length+(offers.length===1?' offer':' offers'))
  if(awarded&&acceptedProviderId)timeline.push('Offer accepted')
  if(job.status==='completed')timeline.push('Completed')
- if(received||ownReview)timeline.push('Reviewed')
 
  const detailsCard=<article className="card work-detail"><p>{job.category} · {job.location_area || job.location_name || 'Location to be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
    ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'Budget '+nzMoney(job.price):'open to offers')}</p></>
@@ -130,7 +130,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
 
  const offersSection=offerError?<p role="alert" className="card">Could not load offers. Refresh to try again.</p>:<section className="card" id="offer"><h2>{own?'Offers':myOffer?'Your offer':'Send an offer'}</h2>
    {own&&!offers?.length&&<p className="muted">Offers will appear here when people respond.</p>}
-   {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link>:'Your offer'} · {formatOfferAmount(b.amount,b.pricing_type)}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{b.line_items?.length>0&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}: {nzMoney(item.amount)}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {nzDate(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
+   {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<><Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link> · </>:null}{formatOfferAmount(b.amount,b.pricing_type)}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{(b.line_items?.length>1||b.line_items?.some((item:{label:string})=>item.label))&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}{b.line_items.length>1?': '+nzMoney(item.amount):''}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {formatNzDateOnly(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
     {own&&job.status==='open'&&b.status!=='rejected'&&<Link className="card-link" href={'/jobs/'+id+'?thread='+b.provider_id+'#offer-'+b.id}>Message {names.get(b.provider_id)?.trim().split(/\s+/)[0] || 'this provider'}</Link>}
     {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary>Accept this offer</summary><ActionForm action={acceptOffer} label="Accept offer"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p><label className="account-setting"><input type="checkbox" required/>I agree to accept this offer.</label></ActionForm></details>:<>
      <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'} schedule={jobSchedule}/></details>
@@ -144,7 +144,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const invitedSection=own?<section className="card"><h2>Invited providers</h2>{sentInviteError?<p role="alert">Could not load invitations. Refresh to try again.</p>:sentInvites?.length?sentInvites.map(i=><p key={i.id}><Link href={'/people/'+i.provider_id} className="card-link">{names.get(i.provider_id) || 'Previous provider'}</Link> · {offers?.some(b=>b.provider_id===i.provider_id)?'Offer received':i.status==='declined'?'Invitation declined':i.status==='seen'?'Opened — awaiting an offer':'Invitation sent'}</p>):<p className="muted">No providers invited yet.</p>}{job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider →</Link>}</section>:null
 
  const mainColumn=<>
-  {posted==='1'&&own&&<PostFeedback jobId={id}/>}
+  {posted==='1'&&own&&<><p className="home-clear" role="status">Job posted.</p><PostFeedback jobId={id}/></>}
+  {edited==='1'&&own&&<p className="home-clear" role="status">Job changes saved.</p>}
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
   {confirmationCard}
   {paymentCard}
@@ -156,8 +157,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {((own&&(ownerActions.edit||ownerActions.repeat))||canAskQuestion||job.status==='open')&&<div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>}
   {job.status==='open'?<>{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
-  {job.status==='completed'&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'}/>}
-  {job.status==='completed'&&<p className="home-clear">Job complete. You can find it again in History.</p>}
+  {job.status==='completed'&&manageRole&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'&&!!ownReview} otherReviewRole={manageRole==='requester'?'Provider':'Requester'}/>}
+  {job.status==='completed'&&<p className="home-clear" role="status">Job completed. You can find it again in History.</p>}
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}
  </>
 

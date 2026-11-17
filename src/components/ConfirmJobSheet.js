@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import ArrivalWhen, { timeLabel } from './ArrivalWhen'
 import FullScreenSheet from './FullScreenSheet'
@@ -35,6 +35,8 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   // Requested day first; otherwise the offer date (a past one falls back to today).
   const initialDay = days.preselect || availableFrom
   const [start, setStart] = useState(() => defaultStartForDate(initialDay))
+  const [timeSelected, setTimeSelected] = useState(false)
+  const submitting = useRef(false)
   const [choice, setChoice] = useState('agreed')
   const [acct, setAcct] = useState('')
   const [acctNo, setAcctNo] = useState('')
@@ -46,6 +48,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   useEffect(() => {
     if (!visible) return
     setStart(defaultStartForDate(initialDay))
+    setTimeSelected(false)
     setChoice('agreed'); setAcct(''); setAcctNo('')
     setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
   }, [visible, initialDay, jobTitle])
@@ -59,15 +62,18 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
   // the one the requester asked for.
   const arrivalDay = nzCalendarDay(start)
   const dayNote = arrivalDayNote(job, arrivalDay)
-  const preview = `Confirmed: I'll be there around ${arrivalDay ? dayLabel(arrivalDay) : nzDate(start)}, ${timeLabel(start)}${dayNote.suffix}.`
+  const preview = (timeSelected
+    ? `Confirmed: I'll be there around ${arrivalDay ? dayLabel(arrivalDay) : nzDate(start)}, ${timeLabel(start)}${dayNote.suffix}.`
+    : 'Choose an arrival time to complete this preview.')
     + (dayNote.line ? `\n${dayNote.line}` : '')
     + `\n${paymentLine(amount, pricingType, choice)}`
     + (noteText ? `\nNote: ${noteText}` : '')
     + (paymentMessage ? `\n\n${paymentMessage}` : '')
-  const blocked = isPast || busy
+  const blocked = !timeSelected || isPast || busy
 
   async function confirm() {
-    if (blocked) return
+    if (blocked || submitting.current) return
+    submitting.current = true
     setBusy(true); setError('')
     try {
       const { error: rpcError } = await supabase.rpc('confirm_job', {
@@ -87,6 +93,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     } catch (e) {
       setError(e?.message || 'Could not confirm. Pull to refresh and try again.')
     } finally {
+      submitting.current = false
       setBusy(false)
     }
   }
@@ -98,7 +105,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
       onClose={onClose}
       footer={<Button title="Confirm job" onPress={confirm} loading={busy} disabled={blocked} />}>
       <Text style={styles.section}>When will you arrive?</Text>
-      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} />
+      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
 
       <Text style={styles.section}>Payment method (optional)</Text>
       <View style={styles.options}>
