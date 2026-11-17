@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import SideHeader from '../../components/SideHeader'
-import AiJobAssistant from '../../components/AiJobAssistant'
 
 // Step 1 is really title + timing — the category is inferred later, so "Basics"
 // rather than "Job type" (which implies a category picker that isn't there).
@@ -29,11 +28,15 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
           <Text style={styles.backText}>{currentStep === 1 ? 'Cancel' : <><Icon name="chevron-back" size={14} color="rgba(255,255,255,0.92)" /> Back</>}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{title || 'Post a job'}</Text>
-        <View style={styles.assistantSlot}>
-          <AiJobAssistant />
-        </View>
+        <View style={styles.spacer} />
       </View>
-      <View style={styles.stepsRow}>
+      {currentStep===1 ? <View style={styles.compact}>
+        <Text style={styles.progressText}>Step 1 of {STEPS.length} · Basics</Text>
+        <View style={styles.track} accessible accessibilityRole="progressbar"
+          accessibilityValue={{min:0,max:STEPS.length,now:1}}>
+          <View style={styles.fill} />
+        </View>
+      </View> : <View style={styles.stepsRow}>
         {STEPS.map((label, i) => {
           const n = i + 1
           const done   = n < currentStep
@@ -51,7 +54,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
             </TouchableOpacity>
           )
         })}
-      </View>
+      </View>}
       </View>
     </View>
   )
@@ -76,7 +79,10 @@ const styles = StyleSheet.create({
   backText: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '600' },
   title:    { fontSize: 17, fontWeight: '700', color: '#fff', textAlign: 'center' },
   spacer:   { minWidth: 60 },
-  assistantSlot: { minWidth: 60, alignItems: 'flex-end' },
+  compact: { gap: 7 },
+  progressText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },
+  fill: { width: '20%', height: '100%', borderRadius: 2, backgroundColor: '#fff' },
 
   stepsRow:    { flexDirection: 'row', justifyContent: 'space-between' },
   stepItem:    { alignItems: 'center', flex: 1 },

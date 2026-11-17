@@ -31,6 +31,26 @@ export const CATEGORIES: string[] = [
   'General Rural Help',
 ]
 
+// The existing conversational drafting endpoint still returns legacy names.
+const DRAFT_CATEGORY_ALIASES = new Map([
+  ['Fencing','Fencing & Gates'],
+  ['Maintenance','Buildings & Maintenance'],
+  ['Property Check','Property & House Sitting'],
+  ['Landscaping','Land & Vegetation'],
+  ['Animal Care','Animals & Farm Sitting'],
+  ['Machinery','Machinery & Repairs'],
+  ['Spraying','Spraying & Pest Control'],
+  ['Water','Water & Drainage'],
+  ['Labour','General Rural Help'],
+  ['General Labour','General Rural Help'],
+  ['Other','General Rural Help'],
+])
+
+export function jobDraftCategory(value: unknown) {
+  if(typeof value!=='string')return ''
+  return CATEGORIES.includes(value)?value:DRAFT_CATEGORY_ALIASES.get(value)??''
+}
+
 // Jobs and services share one taxonomy — keep the old names as aliases so
 // existing imports keep working.
 export const JOB_CATEGORIES: string[] = CATEGORIES

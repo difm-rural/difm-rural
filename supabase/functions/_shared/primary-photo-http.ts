@@ -10,7 +10,7 @@ export async function verifiedPhoto(request: Request) {
 
 export const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-draft-id, x-cleanup-secret',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-draft-id, x-cleanup-secret, x-job-photo-note',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Cache-Control': 'private, no-store',
 }

@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Keyboard, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
-import { usePostJob } from '../context/PostJobContext'
 import { colors } from '../theme/tokens'
 import Icon from './Icon'
 import Button from './Button'
@@ -22,15 +20,15 @@ function DraftRow({ label, value, last }) {
   )
 }
 
-export default function AiJobAssistant() {
-  const navigation = useNavigation()
-  const { jobData } = usePostJob()
-  const [open, setOpen] = useState(false)
+export default function AiJobAssistant({ onUse }) {
+  const [mode, setMode] = useState(null)
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [draft, setDraft] = useState(null)
   const [error, setError] = useState(null)
   const [kbHeight, setKbHeight] = useState(0)
+  const request = useRef(0)
+  const locked = useRef(false)
 
   // Track the keyboard so the bottom sheet lifts above it (RN modals don't
   // resize for the keyboard on Android).
@@ -43,54 +41,51 @@ export default function AiJobAssistant() {
   }, [])
 
   function close() {
-    setOpen(false)
-    setText('')
-    setDraft(null)
-    setError(null)
+    request.current++
+    locked.current = false
+    setMode(null)
     setLoading(false)
   }
 
   async function handleCreate() {
-    if (text.trim().length < 8) return
+    if (text.trim().length < 8 || locked.current) return
+    locked.current = true
+    const version = ++request.current
     setLoading(true)
     setError(null)
     try {
       const d = await draftJobFromText(text.trim())
       if (!d || !d.title) throw new Error('I could not turn that into a job. Try adding a little more detail.')
-      setDraft(d)
+      if (version === request.current) setDraft(d)
     } catch (e) {
-      setError(e.message || 'Could not create a draft. Please try again.')
+      if (version === request.current) setError(e.message || 'Could not create a draft. Please try again.')
     } finally {
-      setLoading(false)
+      if (version === request.current) {
+        locked.current = false
+        setLoading(false)
+      }
     }
   }
 
   function handleUse() {
     if (!draft) return
-    // Land on the first step ("Job type") so the user sees the generated title,
-    // then flows through the pre-filled steps. Step 1 seeds itself from aiSeed.
-    // (Route name differs between the authed and guest post flows.)
-    const names = navigation.getState()?.routeNames || []
-    const step1 = names.includes('PostJob') ? 'PostJob' : 'GuestPostJob'
+    onUse(draft)
+    setDraft(null)
     close()
-    navigation.navigate(step1, { aiSeed: draft })
   }
-
-  // Editing an existing job — not a fresh draft, so the assistant doesn't apply.
-  if (jobData._editJobId) return null
 
   return (
     <>
-      <TouchableOpacity
+      {['Speak', 'Describe'].map(choice => <TouchableOpacity key={choice}
         style={styles.trigger}
-        onPress={() => setOpen(true)}
+        onPress={() => setMode(choice)}
         accessibilityRole="button"
-        accessibilityLabel="AI assistant — describe your job out loud">
-        <Icon name="sparkles" size={14} color={colors.primary} />
-        <Text style={styles.triggerText}>Assistant</Text>
-      </TouchableOpacity>
+        accessibilityLabel={choice === 'Speak' ? 'Speak with the AI assistant' : 'Describe your job to the AI assistant'}>
+        <Icon name={choice === 'Speak' ? 'mic-outline' : 'create-outline'} size={18} color={colors.primary} />
+        <Text style={styles.triggerText}>{choice}</Text>
+      </TouchableOpacity>)}
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
+      <Modal visible={mode !== null} animationType="slide" transparent onRequestClose={close}>
         <View style={styles.backdrop}>
           <TouchableOpacity style={styles.backdropTap} activeOpacity={1} onPress={close} accessibilityLabel="Close" />
           <View style={[styles.sheet, { marginBottom: kbHeight }]}>
@@ -106,7 +101,7 @@ export default function AiJobAssistant() {
               {!draft ? (
                 <View>
                   <Text style={styles.help}>
-                    Say it in your own words — tap the mic on your keyboard and just talk. The assistant fills in the details.
+                    {mode === 'Speak' ? 'Tap the mic on your keyboard and describe what you need.' : 'Describe what you need in your own words.'}
                   </Text>
                   <TextInput
                     style={styles.input}
@@ -115,6 +110,7 @@ export default function AiJobAssistant() {
                     value={text}
                     onChangeText={setText}
                     multiline
+                    maxLength={2000}
                     autoFocus
                     textAlignVertical="top"
                     editable={!loading}
@@ -159,13 +155,12 @@ const styles = StyleSheet.create({
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    gap: 8,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 10,
+    minHeight: 44,
   },
-  triggerText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  triggerText: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   backdropTap: { flex: 1 },

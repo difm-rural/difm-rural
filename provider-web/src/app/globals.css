@@ -608,6 +608,29 @@ a.row:hover { background: var(--sage); }
 .job-steps button { padding: 9px 12px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); color: var(--forest-deep); font: inherit; font-size: 13px; cursor: pointer; }
 .job-steps button[aria-current="step"] { background: var(--forest); color: white; border-color: var(--forest); }
 .job-steps button:disabled { opacity: .5; cursor: default; }
+.job-progress { display: grid; gap: 6px; }
+.job-progress p { margin: 0; }
+.job-progress progress { width: 100%; height: 5px; display: block; accent-color: var(--forest); }
+.job-basics { gap: 20px; }
+.job-ai-helper { border-radius: 12px; background: var(--paper); }
+.job-ai-helper > summary { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; cursor: pointer; }
+.job-ai-helper > summary::after { content: '＋'; color: var(--forest); }
+.job-ai-helper[open] > summary::after { content: '−'; }
+.job-ai-helper > summary small { display: block; margin-top: 4px; color: var(--muted); }
+.job-ai-options { display: grid; gap: 4px; padding: 0 16px 14px; min-width: 0; }
+.job-ai-helper summary::-webkit-details-marker { display: none; }
+.job-ai-choice, .job-ai-photo > summary { width: 100%; min-height: 44px; padding: 11px 10px; text-align: left; font: inherit; font-weight: 650; cursor: pointer; color: var(--forest-deep); }
+.job-ai-choice { border: 0; border-radius: 8px; background: transparent; }
+.job-ai-choice:hover, .job-ai-photo > summary:hover { background: white; }
+.job-ai-helper :is(summary,button):focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.job-ai-panel { display: grid; justify-items: start; gap: 12px; padding: 8px 10px; }
+.job-ai-panel .lform-field { width: 100%; }
+.job-ai-panel img { max-width: 100%; height: auto; border-radius: 8px; }
+.job-timing { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.job-timing legend { font-weight: 700; padding: 0; margin-bottom: 8px; }
+.job-timing label { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.job-timing label:has(input:checked) { background: var(--paper); color: var(--forest-deep); }
+.job-timing input[type="radio"] { margin: 0; flex: none; width: 18px; height: 18px; accent-color: var(--forest); }
 .job-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%,160px),220px)); align-items:start; gap: 12px; }
 .job-photo-grid img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
 .listing-gallery { display: grid; gap: 12px; }

@@ -13,12 +13,13 @@ export async function prepareJobPrimaryPhoto(asset) {
   return bytes
 }
 
-export async function jobPrimaryPhotoRequest(endpoint,asset,draftId) {
+export async function jobPrimaryPhotoRequest(endpoint,asset,draftId,note='') {
   const {data:{session}} = await supabase.auth.getSession()
   if (!session) throw new Error('Sign in to use Photo-to-Job.')
   const {data,error} = await supabase.functions.invoke(endpoint,{
     body:await prepareJobPrimaryPhoto(asset),timeout:30000,
-    headers:{'Content-Type':'image/jpeg',...(draftId?{'x-draft-id':draftId}:{})},
+    headers:{'Content-Type':'image/jpeg',...(draftId?{'x-draft-id':draftId}:{}),
+      ...(note.trim()?{'x-job-photo-note':encodeURIComponent(note.trim())}:{})},
   })
   if(error)throw new Error(draftId?'Could not upload this photo. Your job details are kept.':'Could not suggest a job. Try again or enter the details yourself.')
   return data

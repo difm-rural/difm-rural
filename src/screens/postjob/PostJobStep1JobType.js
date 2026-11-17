@@ -11,9 +11,10 @@ import {localDate} from '../../lib/quickPickDates'
 import DateChips from '../../components/DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from '../../components/NativeDateTimePicker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AiJobAssistant from '../../components/AiJobAssistant'
 import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
 import { photoToJobEnabled } from '../../lib/jobPrimaryPhoto'
-import { CATEGORIES } from '../../lib/categories'
+import { jobDraftCategory } from '../../../shared/categories'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
@@ -68,6 +69,9 @@ export default function PostJobStep1JobType({ navigation, route }) {
   // Which date is being picked: 'date' | 'from' | 'to'. Uses the same picker as
   // the rest of the app (a dialog on Android, an inline spinner with Done on iOS).
   const [picker, setPicker] = useState(null)
+  const [aiExpanded, setAiExpanded] = useState(false)
+  const [photoExpanded, setPhotoExpanded] = useState(false)
+  const canUsePhoto = photoToJobEnabled && route.name !== 'GuestPostJob' && !jobData.photos?.length
 
   function pickerOptions(which) {
     const today = localDate(nzToday())
@@ -182,6 +186,14 @@ export default function PostJobStep1JobType({ navigation, route }) {
     ? Math.max(0, Math.round((dateTo - dateFrom) / 86400000))
     : null
 
+  function applySuggestion(suggestion) {
+    setTitle(value=>value.trim()?value:(suggestion.title || '').slice(0,POSTING_TITLE_MAX))
+    updateJobData({
+      description:jobData.description||(suggestion.description || '').slice(0,POSTING_DESCRIPTION_MAX),
+      category:jobData.category||jobDraftCategory(suggestion.category),
+    })
+  }
+
   function handleBack() {
     navigation.goBack()
   }
@@ -208,22 +220,10 @@ export default function PostJobStep1JobType({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}
           showsVerticalScrollIndicator={false}>
-          {photoToJobEnabled && route.name !== 'GuestPostJob' && !isEditMode && !isRepeatMode && !jobData.photos?.length && (
-            <JobPrimaryPhotoDraft photo={jobData.primaryPhoto} required={jobData.primaryPhotoRequired}
-              onPhoto={primaryPhoto=>updateJobData({primaryPhoto,primaryPhotoRequired:true})}
-              onManual={()=>updateJobData({primaryPhoto:null,primaryPhotoRequired:false})}
-              onSuggestion={suggestion=>{
-                if(!title.trim())setTitle(suggestion.title)
-                updateJobData({
-                  description:jobData.description||suggestion.description,
-                  category:jobData.category||(CATEGORIES.includes(suggestion.category)?suggestion.category:''),
-                })
-              }}/>
-          )}
           {!!scheduleType && !!scheduleError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginBottom: 12 }}>{scheduleError}</Text>}
 
           <View style={styles.card}>
-            <Text style={styles.cardQuestion}>Give the job a title</Text>
+            <Text accessibilityRole="header" style={styles.heading}>What do you need done?</Text>
             <TextInput
               style={[styles.input, attempted && (title.trim().length < 3 || !!postingTextError(title,'title')) && { borderColor: colors.danger, borderWidth: 2 }]}
               placeholder="e.g. Fix fence on north paddock"
@@ -244,10 +244,46 @@ export default function PostJobStep1JobType({ navigation, route }) {
             )}
           </View>
 
+          {!isEditMode && !isRepeatMode && <View style={styles.aiHelper}>
+            <TouchableOpacity style={styles.aiToggle} onPress={() => setAiExpanded(value => !value)}
+              accessibilityRole="button" accessibilityState={{expanded:aiExpanded}}>
+              <Icon name="sparkles-outline" size={20} color={colors.primary} />
+              <View style={styles.flex1}>
+                <Text style={styles.aiTitle}>Use AI to help create my job</Text>
+                <Text style={styles.aiHint}>{canUsePhoto ? 'Use a photo, speak or describe what you need.' : 'Speak or describe what you need.'}</Text>
+              </View>
+              <Icon name={aiExpanded?'chevron-up':'chevron-down'} size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <View style={aiExpanded ? styles.aiChoices : styles.hidden}>
+              {canUsePhoto && <>
+                <TouchableOpacity style={styles.aiChoice} accessibilityRole="button"
+                  accessibilityState={{expanded:photoExpanded}} onPress={() => setPhotoExpanded(value => !value)}>
+                  <Icon name="camera-outline" size={18} color={colors.primary} />
+                  <Text style={styles.aiTitle}>Photo{jobData.primaryPhoto ? ' · selected' : ''}</Text>
+                </TouchableOpacity>
+                <View style={photoExpanded ? styles.photoPanel : styles.hidden}>
+                  <JobPrimaryPhotoDraft photo={jobData.primaryPhoto} required={jobData.primaryPhotoRequired}
+                    onPhoto={primaryPhoto=>updateJobData({primaryPhoto,primaryPhotoRequired:true})}
+                    onManual={()=>updateJobData({primaryPhoto:null,primaryPhotoRequired:false})}
+                    onSuggestion={applySuggestion}/>
+                </View>
+              </>}
+              <AiJobAssistant onUse={draft=>{
+                const suggestion=draftToJobData(draft)
+                applySuggestion(suggestion)
+                if (!scheduleType) {
+                  setScheduleType(suggestion.scheduleType)
+                  setScheduledDate(suggestion.scheduledDate ? localDate(suggestion.scheduledDate) : null)
+                }
+                if (!jobData.price) updateJobData({price:suggestion.price,priceType:suggestion.priceType})
+              }}/>
+            </View>
+          </View>}
+
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>When do you need it done?</Text>
             {attempted && !scheduleType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose when you need the job done.</Text>}
-            <View style={[styles.scheduleList, attempted && (!scheduleType||!!scheduleError) && {borderColor:colors.danger,borderWidth:2}]}>
+            <View style={styles.scheduleList}>
               {SCHEDULE_OPTIONS.filter(opt => opt.id !== 'range' || isHouseSitting(title) || scheduleType==='range').map(opt => (
                 <React.Fragment key={opt.id}>
                   <TouchableOpacity
@@ -337,14 +373,16 @@ const styles = StyleSheet.create({
   scroll:        { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },
 
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    padding: 16,
-    marginBottom: 12,
-  },
+  card: { marginBottom: 18 },
+  heading: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginBottom: 14 },
+  aiHelper: { backgroundColor: colors.primaryLight, borderRadius: 12, marginBottom: 24 },
+  aiToggle: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  aiTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
+  aiHint: { color: colors.textMuted, fontSize: 13, marginTop: 3 },
+  aiChoices: { paddingHorizontal: 14, paddingBottom: 14, gap: 6 },
+  aiChoice: { flexDirection: 'row', alignItems: 'center', padding: 10, gap: 8, minHeight: 44 },
+  photoPanel: { paddingHorizontal: 8 },
+  hidden: { display: 'none' },
   cardQuestion: { fontSize: 16, fontWeight: '700', color: '#222', marginBottom: 12 },
 
   input: {
@@ -370,8 +408,8 @@ const styles = StyleSheet.create({
   rangeCol:   { flex: 1 },
   rangeLabel: { fontSize: 12, color: '#666', marginBottom: 6, marginLeft: 2 },
   rangeDaysText: { fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 8, marginLeft: 2 },
-  scheduleTile:            { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: '#ddd', gap: 12, minHeight: 52, marginTop: 4 },
-  scheduleTileActive:      { borderColor: colors.primary, backgroundColor: '#f0faf5' },
+  scheduleTile:            { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, padding: 12, gap: 12, minHeight: 48 },
+  scheduleTileActive:      { backgroundColor: colors.primaryLight },
   scheduleTileIcon:        { fontSize: 18 },
   scheduleTileLabel:       { flex: 1, fontSize: 15, fontWeight: '600', color: '#222' },
   scheduleTileLabelActive: { color: colors.primary },

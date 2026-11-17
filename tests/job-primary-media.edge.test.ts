@@ -21,6 +21,7 @@ Deno.test('mocked Edge transport validates image bytes, authorization, retry and
   await import('../supabase/functions/draft-job-from-photo/index.ts')
   const [media,ai]=handler
   let visible=false,uploaded:Uint8Array|undefined,aiStatus='draft',modelCalls=0
+  const modelInputs: unknown[][] = []
   let publishCalls=0,stageEligible=true,cleanupClaim=true,leaseCurrent=false
   let beforeRemove: (()=>Promise<void>) | undefined
   const lease='10000000-0000-4000-8000-000000000003'
@@ -75,6 +76,7 @@ Deno.test('mocked Edge transport validates image bytes, authorization, retry and
       modelCalls++
       const body=await request.json()
       assert.equal(body.store,false)
+      modelInputs.push(body.input[0].content)
       return Response.json({output:[{content:[{type:'output_text',text:JSON.stringify({
         status:aiStatus,title:'Fix gate',description:'Repair this gate.',category:'Fencing & Gates',
         question:'Which hinge needs work?',
@@ -120,9 +122,16 @@ Deno.test('mocked Edge transport validates image bytes, authorization, retry and
   visible=false
   assert.equal((await media(read())).status,404)
   assert.equal((await ai(imageRequest({}))).status,401)
+  assert.equal((await ai(imageRequest({...auth,'x-job-photo-note':'%bad%'}))).status,400)
+  assert.equal((await ai(imageRequest({...auth,'x-job-photo-note':'a'.repeat(401)}))).status,400)
   assert.equal((await ai(imageRequest())).status,200)
+  assert.equal(modelInputs[0].length,1)
   aiStatus='needs_detail'
-  assert.equal((await (await ai(imageRequest())).json()).question,'Which hinge needs work?')
+  const note='Replace the hinge near the pā gate.'
+  const withNote=imageRequest({...auth,'x-job-photo-note':encodeURIComponent(note)})
+  assert.equal((await (await ai(withNote)).json()).question,'Which hinge needs work?')
+  assert.deepEqual(modelInputs[1][0],{type:'input_text',text:'Requester context: '+note})
+  assert.match(JSON.stringify(modelInputs[1][1]),/data:image\/jpeg;base64,/)
   aiStatus='invalid'
   assert.equal((await ai(imageRequest())).status,503)
   assert.equal(modelCalls,3)

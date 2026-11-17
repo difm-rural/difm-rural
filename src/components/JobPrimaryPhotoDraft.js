@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Image, Text, View } from 'react-native'
+import { Image, Text, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import Button from './Button'
 import { jobPrimaryPhotoRequest } from '../lib/jobPrimaryPhoto'
+import { colors } from '../theme/tokens'
 
 export default function JobPrimaryPhotoDraft({photo,onPhoto,onSuggestion,onManual,required,allowSuggestion=true,disabled=false}) {
   const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
   const [result,setResult]=useState(null)
+  const [note,setNote]=useState('')
   const generation=useRef(0)
   const work=useRef(false)
   useEffect(()=>()=>{generation.current++},[])
@@ -32,7 +34,7 @@ export default function JobPrimaryPhotoDraft({photo,onPhoto,onSuggestion,onManua
     const version=++generation.current
     setBusy(true);setError('');setResult(null)
     try{
-      const value=await jobPrimaryPhotoRequest('draft-job-from-photo',photo)
+      const value=await jobPrimaryPhotoRequest('draft-job-from-photo',photo,undefined,note)
       if(version===generation.current)setResult(value)
     }catch(cause){if(version===generation.current)setError(cause.message)}
     finally{if(version===generation.current){work.current=false;setBusy(false)}}
@@ -44,7 +46,11 @@ export default function JobPrimaryPhotoDraft({photo,onPhoto,onSuggestion,onManua
     {photo&&<Button title="Remove photo" variant="secondary" disabled={disabled} onPress={()=>change(null)}/>}
     {required&&<Button title="Continue without a photo" variant="secondary" disabled={disabled} onPress={()=>{change(null);onManual()}}/>}
     {photo&&allowSuggestion&&<>
-      <Text>Suggest a job sends this photo for AI analysis. People who can view your posted job can see the photo.</Text>
+      <Text>Add a short description (optional)</Text>
+      <TextInput accessibilityLabel="Optional photo description" value={note} onChangeText={setNote}
+        editable={!busy&&!disabled} maxLength={400} multiline placeholder="e.g. Replace the broken hinge"
+        style={{backgroundColor:colors.white,borderRadius:8,padding:12,minHeight:56,color:colors.textPrimary}}/>
+      <Text>Suggest a job sends the photo and description for AI analysis. People who can view your posted job can see the photo.</Text>
       <Button title={busy?'Analysing photo…':'Suggest a job'} disabled={disabled||busy} onPress={suggest}/>
     </>}
     {!!error&&<Text accessibilityRole="alert">{error}</Text>}

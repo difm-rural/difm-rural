@@ -31,6 +31,7 @@ function harness(storage,seed,{
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='@/components/job-address-input')return {JobAddressInput:'job-address'}
   if(name==='@/components/job-photo-draft')return {JobPhotoDraft:'job-photo-draft'}
+  if(name==='@/components/job-text-draft')return {JobTextDraft:'job-text-draft'}
   if(name==='@/lib/job-primary-photo')return {prepareJobPhoto:async file=>file,jobPhotoRequest:uploadPhoto}
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
@@ -59,7 +60,7 @@ function harness(storage,seed,{
  const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new'});effects.splice(0).forEach(fn=>fn())}
  const nodes=(node=tree)=>!node||typeof node!=='object'?[]:[node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
- const click=label=>{nodes().find(n=>n.type==='button'&&text(n)===label).props.onClick();render()}
+ const click=label=>{nodes().find(n=>n.type==='button'&&(text(n)===label||label==='Next'&&text(n)==='Next — Location')).props.onClick();render()}
  const change=(id,value)=>{nodes().find(n=>n.props?.id===id).props.onChange({target:{value}});render()}
  function submit(){
   const fields=Object.fromEntries(nodes().filter(n=>n.type==='input'&&n.props.type==='hidden').map(n=>[n.props.name,n.props.value]))
@@ -81,6 +82,25 @@ test('job validation names and highlights every missing field, and clears correc
  }
  h.change('job-title','Repair fence')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-title').props['aria-invalid'],undefined)
+})
+test('Basics defaults to manual entry with one collapsed AI helper and preserves a manual title and photo',()=>{
+ const h=harness(undefined,undefined,{photoEnabled:true})
+ const disclosure=h.nodes().find(n=>n.type==='details'&&n.props.className==='job-ai-helper')
+ assert.equal(disclosure.props.open,undefined)
+ assert.match(h.text(disclosure),/Use AI to help create my job/)
+ assert.ok(h.nodes().some(n=>n.type==='progress'&&n.props.value===1&&n.props.max===5))
+ assert.ok(h.nodes().some(n=>n.props.type==='radio'&&n.props.name==='schedule_type'))
+ const image={name:'gate.jpg'}
+ h.change('job-title','Repair gate')
+ h.nodes().find(n=>n.type==='job-photo-draft').props.onFile(image)
+ h.render()
+ h.nodes().find(n=>n.type==='job-text-draft').props.onUse({title:'Suggested title',description:'Fix the hinge.',category:'Fencing'})
+ h.render()
+ assert.equal(h.nodes().find(n=>n.props.id==='job-title').props.value,'Repair gate')
+ assert.equal(h.nodes().find(n=>n.type==='job-photo-draft').props.file,image)
+ assert.equal(categories.jobDraftCategory('Fencing'),'Fencing & Gates')
+ h.click('Next — Location')
+ assert.ok(h.nodes().some(n=>n.type==='h2'&&h.text(n)==='Location'))
 })
 test('date and area errors are associated with the relevant job controls',()=>{
  const h=harness();h.change('job-title','Repair fence');h.change('job-schedule_type','specific');h.click('Next')
@@ -151,20 +171,20 @@ test('invalid public area is highlighted and cannot advance to Details',()=>{
 const datedJob={id:'edit-job',title:'Repair fence',description:'Fence repair',category:categories.CATEGORIES[0],schedule_type:'specific',scheduled_date:'2030-12-01',location_area:'Waitoki'}
 test('specific-date editing exposes the saved choice and submits exactly one matching timing field',()=>{
  const h=harness(undefined,datedJob)
- const timing=h.nodes().find(n=>n.props?.id==='job-schedule_type')
+ const timing=h.nodes().find(n=>n.props?.name==='schedule_type'&&n.props.checked)
  assert.equal(timing.props.value,'specific')
- assert.ok(h.nodes().some(n=>n.type==='option'&&n.props.value==='specific'))
+ assert.equal(timing.props.type,'radio')
  assert.equal(h.nodes().find(n=>n.props?.id==='job-scheduled_date').props.value,'2030-12-01')
- assert.equal(h.nodes().filter(n=>n.props?.name==='schedule_type').length,1)
+ assert.equal(h.nodes().filter(n=>n.props?.name==='schedule_type'&&n.props.checked).length,1)
  h.click('Next')
  const submitted=h.nodes().filter(n=>n.props?.name==='schedule_type')
  assert.equal(submitted.length,1);assert.equal(submitted[0].props.value,'specific')
 })
 test('older missing-type date records select Specific; explicit Flexible stays Flexible',()=>{
  const inferred=harness(undefined,{...datedJob,schedule_type:null})
- assert.equal(inferred.nodes().find(n=>n.props?.id==='job-schedule_type').props.value,'specific')
+ assert.equal(inferred.nodes().find(n=>n.props?.name==='schedule_type'&&n.props.checked).props.value,'specific')
  const flexible=harness(undefined,{...datedJob,schedule_type:'flexible'})
- assert.equal(flexible.nodes().find(n=>n.props?.id==='job-schedule_type').props.value,'flexible')
+ assert.equal(flexible.nodes().find(n=>n.props?.name==='schedule_type'&&n.props.checked).props.value,'flexible')
 })
 
 function reachReview(h){

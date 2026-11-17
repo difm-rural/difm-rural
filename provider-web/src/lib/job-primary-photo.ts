@@ -10,13 +10,14 @@ export async function prepareJobPhoto(file: File) {
   return photo
 }
 
-export async function jobPhotoRequest<T>(endpoint: string, photo: Blob, draft?: string): Promise<T> {
+export async function jobPhotoRequest<T>(endpoint: string, photo: Blob, draft?: string, note=''): Promise<T> {
   const client=createClient()
   const {data:{session}}=await client.auth.getSession()
   if(!session)throw new Error('Sign in to use Photo-to-Job.')
   const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/'+endpoint,{
     method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'image/jpeg',
-      apikey:process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,...(draft?{'x-draft-id':draft}:{})},
+      apikey:process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,...(draft?{'x-draft-id':draft}:{}),
+      ...(note.trim()?{'x-job-photo-note':encodeURIComponent(note.trim())}:{})},
     body:photo,signal:AbortSignal.timeout(30000),
   })
   if(!response.ok)throw new Error(draft?'Could not upload the photo. Your draft is kept. Try again.':'Could not suggest a job. Try again or enter the details yourself.')
