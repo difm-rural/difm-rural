@@ -161,37 +161,249 @@ async function publicNames(client: SupabaseLike, ids: unknown[]): Promise<Map<st
 // search_jobs / search_listings
 // ---------------------------------------------------------------------------
 export type SearchArgs = { query?: string; category?: string; area?: string; limit?: number }
+export type Point = { latitude: number; longitude: number }
+// Turns a town/area name into a point (the app's own place lookup, via the
+// maps-proxy function). Null when the place can't be found.
+export type AreaGeocoder = (area: string) => Promise<Point | null>
+export type SearchOptions = { geocode?: AreaGeocoder }
 
-export async function searchJobs(client: SupabaseLike, args: SearchArgs = {}) {
-  const limit = clampLimit(args.limit)
-  let q = client.from('jobs_public').select(JOB_COLUMNS)
-    .eq('status', 'open').eq('visibility', 'public')
-  const term = searchTerm(args.query)
-  if (term) q = q.or(`title.ilike.*${term}*,description.ilike.*${term}*`)
-  const category = categoryFilter(args.category)
-  if (category) q = q.eq('category', category)
-  const area = searchTerm(args.area)
-  if (area) q = q.ilike('location_area', `*${area}*`)
-  const rows = check<JobRow[]>(await q.order('created_at', { ascending: false }).limit(limit)) || []
-  return { results: rows.slice(0, limit).map(jobSummary), count: Math.min(rows.length, limit), limit }
+export const JOB_RADIUS_KM = 30
+// Listings without a travel range are treated as covering this far.
+export const DEFAULT_LISTING_RANGE_KM = 30
+// How many matching rows are scored in memory when an area or query is given.
+const CANDIDATES = 300
+
+const STOP_WORDS = new Set(['a', 'an', 'and', 'any', 'for', 'in', 'near', 'nearby', 'around', 'the', 'of', 'to', 'at', 'on', 'my', 'me', 'someone', 'somebody', 'who', 'can', 'need', 'needed', 'wanted', 'looking', 'job', 'jobs', 'work', 'listing', 'listings', 'service', 'services', 'provider', 'providers', 'help', 'local', 'nz', 'with', 'or'])
+
+// Small synonym list: a stem -> extra stems that mean the same kind of work.
+const SYNONYMS: Record<string, string[]> = {
+  fenc: ['gate', 'post and rail'],
+  gate: ['fenc'],
+  spray: ['weed', 'pest control'],
+  weed: ['spray'],
+  mow: ['lawn', 'grass'],
+  lawn: ['mow', 'grass'],
+  dig: ['excavat', 'earthwork'],
+  excavat: ['digger', 'earthwork'],
+  drain: ['culvert'],
+  hay: ['bale', 'baleage', 'silage'],
+  graz: ['paddock', 'pasture'],
+  paddock: ['graz', 'pasture'],
+  septic: ['wastewater', 'sewage'],
+  firewood: ['wood', 'logs'],
+  tree: ['arborist', 'hedge', 'felling'],
+  hedge: ['trim', 'tree'],
+  drone: ['spray', 'aerial'],
+  plumb: ['pipe'],
+  electric: ['wiring'],
+  shed: ['build'],
+  sit: ['feed', 'care'],
+  driveway: ['gravel', 'metal', 'earthwork'],
+  gravel: ['metal', 'driveway'],
 }
 
-export async function searchListings(client: SupabaseLike, args: SearchArgs = {}) {
-  const limit = clampLimit(args.limit)
-  let q = client.from('services').select(LISTING_COLUMNS).eq('is_active', true).is('closed_at', null)
-  const term = searchTerm(args.query)
-  if (term) q = q.or(`title.ilike.*${term}*,description.ilike.*${term}*,card_headline.ilike.*${term}*`)
-  const category = categoryFilter(args.category)
-  if (category) q = q.eq('category', category)
-  const area = searchTerm(args.area)
-  if (area) q = q.ilike('location_name', `*${area}*`)
-  const rows = check<ListingRow[]>(await q.order('created_at', { ascending: false }).limit(limit)) || []
-  const names = await publicNames(client, rows.map(r => r.provider_id))
-  return {
-    results: rows.slice(0, limit).map(r => listingSummary(r, names.get(String(r.provider_id)) || null)),
-    count: Math.min(rows.length, limit),
-    limit,
+// fence/fencer/fencing -> fenc; spray/spraying/sprayer -> spray; digging -> dig.
+export function stem(word: string): string {
+  let w = word.toLowerCase().replace(/['’]/g, '')
+  for (const suffix of ['ings', 'ing', 'ers', 'er', 'ies', 'es', 'ed', 's']) {
+    if (w.length - suffix.length >= 3 && w.endsWith(suffix)) {
+      w = w.slice(0, -suffix.length) + (suffix === 'ies' ? 'y' : '')
+      break
+    }
   }
+  if (w.length > 3 && w.endsWith('e')) w = w.slice(0, -1)
+  // doubled consonant left by -ing/-er (digging -> digg -> dig)
+  if (w.length > 3 && /([b-df-hj-np-tv-z])\1$/.test(w)) w = w.slice(0, -1)
+  return w
+}
+
+// The query as word groups: each group is one meaningful word expanded to its
+// stem and synonyms. A row matches a group if any form appears in its title,
+// description or category.
+export function queryTerms(value: unknown): string[][] {
+  const words = searchTerm(value).toLowerCase().split(/\s+/).filter(w => w.length >= 2 && !STOP_WORDS.has(w))
+  const groups: string[][] = []
+  for (const word of [...new Set(words)].slice(0, 6)) {
+    const root = stem(word)
+    if (root.length < 3) continue
+    groups.push([...new Set([root, ...(SYNONYMS[root] || [])])].map(t => searchTerm(t)).filter(Boolean))
+  }
+  return groups
+}
+
+function textFilter(groups: string[][], columns: string[]): string | null {
+  const terms = [...new Set(groups.flat())].slice(0, 24)
+  if (!terms.length) return null
+  return terms.flatMap(t => columns.map(c => `${c}.ilike.*${t}*`)).join(',')
+}
+
+// Rows matching more of the query's words rank first.
+function wordScore(row: Record<string, unknown>, groups: string[][]): number {
+  if (!groups.length) return 0
+  const text = [row.title, row.description, row.category, row.card_headline].map(v => String(v ?? '')).join(' ').toLowerCase()
+  return groups.filter(g => g.some(t => text.includes(t.toLowerCase()))).length
+}
+
+function pointOf(lat: unknown, lng: unknown): Point | null {
+  if (lat === null || lat === undefined || lng === null || lng === undefined || lat === '' || lng === '') return null
+  const latitude = Number(lat), longitude = Number(lng)
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 ? { latitude, longitude } : null
+}
+
+export function distanceKm(a: Point, b: Point): number {
+  const r = Math.PI / 180, dlat = (b.latitude - a.latitude) * r, dlng = (b.longitude - a.longitude) * r
+  const h = Math.sin(dlat / 2) ** 2 + Math.cos(a.latitude * r) * Math.cos(b.latitude * r) * Math.sin(dlng / 2) ** 2
+  return 6371 * 2 * Math.atan2(Math.sqrt(Math.min(1, h)), Math.sqrt(Math.max(0, 1 - h)))
+}
+
+// Whole kilometres, never 0: enough to compare, not enough to pinpoint.
+const roundKm = (km: number) => Math.max(1, Math.round(km))
+
+async function resolveArea(area: string, geocode?: AreaGeocoder): Promise<Point | null> {
+  if (!area || !geocode) return null
+  try { return await geocode(area) } catch { return null }
+}
+
+type Located<T> = { row: T; km: number; score: number }
+
+function byScoreThenDistance<T>(a: Located<T>, b: Located<T>) {
+  return b.score - a.score || a.km - b.km
+}
+
+function withHint<T extends Record<string, unknown>>(result: T, hint: string | null): T & { hint?: string } {
+  return hint ? { ...result, hint } : result
+}
+
+function describeFilters(args: SearchArgs, category: string): string {
+  return [args.query && `"${searchTerm(args.query)}"`, category].filter(Boolean).join(' in ')
+}
+
+// "fencer near Waitoki" in the query with no area: treat Waitoki as the area.
+export function splitQueryArea(args: SearchArgs): SearchArgs {
+  if (searchTerm(args.area) || typeof args.query !== 'string') return args
+  const m = /^(.*?)\s+(?:near|in|around|at|close to)\s+([\p{L}\p{M}'’ -]{3,60})$/iu.exec(args.query.trim())
+  return m && m[1].trim() ? { ...args, query: m[1].trim(), area: m[2].trim() } : args
+}
+
+export async function searchJobs(client: SupabaseLike, input: SearchArgs = {}, options: SearchOptions = {}) {
+  const args = splitQueryArea(input)
+  const limit = clampLimit(args.limit)
+  const groups = queryTerms(args.query)
+  const category = categoryFilter(args.category)
+  const area = searchTerm(args.area)
+  const base = () => {
+    let q = client.from('jobs_public').select(JOB_COLUMNS + ',latitude,longitude').eq('status', 'open').eq('visibility', 'public')
+    const filter = textFilter(groups, ['title', 'description', 'category'])
+    if (filter) q = q.or(filter)
+    if (category) q = q.eq('category', category)
+    return q
+  }
+  const centre = await resolveArea(area, options.geocode)
+
+  if (area && !centre) {
+    const rows = check<JobRow[]>(await base().ilike('location_area', `*${area}*`).order('created_at', { ascending: false }).limit(limit)) || []
+    rows.sort((a, b) => wordScore(b, groups) - wordScore(a, groups))
+    return withHint({
+      results: rows.slice(0, limit).map(jobSummary), count: Math.min(rows.length, limit), limit,
+      area_match: 'text',
+      area_note: `Couldn't find "${area}" as a New Zealand place, so this matched the job's public area text instead.`,
+    }, rows.length ? null : `No open jobs mention "${area}". Try a nearby town or leave the area out.`)
+  }
+
+  if (!centre) {
+    const rows = check<JobRow[]>(await base().order('created_at', { ascending: false }).limit(groups.length ? CANDIDATES : limit)) || []
+    rows.sort((a, b) => wordScore(b, groups) - wordScore(a, groups))
+    return withHint({ results: rows.slice(0, limit).map(jobSummary), count: Math.min(rows.length, limit), limit },
+      rows.length ? null : await jobsElsewhereHint(client, args, groups, category))
+  }
+
+  const rows = check<(JobRow & { latitude?: unknown; longitude?: unknown })[]>(await base().order('created_at', { ascending: false }).limit(CANDIDATES)) || []
+  // Hidden-address jobs have no pin in jobs_public: use their public area's centre.
+  const located: Located<JobRow>[] = []
+  await Promise.all(rows.map(async row => {
+    const point = pointOf(row.latitude, row.longitude) || (row.location_area ? await resolveArea(String(row.location_area), options.geocode) : null)
+    if (point) located.push({ row, km: distanceKm(centre, point), score: wordScore(row, groups) })
+  }))
+  const near = located.filter(x => x.km <= JOB_RADIUS_KM).sort(byScoreThenDistance)
+  const results = near.slice(0, limit).map(x => ({ ...jobSummary(x.row), distance_km: roundKm(x.km) }))
+  let hint: string | null = null
+  if (!near.length) {
+    const nearest = [...located].sort((a, b) => a.km - b.km)[0]
+    hint = nearest
+      ? `No matching open jobs within ${JOB_RADIUS_KM} km of ${area}. ${located.length} matching job${located.length === 1 ? '' : 's'} elsewhere; the nearest is "${clip(nearest.row.title, 80)}" in ${jobArea(nearest.row as { location_area?: string; location_name?: string }) || 'another area'}, about ${roundKm(nearest.km)} km away.`
+      : await jobsElsewhereHint(client, args, groups, category)
+  }
+  return withHint({ results, count: results.length, limit, area_match: 'distance', radius_km: JOB_RADIUS_KM, area }, hint)
+}
+
+async function jobsElsewhereHint(client: SupabaseLike, args: SearchArgs, groups: string[][], category: string): Promise<string> {
+  if (!groups.length && !category) return 'There are no open public jobs right now.'
+  const any = check<{ id: string }[]>(await client.from('jobs_public').select('id').eq('status', 'open').eq('visibility', 'public').limit(1)) || []
+  return any.length
+    ? `No open jobs match ${describeFilters(args, category)}. Try a broader word or leave the category out.`
+    : 'There are no open public jobs right now.'
+}
+
+export async function searchListings(client: SupabaseLike, input: SearchArgs = {}, options: SearchOptions = {}) {
+  const args = splitQueryArea(input)
+  const limit = clampLimit(args.limit)
+  const groups = queryTerms(args.query)
+  const category = categoryFilter(args.category)
+  const area = searchTerm(args.area)
+  const base = () => {
+    let q = client.from('services').select(LISTING_COLUMNS + ',card_headline,latitude,longitude,service_latitude,service_longitude').eq('is_active', true).is('closed_at', null)
+    const filter = textFilter(groups, ['title', 'description', 'category', 'card_headline'])
+    if (filter) q = q.or(filter)
+    if (category) q = q.eq('category', category)
+    return q
+  }
+  const summarise = async (items: { row: ListingRow; extra?: Record<string, unknown> }[]) => {
+    const names = await publicNames(client, items.map(i => i.row.provider_id))
+    return items.map(i => ({ ...listingSummary(i.row, names.get(String(i.row.provider_id)) || null), ...(i.extra || {}) }))
+  }
+  const centre = await resolveArea(area, options.geocode)
+
+  if (area && !centre) {
+    const rows = check<ListingRow[]>(await base().ilike('location_name', `*${area}*`).order('created_at', { ascending: false }).limit(limit)) || []
+    rows.sort((a, b) => wordScore(b, groups) - wordScore(a, groups))
+    return withHint({
+      results: await summarise(rows.slice(0, limit).map(row => ({ row }))), count: Math.min(rows.length, limit), limit,
+      area_match: 'text',
+      area_note: `Couldn't find "${area}" as a New Zealand place, so this matched the listing's town text instead.`,
+    }, rows.length ? null : `No listings mention "${area}". Try a nearby town or leave the area out.`)
+  }
+
+  if (!centre) {
+    const rows = check<ListingRow[]>(await base().order('created_at', { ascending: false }).limit(groups.length ? CANDIDATES : limit)) || []
+    rows.sort((a, b) => wordScore(b, groups) - wordScore(a, groups))
+    return withHint({ results: await summarise(rows.slice(0, limit).map(row => ({ row }))), count: Math.min(rows.length, limit), limit },
+      rows.length ? null : listingsElsewhereHint(args, groups, category, 0))
+  }
+
+  const rows = check<ListingRow[]>(await base().order('created_at', { ascending: false }).limit(CANDIDATES)) || []
+  const located: (Located<ListingRow> & { range: number })[] = []
+  for (const row of rows) {
+    const point = pointOf(row.latitude, row.longitude) || pointOf(row.service_latitude, row.service_longitude)
+    if (!point) continue
+    const range = money(row.travel_range_km) ?? DEFAULT_LISTING_RANGE_KM
+    located.push({ row, km: distanceKm(centre, point), range, score: wordScore(row, groups) })
+  }
+  const covering = located.filter(x => x.km <= x.range).sort(byScoreThenDistance)
+  const results = await summarise(covering.slice(0, limit).map(x => ({ row: x.row, extra: { distance_km: roundKm(x.km), covers_area: true } })))
+  let hint: string | null = null
+  if (!covering.length) {
+    const nearest = [...located].sort((a, b) => a.km - b.km)[0]
+    hint = nearest
+      ? `No listings cover ${area}. ${located.length} matching listing${located.length === 1 ? '' : 's'} elsewhere; the nearest is "${clip(nearest.row.title, 80)}"${nearest.row.category ? ` (${nearest.row.category})` : ''} based in ${listingArea(nearest.row as { location_name?: string }) || 'another area'}, about ${roundKm(nearest.km)} km away, travelling up to ${roundKm(nearest.range)} km. The member could still ask them.`
+      : listingsElsewhereHint(args, groups, category, rows.length)
+  }
+  return withHint({ results, count: results.length, limit, area_match: 'distance', area }, hint)
+}
+
+function listingsElsewhereHint(args: SearchArgs, groups: string[][], category: string, found: number): string {
+  if (found) return 'Matching listings exist but none has a location, so distance could not be checked. Try without an area.'
+  if (!groups.length && !category) return 'There are no active listings right now.'
+  return `No active listings match ${describeFilters(args, category)}. Try a broader word, another category, or search jobs instead.`
 }
 
 // ---------------------------------------------------------------------------

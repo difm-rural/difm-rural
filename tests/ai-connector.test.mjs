@@ -82,7 +82,7 @@ test('search_jobs reads jobs_public only, open + public, and drops address field
   const call = client.calls[0]
   assert.equal(call.table, 'jobs_public')
   assert.deepEqual(op(call, 'eq'), [['eq', 'status', 'open'], ['eq', 'visibility', 'public']])
-  assert.deepEqual(op(call, 'limit'), [['limit', 25]])
+  assert.ok(op(call, 'limit')[0][1] <= 300, 'candidate rows are bounded')
   const json = JSON.stringify(out)
   assert.doesNotMatch(json, /Hidden Road|latitude|longitude|174\.4/)
   assert.equal(out.results[0].area, 'Helensville')
@@ -276,4 +276,83 @@ test('hidden beta: Connected assistants shows only for beta members or connected
   for (const screen of ['../src/screens/tabs/AccountTabScreen.js', '../provider-web/src/app/account/page.tsx']) {
     assert.match(readFileSync(new URL(screen, import.meta.url), 'utf8'), /showConnectedAssistants\(/, screen)
   }
+})
+
+// ---------------------------------------------------------------------------
+// Search quality: stems, synonyms, geocoded areas, distance, hints
+// ---------------------------------------------------------------------------
+import { stem, queryTerms, distanceKm, JOB_RADIUS_KM } from '../shared/aiConnector.ts'
+
+const WAITOKI = { latitude: -36.6125, longitude: 174.5250 }
+const geocode = async area => (/waitoki/i.test(area) ? WAITOKI : /kaitaia/i.test(area) ? { latitude: -35.115, longitude: 173.263 } : null)
+// Real-world shaped rows: a Rodney District fencer ~28 km from Waitoki with a 50 km range.
+const FENCER = { id: 'l-fencer', provider_id: OTHER, title: 'Fencer', description: 'Post and wire fencing, gates', category: 'Fencing & Gates', travel_range_km: 50,
+  location_name: '120 Matakana Valley Road, Rodney District, New Zealand', latitude: -36.38, longitude: 174.70, is_active: true, closed_at: null }
+const GARDENER = { id: 'l-garden', provider_id: OTHER, title: 'Gardening assistance', description: 'Weeding and planting', category: 'Land & Vegetation', travel_range_km: null,
+  location_name: '9 Hill Road, Wellsford, New Zealand', latitude: -36.29, longitude: 174.52, is_active: true, closed_at: null }
+
+test('simple word forms share a stem, and filler words are ignored', () => {
+  for (const w of ['fence', 'fencer', 'fencers', 'fencing']) assert.equal(stem(w), 'fenc', w)
+  for (const w of ['spray', 'spraying', 'sprayer']) assert.equal(stem(w), 'spray', w)
+  assert.equal(stem('digging'), 'dig')
+  const groups = queryTerms('a fencer near Waitoki')
+  assert.equal(groups.length, 2)
+  assert.ok(groups[0].includes('fenc') && groups[0].includes('gate'))
+})
+
+test('"fencer near Waitoki" finds the Rodney District fencer whose 50 km range covers it', async () => {
+  const client = fakeClient({ services: [GARDENER, FENCER], profiles_public: [{ id: OTHER, full_name: 'Sam Fencer' }] })
+  const out = await searchListings(client, { query: 'fencer', area: 'Waitoki' }, { geocode })
+  assert.equal(out.area_match, 'distance')
+  assert.deepEqual(out.results.map(r => r.id), ['l-fencer'])
+  const hit = out.results[0]
+  assert.equal(hit.covers_area, true)
+  assert.ok(hit.distance_km > 20 && hit.distance_km < 35, String(hit.distance_km))
+  assert.equal(hit.area, 'Rodney District')
+  const json = JSON.stringify(out)
+  assert.doesNotMatch(json, /Matakana Valley|Hill Road|-36\.38|174\.70|latitude|longitude/)
+  // the query matched title, description and category forms
+  const or = op(client.calls.find(c => c.table === 'services'), 'or')[0][1]
+  for (const piece of ['title.ilike.*fenc*', 'description.ilike.*fenc*', 'category.ilike.*fenc*', 'title.ilike.*gate*']) assert.ok(or.includes(piece), piece)
+})
+
+test('a listing whose range does not reach the area is left out, with a useful hint', async () => {
+  const client = fakeClient({ services: [{ ...FENCER, travel_range_km: 10 }], profiles_public: [] })
+  const out = await searchListings(client, { query: 'fencing', area: 'Waitoki' }, { geocode })
+  assert.equal(out.results.length, 0)
+  assert.match(out.hint, /No listings cover Waitoki/)
+  assert.match(out.hint, /Fencing & Gates/)
+  assert.match(out.hint, /Rodney District/)
+  assert.doesNotMatch(out.hint, /Matakana Valley/)
+})
+
+test('an unknown place falls back to text matching and says so', async () => {
+  const client = fakeClient({ services: [], profiles_public: [] })
+  const out = await searchListings(client, { query: 'fencing', area: 'Nowhereville' }, { geocode })
+  assert.equal(out.area_match, 'text')
+  assert.match(out.area_note, /Couldn't find "Nowhereville"/)
+  assert.ok(op(client.calls[0], 'ilike').some(o => o[1] === 'location_name'))
+  assert.match(out.hint, /Nowhereville/)
+})
+
+test('jobs within 30 km are sorted by distance, hidden jobs use their public area', async () => {
+  const near = { id: 'j-near', title: 'Fix boundary fence', category: 'Fencing & Gates', status: 'open', location_area: 'Kaukapakapa', location_name: null, latitude: null, longitude: null }
+  const far = { id: 'j-far', title: 'Fence repair', category: 'Fencing & Gates', status: 'open', location_area: null, location_name: '1 Far Road, Kaitaia', latitude: -35.115, longitude: 173.263 }
+  const area = async a => (/kaukapakapa/i.test(a) ? { latitude: -36.62, longitude: 174.49 } : geocode(a))
+  const out = await searchJobs(fakeClient({ jobs_public: [far, near] }), { query: 'fencing', area: 'Waitoki' }, { geocode: area })
+  assert.deepEqual(out.results.map(r => r.id), ['j-near'])
+  assert.ok(out.results[0].distance_km <= JOB_RADIUS_KM)
+  assert.doesNotMatch(JSON.stringify(out), /Far Road|173\.263|latitude/)
+  const none = await searchJobs(fakeClient({ jobs_public: [far] }), { query: 'fencing', area: 'Waitoki' }, { geocode })
+  assert.equal(none.results.length, 0)
+  assert.match(none.hint, /No matching open jobs within 30 km of Waitoki/)
+  assert.match(none.hint, /Kaitaia/)
+  assert.ok(distanceKm(WAITOKI, { latitude: -35.115, longitude: 173.263 }) > 150)
+})
+
+test('a place written into the query is used as the area', async () => {
+  const client = fakeClient({ services: [GARDENER, FENCER], profiles_public: [] })
+  const out = await searchListings(client, { query: 'fencer near Waitoki' }, { geocode })
+  assert.equal(out.area, 'Waitoki')
+  assert.deepEqual(out.results.map(r => r.id), ['l-fencer'])
 })

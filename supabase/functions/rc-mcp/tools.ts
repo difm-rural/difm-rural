@@ -3,9 +3,18 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.108.2'
 import { z } from 'npm:zod@4.4.3'
 
 import {
-  CATEGORIES_HINT, getJob, getListing, myActivity, readConversation, runGatedTool, searchJobs, searchListings,
-  MAX_RESULTS, type AiToolName,
+  CATEGORIES_HINT, createPublicAreaCache, getJob, getListing, lookupPublicArea, myActivity, readConversation, runGatedTool,
+  searchJobs, searchListings, MAX_RESULTS, type AiToolName, type AreaGeocoder,
 } from './connector.ts'
+
+// Town/area -> point, with the same place lookup the app uses (maps-proxy:
+// Google Places restricted to NZ). Called as a guest (publishable key only):
+// maps-proxy refuses assistant tokens, and the lookup needs no member data.
+// Cached per isolate (24 h for hits, 1 min for misses).
+const MAPS_PROXY = (Deno.env.get('SUPABASE_URL') || '') + '/functions/v1/maps-proxy'
+const GUEST_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
+const geocode: AreaGeocoder = createPublicAreaCache(area =>
+  lookupPublicArea(MAPS_PROXY, area, (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string> || {}), apikey: GUEST_KEY } })))
 
 // Only the member-scoped client reaches the tools. There is deliberately no
 // service-role client in this function, so nothing here can bypass RLS.
@@ -24,9 +33,9 @@ function result(outcome: Awaited<ReturnType<typeof runGatedTool>>): CallToolResu
 const limit = z.number().int().min(1).max(MAX_RESULTS).optional()
   .describe(`How many results to return (1–${MAX_RESULTS}, default 10).`)
 const search = {
-  query: z.string().max(200).optional().describe('Words to look for in the title or description, e.g. "fencing" or "hay".'),
+  query: z.string().max(200).optional().describe('What kind of work, e.g. "fencer", "hay", "drone spraying". Put the place in area, not here.'),
   category: z.string().max(80).optional().describe(`Category name. One of: ${CATEGORIES_HINT}.`),
-  area: z.string().max(120).optional().describe('Town or area, e.g. "Waitoki" or "Te Kūiti".'),
+  area: z.string().max(120).optional().describe('A New Zealand town or locality, e.g. "Waitoki" or "Te Kūiti". Results are matched by distance from it.'),
   limit,
 }
 
@@ -35,17 +44,17 @@ export function registerTools(server: McpServer, { supabase, userId }: ToolConte
 
   server.registerTool('search_jobs', {
     title: 'Search open jobs',
-    description: 'Search open jobs on the Rural Connections job board (work requesters want done). Returns up to 25, newest first, with the public town or area only.',
+    description: 'Search open jobs on the Rural Connections job board (work requesters want done). Words match title, description and category, including simple word forms (fence/fencer/fencing). With an area, returns jobs within 30 km of that town, nearest first, with distance_km. Up to 25 results, towns/areas only. If nothing matches, read the hint.',
     inputSchema: z.object(search),
     annotations: READ_ONLY,
-  }, (args) => gated('search_jobs', () => searchJobs(supabase, args)))
+  }, (args) => gated('search_jobs', () => searchJobs(supabase, args, { geocode })))
 
   server.registerTool('search_listings', {
     title: 'Search listings',
-    description: 'Search active provider listings (services members can book, e.g. septic, drone spraying, fencing). Returns up to 25 with pricing and the provider’s town.',
+    description: 'Search active provider listings (services members can book, e.g. septic, drone spraying, fencing). Words match title, description and category, including simple word forms. With an area, returns listings whose travel range covers that town, nearest first, with distance_km. Up to 25 with pricing and the provider’s town. If nothing matches, read the hint.',
     inputSchema: z.object(search),
     annotations: READ_ONLY,
-  }, (args) => gated('search_listings', () => searchListings(supabase, args)))
+  }, (args) => gated('search_listings', () => searchListings(supabase, args, { geocode })))
 
   server.registerTool('get_job', {
     title: 'Get a job',

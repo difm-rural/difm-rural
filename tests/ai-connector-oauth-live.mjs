@@ -196,6 +196,31 @@ try {
       assert.ok(out.results.length <= 25)
       assert.doesNotMatch(JSON.stringify(out), /"(latitude|longitude|location_name)"/)
     })
+    await check('search_listings "fencer near Waitoki" finds the Rodney District fencer (50 km range)', async () => {
+      const { json } = await mcp('tools/call', { name: 'search_listings', arguments: { query: 'fencer', area: 'Waitoki' } })
+      assert.ok(!json.result.isError, JSON.stringify(json.result).slice(0, 200))
+      const out = json.result.structuredContent
+      assert.equal(out.area_match, 'distance', 'Waitoki should be geocoded, not text-matched')
+      const fencer = out.results.find(r => /fenc/i.test(r.title) && r.category === 'Fencing & Gates')
+      assert.ok(fencer, 'no fencer in ' + JSON.stringify(out.results.map(r => r.title)))
+      assert.equal(fencer.covers_area, true)
+      assert.ok(fencer.distance_km > 0 && fencer.distance_km <= (fencer.travel_range_km || 30))
+      assert.match(String(fencer.area), /Rodney/)
+      assert.doesNotMatch(JSON.stringify(out), /"(latitude|longitude|location_name|service_latitude)"|\d+\s+\w+\s+(Road|Rd|Street|Lane)\b/i)
+      console.log(`     → ${fencer.title} · ${fencer.area} · ${fencer.distance_km} km · range ${fencer.travel_range_km} km`)
+      const loose = (await mcp('tools/call', { name: 'search_listings', arguments: { query: 'fencing near Waitoki' } })).json.result.structuredContent
+      assert.ok(loose.results.some(r => r.id === fencer.id), 'place written into the query should work too')
+    })
+    await check('search_jobs with an area uses distance; an unknown place falls back with a note', async () => {
+      const near = (await mcp('tools/call', { name: 'search_jobs', arguments: { area: 'Waitoki' } })).json.result.structuredContent
+      assert.equal(near.area_match, 'distance')
+      assert.ok(near.results.every(r => r.distance_km <= 30))
+      assert.ok(near.results.length || near.hint, 'empty result must carry a hint')
+      const unknown = (await mcp('tools/call', { name: 'search_listings', arguments: { query: 'fencing', area: 'Qzxwvillé' } })).json.result.structuredContent
+      assert.equal(unknown.area_match, 'text')
+      assert.match(unknown.area_note, /Couldn't find/)
+      console.log(`     → jobs near Waitoki: ${near.results.length}${near.hint ? ' · hint: ' + near.hint : ''}`)
+    })
     await check('tools/call my_activity works for the member', async () => {
       const { json } = await mcp('tools/call', { name: 'my_activity', arguments: {} })
       assert.ok(!json.result.isError, JSON.stringify(json.result).slice(0, 200))

@@ -2,3 +2,4 @@
 // Every relative import in its graph carries a file extension, which Deno
 // (and the hosted Edge runtime) require.
 export * from '../../../shared/aiConnector.ts'
+export { createPublicAreaCache, lookupPublicArea } from '../../../shared/publicJobArea.ts'
