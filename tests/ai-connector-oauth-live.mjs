@@ -165,6 +165,47 @@ try {
       assert.equal(row.client_id, clientId)
     })
 
+    console.log('\nE. rc-mcp end to end (deployed function)')
+    const MCP = `${URL_}/functions/v1/rc-mcp`
+    let rpcId = 0
+    const mcp = async (method, params, bearer = token) => {
+      const r = await fetch(MCP, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + bearer, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2025-06-18' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }),
+      })
+      const text = await r.text()
+      const json = text.trim().startsWith('{') ? JSON.parse(text) : JSON.parse(text.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5)).join(''))
+      return { status: r.status, json }
+    }
+    await check('initialize names the Rural Connections server', async () => {
+      const { status, json } = await mcp('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'rc-live-test', version: '1' } })
+      assert.equal(status, 200)
+      assert.equal(json.result.serverInfo.name, 'rural-connections')
+    })
+    await check('tools/list offers exactly the six read-only tools', async () => {
+      const { json } = await mcp('tools/list', {})
+      const names = json.result.tools.map(t => t.name).sort()
+      assert.deepEqual(names, ['get_job', 'get_listing', 'my_activity', 'read_conversation', 'search_jobs', 'search_listings'])
+      assert.ok(json.result.tools.every(t => t.annotations?.readOnlyHint === true))
+    })
+    await check('tools/call search_jobs returns ≤25 results with no addresses', async () => {
+      const { json } = await mcp('tools/call', { name: 'search_jobs', arguments: { limit: 25 } })
+      assert.ok(!json.result.isError, JSON.stringify(json.result).slice(0, 200))
+      const out = json.result.structuredContent
+      assert.ok(out.results.length <= 25)
+      assert.doesNotMatch(JSON.stringify(out), /"(latitude|longitude|location_name)"/)
+    })
+    await check('tools/call my_activity works for the member', async () => {
+      const { json } = await mcp('tools/call', { name: 'my_activity', arguments: {} })
+      assert.ok(!json.result.isError, JSON.stringify(json.result).slice(0, 200))
+    })
+    await check('a normal app session token is refused (oauth_client_required)', async () => {
+      const { status, json } = await mcp('tools/list', {}, signedIn.session.access_token)
+      assert.equal(status, 403)
+      assert.equal(json.error, 'oauth_client_required')
+    })
+
     console.log('\nD. Disconnect')
     const listed = await member.auth.oauth.listGrants()
     await check('Connected assistants lists the test client', async () => assert.ok((listed.data || []).some(g => g.client?.id === clientId)))
@@ -174,6 +215,11 @@ try {
       const { data } = await assistant.rpc('ai_begin_tool_call', { p_tool: 'search_jobs' })
       assert.equal(data?.allowed, false)
       assert.equal(data?.reason, 'denied_session')
+    })
+    await check('rc-mcp refuses the disconnected token', async () => {
+      const r = await fetch(`${URL_}/functions/v1/rc-mcp`, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2025-06-18' }, body: JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'tools/call', params: { name: 'search_jobs', arguments: {} } }) })
+      const text = await r.text()
+      assert.ok(r.status === 401 || /disconnected or has expired/.test(text), `status ${r.status}: ${text.slice(0, 160)}`)
     })
     await check('the refresh token no longer works', async () => {
       const r = await fetch(`${URL_}/auth/v1/oauth/token`, {
