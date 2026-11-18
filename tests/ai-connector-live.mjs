@@ -85,7 +85,7 @@ try {
   jobId = job.id
   const { error: bidError } = await P.client.from('bids').insert({ job_id: jobId, provider_id: P.user.id, amount: 120, message: 'Test offer, please ignore.', status: 'pending' })
   if (bidError) throw new Error('Could not create the test offer: ' + bidError.message)
-  for (const [from, to, content] of [[P, R, 'Test question from provider'], [R, P, `Test reply: it is ${SECRET_ADDRESS}`]]) {
+  for (const [from, to, content] of [[P, R, 'Test question from provider'], [R, P, `Test reply: it is ${SECRET_ADDRESS}`], [P, R, 'Payment: $120 by bank transfer\n\nTest: pay 12-3456-0123456-00, text 021 555 0199 or test.pay@example.nz']]) {
     const { error } = await from.client.from('messages').insert({ job_id: jobId, sender_id: from.user.id, receiver_id: to.user.id, content })
     if (error) throw new Error('Could not create a test message: ' + error.message)
   }
@@ -117,7 +117,9 @@ try {
       const out = await readConversation(m.client, m.user.id, { kind: 'job', id: jobId })
       if (m === O) { assert.equal(out.found, false); return }
       assert.equal(out.found, true)
-      assert.equal(out.messages.length, 2)
+      assert.equal(out.messages.length, 3)
+      assert.equal(out.messages[2].text, 'Payment details sent (bank transfer)')
+      assert.doesNotMatch(JSON.stringify(out), /12-3456-0123456|021 555 0199|test\.pay@/)
       noAddress(out, 'read_conversation')
       assert.ok(out.messages.some(x => x.from === 'you'))
     })

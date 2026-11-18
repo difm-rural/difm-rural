@@ -356,3 +356,70 @@ test('a place written into the query is used as the area', async () => {
   assert.equal(out.area, 'Waitoki')
   assert.deepEqual(out.results.map(r => r.id), ['l-fencer'])
 })
+
+// ---------------------------------------------------------------------------
+// Redaction: bank accounts, phones, emails, payment messages
+// ---------------------------------------------------------------------------
+import { redactPrivate, paymentMessageSummary } from '../shared/aiConnector.ts'
+
+test('NZ bank account numbers are removed in every common format', () => {
+  for (const account of ['12-3456-0123456-00', '12-3456-0123456-001', '12 3456 0123456 00', '123456012345600', '12.3456.01234567.002', '06-0501-0866219-00'])
+    assert.equal(redactPrivate(`Pay to ${account} thanks`), 'Pay to [bank account removed] thanks', account)
+})
+
+test('NZ phone numbers are removed (mobile, landline, freephone, +64)', () => {
+  for (const phone of ['021 123 4567', '0211234567', '022-123-45678', '027 1234 5678', '+64 21 123 4567', '+6421 123 456', '0064 21 123 4567', '(09) 123 4567', '09 123 4567', '+64 9 123 4567', '07-838 1234', '0800 123 456', '0508 123 4567'])
+    assert.equal(redactPrivate(`Call ${phone} anytime`), 'Call [phone removed] anytime', phone)
+})
+
+test('email addresses are removed', () => {
+  for (const email of ['sam@example.co.nz', 'Sam.Smith+farm@mail.example.com', 'a_b-c@sub.domain.nz'])
+    assert.equal(redactPrivate(`Email ${email}.`), 'Email [email removed].', email)
+})
+
+test('prices, dates, times, quantities and ids survive redaction', () => {
+  const keep = [
+    'Quote $1,250 incl GST', '$1,250.50 per hectare', 'Budget $12,345,678', 'Total $250/hr', '0.5 ha', '120 metres of fence, 7 wires',
+    'Start 18/11/2026', 'Due 2026-11-18', 'Arrive 07:30 to 09:45', 'Between 9 and 12 Dec', 'Job 4f1c2a9e-0b3d-4c5e-8f70-123456789abc',
+    'Job 03111111-0222-4333-8444-055555555555', 'Ref 2026-0001', 'NZBN 9429041234567', '2 x 300 kg bales', 'Order 7 of 12',
+  ]
+  for (const text of keep) assert.equal(redactPrivate(text), text, text)
+  // addresses, pins and map links are still removed alongside the new patterns
+  const mixed = redactPrivate('Gate at 42 Rata Road, Waitoki. Pin -36.6012, 174.6123. Call 021 555 1234 or sam@x.nz, pay 12-3456-0123456-00, $480 total')
+  assert.equal(mixed, 'Gate at [address removed], Waitoki. Pin [location removed]. Call [phone removed] or [email removed], pay [bank account removed], $480 total')
+})
+
+test('payment messages collapse to their method, never their body', () => {
+  const body = "Confirmed: I'll be there around Thu 20 Nov 2026, 8:00 am.\nPayment: $480 by bank transfer\nNote: Acct 12-3456-0123456-00 ref JOB\n\nCall me 021 555 1234"
+  assert.equal(paymentMessageSummary(body), 'Payment details sent (bank transfer)')
+  assert.equal(paymentMessageSummary('Payment: $45/hr cash on the day'), 'Payment details sent (cash on the day)')
+  assert.equal(paymentMessageSummary('Payment: by invoice'), 'Payment details sent (invoice)')
+  assert.equal(paymentMessageSummary('anything at all', 'bank_transfer'), 'Payment details sent (bank transfer)')
+  assert.equal(paymentMessageSummary('Can we talk about payment: is cash ok?'), null)
+})
+
+test('read_conversation returns only the payment summary for payment messages', async () => {
+  const client = fakeClient({
+    messages: [
+      { id: 'm3', sender_id: OTHER, receiver_id: ME, content: 'Bank: 38-9012-0345678-00, cheers. Or ring 027 222 3333', created_at: '2026-11-03' },
+      { id: 'm2', sender_id: OTHER, receiver_id: ME, content: "Confirmed: I'll be there around Thu.\nPayment: $480 by bank transfer\nNote: 12-3456-0123456-00", created_at: '2026-11-02' },
+      { id: 'm1', sender_id: OTHER, receiver_id: ME, content: 'Payment: $480 by bank transfer\n\nAcct 01-0002-0003000-00', created_at: '2026-11-01' },
+    ],
+    jobs_public: [{ id: JOB, title: 'Fix gate' }],
+    bids: [{ payment_message_id: 'm3', payment_method: 'bank_transfer' }],
+    profiles_public: [{ id: OTHER, full_name: 'Sam Provider' }],
+  })
+  const out = await readConversation(client, ME, { kind: 'job', id: JOB })
+  assert.deepEqual(out.messages.map(m => m.text), [
+    'Payment details sent (bank transfer)',
+    'Payment details sent (bank transfer)',
+    'Payment details sent (bank transfer)',
+  ])
+  assert.doesNotMatch(JSON.stringify(out), /38-9012|12-3456|01-0002|027 222|Confirmed/)
+})
+
+test('descriptions are redacted too', async () => {
+  const client = fakeClient({ services: [{ id: LISTING, provider_id: OTHER, title: 'Fencing', description: 'Text 021 123 4567 or email fence@example.nz. From $1,250.', location_name: 'Waitoki' }], profiles_public: [] })
+  const out = await getListing(client, { listing_id: LISTING })
+  assert.equal(out.listing.description, 'Text [phone removed] or email [email removed]. From $1,250.')
+})

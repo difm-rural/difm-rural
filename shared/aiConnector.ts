@@ -63,18 +63,50 @@ const RAPID_NUMBER = /\b(?:rapid|rural\s+delivery|rd)\s*(?:no\.?|number|#)?\s*\d
 const COORDINATES = /-?\d{1,3}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}/g
 const MAP_LINK = /\bhttps?:\/\/(?:www\.)?(?:google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|goo\.gl\/maps|maps\.app\.goo\.gl|maps\.apple\.com|what3words\.com|w3w\.co)\S*/giu
 
-// Remove anything that pinpoints a property from free text (descriptions,
-// chat). Towns and regions stay.
-export function redactAddresses(text: unknown): string {
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g
+// NZ bank account: bank (2) branch (4) account (7, sometimes 8) suffix (2-3),
+// with dashes, spaces, dots or nothing between the parts.
+const BANK_ACCOUNT = /(?<![\w$-])\d{2}[\s.-]?\d{4}[\s.-]?\d{7,8}[\s.-]?\d{2,3}(?![\w-])/g
+// NZ phone numbers: mobiles (02x), landlines (03-09), 0800/0508, and +64 / 0064
+// forms, with optional brackets around the area code.
+const PHONE = /(?<![\w$-])(?:(?:\+64|0064)[\s.-]?\(?0?|\(?0)(?:2\d|[3-79])\)?[\s.-]?\d{3,4}[\s.-]?\d{3,5}(?![\w-])/g
+const FREEPHONE = /(?<![\w$-])0(?:800|508)[\s.-]?\d{3}[\s.-]?\d{3,4}(?![\w-])/g
+
+// Remove anything private from free text (descriptions, chat) before it leaves
+// Rural Connections: what pinpoints a property, and contact or bank details.
+// Towns, regions, prices, dates and ids stay.
+export function redactPrivate(text: unknown): string {
   return String(text ?? '')
     .replace(MAP_LINK, '[map link removed]')
+    .replace(EMAIL, '[email removed]')
     .replace(COORDINATES, '[location removed]')
+    .replace(BANK_ACCOUNT, '[bank account removed]')
+    .replace(FREEPHONE, '[phone removed]')
+    .replace(PHONE, '[phone removed]')
     .replace(STREET_ADDRESS, '[address removed]')
     .replace(RAPID_NUMBER, '[address removed]')
 }
+// Older name, kept for callers and tests.
+export const redactAddresses = redactPrivate
+
+// Messages posted by confirm_job / set_job_payment_method carry how to pay
+// (often bank details, in the provider's own words too). Only their kind ever
+// leaves RC: "Payment details sent (bank transfer)".
+const PAYMENT_LINE = /^Payment: (?:\$[\d,]+(?:\.\d{2})?(?:\/hr|\/unit| est\.)? )?(by bank transfer|cash on the day|by invoice|as agreed)\s*$/m
+const PAYMENT_LABELS: Record<string, string> = {
+  bank_transfer: 'bank transfer', cash: 'cash on the day', invoice: 'invoice', agreed: 'as agreed',
+  'by bank transfer': 'bank transfer', 'cash on the day': 'cash on the day', 'by invoice': 'invoice', 'as agreed': 'as agreed',
+}
+
+export function paymentMessageSummary(content: unknown, knownMethod?: string | null): string | null {
+  const line = PAYMENT_LINE.exec(String(content ?? ''))
+  const method = knownMethod ?? line?.[1] ?? null
+  if (!knownMethod && !line) return null
+  return `Payment details sent (${PAYMENT_LABELS[String(method)] || 'payment method shared'})`
+}
 
 function clip(text: unknown, max: number): string | null {
-  const value = redactAddresses(text).trim()
+  const value = redactPrivate(text).trim()
   if (!value) return null
   return value.length > max ? value.slice(0, max - 1).trimEnd() + '…' : value
 }
@@ -587,6 +619,7 @@ export async function readConversation(client: SupabaseLike, userId: string, arg
   const participant = `sender_id.eq.${userId},receiver_id.eq.${userId}`
 
   let rows: MessageRow[]
+  const paymentMessages = new Map<string, string | null>()
   let title: string | null = null
   if (kind === 'booking') {
     const booking = check<{ id: string; requester_id: string; provider_id: string; service_id: string } | null>(
@@ -607,6 +640,11 @@ export async function readConversation(client: SupabaseLike, userId: string, arg
     if (kind === 'job') {
       const job = check<{ title: string } | null>(await client.from('jobs_public').select('title').eq('id', id).maybeSingle())
       title = job?.title ?? null
+      // Payment messages this job's offers point at (latest per offer).
+      const paid = check<{ payment_message_id: string | null; payment_method: string | null }[]>(
+        await client.from('bids').select('payment_message_id,payment_method').eq('job_id', id).not('payment_message_id', 'is', null),
+      ) || []
+      for (const b of paid) if (b.payment_message_id) paymentMessages.set(b.payment_message_id, b.payment_method)
     } else {
       const listing = check<{ title: string } | null>(await client.from('services').select('title').eq('id', id).maybeSingle())
       title = listing?.title ?? null
@@ -626,7 +664,12 @@ export async function readConversation(client: SupabaseLike, userId: string, arg
     messages: rows.reverse().map(r => ({
       from: r.sender_id === userId ? 'you' : firstName(names.get(r.sender_id)) || 'Member',
       at: r.created_at,
-      text: clip(r.content, 2000) ?? '',
+      // Payment messages are summarised by id (bids.payment_message_id) or by
+      // the fixed "Payment: … by bank transfer" line, which also catches older
+      // re-sent ones; their body never leaves RC.
+      text: (paymentMessages.has(r.id)
+        ? paymentMessageSummary(r.content, paymentMessages.get(r.id))
+        : paymentMessageSummary(r.content)) ?? clip(r.content, 2000) ?? '',
     })),
     note: rows.length >= limit ? `Showing the latest ${limit} messages.` : undefined,
   }
