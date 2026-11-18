@@ -140,7 +140,7 @@ try {
     const { error } = await assistant.storage.from('avatars').upload(`${userId}/assistant-test.txt`, new Blob(['x']), { upsert: true })
     assert.ok(error, 'upload succeeded')
   })
-  for (const fn of ['categorize-job', 'draft-job-from-text', 'maps-proxy', 'marketplace-health']) {
+  for (const fn of ['categorize-job', 'draft-job-from-text', 'draft-job-from-photo', 'create-service-draft-from-photo', 'maps-proxy', 'marketplace-health']) {
     await check(`edge function ${fn} returns 403 read-only`, async () => {
       const r = await fetch(`${URL_}/functions/v1/${fn}`, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: '{}' })
       const body = await r.json().catch(() => ({}))

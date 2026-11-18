@@ -43,3 +43,9 @@ export function connectedSince(iso: string | null): string {
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? 'Connected' : 'Connected ' + date.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Pacific/Auckland' })
 }
+
+// Account → Connected assistants is a hidden beta: shown only to beta members
+// and to members who already have an assistant connected (ai_connector_status).
+export function showConnectedAssistants(status: unknown): boolean {
+  return !!status && typeof status === 'object' && (status as { show_connected_assistants?: unknown }).show_connected_assistants === true
+}

@@ -182,6 +182,33 @@ try {
     assert.equal((await runGatedTool(P.client, 'search_jobs', async () => ({}))).ok, true)
   })
 
+  console.log('\n3b. Hidden beta (ai_enabled OFF)')
+  sql(`delete from public.ai_tool_calls where user_id in (${ids})`)
+  await check('with AI off, only beta members get through, and pause still wins', async () => {
+    sql(`update public.ai_settings set ai_enabled = false where id`)
+    try {
+      assert.equal((await runGatedTool(O.client, 'search_jobs', async () => ({}))).reason, 'denied_disabled')
+      let { data: status } = await O.client.rpc('ai_connector_status')
+      assert.equal(status.show_connected_assistants, false, 'non-beta member without an assistant must not see the menu')
+      sql(`insert into public.ai_beta_members (user_id, note) values ('${O.user.id}', 'live test') on conflict do nothing`)
+      assert.equal((await runGatedTool(O.client, 'search_jobs', async () => ({}))).ok, true)
+      ;({ data: status } = await O.client.rpc('ai_connector_status'))
+      assert.equal(status.show_connected_assistants, true)
+      assert.equal(status.available, true)
+      assert.equal((await runGatedTool(P.client, 'search_jobs', async () => ({}))).reason, 'denied_disabled', 'non-beta member must be refused')
+      sql(`insert into public.ai_member_pauses (user_id, reason) values ('${O.user.id}', 'live test') on conflict do nothing`)
+      assert.equal((await runGatedTool(O.client, 'search_jobs', async () => ({}))).reason, 'denied_paused')
+    } finally {
+      sql(`delete from public.ai_beta_members where user_id = '${O.user.id}' and note = 'live test'; delete from public.ai_member_pauses where user_id = '${O.user.id}'; update public.ai_settings set ai_enabled = true where id`)
+    }
+  })
+  await check('members cannot read others on, or add themselves to, the beta list', async () => {
+    const { data } = await O.client.from('ai_beta_members').select('user_id')
+    assert.ok(!(data || []).some(r => r.user_id !== O.user.id))
+    const { error } = await O.client.rpc('ai_admin_set_beta', { p_email: O.email, p_on: true })
+    assert.ok(error, 'a member could add themselves to the beta')
+  })
+
   console.log('\n4. Disconnected tokens fail')
   await check('a revoked session token is refused', async () => {
     const extra = await signIn(P.email, PASSWORD)

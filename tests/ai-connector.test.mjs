@@ -262,3 +262,18 @@ test('public-web forwards /oauth/consent to the console consent screen', async (
   const bad = GET(new Request('https://ruralconnections.nz/oauth/consent?authorization_id=%22%3E%3Cscript%3E'))
   assert.equal(bad.headers.get('location'), 'https://dev.ruralconnections.nz/oauth/consent')
 })
+
+test('hidden beta: Connected assistants shows only for beta members or connected members', async () => {
+  const { showConnectedAssistants } = await import('../shared/connectedAssistants.ts')
+  assert.equal(showConnectedAssistants({ show_connected_assistants: true }), true)
+  assert.equal(showConnectedAssistants({ show_connected_assistants: false, ai_enabled: true }), false)
+  assert.equal(showConnectedAssistants(null), false)
+  const sql = readFileSync(new URL('../supabase/migrations/20261118210000_ai_beta_members.sql', import.meta.url), 'utf8')
+  // pause is checked before the global switch / beta, so a paused beta member is refused
+  assert.ok(sql.indexOf("v_status := 'denied_paused'") < sql.indexOf("v_status := 'denied_disabled'"))
+  assert.match(sql, /coalesce\(\(select a\.ai_enabled[\s\S]*?\)\s*or exists \(select 1 from public\.ai_beta_members/)
+  assert.match(sql, /'show_connected_assistants', s\.beta or s\.has_assistant/)
+  for (const screen of ['../src/screens/tabs/AccountTabScreen.js', '../provider-web/src/app/account/page.tsx']) {
+    assert.match(readFileSync(new URL(screen, import.meta.url), 'utf8'), /showConnectedAssistants\(/, screen)
+  }
+})
