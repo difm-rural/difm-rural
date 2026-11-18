@@ -68,6 +68,12 @@ export async function fetchActiveNextMoves(userId, isProvider) {
     .filter(entry => entry.job)
   const jobIds = jobs.map(job => job.id)
   const awardedJobIds = jobs.filter(job => job.status === 'accepted').map(job => job.id)
+  const scheduledIds=[...new Set([...awardedJobIds,...providerJobs.map(({job})=>job.id)])]
+  const schedules=scheduledIds.length
+    ? await supabase.from('work_schedules').select('job_id,arrival_start_at').in('job_id',scheduledIds)
+    : {data:[]}
+  const arrivals=new Map((schedules.data||[]).map(row=>[row.job_id,row.arrival_start_at]))
+  const confirmation=id=>schedules.error?{}:{hasArrival:!!arrivals.get(id),arrivalAt:arrivals.get(id)}
   const otherIds = [
     ...requesterBookings.map(booking => booking.provider_id),
     ...providerBookings.map(booking => booking.requester_id),
@@ -110,6 +116,7 @@ export async function fetchActiveNextMoves(userId, isProvider) {
   jobs.forEach(job => {
     const pay = payByJob[job.id] || {}
     const nextMove = jobNextMove(job, 'requester', {
+      ...confirmation(job.id),
       otherName: pay.provider ? names[pay.provider] : null,
       bidCount: bidCounts[job.id] || 0,
       unansweredQuestionCount: questionCounts[job.id] || 0,
@@ -152,6 +159,7 @@ export async function fetchActiveNextMoves(userId, isProvider) {
 
   providerJobs.forEach(({ bid, job }) => {
     const nextMove = jobNextMove(job, 'provider', {
+      ...confirmation(job.id),
       otherName: names[job.requester_id],
       paymentMethod: bid.payment_method,
       paymentSortedAt: bid.payment_sorted_at,

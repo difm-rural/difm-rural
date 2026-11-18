@@ -1,5 +1,5 @@
 export type RelationshipSide='locals'|'customers'
-export const relationshipLabels={locals:'My Locals',customers:'My Customers'} as const
+export const relationshipLabels={locals:'My People',customers:'My Customers'} as const
 export const relationshipSide=(value:unknown):RelationshipSide=>value==='customers'?'customers':'locals'
 export const relationshipColumn=(side:RelationshipSide)=>side==='customers'?'provider_id':'requester_id'
 export const relationshipPair=(viewer:string,other:string,side:RelationshipSide)=>

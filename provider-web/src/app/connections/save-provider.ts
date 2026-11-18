@@ -12,8 +12,8 @@ export async function saveProvider(_:ActionState,data:FormData):Promise<ActionSt
  const intent=data.get('intent')
  if(!validId(provider)||provider===user.id||(intent!=='save'&&intent!=='remove'))return {error:'Choose an available provider.'}
  try{await setProviderSaved(supabase,user.id,provider,intent==='save')}
- catch{return {error:'Could not update My Locals. Try again.'}}
+ catch{return {error:'Could not update My People. Try again.'}}
  revalidatePath('/connections')
  revalidatePath('/people/'+provider)
- return {error:'',success:intent==='save'?'Saved to My Locals.':'Removed from My Locals.'}
+ return {error:'',success:intent==='save'?'Saved to My People.':'Removed from My People.'}
 }

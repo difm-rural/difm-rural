@@ -133,7 +133,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
     saveLock.current=true
     setSaving(true)
     try{await setProviderSaved(supabase,viewerId,providerId,!saved);setSaved(!saved)}
-    catch{Alert.alert('Could not update My Locals','Try again.')}
+    catch{Alert.alert('Could not update My People','Try again.')}
     finally{saveLock.current=false;setSaving(false)}
   }
 

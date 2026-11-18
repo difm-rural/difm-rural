@@ -40,6 +40,7 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
      if(awardError)error={code:'fixture'}
      else data=[{job_id:'awarded',job:awardHidden?null:{accepted_at:'2026-11-16'}}]
     }
+    if(table==='work_schedules')data=[{job_id:'awarded',arrival_start_at:'2099-11-30T21:00:00Z'}]
     return Promise.resolve({data,error}).then(resolve)
    },
   }
@@ -51,7 +52,8 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@shared/formatting':{formatDate:()=>''},
   '@shared/notificationBody':{},'@shared/marketSide':{},
   '@shared/nextMove':{jobNextMove,bookingNextMove},'@shared/onTheGo':{rankOnTheGo},
-  '@shared/relationshipHistory':{relationshipLabels:{locals:'My Locals',customers:'My Customers'}},
+  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyAreas:()=>[],propertySpokes:()=>[]},
+  '@/components/home-modes':{HomeModes:({work})=>work},
   '@/components/seasonal-reminders':{SeasonalReminders:()=>null},
   '@/lib/seasonal-reminders':{loadSeasonalReminders:()=>[]},
   '@/components/navigation-link':{default:'a'},
@@ -71,7 +73,8 @@ test('dashboard ranks awards using a participant-filtered timestamp and keeps jo
  assert.match(html,/Awarded fence.*Pending fence/)
  const view=calls.find(call=>call.table==='jobs_public')
  assert.equal(view.cols,'id,title,status,requester_id,created_at,scheduled_date,date_from')
- const award=calls.find(call=>call.cols.includes('job:jobs'))
+ assert.match(html,/<strong>1<\/strong> Upcoming confirmed/)
+ const award=calls.find(call=>call.table==='bids'&&call.cols.includes('job:jobs'))
  assert.equal(award.cols,'job_id,job:jobs(accepted_at)')
  assert.deepEqual(award.filters,[['eq','provider_id','viewer'],['eq','status','accepted'],['in','job_id',['awarded']]])
 })
@@ -80,7 +83,8 @@ test('pending offers never read the base job timestamp',async()=>{
  const {html,calls}=await dashboard({onlyPending:true})
  assert.match(html,/Pending fence/)
  assert.doesNotMatch(html,/Some activity could not be loaded/)
- assert.ok(!calls.some(call=>call.cols.includes('job:jobs')))
+ assert.ok(!calls.some(call=>call.table==='bids'&&call.cols.includes('job:jobs')))
+ assert.ok(!calls.some(call=>call.table==='work_schedules'))
 })
 
 test('dashboard keeps available activity and signals an actual lookup error',async()=>{
@@ -89,7 +93,7 @@ test('dashboard keeps available activity and signals an actual lookup error',asy
  assert.match(award.html,/Pending fence.*Awarded fence/)
  const view=await dashboard({viewError:true})
  assert.match(view.html,/Some activity could not be loaded/)
- assert.ok(!view.calls.some(call=>call.cols.includes('job:jobs')))
+ assert.ok(!view.calls.some(call=>call.table==='bids'&&call.cols.includes('job:jobs')))
  const hidden=await dashboard({awardHidden:true})
  assert.doesNotMatch(hidden.html,/Some activity could not be loaded/)
  assert.match(hidden.html,/Pending fence.*Awarded fence/)

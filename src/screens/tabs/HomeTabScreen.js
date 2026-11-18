@@ -2,9 +2,8 @@ import {notificationBody} from '../../../shared/notificationBody'
 import {notificationSide, sideTag} from '../../../shared/marketSide'
 import {rankOnTheGo} from '../../../shared/onTheGo'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -23,10 +22,11 @@ import {
   notificationTimeAgo,
   openNotificationTarget,
 } from '../../lib/notifications'
-import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
-import { relationshipLabels } from '../../../shared/relationshipHistory'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../../../shared/homeMode'
+import {loadPropertyNetwork,propertyAreas,propertySpokes} from '../../../shared/propertyNetwork'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
@@ -55,7 +55,15 @@ function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
 export default function HomeTabScreen({ navigation }) {
   const insets = useSafeAreaInsets()
   const [userId, setUserId]             = useState(null)
-  const [profile, setProfile]           = useState(null)
+  const [mode,setMode]=useState('property')
+  const [network,setNetwork]=useState(null)
+  const preferenceOwner=useRef(null)
+  const preferenceRevision=useRef(0)
+  function chooseMode(value){
+    preferenceRevision.current++
+    setMode(value)
+    if(userId)void AsyncStorage.setItem(homeModeKey(userId),value).catch(()=>{})
+  }
   const [notifications, setNotifications] = useState([])
   const [invitedJobs, setInvitedJobs]   = useState([])
   const [seasonalReminders, setSeasonalReminders] = useState([])
@@ -64,6 +72,7 @@ export default function HomeTabScreen({ navigation }) {
   // that needs your action, "On the go" ranks them all.
   const [activeMoves, setActiveMoves]     = useState([])
   const [loading, setLoading]           = useState(true)
+  const [loadError,setLoadError]=useState(false)
   const [refreshing, setRefreshing]     = useState(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
@@ -76,32 +85,35 @@ export default function HomeTabScreen({ navigation }) {
   }, []))
 
   async function load() {
+    setLoadError(false)
+    try{
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setLoading(false); setRefreshing(false); return }
+    if (!user)return
     setUserId(user.id)
+    if(preferenceOwner.current!==user.id){
+      preferenceOwner.current=user.id
+      const revision=++preferenceRevision.current
+      setMode('property')
+      void AsyncStorage.getItem(homeModeKey(user.id)).then(value=>{
+        if(preferenceRevision.current===revision)setMode(homeMode(value))
+      }).catch(()=>{})
+    }
 
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url, primary_role, role')
-      .eq('id', user.id)
-      .single()
-    setProfile(prof)
-
-    const isProvider  = canProvide(prof)  // providing is additive
-
-    const [notifs, invited, reminders, active] = await Promise.all([
+    const [notifs, invited, reminders, active, propertyNetwork] = await Promise.all([
       fetchNotifications(8),
-      isProvider ? fetchInvitedJobsForProvider(user.id) : Promise.resolve([]),
+      fetchInvitedJobsForProvider(user.id),
       fetchSeasonalReminders(),
-      fetchActiveNextMoves(user.id, isProvider),
+      fetchActiveNextMoves(user.id,true),
+      loadPropertyNetwork(supabase,user.id).catch(()=>null),
     ])
     setNotifications(notifs)
     setInvitedJobs(invited)
     setSeasonalReminders(reminders)
     setActiveMoves(active)
+    setNetwork(propertyNetwork)
     reminders.forEach(reminder => recordSeasonalEvent(reminder.id, 'impression'))
-    setLoading(false)
-    setRefreshing(false)
+    }catch{setLoadError(true)}
+    finally{setLoading(false);setRefreshing(false)}
   }
 
   function onRefresh() {
@@ -125,12 +137,20 @@ export default function HomeTabScreen({ navigation }) {
     }
   }
 
-  const isRequester = true
-  const isProvider  = canProvide(profile)
-  const firstName   = profile?.full_name?.split(' ')[0] || 'there'
-  const unread      = notifications.filter(n => !n.read)
-  const nextMoves   = activeMoves.filter(item => item.nextMove.needsAction)
-  const onTheGo     = rankOnTheGo(activeMoves.map(item => ({ ...item, needsAction: item.nextMove.needsAction })))
+  const propertyMode=mode==='property'
+  const workItems=activeMoves.filter(item=>item.viewerRole==='provider')
+  const pendingOffers=workItems.filter(item=>item.entityType==='job'&&item.item.status==='open').length
+  const upcoming=workItems.filter(item=>item.nextMove.tone==='scheduled').length
+  const invitationCount=invitedJobs.filter(invite=>invite.status==='pending'||invite.status==='seen').length
+  const modeItems=activeMoves.filter(item=>item.viewerRole===homeRole(mode))
+  const areas=network?propertyAreas(network).filter(area=>area.active):[]
+  const preview=areas.slice(0,6)
+  const spokes=propertySpokes(preview.length)
+  const linked=areas.filter(area=>area.linkedCount).length
+  const gaps=areas.filter(area=>area.needsHelp).length
+  const unread=notifications.filter(n=>!n.read)
+  const nextMoves=modeItems.filter(item=>item.nextMove.needsAction)
+  const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
   const nextMoveKeys = new Set(nextMoves.map(item => `${item.entityType}:${item.entityId}`))
   const remainingNotifications = unread.filter(notification => {
     // An outstanding booking/job action does not replace a new chat message.
@@ -147,10 +167,6 @@ export default function HomeTabScreen({ navigation }) {
     ...nextMoves.map(item => ({ ...item, _kind: 'nextMove' })),
     ...remainingNotifications.map(item => ({ ...item, _kind: 'notification' })),
   ].slice(0, 5)
-  const totalActive = onTheGo.total
-  // Nothing on the go at all → show only the "No active work yet" empty state.
-  const nothingAtAll = totalActive === 0 && seasonalReminders.length === 0
-
   function openAttentionItem(item) {
     if (item._kind === 'notification') {
       openNotificationTarget(navigation, userId, item)
@@ -185,17 +201,12 @@ export default function HomeTabScreen({ navigation }) {
       <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>Rural Connections <DevelopmentBadge/></Text>
-          <View style={styles.titleRow}>
-            <Image source={require('../../../assets/brand/barn-badge-red.png')} style={styles.brandBadge} />
-            <Text style={styles.title}>
-              {isProvider && !isRequester ? 'Ready for work?' : 'What needs doing?'}
-            </Text>
+          <View style={styles.modeSwitch} accessibilityRole="radiogroup" accessibilityLabel="Home mode">
+            {HOME_MODES.map(item=><TouchableOpacity key={item.id} style={[styles.modeButton,mode===item.id&&styles.modeSelected]}
+              accessibilityRole="radio" accessibilityState={{checked:mode===item.id}} onPress={()=>chooseMode(item.id)}>
+              <Text style={[styles.modeLabel,mode===item.id&&styles.modeLabelSelected]}>{item.label}</Text>
+            </TouchableOpacity>)}
           </View>
-          <Text style={styles.subtitle}>
-            {totalActive > 0
-              ? `${totalActive} active item${totalActive === 1 ? '' : 's'} on the go`
-              : `Good to see you, ${firstName}`}
-          </Text>
         </View>
       </View>
 
@@ -205,75 +216,50 @@ export default function HomeTabScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
 
-        {/* Jobs — work someone needs done (amber) */}
-        <View style={[styles.sidePanel, styles.jobPanel]}>
-          <View style={styles.sidePanelHead}>
-            <View style={[styles.sidePanelIcon, { backgroundColor: colors.jobIcon }]}>
-              <Icon name="briefcase" size={15} color={colors.white} />
+        <Text style={styles.title} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
+        {loadError&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
+        {propertyMode ? <>
+          <Text style={styles.subtitle}>Find local help and manage the people supporting your property.</Text>
+          <TouchableOpacity style={styles.networkPreview} onPress={()=>navigation.navigate('PropertyNetwork')}
+            accessibilityRole="button" accessibilityLabel="Open My Property Network">
+            <View style={styles.networkArt} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {preview.map((area,index)=><View key={area.id} style={[styles.miniNode,area.needsHelp&&styles.miniGap,
+                {left:spokes[index].x+'%',top:spokes[index].y+'%'}]}>
+                <Icon name={area.icon} size={13} color={colors.primaryDark}/>
+              </View>)}
+              <View style={styles.miniCentre}><Icon name="home-outline" size={19} color={colors.white}/></View>
             </View>
-            <Text style={[styles.sidePanelLabel, { color: colors.jobInk }]}>Jobs · work someone needs done</Text>
-          </View>
-          <View style={[styles.actionsGrid, styles.panelGrid]}>
-            <PrimaryAction
-              title="Post a job"
-              subtitle="Get local help with a job"
-              onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Home' } })}
-            />
-            {isProvider && (
-              <PrimaryAction
-                title="Find jobs"
-                subtitle="Open work nearby"
-                variant="secondary"
-                onPress={() => navigation.getParent()?.navigate('Jobs', { screen: 'JobsBoard' })}
-              />
-            )}
-          </View>
-        </View>
-
-        {/* Listings — what locals are offering (blue) */}
-        <View style={[styles.sidePanel, styles.listingPanel]}>
-          <View style={styles.sidePanelHead}>
-            <View style={[styles.sidePanelIcon, { backgroundColor: colors.listingIcon }]}>
-              <Icon name="pricetag" size={15} color={colors.white} />
+            <View style={{flex:1}}><Text style={styles.sectionTitle}>My Property Network</Text>
+              <Text style={styles.subtitle}>{linked||gaps?linked+' areas with providers · '+gaps+' areas need help':
+                network?'Set up support areas and keep your local people together.':'Open your network to view support areas and providers.'}</Text>
+              <Text style={[styles.sectionLink,{marginTop:8}]}>Open My Property Network</Text>
             </View>
-            <Text style={[styles.sidePanelLabel, { color: colors.listingInk }]}>Listings · what locals are offering</Text>
-          </View>
-          <View style={[styles.actionsGrid, styles.panelGrid]}>
-            <PrimaryAction
-              title="Browse listings"
-              subtitle="Listings near you"
-              variant="secondary"
-              onPress={() => navigation.getParent()?.navigate('Browse', { screen: 'BrowseMain' })}
-            />
-            {isProvider && (
-              <PrimaryAction
-                title="Create a listing"
-                subtitle="Advertise what you offer"
-                variant="secondary"
-                onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
-              />
-            )}
-          </View>
-        </View>
-
-        {/* Invited to you — private job offers from past requesters */}
-        {invitedJobs.length > 0 && (
-          <TouchableOpacity
-            style={styles.inviteCard}
-            onPress={() => navigation.navigate('InvitedJobs')}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`You've been invited to ${invitedJobs.length} jobs`}>
-            <Icon name="mail-open-outline" size={22} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.inviteCardTitle}>
-                Job invitations ({invitedJobs.length})
-              </Text>
-              <Text style={styles.inviteCardSub}>Someone you've worked with offered you work directly.</Text>
-            </View>
-            <Icon name="chevron-forward" size={18} color={colors.primary} />
           </TouchableOpacity>
-        )}
+          <View style={styles.actionsGrid}>
+            <PrimaryAction title="Post a job" subtitle="Get help with something that needs doing."
+              onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Home'}})}/>
+            <PrimaryAction title="Find local help" subtitle="Browse local providers and services." variant="secondary"
+              onPress={()=>navigation.getParent()?.navigate('Browse',{screen:'BrowseMain'})}/>
+          </View>
+        </> : <>
+          <View style={styles.workSummary}>
+            {[[workItems.length-pendingOffers,'Active work'],[pendingOffers,'Offers awaiting replies'],[upcoming,'Upcoming confirmed'],[invitationCount,'Invitations to review']].map(([count,label],index)=>
+              <TouchableOpacity key={label} style={styles.workMetric} accessibilityRole="button" accessibilityLabel={count+' '+label}
+                onPress={()=>index===3?navigation.navigate('InvitedJobs'):navigation.getParent()?.navigate('Activity')}>
+                <Text style={styles.metricNumber}>{count}</Text><Text style={styles.metricLabel}>{label}</Text>
+              </TouchableOpacity>)}
+          </View>
+          <View style={styles.actionsGrid}>
+            <PrimaryAction title="Find work" subtitle="Browse available jobs."
+              onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'JobsBoard'})}/>
+            <PrimaryAction title="Create a listing" subtitle="Advertise a service." variant="secondary"
+              onPress={()=>navigation.navigate('CreateService',{newListing:Date.now()})}/>
+          </View>
+          <TouchableOpacity style={styles.connCard} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'customers'})}>
+            <Icon name="people-outline" size={22} color={colors.primary}/><Text style={styles.connCardTitle}>My Customers</Text>
+            <Icon name="chevron-forward" size={17} color={colors.textMuted}/>
+          </TouchableOpacity>
+        </>}
 
         {attention.length > 0 && (
           <>
@@ -386,36 +372,8 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
-        {/* All caught up — only when nothing is on the go and nothing needs attention */}
-        {attention.length === 0 && onTheGo.total === 0 && !nothingAtAll && (
-          <TouchableOpacity
-            style={styles.statusRow}
-            onPress={() => navigation.getParent()?.navigate('Activity')}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel="All caught up. View activity">
-            <Icon name="checkmark-circle" size={20} color={colors.success} />
-            <Text style={styles.statusText} numberOfLines={1}>
-              <Text style={styles.statusStrong}>All caught up</Text>
-            </Text>
-            <Text style={styles.statusLink}>Activity ›</Text>
-          </TouchableOpacity>
-        )}
-
-        {nothingAtAll && (
-          <View style={styles.section}>
-            <EmptyState
-              compact
-              icon="leaf-outline"
-              title="No active work yet"
-              body={
-                isProvider && !isRequester
-                  ? 'Find jobs on the board or advertise a service when you are ready.'
-                  : 'Post a job or browse listings to get started.'
-              }
-            />
-          </View>
-        )}
+        {!loadError&&attention.length===0&&onTheGo.total===0&&<EmptyState compact icon="leaf-outline"
+          title="No active work yet" body={propertyMode?'Post a job or find local help to get started.':'Find work or create a listing to get started.'}/>}
 
         {seasonalReminders.length > 0 && (
           <View style={styles.seasonalSection}>
@@ -448,25 +406,6 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
-        <TouchableOpacity style={styles.connCard} onPress={()=>navigation.navigate('PropertyNetwork')}
-          accessibilityRole="button" accessibilityLabel="My Property Network">
-          <Icon name="home-outline" size={22} color={colors.primary}/>
-          <Text style={styles.connCardTitle}>My Property Network</Text>
-          <Icon name="chevron-forward" size={17} color={colors.textMuted}/>
-        </TouchableOpacity>
-
-        {Object.entries(relationshipLabels).map(([side,label])=>(
-          <TouchableOpacity key={side}
-            style={styles.connCard}
-            onPress={() => navigation.navigate('Connections',{side})}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={label}>
-            <Icon name="people-outline" size={22} color={colors.primary} />
-            <Text style={styles.connCardTitle}>{label}</Text>
-            <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-        ))}
       </ScrollView>
     </View>
   )
@@ -488,22 +427,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   kicker:     { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
-  titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brandBadge: { width: 30, height: 30, borderRadius: 8 },
   title:      { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 
   actionsGrid: { flexDirection: 'row', gap: 10, marginBottom: 15 },
-  panelGrid:   { marginBottom: 0 },
   actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 84 },
 
-  // Grouped jobs / listings panels (colour-coded fills, no border — white cards sit on top)
-  sidePanel:      { borderRadius: 16, padding: 14, marginBottom: 12 },
-  jobPanel:       { backgroundColor: colors.jobFill },
-  listingPanel:   { backgroundColor: colors.listingFill },
-  sidePanelHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  sidePanelIcon:  { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  sidePanelLabel: { flex: 1, fontSize: 13, fontWeight: '800' },
+  modeSwitch:{flexDirection:'row',backgroundColor:colors.primaryLight,padding:4,borderRadius:14,gap:4},
+  modeButton:{flex:1,minHeight:44,alignItems:'center',justifyContent:'center',borderRadius:10},
+  modeSelected:{backgroundColor:colors.primaryDark},
+  modeLabel:{color:colors.primaryDark,fontWeight:'700'},
+  modeLabelSelected:{color:colors.white},
+  networkPreview:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:colors.primaryLight,borderRadius:16,marginVertical:16},
+  networkArt:{width:96,height:106,position:'relative'},
+  miniNode:{position:'absolute',width:23,height:23,marginLeft:-11.5,marginTop:-11.5,borderRadius:12,backgroundColor:colors.white,alignItems:'center',justifyContent:'center'},
+  miniGap:{backgroundColor:colors.warningLight},
+  miniCentre:{position:'absolute',left:'50%',top:'50%',marginLeft:-15,marginTop:-15,width:30,height:30,borderRadius:15,backgroundColor:colors.primaryDark,alignItems:'center',justifyContent:'center'},
+  workSummary:{flexDirection:'row',flexWrap:'wrap',marginVertical:14,backgroundColor:colors.primaryLight,borderRadius:14},
+  workMetric:{width:'50%',padding:12,minHeight:55},
+  metricNumber:{fontSize:19,fontWeight:'800',color:colors.primaryDark},
+  metricLabel:{fontSize:13,color:colors.textPrimary},
   primaryAction:   { backgroundColor: colors.primary },
   secondaryAction: { backgroundColor: colors.white },
   actionTitle:    { fontSize: 17, fontWeight: '700', marginBottom: 4 },
@@ -511,7 +454,7 @@ const styles = StyleSheet.create({
   primaryActionText:   { color: colors.white },
   primaryActionSub:    { color: 'rgba(255,255,255,0.85)' },
   secondaryActionText: { color: colors.textPrimary },
-  secondaryActionSub:  { color: colors.textMuted },
+  secondaryActionSub:  { color: colors.textSecondary },
 
   section: {
     backgroundColor: colors.white,
@@ -529,39 +472,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
-
-  attentionClear: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 },
-  attentionClearText: { fontSize: 13, color: colors.textMuted },
-
-  // Compact "all caught up" status row
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    minHeight: 52,
-    marginBottom: 12,
-  },
-  statusText:   { flex: 1, fontSize: 14 },
-  statusStrong: { fontWeight: '700', color: colors.textPrimary },
-  statusMuted:  { color: colors.textMuted },
-  statusLink:   { fontSize: 13, fontWeight: '700', color: colors.primary },
-
-  inviteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  inviteCardTitle: { fontSize: 15, fontWeight: '700', color: colors.primary },
-  inviteCardSub:   { fontSize: 12.5, color: colors.textSecondary, marginTop: 2 },
 
   connCard: {
     flexDirection: 'row',
@@ -592,20 +502,6 @@ const styles = StyleSheet.create({
   notifTime: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   notifDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 6 },
 
-  // Connections button count pill
-  summaryCount: {
-    minWidth: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  summaryCountText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-
-  // "Your activity" stat tiles
-  activitySection: { marginBottom: 12 },
   seasonalSection: { marginTop: 1 },
   seasonalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   seasonalRow:     { gap: 12, paddingRight: 20 },
@@ -617,18 +513,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-  statRow:  { flexDirection: 'row', gap: 10 },
-  statTile: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  statNumber: { fontSize: 22, fontWeight: '800', color: colors.primary },
-  statLabel:  { fontSize: 11, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
-
 })

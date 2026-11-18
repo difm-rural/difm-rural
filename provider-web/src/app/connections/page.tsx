@@ -27,9 +27,12 @@ export default async function ConnectionsPage({searchParams}:{searchParams:Promi
   <header className="home-heading"><div><h1>{label}</h1><p className="muted">{side==='locals'?'Providers you’ve saved or worked with':'Requesters you’ve completed work for'}</p></div>
    <Link href="/connections/invitations" className="lform-cancel">Job invitations</Link>
   </header>
-  <nav className="activity-segments" aria-label="Work relationships">
+  {side==='locals'&&<nav className="activity-segments" aria-label="My Property">
+   <Link href="/property-network">My Network</Link><Link href={base} aria-current="page">My People</Link>
+  </nav>}
+  {side==='customers'&&<nav className="activity-segments" aria-label="Work relationships">
    {Object.entries(relationshipLabels).map(([value,name])=><Link key={value} href={'/connections?view='+value} aria-current={side===value?'page':undefined}>{name}</Link>)}
-  </nav>
+  </nav>}
   {side==='locals'&&<section>
    <h2>Saved</h2>
    {results[1].status==='rejected'?<p role="alert">Could not load saved providers. <Link href={base}>Retry</Link></p>

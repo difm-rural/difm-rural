@@ -198,7 +198,10 @@ export default function PropertyNetworkScreen({navigation,route}){
    <LocalAction label="Back" icon="chevron-back" onPress={()=>navigation.goBack()}/>
    <Text accessibilityRole="header" style={styles.title}>My Property Network</Text>
    <Text style={styles.muted}>See who helps with your property and where you still need support.</Text>
-   <LocalAction label="My Locals" onPress={()=>navigation.navigate('Connections',{side:'locals'})}/>
+   <View style={styles.row} accessibilityLabel="My Property">
+    <Text style={[styles.nodeLabel,styles.viewButton]}>My Network</Text>
+    <LocalAction label="My People" onPress={()=>navigation.navigate('Connections',{side:'locals',fromPropertyNetwork:true})}/>
+   </View>
    {!area&&!!error&&<View><Text accessibilityRole="alert">{error}</Text><LocalAction label="Retry" onPress={()=>{setError('');void load()}}/></View>}
    {!area&&!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
    {!data&&!error&&<Loading label="Loading My Property Network…"/>}
@@ -266,8 +269,8 @@ export default function PropertyNetworkScreen({navigation,route}){
          {!!person.rating&&<Text>{person.rating} out of 5 · {person.reviewCount} provider reviews</Text>}
          {(person.saved||person.worked)&&<Text>{[person.saved?'Saved':'',person.worked?'Worked together':''].filter(Boolean).join(' · ')}</Text>}
          <LocalAction label="View profile" onPress={()=>profile(person)}/>
-         {!person.saved&&<LocalAction label="Save to My Locals" disabled={busy} onPress={async()=>{
-          if(await mutate(()=>setProviderSaved(supabase,owner,person.id,true),'Saved to My Locals.'))
+         {!person.saved&&<LocalAction label="Save to My People" disabled={busy} onPress={async()=>{
+          if(await mutate(()=>setProviderSaved(supabase,owner,person.id,true),'Saved to My People.'))
            setMatches(rows=>rows?.map(row=>row.id===person.id?{...row,saved:true}:row))
          }}/>}
          <LocalAction label={linked.some(row=>row.id===person.id)?'Added to Property Network':'Add to Property Network'}

@@ -38,7 +38,7 @@ export function LocalInvitePicker({person,jobs,failed,busy,onInvite,onPost,onClo
    <View accessibilityViewIsModal style={{backgroundColor:colors.white,borderRadius:12,padding:18,maxHeight:'80%'}}>
     <Text accessibilityRole="header" style={{fontSize:20,fontWeight:'700',color:colors.textPrimary}}>Invite to job</Text>
     <ScrollView>
-     {failed?<Text accessibilityRole="alert">Could not load open jobs. Refresh My Locals and try again.</Text>
+     {failed?<Text accessibilityRole="alert">Could not load open jobs. Refresh My People and try again.</Text>
       :jobs.length===0?<Text>No eligible open jobs for this provider.</Text>
       :jobs.map(job=><LocalAction key={job.id} disabled={busy} label={job.title+(job.revision?' · Invite again':'')} onPress={()=>{
        Alert.alert('Send job invitation?', 'This provider can view the job and make an offer.', [

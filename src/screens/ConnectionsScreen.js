@@ -128,7 +128,7 @@ export default function ConnectionsScreen({ navigation, route }) {
       await setProviderSaved(supabase,viewer,person.id,!currentlySaved)
       if(currentlySaved)setSaved(rows=>rows.filter(row=>row.id!==person.id))
       else setSaved(rows=>[person,...rows.filter(row=>row.id!==person.id)])
-    }catch{Alert.alert('Could not update My Locals','Try again.')}
+    }catch{Alert.alert('Could not update My People','Try again.')}
     finally{changeLock.current=false;setChanging(false)}
   }
 
@@ -265,7 +265,14 @@ export default function ConnectionsScreen({ navigation, route }) {
           {inviteJob ? 'Choose a previous provider' : relationshipLabels[side]}
         </Text>
         {!inviteJob&&<Text style={styles.headerSubtitle}>{side==='locals'?'Providers you’ve saved or worked with':'Requesters you’ve completed work for'}</Text>}
-        {!inviteJob&&<View style={styles.toggle}>
+        {!inviteJob&&side==='locals'&&<View style={styles.toggle}>
+          <TouchableOpacity style={styles.toggleBtn} accessibilityRole="button" onPress={()=>
+            route.params?.fromPropertyNetwork?navigation.goBack():navigation.getParent()?.navigate('Home',{screen:'PropertyNetwork'})}>
+            <Text style={styles.toggleText}>My Network</Text>
+          </TouchableOpacity>
+          <View style={[styles.toggleBtn,styles.toggleBtnActive]}><Text style={[styles.toggleText,styles.toggleTextActive]}>My People</Text></View>
+        </View>}
+        {!inviteJob&&side==='customers'&&<View style={styles.toggle}>
           {Object.entries(relationshipLabels).map(([value,label])=>(
             <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:side===value}}
               style={[styles.toggleBtn,side===value&&styles.toggleBtnActive]} onPress={()=>{

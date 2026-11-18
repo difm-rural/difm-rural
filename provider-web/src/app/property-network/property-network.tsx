@@ -154,8 +154,9 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  }
 
  return <section className="page work-page property-network">
-  <header className="home-heading"><div><h1>My Property Network</h1><p className="muted">See who helps with your property and where you still need support.</p></div>
-   <Link href="/connections?view=locals" className="card-link">My Locals</Link></header>
+  <header className="home-heading"><div><h1>My Property Network</h1><p className="muted">See who helps with your property and where you still need support.</p></div></header>
+  <nav className="activity-segments" aria-label="My Property"><Link href="/property-network" aria-current="page">My Network</Link>
+   <Link href="/connections?view=locals">My People</Link></nav>
   {error&&<p role="alert">{error} <button className="lform-cancel" type="button" onClick={()=>{setError('');void load()}}>Retry</button></p>}
   {feedback&&<p role="status">{feedback}</p>}
   {!data&&!error&&<p role="status">Loading My Property Network…</p>}
@@ -240,9 +241,9 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
         {(person.saved||person.worked)&&<p>{[person.saved?'Saved':'',person.worked?'Worked together':''].filter(Boolean).join(' · ')}</p>}
         <div className="lform-actions">{providerLink(person)}
          {!person.saved&&<button type="button" className="lform-cancel" disabled={busy} onClick={async()=>{
-          if(await mutate(()=>setProviderSaved(client,owner,person.id,true),'Saved to My Locals.'))
+          if(await mutate(()=>setProviderSaved(client,owner,person.id,true),'Saved to My People.'))
            setMatches(rows=>rows?.map(row=>row.id===person.id?{...row,saved:true}:row)??null)
-         }}>Save to My Locals</button>}
+         }}>Save to My People</button>}
          <button type="button" className="lform-cancel" disabled={busy||linked.some(row=>row.id===person.id)} onClick={()=>void mutate(
           ()=>setPropertyProvider(client,owner,service,person.id,true),'Provider linked.')}>
           {linked.some(row=>row.id===person.id)?'Added to Property Network':'Add to Property Network'}</button>
