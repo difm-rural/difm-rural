@@ -55,6 +55,21 @@ test('connections read public profiles and scope shared work to both participant
  assert.equal(c.calls.some(v=>v[0]==='from'&&['profiles','jobs'].includes(v[1])),false)
  const cols=c.calls.filter(v=>v[0]==='select'&&v[1]==='profiles_public').map(v=>v[2]).join(',');assert.doesNotMatch(cols,/phone|address|latitude|longitude/)
 })
+test('My Locals and My Customers show the same completed job from opposite directions',async()=>{
+ const base={times_worked:1,jobs_count:1,bookings_count:0,first_engaged_at:'2026-01-01',last_engaged_at:'2026-02-01',categories:[]}
+ const c=client({
+  connections:[{...base,requester_id:me,provider_id:other}],
+  bids:[{job_id:jobId,provider_id:other,status:'accepted'},{job_id:'open',provider_id:other,status:'accepted'}],
+  jobs_public:[row(jobId,{status:'completed',requester_id:me}),row('open',{status:'open',requester_id:me})],
+ })
+ assert.deepEqual((await connections.loadConnections(c,me,'locals')).map(person=>person.personId),[other])
+ assert.deepEqual((await connections.loadConnections(c,other,'customers')).map(person=>person.personId),[me])
+ assert.deepEqual(await connections.loadConnections(c,stranger,'customers'),[])
+ assert.deepEqual(await connections.loadConnections(c,me,'locals',stranger),[])
+ assert.deepEqual((await connections.connectionHistory(c,me,other,'locals')).map(job=>job.id),[jobId])
+ assert.deepEqual((await connections.connectionHistory(c,other,me,'customers')).map(job=>job.id),[jobId])
+ assert.deepEqual(await connections.connectionHistory(c,me,other,'customers'),[])
+})
 test('saved job and interest mutations derive ownership from sign-in',async()=>{
  const c=client({jobs_public:[{id:jobId}],saved_interests:[{id:jobId,user_id:other}]});globalThis.__discoveryAuth={supabase:c,user:{id:me}}
  assert.equal((await actions.saveWatchedJob({error:''},form({job_id:jobId,user_id:other}))).error,'')

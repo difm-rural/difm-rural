@@ -105,18 +105,18 @@ export default function ConnectionNetwork({ center, connections, onSelect, size 
 
       {/* Provider nodes */}
       {nodes.map((node, i) => {
-        const name = node.conn.provider?.full_name || 'Provider'
+        const name = node.conn.person?.full_name || 'Member'
         const boxW = Math.max(node.dia + 10, 74)
         return (
           <TouchableOpacity
-            key={node.conn.provider_id || i}
+            key={node.conn.personId || i}
             activeOpacity={0.75}
             onPress={() => onSelect(node.conn)}
             style={{ position: 'absolute', left: node.x - boxW / 2, top: node.y - node.dia / 2, width: boxW, alignItems: 'center' }}
             accessibilityRole="button"
             accessibilityLabel={`${name}, worked together ${node.conn.times_worked || 1} times`}>
             <View style={[styles.nodeRing, { borderColor: node.color, borderRadius: node.dia / 2 }]}>
-              <ConnectionAvatar name={name} avatarUrl={node.conn.provider?.avatar_url} size={node.dia - 6} />
+              <ConnectionAvatar name={name} avatarUrl={node.conn.person?.avatar_url} size={node.dia - 6} />
             </View>
             <Text style={styles.nodeLabel} numberOfLines={1}>{name.split(' ')[0]}</Text>
             {!!node.category && (

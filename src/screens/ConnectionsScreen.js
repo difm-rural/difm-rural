@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -10,38 +10,58 @@ import EmptyState from '../components/EmptyState'
 import { ConnectionAvatar } from '../components/ConnectionAvatar'
 import ConnectionNetwork from '../components/ConnectionNetwork'
 import {
-  fetchConnectionsForRequester,
+  fetchConnections,
   formatLastWorked,
   timesWorkedLabel,
   categoriesLabel,
   categoryColor,
   primaryCategory,
 } from '../lib/connections'
+import {relationshipLabels,relationshipSide} from '../../shared/relationshipHistory'
 
 const CANVAS_SIZE = Math.min(Dimensions.get('window').width - 32, 420)
 
 export default function ConnectionsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const inviteJob = route.params?.inviteJob || null
+  const side = inviteJob ? 'locals' : relationshipSide(route.params?.side)
   const [connections, setConnections] = useState([])
   const [me, setMe] = useState(null)
-  const [view, setView] = useState(inviteJob ? 'list' : 'network') // 'network' | 'list'
+  const [view, setView] = useState('list')
+  const [failed,setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const request = useRef(0)
 
-  useFocusEffect(useCallback(() => { load() }, []))
+  useFocusEffect(useCallback(() => {
+    setLoading(true)
+    load()
+    return ()=>{request.current++}
+  }, [side]))
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setConnections([]); setLoading(false); setRefreshing(false); return }
-    const [rows, profRes] = await Promise.all([
-      fetchConnectionsForRequester(user.id),
-      supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single(),
-    ])
-    setConnections(rows)
-    setMe({ name: profRes.data?.full_name, avatarUrl: profRes.data?.avatar_url })
-    setLoading(false)
-    setRefreshing(false)
+    const id=++request.current
+    setFailed(false)
+    try {
+      const {data:{user}}=await supabase.auth.getUser()
+      if(!user){
+        if(id===request.current)setConnections([])
+        return
+      }
+      const [rows, profRes] = await Promise.all([
+        fetchConnections(user.id,side),
+        supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single(),
+      ])
+      if(id===request.current){
+        setConnections(rows)
+        setMe({ name: profRes.data?.full_name, avatarUrl: profRes.data?.avatar_url })
+      }
+    }catch{if(id===request.current)setFailed(true)}finally{
+      if(id===request.current){
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
   }
 
   function onRefresh() {
@@ -50,7 +70,7 @@ export default function ConnectionsScreen({ navigation, route }) {
   }
 
   async function inviteConnection(conn) {
-    const name = conn.provider?.full_name || 'this provider'
+    const name = conn.person?.full_name || 'this provider'
     Alert.alert(
       'Invite previous provider?',
       `Invite ${name} to view and offer on “${inviteJob.title}”?`,
@@ -87,11 +107,11 @@ export default function ConnectionsScreen({ navigation, route }) {
       inviteConnection(conn)
       return
     }
-    navigation.navigate('ConnectionDetail', { connection: conn })
+    navigation.navigate('ConnectionDetail', { connection: conn, side })
   }
 
   function renderItem({ item }) {
-    const name = item.provider?.full_name || 'Provider'
+    const name = item.person?.full_name || 'Member'
     return (
       <TouchableOpacity
         style={styles.row}
@@ -100,7 +120,7 @@ export default function ConnectionsScreen({ navigation, route }) {
         accessibilityRole="button"
         accessibilityLabel={`${name}, ${timesWorkedLabel(item.times_worked)}`}>
         <View style={[styles.rowDot, { backgroundColor: categoryColor(primaryCategory(item.categories)) }]} />
-        <ConnectionAvatar name={name} avatarUrl={item.provider?.avatar_url} />
+        <ConnectionAvatar name={name} avatarUrl={item.person?.avatar_url} />
         <View style={{ flex: 1 }}>
           <Text style={styles.name} numberOfLines={1}>{name}</Text>
           <Text style={styles.meta} numberOfLines={1}>
@@ -110,6 +130,7 @@ export default function ConnectionsScreen({ navigation, route }) {
           {item.categories?.length > 0 && (
             <Text style={styles.categories} numberOfLines={1}>{categoriesLabel(item.categories)}</Text>
           )}
+          {!!item.person?.region&&<Text style={styles.meta}>{item.person.region}</Text>}
         </View>
         <Icon name="chevron-forward" size={18} color={colors.textMuted} />
       </TouchableOpacity>
@@ -158,10 +179,24 @@ export default function ConnectionsScreen({ navigation, route }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>{inviteJob ? 'Invite to job' : 'Connections'}</Text>
         <Text style={styles.headerTitle} accessibilityRole="header">
-          {inviteJob ? 'Choose a previous provider' : "People you've worked with"}
+          {inviteJob ? 'Choose a previous provider' : relationshipLabels[side]}
         </Text>
+        {!inviteJob&&<Text style={styles.headerSubtitle}>{side==='locals'?'Providers you’ve worked with':'Requesters you’ve completed work for'}</Text>}
+        {!inviteJob&&<View style={styles.toggle}>
+          {Object.entries(relationshipLabels).map(([value,label])=>(
+            <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:side===value}}
+              style={[styles.toggleBtn,side===value&&styles.toggleBtnActive]} onPress={()=>{
+                if(side!==value){setLoading(true);navigation.setParams({side:value})}
+              }}>
+              <Text style={[styles.toggleText,side===value&&styles.toggleTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>}
+        {side==='customers'&&<TouchableOpacity accessibilityRole="button" style={styles.backBtn}
+          onPress={()=>navigation.getParent()?.navigate('Home',{screen:'InvitedJobs'})}>
+          <Text style={styles.backBtnText}>Job invitations</Text>
+        </TouchableOpacity>}
         {inviteJob ? (
           <Text style={styles.headerSubtitle} numberOfLines={2}>{inviteJob.title}</Text>
         ) : null}
@@ -187,18 +222,23 @@ export default function ConnectionsScreen({ navigation, route }) {
       </View>
 
       {loading ? (
-        <Loading label="Loading your connections…" />
+        <Loading label={`Loading ${relationshipLabels[side]}…`} />
+      ) : failed ? (
+        <TouchableOpacity accessibilityRole="button" onPress={onRefresh} style={styles.row}>
+          <Text style={styles.name}>Could not load work history. Tap to retry.</Text>
+        </TouchableOpacity>
       ) : connections.length === 0 ? (
         <EmptyState
           icon="people-outline"
-          title="No connections yet"
-          body="Once you complete a job or booking, the providers you worked with show up here so you can offer them work again."
+          title={side==='locals'?'No previous providers yet':'No previous customers yet'}
+          body={side==='locals'?'Providers appear here after a completed job or booking.':'Requesters appear here after you complete a job or booking for them.'}
         />
       ) : view === 'network' ? (
         networkView
       ) : (
         <FlatList
           data={connections}
+          ListHeaderComponent={!inviteJob?<Text style={styles.headerSubtitle}>Worked together</Text>:null}
           renderItem={renderItem}
           keyExtractor={item => `${item.requester_id}-${item.provider_id}`}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}

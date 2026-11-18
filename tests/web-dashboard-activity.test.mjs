@@ -51,6 +51,7 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@shared/formatting':{formatDate:()=>''},
   '@shared/notificationBody':{},'@shared/marketSide':{},
   '@shared/nextMove':{jobNextMove,bookingNextMove},'@shared/onTheGo':{rankOnTheGo},
+  '@shared/relationshipHistory':{relationshipLabels:{locals:'My Locals',customers:'My Customers'}},
   '@/components/seasonal-reminders':{SeasonalReminders:()=>null},
   '@/lib/seasonal-reminders':{loadSeasonalReminders:()=>[]},
   '@/components/navigation-link':{default:'a'},

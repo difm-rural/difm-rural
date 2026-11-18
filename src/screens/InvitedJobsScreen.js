@@ -65,8 +65,7 @@ export default function InvitedJobsScreen({ navigation }) {
           accessibilityLabel="Go back">
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
-        <Text style={styles.kicker}>Connections</Text>
-        <Text style={styles.headerTitle} accessibilityRole="header">Invited to you</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">Job invitations</Text>
         <Text style={styles.headerSub}>Jobs offered to you privately. Make an offer to take one on.</Text>
       </View>
 

@@ -26,7 +26,7 @@ import {
 import { canProvide } from '../../lib/roles'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
-import { fetchConnectionsForRequester } from '../../lib/connections'
+import { relationshipLabels } from '../../../shared/relationshipHistory'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
@@ -57,7 +57,6 @@ export default function HomeTabScreen({ navigation }) {
   const [userId, setUserId]             = useState(null)
   const [profile, setProfile]           = useState(null)
   const [notifications, setNotifications] = useState([])
-  const [connections, setConnections]   = useState([])
   const [invitedJobs, setInvitedJobs]   = useState([])
   const [seasonalReminders, setSeasonalReminders] = useState([])
   const [seasonalExpanded, setSeasonalExpanded] = useState(false)
@@ -90,15 +89,13 @@ export default function HomeTabScreen({ navigation }) {
 
     const isProvider  = canProvide(prof)  // providing is additive
 
-    const [notifs, conns, invited, reminders, active] = await Promise.all([
+    const [notifs, invited, reminders, active] = await Promise.all([
       fetchNotifications(8),
-      fetchConnectionsForRequester(user.id),
       isProvider ? fetchInvitedJobsForProvider(user.id) : Promise.resolve([]),
       fetchSeasonalReminders(),
       fetchActiveNextMoves(user.id, isProvider),
     ])
     setNotifications(notifs)
-    setConnections(conns)
     setInvitedJobs(invited)
     setSeasonalReminders(reminders)
     setActiveMoves(active)
@@ -270,7 +267,7 @@ export default function HomeTabScreen({ navigation }) {
             <Icon name="mail-open-outline" size={22} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={styles.inviteCardTitle}>
-                You've been invited to {invitedJobs.length} job{invitedJobs.length === 1 ? '' : 's'}
+                Job invitations ({invitedJobs.length})
               </Text>
               <Text style={styles.inviteCardSub}>Someone you've worked with offered you work directly.</Text>
             </View>
@@ -451,22 +448,18 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
-        {/* Your connections — a button to the full list */}
-        {connections.length > 0 && (
-          <TouchableOpacity
+        {Object.entries(relationshipLabels).map(([side,label])=>(
+          <TouchableOpacity key={side}
             style={styles.connCard}
-            onPress={() => navigation.navigate('Connections')}
+            onPress={() => navigation.navigate('Connections',{side})}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel={`Your connections, ${connections.length}`}>
+            accessibilityLabel={label}>
             <Icon name="people-outline" size={22} color={colors.primary} />
-            <Text style={styles.connCardTitle}>Your connections</Text>
-            <View style={styles.summaryCount}>
-              <Text style={styles.summaryCountText}>{connections.length}</Text>
-            </View>
+            <Text style={styles.connCardTitle}>{label}</Text>
             <Icon name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
-        )}
+        ))}
       </ScrollView>
     </View>
   )

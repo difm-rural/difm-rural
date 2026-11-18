@@ -2,27 +2,29 @@
 // Backed by the `connections` DB view (completed jobs + bookings, grouped by
 // the requester/provider pair). Names/avatars come from `profiles_public`.
 import { supabase } from './supabase'
+import { allRows, relationshipColumn } from '../../shared/relationshipHistory'
 
 // Providers the given requester has worked with, most recent first, each with
 // a `.provider` { id, full_name, avatar_url } attached.
-export async function fetchConnectionsForRequester(uid) {
+export async function fetchConnections(uid, side) {
   if (!uid) return []
-  const { data: rows, error } = await supabase
+  const column = relationshipColumn(side)
+  const otherColumn = side === 'customers' ? 'requester_id' : 'provider_id'
+  const rows = await allRows(() => supabase
     .from('connections')
-    .select('*')
-    .eq('requester_id', uid)
-    .order('last_engaged_at', { ascending: false })
-  if (error || !rows?.length) return []
+    .select('requester_id,provider_id,times_worked,jobs_count,bookings_count,first_engaged_at,last_engaged_at,categories')
+    .eq(column, uid)
+    .order('last_engaged_at', { ascending: false }).order(otherColumn))
+  const people = new Map()
+  const ids = rows.map(row => row[otherColumn]).filter(id => id && id !== uid)
 
-  const providerIds = [...new Set(rows.map(r => r.provider_id).filter(Boolean))]
-  const { data: profiles } = await supabase
-    .from('profiles_public')
-    .select('id, full_name, avatar_url')
-    .in('id', providerIds)
-  const pmap = {}
-  profiles?.forEach(p => { pmap[p.id] = p })
-
-  return rows.map(r => ({ ...r, provider: pmap[r.provider_id] || null }))
+  for(let i=0;i<ids.length;i+=200){
+    const {data,error}=await supabase.from('profiles_public').select('id,full_name,avatar_url,region').in('id',ids.slice(i,i+200))
+    if(error)throw error
+    data?.forEach(person=>people.set(person.id,person))
+  }
+  return rows.filter(row=>row[column]===uid&&row[otherColumn]&&row[otherColumn]!==uid)
+    .map(row=>({...row,personId:row[otherColumn],person:people.get(row[otherColumn])??null}))
 }
 
 // "Apr 2026" — engagement month/year (we only store created_at, not a
@@ -30,7 +32,7 @@ export async function fetchConnectionsForRequester(uid) {
 export function formatLastWorked(dateStr) {
   if (!dateStr) return ''
   try {
-    return new Date(dateStr).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })
+    return new Date(dateStr).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric', timeZone:'Pacific/Auckland' })
   } catch {
     return ''
   }

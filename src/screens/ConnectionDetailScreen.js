@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
@@ -7,18 +7,25 @@ import Icon from '../components/Icon'
 import Button from '../components/Button'
 import { ConnectionAvatar } from '../components/ConnectionAvatar'
 import { formatLastWorked, timesWorkedLabel } from '../lib/connections'
+import { completedRelationshipJobs, relationshipColumn, relationshipSide } from '../../shared/relationshipHistory'
 
 export default function ConnectionDetailScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const { connection } = route.params
-  const provider = connection.provider
-  const providerId = connection.provider_id
-  const name = provider?.full_name || 'Provider'
+  const side = relationshipSide(route.params.side)
+  const isLocal = side==='locals'
+  const provider = connection.person
+  const providerId = connection.personId
+  const name = provider?.full_name || 'Member'
 
   const [services, setServices] = useState([])
-  const [loadingServices, setLoadingServices] = useState(true)
+  const [loadingServices, setLoadingServices] = useState(isLocal)
+  const [history,setHistory] = useState(null)
+  const [historyError,setHistoryError] = useState(false)
+  const [opening,setOpening] = useState(false)
 
   useEffect(() => {
+    if(!isLocal)return
     let active = true
     ;(async () => {
       const { data } = await supabase
@@ -34,7 +41,35 @@ export default function ConnectionDetailScreen({ navigation, route }) {
       }
     })()
     return () => { active = false }
-  }, [providerId])
+  }, [providerId,isLocal])
+
+  useEffect(()=>{
+    let active=true
+    async function load(){
+      try{
+        const {data:{user}}=await supabase.auth.getUser()
+        if(!user||connection[relationshipColumn(side)]!==user.id)throw new Error('Unavailable')
+        const rows=await completedRelationshipJobs(supabase,connection.requester_id,connection.provider_id)
+        if(active){setHistory(rows);setHistoryError(false)}
+      }catch{if(active)setHistoryError(true)}
+    }
+    setHistory(null)
+    load()
+    return ()=>{active=false}
+  },[connection,side])
+
+  async function openJob(item){
+    if(opening)return
+    setOpening(true)
+    try{
+      const {data,error}=await supabase.from('jobs_public').select('*').eq('id',item.id)
+        .eq('requester_id',connection.requester_id).eq('status','completed').maybeSingle()
+      if(error||!data)throw new Error('Unavailable')
+      if(navigation.getState().routeNames.includes('JobDetail'))navigation.navigate('JobDetail',{job:data})
+      else navigation.getParent()?.navigate('Activity',{screen:'JobDetail',params:{job:data}})
+    }catch{Alert.alert('Job unavailable','This job is no longer available.')}
+    finally{setOpening(false)}
+  }
 
   function bookService(svc) {
     navigation.navigate('ServiceDetail', {
@@ -92,15 +127,29 @@ export default function ConnectionDetailScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* Offer a job directly — a private invite */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Completed jobs</Text>
+          {historyError?<Text style={styles.muted}>Could not load shared job history.</Text>:history===null
+            ?<Text style={styles.muted}>Loading shared jobs…</Text>:!history.length
+            ?<Text style={styles.muted}>No completed job details available.</Text>:history.map(item=>(
+              <TouchableOpacity key={item.id} style={styles.serviceRow} onPress={()=>openJob(item)}
+                disabled={opening} accessibilityRole="button">
+                <View style={{flex:1}}><Text style={styles.serviceTitle}>{item.title}</Text>
+                  <Text style={styles.serviceCat}>{formatLastWorked(item.created_at)}</Text></View>
+                <Icon name="chevron-forward" size={18} color={colors.textSecondary}/>
+              </TouchableOpacity>
+            ))}
+        </View>
+
+        {isLocal&&provider&&<>
         <Button
-          title="Offer a job"
+          title="Invite to a job"
           icon="briefcase-outline"
           onPress={() => navigation.getParent()?.navigate('Jobs', {
             screen: 'PostJob',
             params: { inviteProviderId: providerId, inviteProviderName: provider?.full_name },
           })}
-          accessibilityLabel={`Offer a job to ${name}`}
+          accessibilityLabel={`Invite ${name} to a job`}
         />
         <Text style={styles.offerHint}>
           Send {name.split(' ')[0]} a private job offer — only they'll see it, unless you choose to post it publicly.
@@ -136,6 +185,7 @@ export default function ConnectionDetailScreen({ navigation, route }) {
           style={{ marginTop: 16 }}
           accessibilityLabel={`View ${name}'s full profile`}
         />
+        </>}
       </ScrollView>
     </View>
   )

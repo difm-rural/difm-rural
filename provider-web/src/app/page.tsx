@@ -3,6 +3,7 @@ import {notificationBody} from '@shared/notificationBody'
 import {notificationSide, sideTag} from '@shared/marketSide'
 import {bookingNextMove,jobNextMove,type NextMove} from '@shared/nextMove'
 import {rankOnTheGo} from '@shared/onTheGo'
+import {relationshipLabels} from '@shared/relationshipHistory'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
@@ -134,7 +135,7 @@ export default async function HomePage() {
       {nothingAtAll && <div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or browse listings to get started.</p></div>}
       <SeasonalReminders campaigns={seasonal}/>
     </div><aside className="home-aside">
-      <Link href="/connections" className="card home-quick"><UsersRound size={22}/><span><strong>Connections</strong><small>People you’ve worked with · Job invitations</small></span><ArrowRight size={17}/></Link>
+      {Object.entries(relationshipLabels).map(([view,label])=><Link key={view} href={'/connections?view='+view} className="card home-quick"><UsersRound size={22}/><span><strong>{label}</strong><small>{view==='locals'?'Providers you’ve worked with':'Requesters you’ve completed work for'}</small></span><ArrowRight size={17}/></Link>)}
       <Link href="/listings" className="card home-quick"><ListChecks size={22}/><span><strong>My listings</strong><small>{listings.error ? 'Manage your listings' : (listings.data || []).filter(s => s.is_active && !s.closed_at).length + ' live · Manage live, paused and closed listings'}</small></span><ArrowRight size={17}/></Link>
       <div className="home-explainer"><h3>Jobs & listings</h3><p><strong>Jobs</strong> are work you need done. Local people can send you an offer.</p><p><strong>Listings</strong> advertise services, grazing, hire and local goods.</p></div>
     </aside></div>
