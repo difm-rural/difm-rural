@@ -5,8 +5,8 @@
 // src/lib/nextMove.js re-exports jobNextMove + bookingNextMove from here and
 // keeps the data-fetching fetchActionableNextMoves. provider-web imports
 // jobNextMove from '@shared/nextMove'.
-import { bookingPricingType } from './listingEstimate'
-import { nzCalendarDay, nzToday } from './postingDates'
+import { bookingPricingType } from './listingEstimate.ts'
+import { nzCalendarDay, nzToday } from './postingDates.ts'
 
 export type NextMove = {
   label: string
