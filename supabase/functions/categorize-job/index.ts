@@ -1,3 +1,4 @@
+import { refuseAssistantToken } from '../_shared/assistant-token.ts'
 // Infers a job category from its title + description.
 // Returns { category } — always one of the known categories, defaulting to
 // "General Rural Help" on any error so job posting is never blocked.
@@ -40,6 +41,8 @@ function pickCategory(raw: string | null): string {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const assistant = refuseAssistantToken(req, corsHeaders)
+  if (assistant) return assistant
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   const openAiApiKey = Deno.env.get('OPENAI_API_KEY')

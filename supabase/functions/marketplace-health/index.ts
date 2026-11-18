@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { refuseAssistantToken } from '../_shared/assistant-token.ts'
 
 const REQUEST_BUDGET_MS = 24_000
 
@@ -7,6 +8,8 @@ Deno.serve(async request => {
     Response.json({ status }, { status: code, headers: { 'Cache-Control': 'no-store' } })
 
   if (request.method !== 'POST') return respond('method_not_allowed', 405)
+  const assistant = refuseAssistantToken(request, { 'Cache-Control': 'no-store' })
+  if (assistant) return assistant
   if (request.headers.has('x-marketplace-health-secret')) return respond('scheduling_disabled', 403)
   const authorization = request.headers.get('Authorization')
   if (!authorization?.startsWith('Bearer ')) return respond('unauthorised', 401)
