@@ -8,4 +8,8 @@ Updated Home and Activity on web and Expo. Existing preferences, requester activ
 
 ## Validation and release
 
-Release verification pending.
+- Release commit `6132076128ebc2b234b1b12cd3160e6eb6b9e3d9` excludes the pending map work.
+- The final isolated release passed 308 repository tests, the provider web production build and both Expo exports. Regression tests cover named gaps, configured and untouched areas, empty and unavailable metrics, indicator priority, upcoming arrival times, account-scoped customer counts and existing mode persistence.
+- Signed-in browser layout and device interaction remain to be verified.
+- Vercel confirmed deployment `7JAzwUmk9SmbJk9j1cmb4GAEH1zb` succeeded. The development Home and focused Activity URLs returned HTTP 200. [Development site](https://dev.ruralconnections.nz/) · [Vercel deployment](https://vercel.com/rural-connections/difm-rural/7JAzwUmk9SmbJk9j1cmb4GAEH1zb)
+- Expo published Android and iOS to `preview` with runtime `1.0.0`, update group `c9628b62-b427-42d8-ab6e-c5033ead778d`. [Expo update](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/c9628b62-b427-42d8-ab6e-c5033ead778d)

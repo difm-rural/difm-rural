@@ -7,3 +7,12 @@ A requester can hide and re-add areas, set each service's status, and add custom
 Migration `20261118170000_property_network.sql` adds owner-only tables for area preferences, service states and provider links. Suggested services are generated from the shared catalogue and only materialised when used. RLS scopes every row to its owner. Linking uses an invoker RPC, the existing public profile projection and a composite foreign key to the owner's service. Property addresses and job details are outside the data model.
 
 The post-completion suggestion is deferred. Requesters can link providers from Worked together in V1.
+
+## Validation and deployment
+
+- All 297 repository tests passed. Isolated PostgreSQL tests verified private reads and writes, area restoration, status changes, multiple provider links, atomic linking, unlinking and the existing invitation rules. The provider web build and Android and iOS Expo exports passed.
+- Hosted testing verified that a synthetic service and provider link persist across sign-ins and are invisible to the linked provider and guests. Unlinking worked. A Windows quoting error interrupted the first fixture cleanup. The exact fixture was removed, and the rerun passed with cleanup verified.
+- The deployed diagram and List view passed signed-in Chrome checks at 1280 px and 360 px. Area selection opened the corresponding services. The diagram nodes stayed within the chart and did not overlap at either width.
+- Release commit `ce311e6d8b9844cca029c95e61f22257de953088`. Supabase migration `20261118170000` applied to the existing RC test project.
+- [My Property Network on the development website](https://dev.ruralconnections.nz/property-network) · [Vercel deployment](https://vercel.com/rural-connections/difm-rural/CcjqhHHL9FvcoTBCEw6aa9gayiTV)
+- [Expo preview group `cb0ffe95-769e-4c27-8ce8-391021e569c3`](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/cb0ffe95-769e-4c27-8ce8-391021e569c3) published for Android and iOS on runtime `1.0.0`. Native on-device interaction remains unverified.

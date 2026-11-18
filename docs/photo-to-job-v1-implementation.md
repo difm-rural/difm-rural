@@ -2,6 +2,8 @@
 
 Implemented locally for signed-in requesters on Expo and provider web. The source photo is the single primary image for a new Photo-to-Job post. Selecting it does not upload it to Storage. The requester can replace it, remove it, or explicitly continue without a photo. Existing manual posting stays available. [Approved design](photo-to-job-design.md) · [V1 plan](photo-to-job-v1-implementation-plan.md)
 
+The feature is now deployed to the existing test backend, Vercel Preview and Expo preview. See the hosted rollout results below.
+
 ## Files changed
 
 | Area | Files |
@@ -121,6 +123,18 @@ A read-only catalog check confirmed the migration was unrecorded and the private
 
 Before retrying, remove the publication function's dependence on setting the protected JWT claim. Preserve service-only publication, the verified requester ID, the existing invitation eligibility rules and atomic publication. Test the corrected path with the restricted migration and execution roles, then rerun hosted preflight.
 
-### Grok Bot test instructions for the next successful deployment
+## Hosted test rollout results
 
-Use the provider-web deployment URL and the Android or iOS `preview` update group recorded after a successful rollout. With dedicated test accounts and a synthetic photo, generate a draft, edit its description, override the category, review and post. Confirm the photo appears on the published card and detail and that a provider can submit an offer through to award, confirmation and completion. Post a second job as invite-only. Verify the invited provider can load its photo, an unrelated account is denied even with the exact image route, and a crafted completion update cannot make the job public. Remove the test jobs and verify cleanup.
+| Component | Verified result |
+|---|---|
+| Release source | `codex/photo-to-job-v1-test` at `602aae8c33892bde11f8d1838c29dc444d78cfb5`. Automatic approval blocked the push to `main` because it triggers production Vercel deployments. The release branch triggered Preview builds. |
+| Supabase | Migration `20261117120000` applied to the existing project `opagkgfxmjqmnvhrcris`. The private JPEG bucket, restrictive Storage policy, service-only publication RPC and job audience guard were verified. |
+| Edge Functions | Both `job-primary-media` and `draft-job-from-photo` deployed and passed signed-in HTTP smoke tests against the existing project. The project disables legacy API keys. The functions now prefer its configured publishable key for bearer validation. Service credentials stay server-side. |
+| Provider web | [Vercel Preview](https://difm-rural-g2ntkmyfv-rural-connections.vercel.app) built successfully from the release commit. [Deployment `CN6wSTDJHfiUQYrWg3ZysX6vRkp5`](https://vercel.com/rural-connections/difm-rural/CN6wSTDJHfiUQYrWg3ZysX6vRkp5). The homepage, posting route and media route redirected unauthenticated requests to Vercel SSO. The feature defaults in the Vercel build are scoped to the existing Supabase URL and can be overridden by explicit flags. |
+| Expo | [Preview group `a919328c-e667-4998-9b42-631f2c13d21e`](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/a919328c-e667-4998-9b42-631f2c13d21e) verified for Android and iOS, runtime `1.0.0`, from the same release commit. Both clients use the existing Supabase project in source. A device launch and sign-in remain to be verified. |
+
+**Migration correction.** The service-only publisher uses the requester ID derived from the verified bearer. It checks that the staged object belongs to that requester and evaluates prior completed work for the same requester/provider pair directly. It creates the job, invitation and media link in one transaction. It no longer changes the protected JWT claim. The rollback-only PostgreSQL fixture confirmed a failed invite insert leaves an unpublished stage for retry. The mocked Edge regression, 280 repository tests and provider-web production build passed.
+
+**Hosted smoke test.** Temporary requester, provider and unrelated accounts used a synthetic gate image. AI returned HTTP 200 and one clarifying question. Tests covered invalid JPEG rejection, invisible staged images, direct RPC denial, cross-account publication denial, public publication, idempotent retry, invite-only publication and authorised image retrieval. An unrelated signed-in user and a guest received 404 for the private image. The provider submitted an offer, the requester accepted it, and the provider completed the job with its invite-only visibility intact. A crafted update to make the job public was denied. Cleanup removed both test images, and the final read-only check found zero remaining test accounts, jobs, media rows or objects.
+
+**Outstanding client checks.** Vercel SSO protected the Preview. Desktop browser interaction was stopped, so signed-in browser wizard steps, application redirects after Vercel sign-in, and device rendering remain unverified. The hosted smoke test exercised the deployed backend over HTTP. In V1, the requester types the answer to an AI clarification into the editable description. The app has no follow-up AI request for that answer. Grok Bot should record any friction with that interaction.

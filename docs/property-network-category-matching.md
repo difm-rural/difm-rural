@@ -25,4 +25,9 @@ Search starts with the requester profile region when present and allows a town o
 
 ## Validation and release
 
-Release verification pending.
+- The isolated release passed 302 repository tests. The development working copy also passed 309 tests, including seven for the separate pending Map V1 work.
+- The provider web production build and Android and iOS Expo exports passed.
+- Rollback-only local PostgreSQL fixtures passed for Property Network ownership and provider links, saved providers, invitations and invite-only access. The matching tests verify service and location filtering, order, widening and absence of private coordinate queries.
+- Results are capped at 24 providers. Review information is optional if the review query fails. Signed-in hosted UI and physical-device interaction were not independently exercised.
+- Both clients deployed from `3c82989de8afd0c9d34b3e893b27f662ced35845`. Vercel confirmed deployment `BTAR2yqPoTJFzp11GGEakUNHQcfU` succeeded. [Development site](https://dev.ruralconnections.nz/property-network) · [Vercel deployment](https://vercel.com/rural-connections/difm-rural/BTAR2yqPoTJFzp11GGEakUNHQcfU)
+- Expo published Android and iOS to `preview`, runtime `1.0.0`, update group `9eef6e85-9003-4b88-8c00-0554e429fec8`. [Expo update](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/9eef6e85-9003-4b88-8c00-0554e429fec8)

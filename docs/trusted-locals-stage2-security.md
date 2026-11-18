@@ -23,3 +23,13 @@ The hosted aggregate inventory found **0 invite-only jobs with legacy photo refe
 ## Deployment
 
 The linked migration dry run listed only `20261118140000` and `20261118150000`. The local SQL regressions verify atomic gallery rollback, duplicate publication, guest and participant access, direct public Storage-policy denial and decline/withdrawal revocation through the database. They use a Storage catalog fixture. Hosted HTTP checks are recorded separately from local SQL.
+
+### Hosted outcome
+
+- Release commit `df3fc52d7c283b6a5e37e7562beeb667a84e63fb`. The unrelated Photo-to-Job documentation edit and untracked Trusted Locals discovery document were excluded from the commit.
+- Supabase recorded both migrations. `job-primary-media` deployed to the existing test project with its existing gateway setting and in-handler bearer checks. The hosted inventory had zero legacy items to move or remove.
+- Provider web is live at [dev.ruralconnections.nz](https://dev.ruralconnections.nz). The [Vercel provider deployment](https://vercel.com/rural-connections/difm-rural/D6fPpC91xExrBh8LSkBSje6cFMtC) completed successfully.
+- Expo [preview group `143b435b-f53e-49b8-b356-dbcf0d0acac3`](https://expo.dev/accounts/difmrural/projects/difm-rural/updates/143b435b-f53e-49b8-b356-dbcf0d0acac3) was published for Android and iOS from that commit, runtime `1.0.0`.
+- Local results were 283 passing repository tests, both rollback-only PostgreSQL security suites, a successful provider web build, and both Expo exports. An initial Next.js build was blocked by a Windows generated-folder permission error and the authorised rerun passed.
+- With the approved synthetic requester and provider, hosted HTTP checks verified repeat publication, two-image access, byte checks against the sanitised upload checksum, denial of public Storage uploads, and denial for anonymous callers. Decline and withdrawal denied image access, a fresh invite restored it, and the owner retained access. The signed-in development website showed the invitation and served the image through the web proxy. Requests for the exact private object path were denied through both the public and authenticated Storage endpoints. Synthetic jobs were deleted and their media endpoints denied access afterwards. Physical removal of the detached private test bytes through the existing cleanup worker was not independently verified.
+- The approved hosted accounts covered the requester and invitee; unrelated authenticated and awarded-provider cases were exercised by the isolated SQL suite. Android and iOS device rendering was not verified. The detected Android emulator was offline.
