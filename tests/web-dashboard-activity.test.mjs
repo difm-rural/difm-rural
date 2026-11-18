@@ -54,6 +54,7 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@shared/notificationBody':{},'@shared/marketSide':{},
   '@shared/nextMove':{jobNextMove,bookingNextMove},'@shared/onTheGo':{rankOnTheGo},
   '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyAreas:()=>[],propertySpokes:()=>[]},
+  './property-network/area-icon':{PropertyAreaIcon:()=>null},
   '@shared/homeSummary':{homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary},
   '@/components/home-modes':{HomeModes:({work})=>work},
   '@/components/seasonal-reminders':{SeasonalReminders:()=>null},

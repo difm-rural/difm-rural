@@ -2,60 +2,77 @@ import {CATEGORIES} from './categories'
 import {localityFromAddress} from './locality'
 import {allRows} from './relationshipHistory'
 import type {AreaId,PropertyService} from './propertyNetwork'
+import type {ListingKind} from './listingPricing'
 
-type Need={categories:readonly string[];terms:readonly string[]}
+type Need={categories:readonly string[];terms:readonly string[];kind?:ListingKind}
 const need=(categories:string[],...terms:string[]):Need=>({categories,terms})
+const hire=(categories:string[],...terms:string[]):Need=>({categories,terms,kind:'hire'})
 
-export const PROPERTY_NEEDS:Record<AreaId,readonly Need[]>={
- water:[
-  need(['Water & Drainage','Transport & Delivery'],'water delivery','water cartage','water cart'),
-  need(['Water & Drainage'],'pump repair','pump repairs','pump servicing','pump installation'),
-  need(['Water & Drainage'],'trough','troughs','water line','water lines','pipe repair','pipe repairs'),
-  need(['Water & Drainage'],'tank cleaning','tank clean'),
- ],
- land:[
-  need(['Spraying & Pest Control'],'weed spraying','weed control','gorse spraying'),
-  need(['Cropping, Hay & Feed','Spraying & Pest Control'],'lime spreading','fertiliser spreading','fertilizer spreading'),
-  need(['Land & Vegetation','Cropping, Hay & Feed'],'pasture advice','pasture management','pasture consultant'),
-  need(['Land & Vegetation','Cropping, Hay & Feed'],'mowing','slashing','topping'),
- ],
- fencing:[
-  need(['Fencing & Gates'],'fence repair','fence repairs','fencing repairs'),
-  need(['Fencing & Gates'],'new fencing','rural fencing','fence installation'),
-  need(['Fencing & Gates'],'gate','gates'),
-  need(['Fencing & Gates'],'electric fencing','electric fence','electric fences'),
- ],
- livestock:[
-  need(['Animals & Farm Sitting'],'stock handling','livestock handling','stock moving'),
-  need(['Animals & Farm Sitting'],'shearing','shearer'),
-  need(['Animals & Farm Sitting'],'animal care','animal feeding','stock checks','farm sitting'),
-  need(['Animals & Farm Sitting','Cropping, Hay & Feed'],'grazing advice','grazing management'),
- ],
- access:[
-  need(['Earthworks & Driveways','Transport & Delivery'],'gravel delivery','gravel cartage','aggregate delivery'),
-  need(['Earthworks & Driveways'],'grading','grader','driveway repairs'),
-  need(['Water & Drainage','Earthworks & Driveways'],'drainage','culvert','culverts'),
- ],
- upkeep:[
-  need(['Buildings & Maintenance'],'gutter cleaning','gutter clearing'),
-  need(['Buildings & Maintenance'],'roof repair','roof repairs','roofing'),
-  need(['Buildings & Maintenance'],'general maintenance','property maintenance','building maintenance'),
- ],
- trees:[
-  need(['Land & Vegetation'],'tree trimming','tree pruning','shelterbelt trimming'),
-  need(['Land & Vegetation'],'tree removal','tree felling'),
-  need(['Land & Vegetation'],'firewood'),
- ],
- machinery:[
-  need(['Machinery & Repairs','Cropping, Hay & Feed'],'tractor work','tractor services'),
-  need(['Machinery & Repairs'],'equipment repair','equipment repairs','machinery repair','machinery repairs','machinery servicing'),
-  need(['Machinery & Repairs'],'equipment hire','machinery hire','tractor hire'),
- ],
+// Keyed by each service's stored key (see SUPPORT_AREAS). The first category
+// is the service's own; the rest widen the search.
+export const PROPERTY_NEEDS:Record<AreaId,Readonly<Record<string,Need>>>={
+ water:{
+  'suggested-1':need(['Water & Drainage','Transport & Delivery'],'water delivery','water cartage','water cart'),
+  'suggested-2':need(['Water & Drainage'],'pump repair','pump repairs','pump servicing','pump installation'),
+  'suggested-3':need(['Water & Drainage'],'trough','troughs','water line','water lines','pipe repair','pipe repairs'),
+  'suggested-4':need(['Water & Drainage'],'tank cleaning','tank clean'),
+ },
+ land:{
+  'suggested-2':need(['Cropping, Hay & Feed','Spraying & Pest Control'],'lime spreading','fertiliser spreading','fertilizer spreading'),
+  'suggested-3':need(['Land & Vegetation','Cropping, Hay & Feed'],'pasture advice','pasture management','pasture consultant'),
+  'suggested-4':need(['Land & Vegetation','Cropping, Hay & Feed'],'mowing','slashing','topping'),
+ },
+ fencing:{
+  'suggested-1':need(['Fencing & Gates'],'fence repair','fence repairs','fencing repairs'),
+  'suggested-2':need(['Fencing & Gates'],'new fencing','rural fencing','fence installation'),
+  'suggested-3':need(['Fencing & Gates'],'gate','gates'),
+  'suggested-4':need(['Fencing & Gates'],'electric fencing','electric fence','electric fences'),
+ },
+ livestock:{
+  'suggested-1':need(['Animals & Farm Sitting'],'stock handling','livestock handling','stock moving'),
+  'suggested-2':need(['Animals & Farm Sitting'],'shearing','shearer'),
+  'suggested-3':need(['Animals & Farm Sitting'],'animal care','animal feeding','stock checks','farm sitting'),
+  'suggested-4':need(['Animals & Farm Sitting','Cropping, Hay & Feed'],'grazing advice','grazing management'),
+ },
+ access:{
+  'suggested-1':need(['Transport & Delivery','Earthworks & Driveways'],'gravel delivery','gravel cartage','aggregate delivery'),
+  'suggested-2':need(['Earthworks & Driveways'],'grading','grader','driveway repairs'),
+  'suggested-3':need(['Water & Drainage','Earthworks & Driveways'],'drainage','culvert','culverts'),
+ },
+ upkeep:{
+  'suggested-1':need(['Buildings & Maintenance'],'gutter cleaning','gutter clearing'),
+  'suggested-2':need(['Buildings & Maintenance'],'roof repair','roof repairs','roofing'),
+  'suggested-3':need(['Buildings & Maintenance'],'general maintenance','property maintenance','building maintenance'),
+ },
+ trees:{
+  'suggested-1':need(['Land & Vegetation'],'tree trimming','tree pruning','shelterbelt trimming'),
+  'suggested-2':need(['Land & Vegetation'],'tree removal','tree felling'),
+  'suggested-3':need(['Land & Vegetation'],'firewood'),
+ },
+ machinery:{
+  'suggested-1':need(['Machinery & Repairs','Cropping, Hay & Feed'],'tractor work','tractor services'),
+  'suggested-2':need(['Machinery & Repairs'],'equipment repair','equipment repairs','machinery repair','machinery repairs','machinery servicing'),
+  'suggested-3':hire(['Machinery','Implements'],'equipment hire','machinery hire','tractor hire','hire'),
+ },
+ spraying:{
+  'suggested-1':need(['Spraying & Pest Control'],'weed spraying','weed control','gorse spraying'),
+  'suggested-2':need(['Spraying & Pest Control'],'pest control','pest management','rodent control','rat control'),
+  'suggested-3':need(['Spraying & Pest Control'],'possum control','rabbit control','possum trapping','rabbit shooting','possums','rabbits'),
+ },
+ feed:{
+  'suggested-1':need(['Cropping, Hay & Feed','Transport & Delivery'],'hay','baleage','hay supply','hay bales','baleage supply'),
+  'suggested-2':need(['Cropping, Hay & Feed','Machinery & Repairs'],'silage','silage making','baleage making','baling','wrapping'),
+  'suggested-3':need(['Cropping, Hay & Feed','Transport & Delivery'],'feed delivery','hay delivery','baleage delivery','supplement delivery'),
+ },
+ sitting:{
+  'suggested-1':need(['Property & House Sitting'],'house sitting','house sitter','house minding'),
+  'suggested-2':need(['Property & House Sitting'],'property checks','property check','property minding'),
+  'suggested-3':need(['Property & House Sitting','Animals & Farm Sitting'],'animal feeding','pet feeding','pet sitting','feeding animals','farm sitting'),
+ },
 }
 
 export function propertyNeed(service:PropertyService,fallbackCategory:string):Need{
- const slot=/^suggested-(\d+)$/.exec(service.service_key)
- return (slot&&PROPERTY_NEEDS[service.area][Number(slot[1])-1])||
+ return PROPERTY_NEEDS[service.area]?.[service.service_key]||
   need(CATEGORIES.includes(fallbackCategory)?[fallbackCategory]:[],service.name)
 }
 
@@ -99,7 +116,7 @@ export async function loadPropertyMatches(client:unknown,owner:string,rule:Need,
  const db=client as Client
  if(!rule.categories.length||(!matchLocality(locality)&&!matchLocality(region)))return []
  const listings=await allRows(()=>db.from('services').select<Listing>('provider_id,category,title,description,location_name')
-  .in('category',[...rule.categories]).eq('kind','service').eq('is_active',true).is('closed_at',null).order('id'))
+  .in('category',[...rule.categories]).eq('kind',rule.kind??'service').eq('is_active',true).is('closed_at',null).order('id'))
  const shortlist=rankPropertyListings(listings,rule,owner,locality,region,saved,worked).slice(0,24)
  const ids=shortlist.map(result=>result.id)
  if(!ids.length)return []

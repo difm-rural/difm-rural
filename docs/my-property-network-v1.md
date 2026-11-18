@@ -6,6 +6,10 @@ A requester can hide and re-add areas, set each service's status, and add custom
 
 Migration `20261118170000_property_network.sql` adds owner-only tables for area preferences, service states and provider links. Suggested services are generated from the shared catalogue and only materialised when used. RLS scopes every row to its owner. Linking uses an invoker RPC, the existing public profile projection and a composite foreign key to the owner's service. Property addresses and job details are outside the data model.
 
+## Areas and categories
+
+There are 11 support areas. Together they reach every category in `shared/categories.ts` except General Rural Help. Each suggested service in `SUPPORT_AREAS` has a fixed `key` (`suggested-N`), its own listing `category`, and an optional `kind` (Equipment hire is kind `hire`, category `Machinery`). Find help, provider discovery and matching use the service's category and kind. Post a job uses the main category (`propertyJobCategory`). The new areas, Spraying & Pests, Hay & Feed, and House & Property Sitting, start inactive. Weed spraying moved from Pasture & Land to Spraying & Pests and kept `suggested-1`. Migration `20261118224050_property_network_more_areas.sql` widens the area checks and moves the saved Weed spraying rows and their links. It also activates Spraying & Pests for owners who had set Weed spraying up. Up to 8 active areas share one oval. With 9 to 11, the diagram uses a taller oval (`propertyDiagramRatio`). Web icons are Lucide (`property-network/area-icon.tsx`). App icons are Ionicons, with `mci:` MaterialCommunityIcons used for the tree and barley icons, which Ionicons lacks.
+
 The post-completion suggestion is deferred. Requesters can link providers from Worked together in V1.
 
 ## Validation and deployment

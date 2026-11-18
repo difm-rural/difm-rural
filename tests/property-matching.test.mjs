@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {CATEGORIES} from '../shared/categories.ts'
+import {CATEGORIES,LISTING_CATEGORIES} from '../shared/categories.ts'
 import {SUPPORT_AREAS} from '../shared/propertyNetwork.ts'
 import {PROPERTY_NEEDS,propertyNeed,matchLocality,rankPropertyListings,loadPropertyMatches} from '../shared/propertyMatching.ts'
 
@@ -10,10 +10,14 @@ const listing=(provider_id,title,location_name,category='Water & Drainage')=>({p
 
 test('every stock service has a canonical mapping and some search across multiple categories',()=>{
  for(const area of SUPPORT_AREAS){
-  assert.equal(PROPERTY_NEEDS[area.id].length,area.services.length)
-  for(const rule of PROPERTY_NEEDS[area.id]){
-   assert.ok(rule.categories.length&&rule.categories.every(category=>CATEGORIES.includes(category)))
+  assert.deepEqual(Object.keys(PROPERTY_NEEDS[area.id]),area.services.map(service=>service.key))
+  for(const service of area.services){
+   const rule=PROPERTY_NEEDS[area.id][service.key],kind=rule.kind??'service'
+   assert.equal(rule.categories[0],service.category,service.name)
+   assert.equal(kind,service.kind??'service',service.name)
+   assert.ok(rule.categories.every(category=>LISTING_CATEGORIES[kind].includes(category)))
    assert.ok(rule.terms.length)
+   assert.equal(propertyNeed({area:area.id,service_key:service.key,name:service.name,status:null},'x'),rule)
   }
  }
  assert.deepEqual(need.categories,['Water & Drainage','Transport & Delivery'])

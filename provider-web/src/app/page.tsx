@@ -6,6 +6,7 @@ import {rankOnTheGo} from '@shared/onTheGo'
 import {HomeModes} from '@/components/home-modes'
 import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary} from '@shared/homeSummary'
 import {loadPropertyNetwork,propertyAreas,propertySpokes} from '@shared/propertyNetwork'
+import {PropertyAreaIcon} from './property-network/area-icon'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
@@ -151,7 +152,7 @@ export default async function HomePage() {
     <header className="home-heading"><div><h1>Your property, your people</h1><p className="muted">Find local help and manage the people supporting your property.</p></div></header>
     <section className="home-network-preview">
      <div className="home-network-art" aria-hidden="true">
-      {preview.map((area,index)=><span key={area.id} className={'home-network-mini-node'+(area.needsHelp?' gap':'')} style={{left:spokes[index].x+'%',top:spokes[index].y+'%'}}>{area.glyph}</span>)}
+      {preview.map((area,index)=><span key={area.id} className={'home-network-mini-node'+(area.needsHelp?' gap':'')} style={{left:spokes[index].x+'%',top:spokes[index].y+'%'}}><PropertyAreaIcon area={area.id} size={13}/></span>)}
       <span className="home-network-mini-centre"><House size={21}/></span>
      </div>
      <div><h2>My Property Network</h2>

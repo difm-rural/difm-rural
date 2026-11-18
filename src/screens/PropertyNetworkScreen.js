@@ -13,8 +13,8 @@ import {colors} from '../theme/tokens'
 import {loadInviteChoices,loadSavedProviders,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
 import {loadPropertyMatches,matchLocality,propertyNeed} from '../../shared/propertyMatching'
 import {
- PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_RATIO,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
- propertyAreas,propertyProviderName,propertyServiceCategory,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
+ PROPERTY_AREA_DESCRIPTIONS,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
+ propertyAreas,propertyDiagramRatio,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
 } from '../../shared/propertyNetwork'
 
 function AreaButton({area,selected,onPress,style,diagram=false}){
@@ -30,14 +30,14 @@ function AreaButton({area,selected,onPress,style,diagram=false}){
 }
 
 function PropertyDiagram({areas,selected,onSelect,onOpenProperty}){
- const spots=propertySpokes(areas.length)
- const [size,setSize]=useState(0)
- return <View style={styles.diagram} onLayout={event=>setSize(event.nativeEvent.layout.width)}>
+ const spots=propertySpokes(areas.length),ratio=propertyDiagramRatio(areas.length)
+ const [size,setSize]=useState(0),hub=size*PROPERTY_HUB_SIZE/100
+ return <View style={[styles.diagram,{aspectRatio:1/ratio}]} onLayout={event=>setSize(event.nativeEvent.layout.width)}>
   {size>0&&areas.map((area,index)=>{
    const point=spots[index],length=size*point.length/100,angle=point.angle*Math.PI/180
    return <View pointerEvents="none" key={area.id} style={{position:'absolute',
     left:size*.5 + length*.5*Math.cos(angle)-length/2,
-    top:size*PROPERTY_DIAGRAM_RATIO*.5 + length*.5*Math.sin(angle)-1,
+    top:size*ratio*.5 + length*.5*Math.sin(angle)-1,
     width:length,height:2,transform:[{rotate:point.angle+'deg'}],
     flexDirection:'row',justifyContent:'space-between',
    }}>
@@ -45,11 +45,11 @@ function PropertyDiagram({areas,selected,onSelect,onOpenProperty}){
      :Array.from({length:9},(_,dash)=><View key={dash} style={{width:'7%',height:2,backgroundColor:'#72847a'}}/>)}
    </View>
   })}
-  <TouchableOpacity style={styles.centre} accessibilityRole="button" accessibilityLabel="My Property" onPress={onOpenProperty}><Icon name="home-outline" size={22} color={colors.white}/><Text style={styles.centreText}>My Property</Text></TouchableOpacity>
+  <TouchableOpacity style={[styles.centre,{width:hub,height:hub,borderRadius:hub/2,left:(size-hub)/2,top:(size*ratio-hub)/2}]} accessibilityRole="button" accessibilityLabel="My Property" onPress={onOpenProperty}><Icon name="home-outline" size={22} color={colors.white}/><Text style={styles.centreText}>My Property</Text></TouchableOpacity>
   {size>0&&areas.map((area,index)=>{
    const pt=spots[index],width=size*PROPERTY_NODE_WIDTH/100
    return <AreaButton key={area.id} diagram area={area} selected={area.id===selected} onPress={()=>onSelect(area.id)}
-    style={{width,left:size*pt.x/100-width/2,top:size*PROPERTY_DIAGRAM_RATIO*pt.y/100-PROPERTY_NODE_HEIGHT/2}}/>
+    style={{width,left:size*pt.x/100-width/2,top:size*ratio*pt.y/100-PROPERTY_NODE_HEIGHT/2}}/>
   })}
  </View>
 }
@@ -116,8 +116,8 @@ export default function PropertyNetworkScreen({navigation,route}){
   const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{selectArea('');return true})
   return ()=>subscription.remove()
  },[selected,navigation]))
- function browse(category){
-  navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category}})
+ function browse({category,kind}){
+  navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category,kind}})
  }
  function post(person,category){
   setTarget(null)
@@ -152,7 +152,7 @@ export default function PropertyNetworkScreen({navigation,route}){
   try{
    const [saved,worked,discovered]=await Promise.all([
     loadSavedProviders(supabase,owner),fetchConnections(owner,'locals'),
-    discoverPropertyProviders(supabase,owner,propertyServiceCategory(area,service)),
+    discoverPropertyProviders(supabase,owner,propertyServiceTarget(area,service).category,propertyServiceTarget(area,service).kind),
    ])
    if(request!==pickerRequest.current)return
    setGroups([{label:'Saved',people:saved},{label:'Worked together',people:worked.flatMap(row=>row.person?[row.person]:[])},
@@ -238,8 +238,8 @@ export default function PropertyNetworkScreen({navigation,route}){
      {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
      {area.services.map(service=>{
       const linked=linkedPropertyProviders(data,service)
-      const category=propertyServiceCategory(area,service)
-      const postCategory=propertyNeed(service,category).categories[0]||category
+      const category=propertyServiceTarget(area,service).category
+      const postCategory=propertyJobCategory(area,service)
       return <View style={styles.service} key={service.service_key}>
        <Text accessibilityRole="header" style={styles.serviceTitle}>{service.name}</Text>
        <Text style={service.status==='needs_help'?styles.gap:styles.muted}>
@@ -324,7 +324,7 @@ export default function PropertyNetworkScreen({navigation,route}){
            {available.length>providerLimit&&<LocalAction label="Show more providers" onPress={()=>setProviderLimit(value=>value+12)}/>}
           </View>
          })}
-        <LocalAction label="Browse more providers" onPress={()=>browse(propertyServiceCategory(area,service))}/>
+        <LocalAction label="Browse more providers" onPress={()=>browse(propertyServiceTarget(area,service))}/>
        </View>}
        </>}
       </View>
@@ -350,8 +350,8 @@ const styles=StyleSheet.create({
  feedback:{color:colors.primaryDark,fontWeight:'700',marginBottom:8},
  row:{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:8},
  viewButton:{padding:10,borderRadius:10,backgroundColor:colors.primaryLight},
- diagram:{alignSelf:'center',width:'100%',maxWidth:430,aspectRatio:1/PROPERTY_DIAGRAM_RATIO,borderRadius:240,backgroundColor:colors.primaryLight,marginTop:12},
- centre:{position:'absolute',left:'38%',top:'42%',width:'24%',height:'16%',borderRadius:80,backgroundColor:colors.primaryDark,padding:6,justifyContent:'center',alignItems:'center'},
+ diagram:{alignSelf:'center',width:'100%',maxWidth:430,borderRadius:240,backgroundColor:colors.primaryLight,marginTop:12},
+ centre:{position:'absolute',backgroundColor:colors.primaryDark,padding:6,justifyContent:'center',alignItems:'center'},
  centreText:{color:colors.white,textAlign:'center',fontWeight:'700'},
  areaButton:{backgroundColor:colors.white,borderRadius:14},
  diagramNode:{position:'absolute',minHeight:PROPERTY_NODE_HEIGHT,paddingHorizontal:3,paddingVertical:4,alignItems:'center',justifyContent:'center'},

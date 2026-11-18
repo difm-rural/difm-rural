@@ -7,11 +7,16 @@ import {loadConnections} from '@/lib/connections-data'
 import {loadInviteChoices,loadSavedProviders,setProviderSaved} from '@shared/trustedLocals'
 import {loadPropertyMatches,matchLocality,propertyNeed,type PropertyMatch} from '@shared/propertyMatching'
 import {ProviderInviteAction} from '../connections/provider-actions'
+import {Plus} from 'lucide-react'
+import {PropertyAreaIcon} from './area-icon'
 import {
- PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_RATIO,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
- propertyAreas,propertyDiscoveryPath,propertyProviderName,propertyServiceCategory,propertySpokes,
+ PROPERTY_AREA_DESCRIPTIONS,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
+ propertyAreas,propertyDiagramRatio,propertyDiscoveryPath,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,
  savePropertyService,setPropertyArea,setPropertyProvider,
  type AreaId,type NetworkData,type PropertyProvider,type PropertyService,type ServiceStatus,
+} from '@shared/propertyNetwork'
+import type {ListingKind} from '@shared/listingPricing'
+import {
 } from '@shared/propertyNetwork'
 
 type ProviderGroup={label:string;people:PropertyProvider[]}
@@ -109,13 +114,13 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
   finally{lock.current=false;setBusy(false)}
  }
 
- async function openPicker(service:PropertyService,category:string){
+ async function openPicker(service:PropertyService,{category,kind}:{category:string;kind:ListingKind}){
   const request=++pickerRequest.current
   setPicker(service.service_key);setProviderGroups(null);setProviderError('');setProviderSearch('');setProviderLimit(12)
   try{
    const [saved,worked,discovered]=await Promise.all([
     loadSavedProviders(client,owner),loadConnections(client,owner,'locals'),
-    discoverPropertyProviders(client,owner,category),
+    discoverPropertyProviders(client,owner,category,kind),
    ])
    if(request!==pickerRequest.current)return
    setProviderGroups([
@@ -175,16 +180,16 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      <li><button type="button" onClick={()=>propertyInfo.current?.showModal()}>My Property</button></li>
      {active.map(area=>
      <li key={area.id}><button type="button" data-area={area.id} aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
-      <span aria-hidden="true">{area.glyph}</span> {area.label} <AreaBadges area={area}/>
+      <PropertyAreaIcon area={area.id} size={20}/> {area.label} <AreaBadges area={area}/>
      </button></li>
-    )}</ul>:<div className="property-diagram" aria-label="Property diagram" style={{aspectRatio:1/PROPERTY_DIAGRAM_RATIO}}>
+    )}</ul>:<div className="property-diagram" aria-label="Property diagram" style={{aspectRatio:1/propertyDiagramRatio(active.length)}}>
      {active.map((area,index)=><span key={area.id} aria-hidden="true" className={'property-spoke'+(area.hasProvider?' linked':'')}
       style={{width:spokes[index].length+'%',transform:'rotate('+spokes[index].angle+'deg)'}}/>)}
      <button type="button" className="property-centre" onClick={()=>propertyInfo.current?.showModal()}>My Property</button>
      {active.map((area,index)=><button type="button" className="property-node" data-area={area.id}
       style={{left:spokes[index].x+'%',top:spokes[index].y+'%',width:PROPERTY_NODE_WIDTH+'%',minHeight:PROPERTY_NODE_HEIGHT}} key={area.id}
       aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
-      <span aria-hidden="true" className="property-glyph">{area.glyph}</span>{area.label}<AreaBadges area={area}/>
+      <PropertyAreaIcon area={area.id}/>{area.label}<AreaBadges area={area}/>
      </button>)}
     </div>}
     {!active.length&&<p>Add a support area to get started.</p>}
@@ -194,9 +199,9 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      <div className="property-library-tiles">{areas.filter(area=>!area.active).map(area=>
       <button className="property-library-tile" type="button" key={area.id} aria-label={'Add '+area.label}
        disabled={busy} onClick={()=>void mutate(()=>setPropertyArea(client,owner,area.id,true),area.label+' added.')}>
-       <span aria-hidden="true" className="property-glyph">{area.glyph}</span>
+       <PropertyAreaIcon area={area.id}/>
        <span><strong>{area.label}</strong><small>{PROPERTY_AREA_DESCRIPTIONS[area.id]}</small></span>
-       <span aria-hidden="true" className="property-glyph">+</span>
+       <Plus size={22} strokeWidth={2} aria-hidden="true" className="property-area-icon"/>
       </button>
      )}</div>
      {areas.every(area=>area.active)&&<p className="muted">All support areas are in your network.</p>}
@@ -204,12 +209,12 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
    </section>
    {current&&<section className="property-area-panel" aria-labelledby="property-area-heading">
     <button type="button" className="lform-cancel" onClick={()=>selectArea('')}>Back to My Property Network</button>
-    <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}><span aria-hidden="true">{current.glyph} </span>{current.label}</h2>
+    <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}><PropertyAreaIcon area={current.id} size={26}/> {current.label}</h2>
     <p className="muted">{PROPERTY_AREA_DESCRIPTIONS[current.id]}</p>
     {current.services.map(service=>{
      const linked=linkedPropertyProviders(data,service)
-     const category=propertyServiceCategory(current,service)
-     const postPath='/jobs/new?'+new URLSearchParams({category:propertyNeed(service,category).categories[0]||category})
+     const target=propertyServiceTarget(current,service),category=target.category
+     const postPath='/jobs/new?'+new URLSearchParams({category:propertyJobCategory(current,service)})
      return <article className="property-service" key={service.service_key}>
       <h3>{service.name}</h3>
       <p className={service.status==='needs_help'?'property-gap':'muted'}>{service.status==='needs_help'?'Find help':
@@ -259,7 +264,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        {Object.entries(PROPERTY_SERVICE_STATES).map(([value,label])=><label key={value} className="property-status-option">
         <input type="radio" name={'support-'+service.service_key} checked={service.status===value} onChange={async()=>{
          if(!await mutate(()=>savePropertyService(client,owner,{...service,status:value as ServiceStatus}),'Support status saved.'))return
-         if(value==='has_provider')void openPicker(service,category)
+         if(value==='has_provider')void openPicker(service,target)
          else{pickerRequest.current++;setPicker(null)}
         }}/>
         {label}
@@ -277,13 +282,13 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
       {service.status==='has_provider'&&!linked.length&&<p className="muted">No provider linked yet.</p>}
       {service.status==='has_provider'&&<button className="lform-cancel" type="button" disabled={busy}
        aria-expanded={picker===service.service_key}
-       onClick={()=>picker===service.service_key?setPicker(null):void openPicker(service,category)}>Link a provider</button>}
+       onClick={()=>picker===service.service_key?setPicker(null):void openPicker(service,target)}>Link a provider</button>}
       {picker===service.service_key&&<section className="property-picker">
        <h4>Choose a provider</h4>
        {providerGroups&&<label className="lform-field">Find by name or region
         <input value={providerSearch} onChange={event=>{setProviderSearch(event.target.value);setProviderLimit(12)}}/>
        </label>}
-       {providerError?<p role="alert">{providerError} <button type="button" onClick={()=>void openPicker(service,category)}>Retry</button></p>
+       {providerError?<p role="alert">{providerError} <button type="button" onClick={()=>void openPicker(service,target)}>Retry</button></p>
         :!providerGroups?<p role="status">Loading providers…</p>:providerGroups.map(group=>{
          const available=filterPropertyProviders(group.people,linked,providerSearch)
          return <section key={group.label}><h5>{group.label}</h5>{available.length===0?<p className="muted">No providers to link here.</p>
@@ -295,7 +300,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
           {available.length>providerLimit&&<button className="lform-cancel" type="button" onClick={()=>setProviderLimit(value=>value+12)}>Show more providers</button>}
          </section>
         })}
-       <Link href={propertyDiscoveryPath(category)} className="card-link">Browse more providers</Link>
+       <Link href={propertyDiscoveryPath(category,target.kind)} className="card-link">Browse more providers</Link>
       </section>}
       </>}
      </article>

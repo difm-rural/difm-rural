@@ -1,4 +1,5 @@
-import {CATEGORIES} from '@shared/categories'
+import {CATEGORIES,LISTING_CATEGORIES} from '@shared/categories'
+import type {ListingKind} from '@shared/listingPricing'
 export type Coordinates={latitude:number;longitude:number}
 export type DiscoveryFilters={q:string;category:string;kind:string;sort:'newest'|'nearest';radius:number|null;page:number;interest:string}
 export const RADII=[10,25,50,100,200]
@@ -9,7 +10,13 @@ export function coordinates(lat:unknown,lng:unknown):Coordinates|null{
 }
 export function discoveryFilters(values:Record<string,unknown>):DiscoveryFilters{
  const radius=Number(values.radius),page=Number(values.page)
- return {q:typeof values.q==='string'?values.q.trim().slice(0,120):'',category:CATEGORIES.includes(String(values.category))?String(values.category):'',kind:['service','grazing','hire','lease','for_sale'].includes(String(values.kind))?String(values.kind):'',sort:values.sort==='nearest'?'nearest':'newest',radius:Number.isInteger(radius)&&radius>=1&&radius<=200?radius:null,page:Number.isInteger(page)&&page>0?Math.min(page,100000):1,interest:typeof values.interest==='string'&&/^[a-f0-9-]{36}$/i.test(values.interest)?values.interest:''}
+ const kind=['service','grazing','hire','lease','for_sale'].includes(String(values.kind))?String(values.kind):''
+ return {q:typeof values.q==='string'?values.q.trim().slice(0,120):'',category:discoveryCategories(kind).includes(String(values.category))?String(values.category):'',kind,sort:values.sort==='nearest'?'nearest':'newest',radius:Number.isInteger(radius)&&radius>=1&&radius<=200?radius:null,page:Number.isInteger(page)&&page>0?Math.min(page,100000):1,interest:typeof values.interest==='string'&&/^[a-f0-9-]{36}$/i.test(values.interest)?values.interest:''}
+}
+// The main categories, plus a resource kind's own (e.g. hire → Machinery).
+export function discoveryCategories(kind:string){
+ const own=kind&&kind!=='service'?LISTING_CATEGORIES[kind as ListingKind]:[]
+ return [...CATEGORIES,...own.filter(category=>!CATEGORIES.includes(category))]
 }
 export function discoveryHref(path:string,f:Partial<DiscoveryFilters>){const params=new URLSearchParams();for(const [k,v] of Object.entries(f))if(v!==null&&v!==''&&v!==undefined&&!(k==='page'&&v===1))params.set(k,String(v));return path+(params.size?'?'+params:'')}
 export function distanceKm(a:Coordinates,b:Coordinates){const r=Math.PI/180,dlat=(b.latitude-a.latitude)*r,dlng=(b.longitude-a.longitude)*r,h=Math.sin(dlat/2)**2+Math.cos(a.latitude*r)*Math.cos(b.latitude*r)*Math.sin(dlng/2)**2;return 6371*2*Math.atan2(Math.sqrt(Math.min(1,h)),Math.sqrt(Math.max(0,1-h)))}

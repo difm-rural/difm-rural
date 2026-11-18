@@ -1,5 +1,7 @@
-.property-layout { max-width: 640px; margin-inline: auto; }
+.property-layout { width: 100%; max-width: 640px; margin-inline: auto; }
 .property-diagram { position: relative; width: min(100%, 430px); margin: 12px auto 0; background: var(--sage); border-radius: 50%; }
+/* Below 360px, use the screen width less a 16px gutter (the narrowest tested layout is 288px). */
+@media (max-width: 359px) { .property-diagram { width: calc(100vw - 32px); margin-inline: calc(50% - 50vw + 16px); } }
 .property-centre, .property-node { position: absolute; transform: translate(-50%, -50%); }
 .property-centre { text-decoration: none; left: 50%; top: 50%; width: 24%; aspect-ratio: 1; display: grid; place-content: center; text-align: center; padding: 6px; border-radius: 50%; background: var(--forest-deep); color: #fff; font-size: clamp(12px, 2vw, 16px); font-weight: 750; }
 .property-centre { border: 0; cursor: pointer; }
@@ -11,7 +13,8 @@
 .property-node[aria-pressed=true], .property-area-list button[aria-pressed=true] { background: var(--forest-deep); color: #fff; }
 .property-node:active, .property-library-tile:active { filter: brightness(.9); }
 .property-network a:focus-visible, .property-network button:focus-visible, .property-network input:focus-visible { outline: 3px solid #aa5b12; outline-offset: 3px; }
-.property-glyph { font-size: 22px; line-height: 1; }
+.property-area-icon { flex-shrink: 0; vertical-align: -0.2em; }
+.property-node .property-area-icon { margin-bottom: 2px; }
 .property-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 5px; margin-top: 4px; }
 .property-badge { font-size: 11px; font-weight: 650; }
 .property-badge.linked { color: var(--forest); }
