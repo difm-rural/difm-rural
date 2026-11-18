@@ -16,6 +16,9 @@
 // audit rows, a pause) is removed at the end, pass or fail.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import {
   searchJobs, searchListings, getJob, getListing, myActivity, readConversation, runGatedTool, MAX_RESULTS,
@@ -27,9 +30,16 @@ const PASSWORD = 'TestPass123!'
 const SECRET_ADDRESS = '42 Kahikatea Road'
 const results = []
 
+// SQL goes through a temp file: passing it as an argument through the Windows
+// shell splits it on spaces and semicolons.
 function sql(query) {
-  const out = execFileSync('npx', ['supabase', 'db', 'query', '--linked', query, '-o', 'json'], { encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
-  return JSON.parse(out.slice(out.indexOf('{'))).rows
+  const file = join(tmpdir(), `rc-ai-live-${process.pid}-${Date.now()}.sql`)
+  writeFileSync(file, query)
+  try {
+    const out = execFileSync('npx', ['supabase', 'db', 'query', '--linked', '-f', JSON.stringify(file), '-o', 'json'], { encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    const start = out.indexOf('{')
+    return start < 0 ? [] : (JSON.parse(out.slice(start)).rows || [])
+  } finally { rmSync(file, { force: true }) }
 }
 
 async function signIn(email, password) {

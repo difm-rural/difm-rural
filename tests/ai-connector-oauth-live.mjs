@@ -16,6 +16,9 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
 const URL_ = 'https://opagkgfxmjqmnvhrcris.supabase.co'
@@ -26,9 +29,16 @@ const REDIRECT = 'http://127.0.0.1:53682/callback'
 const results = []
 let authApiBreach = false
 
+// SQL goes through a temp file: passing it as an argument through the Windows
+// shell splits it on spaces and semicolons.
 function sql(query) {
-  const out = execFileSync('npx', ['supabase', 'db', 'query', '--linked', query, '-o', 'json'], { encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
-  return JSON.parse(out.slice(out.indexOf('{'))).rows
+  const file = join(tmpdir(), `rc-ai-live-${process.pid}-${Date.now()}.sql`)
+  writeFileSync(file, query)
+  try {
+    const out = execFileSync('npx', ['supabase', 'db', 'query', '--linked', '-f', JSON.stringify(file), '-o', 'json'], { encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    const start = out.indexOf('{')
+    return start < 0 ? [] : (JSON.parse(out.slice(start)).rows || [])
+  } finally { rmSync(file, { force: true }) }
 }
 async function check(name, fn) {
   try { await fn(); results.push(['PASS', name]); console.log('  ✔', name) }
