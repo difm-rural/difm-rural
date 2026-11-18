@@ -1,0 +1,20 @@
+.property-layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 1fr); gap: 32px; }
+.property-layout > section { min-width: 0; }
+.property-diagram { position: relative; width: min(100%, 430px); aspect-ratio: 1; margin: 12px auto 0; background: var(--sage); border-radius: 50%; }
+.property-centre, .property-node { position: absolute; transform: translate(-50%, -50%); }
+.property-centre { left: 50%; top: 50%; width: 24%; aspect-ratio: 1; display: grid; place-content: center; text-align: center; padding: 8px; border-radius: 50%; background: var(--forest-deep); color: #fff; font-size: clamp(12px, 2vw, 16px); font-weight: 750; }
+.property-spoke { position: absolute; left: 50%; top: 50%; width: 36%; transform-origin: left; border-block-start: 2px dashed #72847a; }
+.property-spoke.linked { border-block-start: 3px solid var(--forest); }
+.property-node { display: grid; place-content: center; justify-items: center; width: 22%; min-height: 52px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; color: var(--forest-deep); background: #fff; font-size: clamp(10px, 2vw, 13px); line-height: 1.12; font-weight: 700; cursor: pointer; }
+.property-node[aria-pressed=true], .property-area-list button[aria-pressed=true] { background: var(--forest-deep); color: #fff; }
+.property-network button:focus-visible, .property-network summary:focus-visible { outline: 3px solid #aa5b12; outline-offset: 3px; }
+.property-node.gap:not([aria-pressed=true]), .property-gap { color: #7a4f00; }
+.property-legend { margin: 8px 0 16px; font-size: 13px; text-align: center; }
+.property-area-list, .property-linked { list-style: none; padding: 0; }
+.property-area-list li, .property-linked li { margin: 8px 0; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.property-area-list button { border: 1px solid var(--line); border-radius: 8px; background: var(--sage); color: var(--forest-deep); padding: 10px; font: inherit; cursor: pointer; }
+.property-service { border-top: 1px solid var(--line); padding: 16px 0; }
+.property-service h3, .property-picker h4, .property-picker h5 { margin: 0 0 8px; }
+.property-picker { margin: 12px 0; padding: 12px; background: var(--sage); border-radius: 8px; }
+.property-picker section + section { margin-top: 12px; }
+@media(max-width: 980px) { .property-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } }

@@ -15,11 +15,11 @@ export function SaveProviderButton({provider,saved}:{provider:string;saved:boole
  </div>
 }
 
-export function LocalProviderActions({provider,saved,choices}:{provider:string;saved:boolean;choices:Awaited<ReturnType<typeof loadInviteChoices>>|null}){
+type InviteChoices=Awaited<ReturnType<typeof loadInviteChoices>>|null
+
+export function ProviderInviteAction({provider,choices,initiallyOpen}:{provider:string;choices:InviteChoices;initiallyOpen?:boolean}){
  const jobs=choices?providerInviteJobs(choices.jobs,choices.invites,provider):[]
- return <>
-  <SaveProviderButton provider={provider} saved={saved}/>
-  <details className="activity-action"><summary>Invite to job</summary>
+ return <details className="activity-action" open={initiallyOpen || undefined}><summary>Invite to job</summary>
    {choices===null?<p role="alert">Could not load your open jobs. Refresh to retry.</p>:jobs.length>0
     ?<ActionForm action={inviteConnection} label="Send invitation" pendingLabel="Sending invitation…">
       <input type="hidden" name="person_id" value={provider}/>
@@ -31,6 +31,12 @@ export function LocalProviderActions({provider,saved,choices}:{provider:string;s
      </ActionForm>:<p>No eligible open jobs for this provider.</p>}
    <Link href={'/jobs/new?invite='+provider} className="card-link">Post a job</Link>
   </details>
+}
+
+export function LocalProviderActions({provider,saved,choices}:{provider:string;saved:boolean;choices:InviteChoices}){
+ return <>
+  <SaveProviderButton provider={provider} saved={saved}/>
+  <ProviderInviteAction provider={provider} choices={choices}/>
   <ShareProvider providerId={provider}/>
  </>
 }

@@ -51,7 +51,7 @@ function ServiceSection({ title, items, onPressItem }) {
   )
 }
 
-export default function BrowseTabScreen({ navigation }) {
+export default function BrowseTabScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const [currentUserId, setCurrentUserId] = useState(null)
   const [services,    setServices]    = useState([])
@@ -63,6 +63,13 @@ export default function BrowseTabScreen({ navigation }) {
   const loadingRef = useRef(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
+  const category=route?.params?.category
+  useFocusEffect(useCallback(()=>{
+    if(category){
+      setSearch(category)
+      navigation.setParams({category:undefined})
+    }
+  },[category,navigation]))
 
   async function load() {
     if (loadingRef.current) return

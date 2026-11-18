@@ -448,6 +448,13 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
+        <TouchableOpacity style={styles.connCard} onPress={()=>navigation.navigate('PropertyNetwork')}
+          accessibilityRole="button" accessibilityLabel="My Property Network">
+          <Icon name="home-outline" size={22} color={colors.primary}/>
+          <Text style={styles.connCardTitle}>My Property Network</Text>
+          <Icon name="chevron-forward" size={17} color={colors.textMuted}/>
+        </TouchableOpacity>
+
         {Object.entries(relationshipLabels).map(([side,label])=>(
           <TouchableOpacity key={side}
             style={styles.connCard}
