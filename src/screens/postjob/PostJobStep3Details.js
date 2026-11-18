@@ -1,3 +1,4 @@
+import { JobPrivateGallery } from '../../components/JobPrimaryImage'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
 import React, { useEffect, useState } from 'react'
 import {
@@ -46,6 +47,16 @@ export default function PostJobStep3Details({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const { jobData, updateJobData } = usePostJob()
   const checkPhoto=process.env.EXPO_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&route.params?.mode==='edit'&&!!route.params?.job?.id
+  const privateEdit=route.params?.mode==='edit'&&route.params?.job?.visibility==='invite_only'
+  const [privateCount,setPrivateCount]=useState(null)
+  useEffect(()=>{
+    if(!privateEdit)return
+    let active=true
+    supabase.rpc('list_job_private_photos',{p_job:route.params.job.id}).then(({data,error})=>{
+      if(active&&!error)setPrivateCount(data.length)
+    })
+    return ()=>{active=false}
+  },[privateEdit,route.params?.job?.id])
   const [privatePrimaryPhoto,setPrivatePrimaryPhoto]=useState(checkPhoto)
   useEffect(()=>{
     if(!checkPhoto)return
@@ -88,7 +99,7 @@ export default function PostJobStep3Details({ navigation, route }) {
   }
 
   async function handleAddPhoto() {
-    if (photos.length >= 6) return
+    if (photos.length + (privateCount ?? 0) >= 6) return
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return }
     try {
@@ -101,7 +112,7 @@ export default function PostJobStep3Details({ navigation, route }) {
   }
 
   async function handleTakePhoto() {
-    if (photos.length >= 6) return
+    if (photos.length + (privateCount ?? 0) >= 6) return
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
     if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return }
     try {
@@ -175,6 +186,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                 </Text>
               </View>
             )}
+            {privateEdit&&<JobPrivateGallery jobId={route.params.job.id} style={{width:100,height:100}}/>}
             <View style={styles.photoGrid}>
               {photos.map((p, i) => (
                 <View key={i} style={styles.photoThumb}>
@@ -187,7 +199,7 @@ export default function PostJobStep3Details({ navigation, route }) {
                   </TouchableOpacity>
                 </View>
               ))}
-              {!privatePrimaryPhoto && !jobData.primaryPhotoRequired && photos.length < 6 && (
+              {(privateEdit ? privateCount!==null : !privatePrimaryPhoto) && !jobData.primaryPhotoRequired && photos.length + (privateCount ?? 0) < 6 && (
                 <View style={styles.photoAddGroup}>
                   <TouchableOpacity
                     style={styles.photoAdd}

@@ -103,6 +103,8 @@ function CategoryChip({ label }) {
 export default function ProviderProfileScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { providerId } = route.params
+  const [viewerId, setViewerId] = useState(null)
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setViewerId(data.user?.id)) }, [])
 
   const [loading, setLoading]                   = useState(true)
   const [profile, setProfile]                   = useState(null)
@@ -149,7 +151,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
       const acceptedJobIds = bids.filter(b => b.status === 'accepted').map(b => b.job_id)
       if (acceptedJobIds.length > 0) {
         const { data: jobsData } = await supabase
-          .from('jobs')
+          .from('jobs_public')
           .select('id, status, category')
           .in('id', acceptedJobIds)
           .eq('status', 'completed')
@@ -252,6 +254,9 @@ export default function ProviderProfileScreen({ route, navigation }) {
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Provider profile</Text>
+        {viewerId && viewerId !== providerId && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.getParent()?.navigate('Jobs', {
+          screen: 'PostJob', params: { inviteProviderId: providerId, inviteProviderName: profile?.full_name },
+        })}><Text style={styles.backBtnText}>Invite to job</Text></TouchableOpacity>}
         <Text style={styles.headerTitle} accessibilityRole="header">Provider profile</Text>
       </View>
 

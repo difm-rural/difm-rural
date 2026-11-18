@@ -3,6 +3,7 @@ import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Te
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
+import { sendJobInvitation } from '../lib/invites'
 import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Loading from '../components/Loading'
@@ -79,16 +80,7 @@ export default function ConnectionsScreen({ navigation, route }) {
         {
           text: 'Send invite',
           onPress: async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            const { error } = await supabase.from('job_invites').insert({
-              job_id: inviteJob.id,
-              requester_id: user?.id,
-              provider_id: conn.provider_id,
-            })
-            if (error?.code === '23505') {
-              Alert.alert('Already invited', `${name} has already been invited to this job.`)
-              return
-            }
+            const { error } = await sendJobInvitation(inviteJob.id,conn.provider_id)
             if (error) {
               Alert.alert('Invite not sent', error.message || 'Please try again.')
               return

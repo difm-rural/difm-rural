@@ -1,3 +1,5 @@
+import {ACTIVE_JOB_INVITATIONS, invitationLabel} from '@shared/jobInvitations'
+import {inviteConnection, respondInvitation} from '../../connections/actions'
 import {JobPrimaryImage} from '@/components/job-primary-image'
 import type {JobPrivatePhoto} from '@/components/job-edit-photos'
 import {jobMapTarget} from '@shared/jobMapTarget'
@@ -44,7 +46,10 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  let offerQuery=supabase.from('bids').select('id,provider_id,amount,message,status,available_from,estimated_duration,line_items,pricing_type,materials,payment_method,payment_sorted_at,payment_sorted_by').eq('job_id',id).order('created_at',{ascending:false})
  if(!own)offerQuery=offerQuery.eq('provider_id',user.id)
  const [{data:offers,error:offerError},{data:questions,error:questionError}]=await Promise.all([offerQuery,supabase.from('job_questions').select('id,asker_id,question,answer,created_at').eq('job_id',id).order('created_at',{ascending:true})])
- const {data:sentInvites,error:sentInviteError}=own?await supabase.from('job_invites').select('id,provider_id,status').eq('job_id',id).eq('requester_id',user.id):{data:[],error:null}
+ const {data:sentInvites,error:sentInviteError}=own?await supabase.from('job_invites').select('id,provider_id,status,revision').eq('job_id',id).eq('requester_id',user.id):{data:[],error:null}
+ const {data:receivedInvitation}=!own&&job.status==='open'
+  ?await supabase.from('job_invites').select('id,status,revision').eq('job_id',id).eq('provider_id',user.id).in('status',ACTIVE_JOB_INVITATIONS).maybeSingle()
+  :{data:null}
  const ids=[...new Set([job.requester_id,...(sentInvites || []).map(i=>i.provider_id),...(offers || []).map(b=>b.provider_id),...(questions || []).map(q=>q.asker_id)])]
  const {data:people}=await supabase.from('profiles_public').select('id,full_name').in('id',ids)
  const names=new Map((people || []).map(p=>[p.id,p.full_name]))
@@ -151,7 +156,25 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {!own&&!myOffer&&job.status!=='open'&&<p>This job is no longer accepting offers.</p>}
   </section>
 
- const invitedSection=own?<section className="card"><h2>Invited providers</h2>{sentInviteError?<p role="alert">Could not load invitations. Refresh to try again.</p>:sentInvites?.length?sentInvites.map(i=><p key={i.id}><Link href={'/people/'+i.provider_id} className="card-link">{names.get(i.provider_id) || 'Previous provider'}</Link> · {offers?.some(b=>b.provider_id===i.provider_id)?'Offer received':i.status==='declined'?'Invitation declined':i.status==='seen'?'Opened — awaiting an offer':'Invitation sent'}</p>):<p className="muted">No providers invited yet.</p>}{job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider →</Link>}</section>:null
+ const receivedSection=receivedInvitation&&<section className="card"><h2>{receivedInvitation.status==='accepted'?'Invitation accepted':'Invitation received'}</h2>
+  {receivedInvitation.status!=='accepted'&&<ActionForm action={respondInvitation} label="Accept">
+   <input name="invite_id" type="hidden" value={receivedInvitation.id}/>
+   <input name="revision" type="hidden" value={receivedInvitation.revision}/>
+   <input name="intent" type="hidden" value="accept"/>
+  </ActionForm>}
+  <details className="activity-action"><summary>Decline invitation</summary><ActionForm action={respondInvitation} label="Decline">
+   <input name="invite_id" type="hidden" value={receivedInvitation.id}/>
+   <input name="revision" type="hidden" value={receivedInvitation.revision}/>
+   <input name="intent" type="hidden" value="decline"/>
+   <label className="account-setting"><input name="confirmed" type="checkbox" required/>I want to decline this invitation.</label>
+  </ActionForm></details>
+ </section>
+ const invitedSection=own?<section className="card"><h2>Invited providers</h2>{sentInviteError?<p role="alert">Could not load invitations. Refresh to try again.</p>:sentInvites?.length?sentInvites.map(i=><div key={i.id}>
+  <p><Link href={'/people/'+i.provider_id} className="card-link">{names.get(i.provider_id) || 'Provider'}</Link> · {invitationLabel(i.status)}{offers?.some(b=>b.provider_id===i.provider_id&&b.status!=='rejected')?' · Offer received':''}</p>
+  {job.status==='open'&&(ACTIVE_JOB_INVITATIONS.includes(i.status)
+   ?<ActionForm action={respondInvitation} label="Withdraw invitation"><input name="invite_id" type="hidden" value={i.id}/><input name="revision" type="hidden" value={i.revision}/><input name="intent" type="hidden" value="withdraw"/></ActionForm>
+   :<ActionForm action={inviteConnection} label="Invite again"><input name="job_id" type="hidden" value={id}/><input name="person_id" type="hidden" value={i.provider_id}/><input name="revision" type="hidden" value={i.revision}/></ActionForm>)}
+ </div>):<p className="muted">No providers invited yet.</p>}{job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider</Link>}</section>:null
 
  const mainColumn=<>
   {posted==='1'&&own&&<><p className="status-banner" role="status">Job posted.</p><PostFeedback jobId={id}/></>}
@@ -166,7 +189,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {detailsCard}
   {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
   {((own&&(ownerActions.edit||ownerActions.repeat))||canAskQuestion||job.status==='open')&&<div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>}
-  {job.status==='open'?<>{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
+  {job.status==='open'?<>{receivedSection}{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
   {job.status==='completed'&&manageRole&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'&&!!ownReview} otherReviewRole={manageRole==='requester'?'Provider':'Requester'}/>}
   {job.status==='completed'&&<p className="home-clear" role="status">Job completed. You can find it again in History.</p>}

@@ -30,6 +30,7 @@ import { postJob, editJob } from '../../work-actions'
 type Draft={primary_photo_required:boolean;also_public:boolean;category:string;title:string;description:string;price_type:string;price:string;location:string;area:string;location_note:string;hide_exact_location:boolean;latitude:string;longitude:string;schedule_type:string;scheduled_date:string;date_from:string;date_to:string;materials_type:string;access_conditions:string[];photos:string[]}
 export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,privatePhotos}:{userId:string;seed?:JobSeed;mode?:'new'|'edit'|'repeat';offerCount?:number;inviteProvider?:{id:string;name:string};privatePhotos?:JobPrivatePhoto[]}){
  const [primaryPhoto,setPrimaryPhoto]=useState<File|null>(null)
+ const privateGallery = !!privatePhotos || !!inviteProvider
  const [editPhotos,setEditPhotos]=useState<JobEditablePhoto[]>(privatePhotos??[])
  const [submitting,setSubmitting]=useState(false)
  const [attempted,setAttempted]=useState(false),[furthest,setFurthest]=useState(0)
@@ -167,6 +168,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
   if (submitter?.id !== 'job-review-submit') return
   if(submissionLock.current||pending||busy||submitting||!ready||saved||!selectedCategory)return
   for(let i=0;i<4;i++){const issue=validStep(i);if(issue){setAttempted(true);setError(issue);setStep(i);return}}
+  if(primaryPhoto&&editPhotos.length){setError('Remove the other photos before using the AI photo as the primary image.');return}
   if(draft.primary_photo_required&&!primaryPhoto){setError('Choose a primary photo or continue without a photo.');return}
   const data=new FormData(e.currentTarget)
   await runSubmission(submissionLock,async()=>{
@@ -178,6 +180,19 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
     const photo=await prepareJobPhoto(primaryPhoto)
     const {checksum}=await jobPhotoRequest<{checksum:string}>('job-primary-media',photo,jobId)
     data.set('primary_photo_checksum',checksum)
+   }
+   if(inviteProvider&&!primaryPhoto&&editPhotos.length){
+    const ordered=[...editPhotos].sort((a,b)=>a.slot-b.slot)
+    const files=ordered.map(photo=>photo.file)
+    const {checksum}=await jobPhotoRequest<{checksum:string}>('job-primary-media',await prepareJobPhoto(files[0]!),jobId)
+    const gallery=[]
+    for(const [index,{id,file}] of ordered.slice(1).entries()){
+     const photo=await jobPhotoRequest<{checksum:string}>('job-primary-media?action=stage-gallery&job='+jobId,await prepareJobPhoto(file!),id)
+     gallery.push({id,slot:index+1,checksum:photo.checksum})
+    }
+    data.set('primary_photo_required','on')
+    data.set('primary_photo_checksum',checksum)
+    data.set('new_private_gallery',JSON.stringify(gallery))
    }
    if(privatePhotos){
     const gallery=[]
@@ -239,10 +254,10 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
   </div>}
   {step===2&&<div className="lform-step"><label className="lform-field">What needs doing? *<textarea rows={6} maxLength={POSTING_DESCRIPTION_MAX} {...field('description')} value={draft.description} onChange={e=>set('description',e.target.value)} placeholder="Describe the work, size, access and anything people should know."/>{issue('description')}<small className="muted">{draft.description.length} / {POSTING_DESCRIPTION_MAX} characters</small></label>
    <h3>Photos (optional)</h3><p className="muted">Photos help providers understand the work. Who can view them depends on your job's visibility. Add up to six photos.</p>
-   {(!privatePhotos&&!draft.primary_photo_required||draft.photos.length>0)&&<p className="muted">Photos using older public links can be opened by anyone with the link. Leave out private details.</p>}
-   {privatePhotos&&<JobEditPhotos jobId={jobId} photos={editPhotos} legacyCount={draft.photos.length} onChange={setEditPhotos} onError={setError}/>}
+   {(!privateGallery&&!draft.primary_photo_required||draft.photos.length>0)&&<p className="muted">Photos using older public links can be opened by anyone with the link. Leave out private details.</p>}
+   {privateGallery&&!draft.primary_photo_required&&<JobEditPhotos jobId={jobId} photos={editPhotos} legacyCount={draft.photos.length} onChange={setEditPhotos} onError={setError}/>}
    <div className="lform-photos">{draft.photos.map((url,i)=><div className="lform-photo" key={url}><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a><button type="button" className="lform-photo-remove" aria-label={'Remove photo '+(i+1)} onClick={()=>set('photos',draft.photos.filter(p=>p!==url))}>×</button></div>)}</div>
-   {!privatePhotos&&!draft.primary_photo_required&&draft.photos.length<6&&<label className="lform-field">Add photos<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{void upload(e.target.files);e.target.value=''}}/></label>}
+   {!privateGallery&&!draft.primary_photo_required&&draft.photos.length<6&&<label className="lform-field">Add photos<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{void upload(e.target.files);e.target.value=''}}/></label>}
    <h3>Site access (optional)</h3><div className="account-checkboxes">{Object.entries({...ACCESS,...Object.fromEntries(draft.access_conditions.filter(c=>!(c in ACCESS)).map(c=>[c,c]))}).map(([value,label])=><label key={value}><input type="checkbox" checked={draft.access_conditions.includes(value)} onChange={e=>set('access_conditions',e.target.checked?[...draft.access_conditions,value]:draft.access_conditions.filter(c=>c!==value))}/>{label}</label>)}</div>
   </div>}
   {step===3&&<div className="lform-step"><label className="lform-field">Budget<select value={draft.price_type} onChange={e=>set('price_type',e.target.value)}><option value="open">Open to offers</option><option value="fixed">Set a budget</option></select></label>{draft.price_type==='fixed'&&<label className="lform-field">Budget ($) *<input type="number" inputMode="decimal" min="0.01" max={MAX_POSTING_AMOUNT} step="0.01" {...field('price')} value={draft.price} onChange={e=>set('price',e.target.value)}/>{issue('price')}</label>}<label className="lform-field">Materials<select value={draft.materials_type} onChange={e=>set('materials_type',e.target.value)}>{Object.entries(MATERIALS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><p className="muted">Agree the final scope, timing and payment directly with the provider. Rural Connections does not handle payments.</p></div>}

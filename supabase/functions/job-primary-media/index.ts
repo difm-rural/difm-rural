@@ -64,24 +64,28 @@ Deno.serve(async request => {
           !body.details || typeof body.details!=='object' || Array.isArray(body.details) ||
           typeof body.publicListing!=='boolean' || !(body.providerId===null || uuid(body.providerId)) ||
           (!body.publicListing && !body.providerId)) return answer(400,{error:'invalid_job'})
-      const {data:id,error} = await serviceClient.rpc('publish_job_with_primary_media',{
-        p_owner:user.id,p_draft:body.draftId,p_checksum:body.checksum,p_details:body.details,
+      if (body.gallery!==undefined && (!Array.isArray(body.gallery) || body.gallery.length>5)) return answer(400,{error:'invalid_gallery'})
+      const args = {
+        p_owner:user.id,p_checksum:body.checksum,p_details:body.details,
         p_provider:body.providerId,p_public:body.publicListing,
-      })
+      }
+      const {data:id,error} = body.gallery?.length
+        ? await serviceClient.rpc('publish_job_with_private_gallery',{...args,p_job:body.draftId,p_gallery:body.gallery})
+        : await serviceClient.rpc('publish_job_with_primary_media',{...args,p_draft:body.draftId})
       return error || id!==body.draftId ? answer(409,{error:'publication_unavailable'}) : answer(200,{id})
     }
-    if (action!==null&&action!=='stage-edit') return answer(400,{error:'invalid_action'})
+    if (action!==null&&action!=='stage-edit'&&action!=='stage-gallery') return answer(400,{error:'invalid_action'})
     const draft = request.headers.get('x-draft-id')
     if (!uuid(draft)) return answer(400,{error:'invalid_draft'})
-    const editJob = action==='stage-edit' ? params.get('job') : null
-    if (action==='stage-edit'&&!uuid(editJob)) return answer(400,{error:'invalid_job'})
+    const editJob = action!==null ? params.get('job') : null
+    if (action!==null&&!uuid(editJob)) return answer(400,{error:'invalid_job'})
     let photo: Uint8Array
     try { photo = await verifiedPhoto(request) } catch { return answer(400,{error:'invalid_photo'}) }
     const digest = await crypto.subtle.digest('SHA-256',new Uint8Array(photo))
     const checksum = Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')
     const reservation = {p_owner:user.id,p_draft:draft,p_checksum:checksum}
     const {data:key,error} = editJob
-      ? await serviceClient.rpc('reserve_job_edit_photo',{...reservation,p_job:editJob})
+      ? await serviceClient.rpc(action==='stage-gallery'?'reserve_job_draft_gallery_photo':'reserve_job_edit_photo',{...reservation,p_job:editJob})
       : await serviceClient.rpc('reserve_job_primary_media',reservation)
     if (error) return answer(409,{error:'photo_reservation_unavailable'})
     if (key) {

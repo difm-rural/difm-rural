@@ -63,40 +63,7 @@ export function deleteJob(jobId, requesterId) {
   )
 }
 
-// Requester accepts a bid: award the job, accept the chosen bid, reject the
-// rest. The job is awarded first under an `open`-only guard, so a double-tap
-// (or accepting after a cancel) is blocked before any bid is touched.
-// Returns { error } — the first failing/raced step short-circuits.
-export async function acceptBid(job, bid) {
-  // 1) Award the job, but only if it's still open.
-  const { data: awarded, error: awardError } = await supabase
-    .from('jobs')
-    .update({ status: JOB_STATUS.ACCEPTED })
-    .eq('id', job.id)
-    .eq('status', JOB_STATUS.OPEN)
-    .select()
-  if (awardError) return { error: awardError }
-  if (!awarded || awarded.length === 0) {
-    return { error: { code: 'stale', message: 'This job is no longer open for offers — please refresh.' } }
-  }
-
-  // 2) Accept the chosen offer, only if it's still pending.
-  const { data: accepted, error: acceptError } = await supabase
-    .from('bids')
-    .update({ status: 'accepted' })
-    .eq('id', bid.id)
-    .eq('status', 'pending')
-    .select()
-  if (acceptError) return { error: acceptError }
-  if (!accepted || accepted.length === 0) {
-    // The chosen offer vanished after we awarded — revert so state stays sane.
-    await supabase.from('jobs').update({ status: JOB_STATUS.OPEN })
-      .eq('id', job.id).eq('status', JOB_STATUS.ACCEPTED)
-    return { error: { code: 'stale', message: 'That offer is no longer available — please refresh and choose another.' } }
-  }
-
-  // 3) Reject the remaining pending offers.
-  await supabase.from('bids').update({ status: 'rejected' })
-    .eq('job_id', job.id).neq('id', bid.id).eq('status', 'pending')
-  return { error: null }
+// The database locks the job and chosen offer and awards them together.
+export function acceptBid(job, bid) {
+  return supabase.rpc('accept_job_offer',{p_offer_id:bid.id})
 }

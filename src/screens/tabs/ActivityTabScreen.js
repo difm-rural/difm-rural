@@ -323,15 +323,16 @@ export default function ActivityTabScreen({ navigation }) {
   }
 
   async function fetchProviderData(uid) {
-    // Jobs with an offer pending or accepted. Pending offers remain visible so
-    // the provider can see that the requester has the next move.
-    const { data: bidsData } = await supabase
-      .from('bids')
-      .select('*, jobs(*)')
-      .eq('provider_id', uid)
-      .in('status', ['pending', 'accepted'])
+    const { data: bids } = await supabase.from('bids').select('*')
+      .eq('provider_id', uid).in('status', ['pending', 'accepted'])
       .order('created_at', { ascending: false })
-
+    const ids = [...new Set((bids || []).map(bid => bid.job_id))]
+    const jobsById = new Map()
+    for (let offset = 0; offset < ids.length; offset += 200) {
+      const { data: jobs } = await supabase.from('jobs_public').select('*').in('id', ids.slice(offset, offset + 200))
+      for (const job of jobs || []) jobsById.set(job.id, job)
+    }
+    const bidsData = (bids || []).map(bid => ({ ...bid, jobs: jobsById.get(bid.job_id) }))
     const activeBids = (bidsData || []).filter(b =>
       b.jobs && (
         (b.status === 'pending' && b.jobs.status === 'open')

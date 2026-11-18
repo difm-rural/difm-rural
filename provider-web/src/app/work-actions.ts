@@ -71,15 +71,18 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
     const removed=removedThumbPaths(current?.photos,input.value.photos,'job-photos')
     if(removed.length){try{await supabase.storage.from('job-photos').remove(removed)}catch{/* ignore */}}
   }else if(photoRequired){
+    let gallery:unknown=[]
+    try{gallery=JSON.parse(text(data,'new_private_gallery') || '[]')}catch{return {error:'Could not read the selected photos.'}}
+    if(!Array.isArray(gallery)||gallery.length>5)return {error:'Choose up to six job photos.'}
     const {data:published,error}=await supabase.functions.invoke<{id:string}>('job-primary-media?action=publish',{
       body:{draftId:id,checksum:primaryChecksum,details:{...job,category:await resolveCategory()},
-        providerId:invite||null,publicListing:!invite||data.get('also_public')==='on'},
+        gallery,providerId:invite||null,publicListing:!invite||data.get('also_public')==='on'},
       timeout:30000,
     })
     if(error||published?.id!==id)return {error:'Could not post the job with this photo. Your draft is kept. Try again.'}
   }else if(invite){
     const result=await supabase.rpc('create_invited_job',{p_job_id:id,p_details:{...input.value,category:await resolveCategory(),area_polygon:!moved?current?.area_polygon || null:null,area_hectares:!moved?current?.area_hectares ?? null:null,repeated_from_job_id:source || null},p_provider_id:invite,p_public:data.get('also_public')==='on'})
-    if(result.error)return {error:'Could not create the job and invitation. Your draft is kept. Check that this person is a previous provider and try again.'}
+    if(result.error)return {error:'Could not create the job and invitation. Your draft is kept. Check that the provider is still available and try again.'}
   }else{
     // A retry uses the same draft id, so a lost response cannot create a second job.
     const {data:existing,error:lookupError}=await supabase.from('jobs').select('id').eq('id',id).eq('requester_id',user.id).maybeSingle()
@@ -239,7 +242,7 @@ export async function acceptOffer(_: ActionState, data: FormData): Promise<Actio
   try{
     const {data:bid,error}=await supabase.from('bids').select('id,job_id').eq('id',id).single()
     if(error||!bid)return {error:'Could not load this offer. Refresh and try again.'}
-    const {data:job,error:jobError}=await supabase.from('jobs').select('requester_id,status').eq('id',bid.job_id).single()
+    const {data:job,error:jobError}=await supabase.from('jobs_public').select('requester_id,status').eq('id',bid.job_id).single()
     if(jobError)return {error:'Could not load this job. Refresh and try again.'}
     if(!job||job.requester_id!==user.id||job.status!=='open')return {error:'This job is no longer accepting offers.'}
     const result=await supabase.rpc('accept_job_offer',{p_offer_id:id})

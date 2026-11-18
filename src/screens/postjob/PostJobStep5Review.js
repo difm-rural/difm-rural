@@ -1,3 +1,4 @@
+import { newJobId } from '../../lib/draftId'
 import {formatMoney as nzMoney,formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {publicAreaError} from '../../../shared/publicArea'
 import {localityFromAddress} from '../../../shared/locality'
@@ -157,6 +158,11 @@ export default function PostJobStep5Review({ navigation, route }) {
   // because setState is async — a second tap can fire before the re-render
   // disables the button, which is exactly how duplicates got created.
   const submittingRef = useRef(false)
+  const galleryIds = useRef(new Map())
+  function galleryId(photo) {
+    if (!galleryIds.current.has(photo.uri)) galleryIds.current.set(photo.uri, newJobId())
+    return galleryIds.current.get(photo.uri)
+  }
 
   const locationSummary = hideExactLocation
     ? `${locationArea || 'Area only'} — exact address hidden until you accept`
@@ -279,6 +285,28 @@ export default function PostJobStep5Review({ navigation, route }) {
       return
     }
 
+    if (isEditMode && editJob?.visibility === 'invite_only') {
+      setUploadStatus('Saving photos…')
+      const {data:current,error:lookupError}=await supabase.rpc('list_job_private_photos',{p_job:editJob.id})
+      if (lookupError || current.length + photos.length > 6) throw new Error('Could not check the gallery. Refresh and choose up to six photos in total.')
+      const gallery=[...current]
+      for (const photo of photos) {
+        const id=galleryId(photo)
+        let slot=0
+        while (gallery.some(item=>item.slot===slot)) slot++
+        const {checksum}=await jobPrimaryPhotoRequest('job-primary-media?action=stage-edit&job='+editJob.id,photo,id)
+        gallery.push({id,slot,checksum})
+      }
+      const {data:saved,error}=await supabase.rpc('save_job_with_private_photos',{
+        p_job:editJob.id,p_details:{...payload,photos:[]},p_expected:current.map(photo=>photo.id).sort(),p_photos:gallery,
+      })
+      if (error || saved!==editJob.id) throw new Error('Could not save the job and photos. Your changes are kept.')
+      setUploadStatus('Saved')
+      resetJobData()
+      Alert.alert('Job updated','Your job has been updated.',[{text:'OK',onPress:goToStackRoot}])
+      return true
+    }
+
     if (isEditMode && editJob) {
       const { data, error } = await supabase
         .from('jobs').update(payload).eq('id', editJob.id).eq('requester_id', user.id).eq('status', 'open').select('id').maybeSingle()
@@ -312,16 +340,31 @@ export default function PostJobStep5Review({ navigation, route }) {
     // (its response was lost), the id clashes — that job is ours, so carry on
     // with it rather than posting a second copy.
     let newJob, insertError
-    if (primaryPhotoRequired) {
+    const privateGallery = isInvite && photos.length > 0
+    if (primaryPhotoRequired || privateGallery) {
       setUploadStatus('Uploading primary photo…')
-      const {checksum}=await jobPrimaryPhotoRequest('job-primary-media',primaryPhoto,draftJobId)
+      const {checksum}=await jobPrimaryPhotoRequest('job-primary-media',primaryPhoto || photos[0],draftJobId)
+      const gallery=[]
+      if (privateGallery) {
+        for (const [index,photo] of photos.slice(1).entries()) {
+          const id=galleryId(photo)
+          const {checksum}=await jobPrimaryPhotoRequest('job-primary-media?action=stage-gallery&job='+draftJobId,photo,id)
+          gallery.push({id,slot:index+1,checksum})
+        }
+      }
       const {data,error}=await supabase.functions.invoke('job-primary-media?action=publish',{
-        body:{draftId:draftJobId,checksum,details:payload,
+        body:{draftId:draftJobId,checksum,gallery,details:payload,
           providerId:isInvite?inviteProviderId:null,publicListing:visibility==='public'},
         timeout:30000,
       })
       newJob=data?.id===draftJobId?{id:data.id}:null
       insertError=error||(!newJob?new Error('Could not confirm that the job was posted.'):null)
+    } else if (isInvite) {
+      const result = await supabase.rpc('create_invited_job', {
+        p_job_id: draftJobId, p_details: payload, p_provider_id: inviteProviderId, p_public: alsoPublic,
+      })
+      newJob = result.data ? { id: result.data } : null
+      insertError = result.error || (!newJob ? new Error('Could not confirm that the invitation was sent.') : null)
     } else {
       const result = await supabase
       .from('jobs')
@@ -331,7 +374,7 @@ export default function PostJobStep5Review({ navigation, route }) {
       newJob=result.data
       insertError=result.error
     }
-    if (!primaryPhotoRequired && insertError?.code === '23505' && draftJobId) {
+    if (!isInvite && !primaryPhotoRequired && insertError?.code === '23505' && draftJobId) {
       const { data: existing } = await supabase
         .from('jobs').select('id').eq('id', draftJobId).eq('requester_id', user.id).maybeSingle()
       if (existing) { newJob = existing; insertError = null }
@@ -339,7 +382,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     if (insertError) { setUploadStatus(''); Alert.alert('Could not post job', insertError.message); return }
 
     let photosFailed = false
-    if (photos.length > 0) {
+    if (photos.length > 0 && !privateGallery) {
       setUploadStatus('Uploading photos...')
       const finalUrls = await uploadJobPhotos(newJob.id, photos)
       photosFailed = finalUrls.length < photos.length
@@ -349,14 +392,6 @@ export default function PostJobStep5Review({ navigation, route }) {
       }
     }
 
-    let inviteFailed = false
-    if (isInvite && !primaryPhotoRequired) {
-      const { error: inviteError } = await supabase
-        .from('job_invites')
-        .insert({ job_id: newJob.id, requester_id: user.id, provider_id: inviteProviderId })
-      inviteFailed = !!inviteError
-    }
-
     trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress, invited: isInvite, repeated: isRepeatMode })
     if (isRepeatMode) trackEvent('job_repeated', { source_job_id: repeatedFromJobId, category: resolvedCategory })
     trackCategoryInterest(resolvedCategory)
@@ -364,10 +399,8 @@ export default function PostJobStep5Review({ navigation, route }) {
     resetJobData()
 
     const who = inviteProviderName || 'your provider'
-    const successTitle = isInvite ? 'Offer sent!' : isRepeatMode ? 'Job posted again!' : 'Job posted!'
-    const successBody = inviteFailed
-      ? `Your job is posted, but we couldn't notify ${who}. You can offer it from their profile.`
-      : isInvite
+    const successTitle = isInvite ? 'Invitation sent!' : isRepeatMode ? 'Job posted again!' : 'Job posted!'
+    const successBody = isInvite
         ? (alsoPublic
             ? `${who} has been invited, and your job is also on the public board.`
             : `${who} has been invited. Only they can see this job.`)
@@ -383,7 +416,7 @@ export default function PostJobStep5Review({ navigation, route }) {
     return true
   }
 
-  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : (isInvite ? 'Send offer' : isRepeatMode ? 'Post repeated job' : 'Post job'))
+  const submitLabel = uploadStatus || (isEditMode ? 'Save changes' : (isInvite ? 'Send invitation' : isRepeatMode ? 'Post repeated job' : 'Post job'))
 
   return (
     <View style={styles.screen}>

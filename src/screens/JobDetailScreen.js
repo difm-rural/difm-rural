@@ -1,10 +1,13 @@
-import JobPrimaryImage, {showJobPrimaryMedia} from '../components/JobPrimaryImage'
+import {JobPrivateGallery} from '../components/JobPrimaryImage'
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatOfferAvailability} from '../../shared/offers'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
 import {offerDefaultDay, requestedLabel} from '../../shared/requestedDate'
 import { localDate } from '../lib/quickPickDates'
+import { useIsFocused } from '@react-navigation/native'
+import { respondToJobInvitation } from '../lib/invites'
+import { ACTIVE_JOB_INVITATIONS } from '../../shared/jobInvitations'
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import DateChips from '../components/DateChips'
@@ -102,6 +105,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const [alreadyBid, setAlreadyBid] = useState(false)
   const [myBid, setMyBid] = useState(null)
   const [requesterProfile, setRequesterProfile] = useState(null)
+  const focused = useIsFocused()
+  const [verifiedJobId, setVerifiedJobId] = useState(null)
+  const [jobUnavailable, setJobUnavailable] = useState(false)
   const [myInvite, setMyInvite] = useState(null)
   const [isWatched, setIsWatched] = useState(false)
   const [requesterReview, setRequesterReview] = useState(undefined)
@@ -159,7 +165,7 @@ export default function JobDetailScreen({ route, navigation }) {
 
   const bidMessageRef = useRef(null)
 
-  useEffect(() => { fetchData() }, [initialJob.id])
+  useEffect(() => { if (focused) fetchData() }, [initialJob.id, focused])
 
   useEffect(() => {
     if (job.status !== 'completed' || !currentUser?.id || myBid?.status !== 'accepted') return
@@ -182,8 +188,11 @@ export default function JobDetailScreen({ route, navigation }) {
     // Read through jobs_public so the exact address stays masked for viewers who
     // aren't the owner or the accepted provider (can_see_job_location decides).
     const { data: latestJob } = await supabase.from('jobs_public').select('*').eq('id', initialJob.id).single()
-    const currentJob = latestJob || initialJob
+    if (!latestJob) { setJobUnavailable(true); setMyInvite(null); return }
+    setJobUnavailable(false)
+    const currentJob = latestJob
     setJob(currentJob)
+    setVerifiedJobId(currentJob.id)
 
     trackEvent('job_viewed', { job_id: currentJob.id, category: currentJob.category })
     recordJobProviderView(currentJob.id)
@@ -244,16 +253,17 @@ export default function JobDetailScreen({ route, navigation }) {
 
     // Invited-provider context: show the "you were invited" banner, and mark the
     // invite seen so the requester can tell it's been opened.
-    if (currentJob.visibility === 'invite_only' && currentJob.requester_id !== user.id) {
+    if (currentJob.status === 'open' && currentJob.requester_id !== user.id) {
       const { data: inv } = await supabase
         .from('job_invites')
-        .select('id, status')
+        .select('id, status, revision')
+        .in('status', ACTIVE_JOB_INVITATIONS)
         .eq('job_id', currentJob.id)
         .eq('provider_id', user.id)
         .maybeSingle()
       setMyInvite(inv || null)
       if (inv && inv.status === 'pending') {
-        supabase.from('job_invites').update({ status: 'seen' }).eq('id', inv.id).then(() => {})
+        respondToJobInvitation(inv, 'view').then(() => {})
       }
     } else {
       setMyInvite(null)
@@ -551,7 +561,7 @@ export default function JobDetailScreen({ route, navigation }) {
   function handleDeclineInvite() {
     if (!myInvite) return
     Alert.alert(
-      'Decline this offer?',
+      'Decline this invitation?',
       "It'll be removed from your invites. You can still be invited again later.",
       [
         { text: 'Cancel', style: 'cancel' },
@@ -559,8 +569,7 @@ export default function JobDetailScreen({ route, navigation }) {
           text: 'Decline',
           style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase
-              .from('job_invites').update({ status: 'declined' }).eq('id', myInvite.id)
+            const { error } = await respondToJobInvitation(myInvite, 'decline')
             if (error) { Alert.alert('Could not decline', error.message); return }
             navigation.goBack()
           },
@@ -608,6 +617,10 @@ export default function JobDetailScreen({ route, navigation }) {
   )
 
   // ─── Provider accepted view ───────────────────────────────────────────────────
+  if (jobUnavailable || (initialJob.visibility === 'invite_only' && verifiedJobId !== initialJob.id)) {
+    return <View style={styles.container}>{headerJSX}<Text style={styles.title}>{jobUnavailable ? 'This job is unavailable.' : 'Loading job…'}</Text></View>
+  }
+
   if (isAcceptedProvider) {
     const requesterFirstName = requesterProfile?.full_name?.split(' ')[0] || 'the requester'
     const otherBidCount = Math.max(0, bids.length - 1)
@@ -712,7 +725,7 @@ export default function JobDetailScreen({ route, navigation }) {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
         <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
-          {showJobPrimaryMedia&&!job.photos?.length&&<JobPrimaryImage key={job.id} jobId={job.id} style={{width:'100%',height:200}}/>}
+          <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{width:'100%',height:200}}/>
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
               <Text style={styles.category}>Category: {job.category}</Text>
@@ -1080,16 +1093,21 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.invitedBanner}>
             <Icon name="mail-open-outline" size={20} color={colors.primary} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.invitedBannerTitle}>You were invited to this job</Text>
+              <Text style={styles.invitedBannerTitle}>{myInvite.status === 'accepted' ? 'Invitation accepted' : 'Invitation received'}</Text>
               <Text style={styles.invitedBannerSub}>
-                {(requesterProfile?.full_name?.split(' ')[0] || 'The requester')} offered this to you directly. Make an offer below, or decline.
+                {(requesterProfile?.full_name?.split(' ')[0] || 'The requester')} invited you directly. You can make an offer below.
               </Text>
             </View>
+            {myInvite.status !== 'accepted' && <TouchableOpacity accessibilityRole="button" onPress={async () => {
+              const { error } = await respondToJobInvitation(myInvite, 'accept')
+              if (error) Alert.alert('Could not accept invitation', error.message)
+              else setMyInvite({ ...myInvite, status: 'accepted' })
+            }}><Text style={styles.declineLink}>Accept</Text></TouchableOpacity>}
             <TouchableOpacity
               onPress={handleDeclineInvite}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel="Decline this offer">
+              accessibilityLabel="Decline this invitation">
               <Text style={styles.declineLink}>Decline</Text>
             </TouchableOpacity>
           </View>
@@ -1126,7 +1144,7 @@ export default function JobDetailScreen({ route, navigation }) {
             </View>
           ) : null}
 
-          {showJobPrimaryMedia&&!job.photos?.length&&<JobPrimaryImage key={job.id} jobId={job.id} style={{width:'100%',height:200}}/>}
+          <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{width:'100%',height:200}}/>
           {job.photos?.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.photoStrip} style={styles.photoStripWrap}>

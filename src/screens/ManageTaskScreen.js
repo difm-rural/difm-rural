@@ -29,7 +29,8 @@ import JobPaymentHandoff from '../components/JobPaymentHandoff'
 import { paymentAcknowledgementAvailable } from '../../shared/paymentAcknowledgement'
 import { loadReview, saveReview } from '../lib/reviews'
 import { fetchProviderStats } from '../lib/providerStats'
-import { fetchInvitesForJob, inviteStatusLabel } from '../lib/invites'
+import { ACTIVE_JOB_INVITATIONS } from '../../shared/jobInvitations'
+import { fetchInvitesForJob, inviteStatusLabel, respondToJobInvitation, sendJobInvitation } from '../lib/invites'
 import { jobNextMove } from '../lib/nextMove'
 import NextMoveBanner from '../components/NextMoveBanner'
 import ListingPerformanceCard from '../components/ListingPerformanceCard'
@@ -861,7 +862,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         {/* Offered to — providers this job was privately offered to */}
         {invites.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Offered to</Text>
+            <Text style={styles.cardTitle}>Invited providers</Text>
             {invites.map((inv, idx) => {
               const nm = inv.provider?.full_name || 'Provider'
               return (
@@ -886,6 +887,13 @@ export default function ManageTaskScreen({ navigation, route }) {
                     </View>
                     <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                   </TouchableOpacity>
+                  {job.status === 'open' && <TouchableOpacity accessibilityRole="button" onPress={async () => {
+                    const { error } = ACTIVE_JOB_INVITATIONS.includes(inv.status)
+                      ? await respondToJobInvitation(inv, 'withdraw')
+                      : await sendJobInvitation(job.id, inv.provider_id, inv.revision)
+                    if (error) Alert.alert('Could not update invitation', error.message)
+                    else setInvites(await fetchInvitesForJob(job.id))
+                  }}><Text style={{ color: colors.primary }}>{ACTIVE_JOB_INVITATIONS.includes(inv.status) ? 'Withdraw invitation' : 'Invite again'}</Text></TouchableOpacity>}
                 </View>
               )
             })}

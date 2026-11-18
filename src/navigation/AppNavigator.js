@@ -751,7 +751,7 @@ export default function AppNavigator() {
       // Tab badges: jobs and services posted in the last 24 hours by others
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const [{ count: newJobs }, { count: newServices }] = await Promise.all([
-        supabase.from('jobs').select('id', { count: 'exact', head: true })
+        supabase.from('jobs_public').select('id', { count: 'exact', head: true })
           .eq('status', 'open').gte('created_at', yesterday).neq('requester_id', userId),
         supabase.from('services').select('id', { count: 'exact', head: true })
           .eq('is_active', true).is('closed_at', null).gte('created_at', yesterday).neq('provider_id', userId),

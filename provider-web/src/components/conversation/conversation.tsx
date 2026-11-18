@@ -68,6 +68,7 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
     busyRef.current=true;setSending(true);setError('')
     try{
       let content=text.trim()
+      if(file&&context.privateJob)throw new Error('The requester can add photos in the private job gallery.')
       if(file){
         let url=uploaded.current?.file===file?uploaded.current.url:''
         if(!url){
@@ -121,7 +122,7 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
     {context.closed?<p className="message-closed">This arrangement has ended. You can still read its messages.</p>:<form className="reply message-compose" onSubmit={send}>
       {(file || location) && <div className="message-preview">{file?<>{photoPreview && <img src={photoPreview} alt="Photo ready to send"/>}<span>{file.name}</span></>:<span>Share current location: {location?.latitude.toFixed(6)}, {location?.longitude.toFixed(6)}</span>}<button type="button" onClick={()=>{setFile(null);setLocation(null);uploaded.current=null}} disabled={sending} aria-label="Remove attachment"><X size={16}/></button></div>}
       <textarea value={text} onChange={e=>setText(e.target.value)} maxLength={1000} disabled={sending} placeholder={file?'Add a photo caption (optional)…':'Write a message…'} rows={3} aria-label="Message"/>
-      <div className="message-tools"><label className="message-attach"><ImagePlus size={18}/> Photo<input type="file" accept="image/jpeg,image/png,image/webp" disabled={sending} onChange={e=>{choosePhoto(e.target.files?.[0] || null);e.target.value=''}}/></label>
+      <div className="message-tools">{context.privateJob?<small>Photos can be added in the private job gallery.</small>:<label className="message-attach"><ImagePlus size={18}/> Photo<input type="file" accept="image/jpeg,image/png,image/webp" disabled={sending} onChange={e=>{choosePhoto(e.target.files?.[0] || null);e.target.value=''}}/></label>}
         <button type="button" className="message-attach" onClick={chooseLocation} disabled={sending || locating}><MapPin size={18}/>{locating?'Finding location…':'Share location'}</button>
         <button type="submit" disabled={sending || (!text.trim() && !file && !location)}><Send size={16}/>{sending?'Sending…':'Send'}</button>
       </div>{error && <p className="form-error" role="alert">{error}</p>}

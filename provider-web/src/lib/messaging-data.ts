@@ -37,11 +37,11 @@ export async function loadInbox(client:SupabaseClient,userId:string,notices:Noti
     unread:notices.filter(n=>!n.read && noticeMatchesConversation(n,ref)).length,
   }))
 }
-export type ConversationContext = ConversationRef & {title:string;name:string;closed:boolean;userId:string;messages:ChatMessage[]}
+export type ConversationContext = ConversationRef & {title:string;name:string;closed:boolean;privateJob?:boolean;userId:string;messages:ChatMessage[]}
 export async function loadConversation(client:SupabaseClient,userId:string,ref:ConversationRef):Promise<ConversationContext|null>{
   if(!validConversation(ref) || userId===ref.person)return null
   const messages=await readMessages(client,ref.kind==='booking'?'service_booking_messages':'messages',userId,ref)
-  let title='',closed=false
+  let title='',closed=false,privateJob=false
   if(ref.kind==='listing'){
     const {data:s,error}=await client.from('services').select('id,title,provider_id,is_active,closed_at').eq('id',ref.id).maybeSingle()
     if(error)throw error
@@ -57,7 +57,7 @@ export async function loadConversation(client:SupabaseClient,userId:string,ref:C
     closed=['completed','cancelled','withdrawn','declined'].includes(b.status)
   }else{
     const [{data:j,error},{data:b,error:bidError}]=await Promise.all([
-      client.from('jobs_public').select('title,requester_id,status').eq('id',ref.id).maybeSingle(),
+      client.from('jobs_public').select('title,requester_id,status,visibility').eq('id',ref.id).maybeSingle(),
       client.from('bids').select('provider_id').eq('job_id',ref.id).eq('status','accepted').maybeSingle(),
     ])
     if(error || bidError)throw error || bidError
@@ -65,10 +65,11 @@ export async function loadConversation(client:SupabaseClient,userId:string,ref:C
     if(!j || expected!==ref.person){if(!messages.length)return null;closed=true}
     else closed=['completed','cancelled'].includes(j.status)
     title=j?.title || 'Job'
+    privateJob=j?.visibility==='invite_only'
   }
   const {data:p,error}=await client.from('profiles_public').select('full_name,display_name').eq('id',ref.person).maybeSingle()
   if(error)throw error
-  return {...ref,title,name:p?.full_name || p?.display_name || 'Community member',closed,userId,messages:messages.reverse()}
+  return {...ref,title,name:p?.full_name || p?.display_name || 'Community member',closed,privateJob,userId,messages:messages.reverse()}
 }
 export async function unreadNotices(client:SupabaseClient,userId:string){
   const rows:Notice[]=[]

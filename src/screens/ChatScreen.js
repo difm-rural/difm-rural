@@ -79,7 +79,7 @@ export default function ChatScreen({ route, navigation }) {
         // accepted provider — the requester still gets it for the share-address bar.
         const { data: jobData } = await supabase
           .from('jobs_public')
-          .select('status, requester_id, hide_exact_location, location_name, location_area')
+          .select('status, requester_id, hide_exact_location, location_name, location_area, visibility')
           .eq('id', jobId)
           .single()
         setJobStatus(jobData?.status || null)
@@ -229,6 +229,10 @@ export default function ChatScreen({ route, navigation }) {
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 })
     if (result.canceled) return
 
+    if (jobInfo?.visibility === 'invite_only') {
+      Alert.alert('Private job photos', 'The requester can add photos in the job gallery.')
+      return
+    }
     const coords  = await getCurrentLocation()
     // Scaled to 1600px and saved as JPEG (it is uploaded as image/jpeg).
     const uri     = (await shrinkPhoto(result.assets[0], PHOTO_MAX, { jpeg: true })).uri
