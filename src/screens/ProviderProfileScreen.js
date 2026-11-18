@@ -1,6 +1,10 @@
+import {LocalAction,LocalShare} from '../components/LocalProviderActions'
+import {setProviderSaved} from '../../shared/trustedLocals'
+import {useFocusEffect} from '@react-navigation/native'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -104,7 +108,34 @@ export default function ProviderProfileScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { providerId } = route.params
   const [viewerId, setViewerId] = useState(null)
-  useEffect(() => { supabase.auth.getUser().then(({ data }) => setViewerId(data.user?.id)) }, [])
+  const [saved,setSaved]=useState(null)
+  const [saving,setSaving]=useState(false)
+  const saveLock=useRef(false)
+  useFocusEffect(useCallback(()=>{
+    let active=true
+    setSaved(null)
+    async function loadSave(){
+      const {data}=await supabase.auth.getUser()
+      const user=data.user
+      if(!active)return
+      setViewerId(user?.id)
+      if(!user||user.id===providerId)return
+      const {data:bookmark,error}=await supabase.from('saved_providers').select('provider_id')
+        .eq('requester_id',user.id).eq('provider_id',providerId).maybeSingle()
+      if(active)setSaved(error?'error':!!bookmark)
+    }
+    loadSave().catch(()=>{if(active)setSaved('error')})
+    return ()=>{active=false}
+  },[providerId]))
+
+  async function toggleBookmark(){
+    if(saveLock.current||!viewerId||typeof saved!=='boolean')return
+    saveLock.current=true
+    setSaving(true)
+    try{await setProviderSaved(supabase,viewerId,providerId,!saved);setSaved(!saved)}
+    catch{Alert.alert('Could not update My Locals','Try again.')}
+    finally{saveLock.current=false;setSaving(false)}
+  }
 
   const [loading, setLoading]                   = useState(true)
   const [profile, setProfile]                   = useState(null)
@@ -254,6 +285,11 @@ export default function ProviderProfileScreen({ route, navigation }) {
           <Text style={styles.backBtnText}><Icon name="chevron-back" size={14} color={colors.primary} /> Back</Text>
         </TouchableOpacity>
         <Text style={styles.kicker}>Provider profile</Text>
+        {viewerId&&viewerId!==providerId&&typeof saved==='boolean'&&
+         <LocalAction label={saved?'Remove from saved':'Save provider'} icon={saved?'bookmark':'bookmark-outline'}
+          disabled={saving} onPress={toggleBookmark}/>}
+        {viewerId&&viewerId!==providerId&&saved==='error'&&<Text accessibilityRole="alert">Could not check saved status. Reopen the profile to try again.</Text>}
+        <LocalShare providerId={providerId}/>
         {viewerId && viewerId !== providerId && <TouchableOpacity accessibilityRole="button" onPress={() => navigation.getParent()?.navigate('Jobs', {
           screen: 'PostJob', params: { inviteProviderId: providerId, inviteProviderName: profile?.full_name },
         })}><Text style={styles.backBtnText}>Invite to job</Text></TouchableOpacity>}

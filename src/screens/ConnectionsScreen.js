@@ -1,3 +1,5 @@
+import {loadSavedProviders,loadInviteChoices,providerServices,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
+import {LocalAction,LocalShare,LocalInvitePicker} from '../components/LocalProviderActions'
 import React, { useCallback, useRef, useState } from 'react'
 import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
@@ -26,6 +28,14 @@ export default function ConnectionsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
   const inviteJob = route.params?.inviteJob || null
   const side = inviteJob ? 'locals' : relationshipSide(route.params?.side)
+  const [saved, setSaved] = useState([])
+  const [savedFailed,setSavedFailed] = useState(false)
+  const [choices,setChoices] = useState(null)
+  const [target,setTarget] = useState(null)
+  const [changing,setChanging] = useState(false)
+  const changeLock = useRef(false)
+  const [viewer,setViewer] = useState(null)
+  const locals = side==='locals'&&!inviteJob
   const [connections, setConnections] = useState([])
   const [me, setMe] = useState(null)
   const [view, setView] = useState('list')
@@ -38,7 +48,7 @@ export default function ConnectionsScreen({ navigation, route }) {
     setLoading(true)
     load()
     return ()=>{request.current++}
-  }, [side]))
+  }, [side, inviteJob?.id]))
 
   async function load() {
     const id=++request.current
@@ -49,13 +59,21 @@ export default function ConnectionsScreen({ navigation, route }) {
         if(id===request.current)setConnections([])
         return
       }
-      const [rows, profRes] = await Promise.all([
+      const [history, profile, savedResult, inviteResult] = await Promise.allSettled([
         fetchConnections(user.id,side),
         supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single(),
+        locals ? loadSavedProviders(supabase,user.id) : [],
+        locals ? loadInviteChoices(supabase,user.id) : null,
       ])
       if(id===request.current){
-        setConnections(rows)
-        setMe({ name: profRes.data?.full_name, avatarUrl: profRes.data?.avatar_url })
+        setViewer(user.id)
+        setConnections(history.status==='fulfilled'?history.value:[])
+        setFailed(history.status==='rejected')
+        setSavedFailed(savedResult.status==='rejected')
+        setSaved(savedResult.status==='fulfilled'?savedResult.value:[])
+        setChoices(inviteResult.status==='fulfilled'?inviteResult.value:null)
+        const profRes=profile.status==='fulfilled'?profile.value.data:null
+        setMe({ name:profRes?.full_name, avatarUrl:profRes?.avatar_url })
       }
     }catch{if(id===request.current)setFailed(true)}finally{
       if(id===request.current){
@@ -102,9 +120,76 @@ export default function ConnectionsScreen({ navigation, route }) {
     navigation.navigate('ConnectionDetail', { connection: conn, side })
   }
 
+  async function toggleSaved(person, currentlySaved) {
+    if (changeLock.current || !viewer) return
+    changeLock.current=true
+    setChanging(true)
+    try{
+      await setProviderSaved(supabase,viewer,person.id,!currentlySaved)
+      if(currentlySaved)setSaved(rows=>rows.filter(row=>row.id!==person.id))
+      else setSaved(rows=>[person,...rows.filter(row=>row.id!==person.id)])
+    }catch{Alert.alert('Could not update My Locals','Try again.')}
+    finally{changeLock.current=false;setChanging(false)}
+  }
+
+  async function sendLocalInvite(job){
+    if(changeLock.current || !target) return
+    changeLock.current=true
+    setChanging(true)
+    try{
+      const {error}=await sendJobInvitation(job.id,target.id,job.revision)
+      if(error)throw error
+      setChoices(current=>current&&({...current,invites:[
+        ...current.invites.filter(row=>row.job_id!==job.id||row.provider_id!==target.id),
+        {job_id:job.id,provider_id:target.id,status:'pending',revision:(job.revision??0)+1},
+      ]}))
+      setTarget(null)
+      Alert.alert('Invitation sent','The provider can view the job and make an offer.')
+    }catch{Alert.alert('Invitation could not be sent','Check that the job is still open and try again.')}
+    finally{changeLock.current=false;setChanging(false)}
+  }
+
+  function openProfile(person){
+    navigation.navigate('ProviderProfile',{providerId:person.id})
+  }
+
+  function providerActions(person){
+    if(!person)return null
+    const isSaved=saved.some(row=>row.id===person.id)
+    return <View style={{paddingHorizontal:12}}>
+      <View style={{flexDirection:'row',flexWrap:'wrap'}}>
+       {!savedFailed&&<LocalAction label={isSaved?'Remove from saved':'Save provider'}
+        icon={isSaved?'bookmark':'bookmark-outline'} disabled={changing} onPress={()=>toggleSaved(person,isSaved)}/>}
+       <LocalAction label="Invite to job" onPress={()=>setTarget(person)}/>
+      </View>
+      <LocalShare providerId={person.id}/>
+    </View>
+  }
+
+  const localSections = <View>
+    <Text style={styles.name} accessibilityRole="header">Saved</Text>
+    {savedFailed?<LocalAction label="Could not load saved providers. Retry" onPress={onRefresh}/>
+     :!saved.length?<View style={{paddingVertical:12}}>
+      <Text style={styles.meta}>No saved providers yet. Browse local providers and save the ones you’d like to use again.</Text>
+      <LocalAction label="Browse local providers" onPress={()=>navigation.getParent()?.navigate('Browse')}/>
+     </View>:saved.map(person=><View key={person.id} style={{marginVertical:6}}>
+      <TouchableOpacity style={styles.row} accessibilityRole="button" onPress={()=>openProfile(person)}>
+       <ConnectionAvatar name={person.full_name||person.display_name||'Provider'} avatarUrl={person.avatar_url}/>
+       <View style={{flex:1}}><Text style={styles.name}>{person.full_name||person.display_name||'Provider'}</Text>
+        {!!person.region&&<Text style={styles.meta}>{person.region}</Text>}
+        {!!providerServices(person)&&<Text style={styles.categories}>{providerServices(person)}</Text>}
+       </View>
+      </TouchableOpacity>
+      {providerActions(person)}
+     </View>)}
+    <Text style={[styles.name,{marginTop:16}]} accessibilityRole="header">Worked together</Text>
+    {failed&&<LocalAction label="Could not load work history. Retry" onPress={onRefresh}/>}
+  </View>
+
   function renderItem({ item }) {
     const name = item.person?.full_name || 'Member'
     return (
+      <View>
       <TouchableOpacity
         style={styles.row}
         activeOpacity={0.75}
@@ -126,6 +211,11 @@ export default function ConnectionsScreen({ navigation, route }) {
         </View>
         <Icon name="chevron-forward" size={18} color={colors.textMuted} />
       </TouchableOpacity>
+      {locals&&item.person&&<>
+        <LocalAction label="View provider profile" onPress={()=>openProfile(item.person)}/>
+        {providerActions(item.person)}
+      </>}
+      </View>
     )
   }
 
@@ -174,7 +264,7 @@ export default function ConnectionsScreen({ navigation, route }) {
         <Text style={styles.headerTitle} accessibilityRole="header">
           {inviteJob ? 'Choose a previous provider' : relationshipLabels[side]}
         </Text>
-        {!inviteJob&&<Text style={styles.headerSubtitle}>{side==='locals'?'Providers you’ve worked with':'Requesters you’ve completed work for'}</Text>}
+        {!inviteJob&&<Text style={styles.headerSubtitle}>{side==='locals'?'Providers you’ve saved or worked with':'Requesters you’ve completed work for'}</Text>}
         {!inviteJob&&<View style={styles.toggle}>
           {Object.entries(relationshipLabels).map(([value,label])=>(
             <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:side===value}}
@@ -193,7 +283,7 @@ export default function ConnectionsScreen({ navigation, route }) {
           <Text style={styles.headerSubtitle} numberOfLines={2}>{inviteJob.title}</Text>
         ) : null}
 
-        {!loading && connections.length > 0 && (
+        {!locals && !loading && connections.length > 0 && (
           <View style={styles.toggle}>
             {['network', 'list'].map(v => (
               <TouchableOpacity
@@ -215,6 +305,12 @@ export default function ConnectionsScreen({ navigation, route }) {
 
       {loading ? (
         <Loading label={`Loading ${relationshipLabels[side]}…`} />
+      ) : locals ? (
+        <FlatList data={connections} ListHeaderComponent={localSections} renderItem={renderItem}
+         ListEmptyComponent={!failed?<Text style={styles.meta}>Completed jobs and bookings appear here.</Text>:null}
+         keyExtractor={item=>item.personId}
+         contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}
+         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary}/>}/>
       ) : failed ? (
         <TouchableOpacity accessibilityRole="button" onPress={onRefresh} style={styles.row}>
           <Text style={styles.name}>Could not load work history. Tap to retry.</Text>
@@ -237,6 +333,13 @@ export default function ConnectionsScreen({ navigation, route }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         />
       )}
+      <LocalInvitePicker person={target} jobs={target&&choices?providerInviteJobs(choices.jobs,choices.invites,target.id):[]}
+       failed={!choices} busy={changing} onInvite={sendLocalInvite}
+       onClose={()=>{if(!changeLock.current)setTarget(null)}}
+       onPost={()=>{
+        setTarget(null)
+        navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{inviteProviderId:target.id,inviteProviderName:target.full_name||target.display_name}})
+       }}/>
     </View>
   )
 }

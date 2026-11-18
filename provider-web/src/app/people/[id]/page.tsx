@@ -1,3 +1,7 @@
+import { createClient } from '@/lib/supabase/server'
+import { validId } from '@/lib/job-input'
+import { SaveProviderButton } from '../../connections/provider-actions'
+import { ShareProvider } from '@/components/share-provider'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
@@ -7,10 +11,32 @@ import { availabilityDisplay } from '@shared/providerAvailability'
 import { ListingCard } from '../../listings/listing-card'
 import { formatRate, LISTING_KINDS } from '@shared/listingPricing'
 export default async function PublicProfilePage({params}:{params:Promise<{id:string}>}){
-  const {supabase,user,profile}=await requireProvider();const {id}=await params
+  const {id}=await params
+  if(!validId(id))notFound()
+  const publicClient=await createClient()
+  const {data:{user:viewer}}=await publicClient.auth.getUser()
+  if(!viewer){
+    const {data:p,error}=await loadPublicProfile(publicClient,id)
+    if(error)throw new Error('Could not load profile')
+    if(!p)notFound()
+    return <main className="page work-page">
+      <Link href="/login" className="card-link">Rural Connections</Link>
+      <header className="card account-summary">
+        {p.avatar_url&&<img className="account-avatar" src={p.avatar_url} alt=""/>}
+        <div><h1>{p.full_name || p.display_name || 'Community member'}</h1>{p.region&&<p>{p.region}</p>}</div>
+      </header>
+      {p.bio&&<section className="card"><h2>About</h2><p className="work-description">{p.bio}</p></section>}
+      {p.skills?.length>0&&<section className="card"><h2>What I can help with</h2><ul className="profile-tags">{p.skills.map((skill:string,index:number)=><li key={index}>{skill}</li>)}</ul></section>}
+      <ShareProvider providerId={id}/>
+      <Link href={'/login?next='+encodeURIComponent('/people/'+id)} className="lform-save">Sign in to save or invite</Link>
+    </main>
+  }
+  const {supabase,user,profile}=await requireProvider('/people/'+id)
   const {data:p,error}=await loadPublicProfile(supabase,id)
   if(error)throw new Error('Could not load profile')
   if(!p)notFound()
+  const saved=user.id!==id?await supabase.from('saved_providers').select('provider_id')
+   .eq('requester_id',user.id).eq('provider_id',id).maybeSingle():null
   let reviews:PublicReview[]=[],reviewError=false
   try{reviews=await allPublicReviews(supabase,id)}catch{reviewError=true}
   const {data:listings,error:listingError}=await supabase.from('services').select('id,title,kind,rate,pricing_type,unit_label,min_charge,photos,category,card_headline,card_supporting_text,card_style').eq('provider_id',id).eq('is_active',true).is('closed_at',null).order('created_at',{ascending:false})
@@ -18,6 +44,8 @@ export default async function PublicProfilePage({params}:{params:Promise<{id:str
   const availability=availabilityDisplay(p.availability_status,p.availability_until,p.availability_updated_at)
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href={user.id===id?'/account':'/browse'} className="card-link">{user.id===id?'Back to Account':'Browse listings'}</Link>
     <article className="card account-summary">{p.avatar_url?<img className="account-avatar" src={p.avatar_url} alt={p.full_name || 'Profile photo'}/>:<span className="account-avatar account-initial">{(p.full_name || p.display_name || '?').slice(0,1)}</span>}<div><h1>{p.full_name || p.display_name || 'Community member'}</h1><p>{p.region || 'Region not provided'}</p><p className="muted">Member since {new Date(p.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p><Link className="card-link" href={'/people/'+id+'/reviews'}>{reviewError?'View reviews':reviews.length?'★ '+avg.toFixed(1)+' · '+reviews.length+' reviews':'No reviews yet · View reviews'}</Link></div></article>
+    <ShareProvider providerId={id}/>
+    {saved&&(saved.error?<p role="alert">Could not check whether this provider is saved.</p>:<SaveProviderButton provider={id} saved={!!saved.data}/>)}
     {user.id!==id&&<Link className="card-link" href={'/jobs/new?invite='+id}>Invite to job</Link>}
     {!availability.stale && <p className="account-current">{availability.label}</p>}
     {p.bio && <section className="card"><h2>About</h2><p className="work-description">{p.bio}</p></section>}

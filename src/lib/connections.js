@@ -19,7 +19,7 @@ export async function fetchConnections(uid, side) {
   const ids = rows.map(row => row[otherColumn]).filter(id => id && id !== uid)
 
   for(let i=0;i<ids.length;i+=200){
-    const {data,error}=await supabase.from('profiles_public').select('id,full_name,avatar_url,region').in('id',ids.slice(i,i+200))
+    const {data,error}=await supabase.from('profiles_public').select('id,full_name,display_name,avatar_url,region,skills').in('id',ids.slice(i,i+200))
     if(error)throw error
     data?.forEach(person=>people.set(person.id,person))
   }
