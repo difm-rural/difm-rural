@@ -1,3 +1,4 @@
+import { refuseAssistantToken } from '../_shared/assistant-token.ts'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -521,6 +522,8 @@ async function copyWebsiteImageToService(serviceId: unknown, imageValue: unknown
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const assistant = refuseAssistantToken(req, corsHeaders)
+  if (assistant) return assistant
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
   const user = await signedInUser(req)
   if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)

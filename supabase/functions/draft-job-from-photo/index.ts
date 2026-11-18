@@ -1,5 +1,6 @@
 import { answer, cors, photoClients, verifiedPhoto } from '../_shared/primary-photo-http.ts'
 import { normalisePhotoDraft } from '../_shared/primary-photo.ts'
+import { refuseAssistantToken } from '../_shared/assistant-token.ts'
 
 const categories = [
   'Fencing & Gates','Animals & Farm Sitting','Water & Drainage','Spraying & Pest Control',
@@ -17,6 +18,8 @@ const schema = {
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response(null,{headers:cors})
+  const assistant = refuseAssistantToken(request, cors)
+  if (assistant) return assistant
   if (request.method !== 'POST') return answer(405,{error:'method_not_allowed'})
   try {
     const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1]

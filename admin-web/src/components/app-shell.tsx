@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Activity, ChevronRight, GitBranch, HeartPulse, LayoutDashboard, LogOut, Megaphone, MessageSquareHeart, ShieldCheck, UsersRound } from 'lucide-react'
+import { Activity, Bot, ChevronRight, GitBranch, HeartPulse, LayoutDashboard, LogOut, Megaphone, MessageSquareHeart, ShieldCheck, UsersRound } from 'lucide-react'
 
 const navigation = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -12,6 +12,7 @@ const navigation = [
   { href: '/providers', label: 'Provider supply', icon: UsersRound },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone },
   { href: '/feedback', label: 'Flow feedback', icon: MessageSquareHeart },
+  { href: '/assistants', label: 'AI assistants', icon: Bot },
 ]
 
 export function AppShell({ children, adminName }: { children: React.ReactNode; adminName: string }) {

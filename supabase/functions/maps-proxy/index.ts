@@ -1,3 +1,4 @@
+import { refuseAssistantToken } from '../_shared/assistant-token.ts'
 // Proxies the Google Maps web APIs the app needs so the API key never ships
 // in the app bundle. The key lives in the GOOGLE_MAPS_API_KEY function secret.
 //
@@ -153,6 +154,8 @@ async function handlePlaceDetails(url: URL, googleKey: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const assistant = refuseAssistantToken(req, corsHeaders)
+  if (assistant) return assistant
 
   const googleKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
   if (!googleKey) {

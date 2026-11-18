@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs'
 import { stripTypeScriptTypes } from 'node:module'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
+import { refuseAssistantToken } from '../supabase/functions/_shared/assistant-token.ts'
 
 const source = readFileSync(new URL('../supabase/functions/marketplace-health/index.ts', import.meta.url), 'utf8')
-const script = stripTypeScriptTypes(source.replace(/^import .*\r?\n/, ''))
+const script = stripTypeScriptTypes(source.replace(/^import .*\r?\n/gm, ''))
 
 function setup({ isAdmin = true, user = { id: 'admin' }, claimStatus = 'claimed', result = 'succeeded', finishError = null,
   abortOnFinish = false } = {}) {
@@ -22,6 +23,7 @@ function setup({ isAdmin = true, user = { id: 'admin' }, claimStatus = 'claimed'
   runInNewContext(script, {
     Deno: { env: { get: name => env.get(name) }, serve: fn => { handler = fn } },
     Response,
+    refuseAssistantToken,
     AbortSignal: { any: AbortSignal.any, timeout: ms => { budget = ms; return deadline.signal } },
     console: { error: message => logs.push(JSON.parse(message)) },
     fetch: async (_url, init) => { init.signal.throwIfAborted(); return new Response() },

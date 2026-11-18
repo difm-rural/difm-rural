@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { pickAndUploadAvatar, removeAvatar as removeAvatarRecord } from '../../lib/uploadAvatar'
 import { useUser } from '../../context/UserContext'
 import { supabase } from '../../lib/supabase'
+import { showConnectedAssistants } from '../../../shared/connectedAssistants'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Loading from '../../components/Loading'
@@ -259,6 +260,12 @@ export default function AccountTabScreen({ navigation, route }) {
   })
 
   useFocusEffect(useCallback(() => { loadProfile() }, []))
+  // Hidden beta: Connected assistants shows only for beta members or members
+  // who already have an assistant connected.
+  const [showAssistants, setShowAssistants] = useState(false)
+  useFocusEffect(useCallback(() => {
+    supabase.rpc('ai_connector_status').then(({ data }) => setShowAssistants(showConnectedAssistants(data)), () => {})
+  }, []))
 
   useEffect(() => {
     if (!route?.params?.openAvailability) return
@@ -689,6 +696,12 @@ export default function AccountTabScreen({ navigation, route }) {
           icon="bookmark-outline" label="Saved searches & alerts" sub="Searches, follows and alert frequency"
           onPress={() => navigation.navigate('SavedInterests')}
         />
+        {showAssistants && (
+          <HubButton
+            icon="sparkles-outline" label="Connected assistants" sub="AI assistants that can search and read your activity"
+            onPress={() => navigation.navigate('ConnectedAssistants')}
+          />
+        )}
         <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}

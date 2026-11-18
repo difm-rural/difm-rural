@@ -1,0 +1,14 @@
+{
+  "nodeModulesDir": "none",
+  "compilerOptions": {
+    "strict": true
+  },
+  "imports": {
+    "../../../shared/listingEstimate": "../../../shared/listingEstimate.ts",
+    "../../../shared/postingDates": "../../../shared/postingDates.ts",
+    "../../../shared/listingPricing": "../../../shared/listingPricing.ts"
+  },
+  "tasks": {
+    "check": "deno check index.ts"
+  }
+}
