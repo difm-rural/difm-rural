@@ -200,7 +200,7 @@ export async function markJobPaymentSorted(_:ActionState,data:FormData):Promise<
  }
  if(validId(jobId))revalidatePath('/jobs/'+jobId)
  revalidatePath('/activity');revalidatePath('/')
- return {error:'',success:undo?'Payment acknowledgement removed.':'Payment marked as sorted.'}
+ return {error:'',success:undo?'Payment acknowledgement removed.':'Payment sorted'}
 }
 export async function jobQuestion(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),questionId=text(data,'question_id'),content=text(data,questionId?'answer':'question')
@@ -230,9 +230,10 @@ export async function sendOffer(_: ActionState, data: FormData): Promise<ActionS
   if (existing.error) return failed()
   if (existing.data?.length) return {error:'You already have an offer on this job. You can track it in Activity.'}
   const { error } = await supabase.from('bids').insert({...input.value,job_id:id,provider_id:user.id,status:'pending'})
-  if (error) return failed()
+  if (error) return {error:'Could not send your offer. Your details are kept. Please try again.'}
   revalidatePath('/jobs/'+id)
-  return {error:'',success:'Offer sent. The requester will review it — you can track it in Activity.'}
+  revalidatePath('/activity')
+  redirect('/jobs/'+id+'?offered=1')
 }
 
 export async function acceptOffer(_: ActionState, data: FormData): Promise<ActionState> {

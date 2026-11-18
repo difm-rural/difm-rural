@@ -1,3 +1,4 @@
+import {fillJobDraftFields} from '../shared/jobSuggestion.ts'
 import * as formatting from '../shared/formatting.js'
 import * as publicArea from '../shared/publicArea.ts'
 import * as postingText from '../shared/postingText.ts'
@@ -37,6 +38,7 @@ function harness(storage,seed,{
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx}
+  if(name==='@shared/jobSuggestion')return {fillJobDraftFields}
   if(name==='@shared/jobDraft')return jobDraft
   if(name==='@shared/postingDates')return dates
   if(name==='@shared/postingMoney')return money
@@ -335,4 +337,30 @@ test('photo posting requires an upload, retains a replacement on failure, and re
  assert.deepEqual(attempted,Array(2).fill({endpoint:'job-primary-media',file:replacement,draft:'test-job-id'}))
  assert.equal(h.submissions[0].primary_photo_checksum,'b'.repeat(64))
  assert.equal(h.submissions[0].primary_photo_required,'on')
+})
+
+
+test('Describe fills the visible named title and draft details, then preserves explicit edits',()=>{
+ const h=harness()
+ const apply=()=>h.nodes().find(node=>node.type==='job-text-draft').props.onUse
+ const title=()=>h.nodes().find(node=>node.props?.id==='job-title')
+ assert.equal(apply()({title:'Repair a farm gate',description:'Replace hinges on the farm gate.',category:'Fencing'}),true)
+ h.render()
+ assert.equal(title().props.value,'Repair a farm gate')
+ assert.equal(title().props.name,'title')
+ assert.equal(h.nodes().filter(node=>node.props?.name==='title').length,1)
+ assert.equal(h.nodes().find(node=>node.props?.name==='description').props.value,'Replace hinges on the farm gate.')
+ assert.ok(h.nodes().some(node=>node.props.role==='status'&&h.text(node).includes('Suggestion applied.')))
+ assert.equal(h.nodes().find(node=>node.props?.name==='location').props.value,'')
+ h.change('job-title','Keep the existing title')
+ assert.equal(apply()({title:'Replacement',description:'Replace this',category:'Other'}),true)
+ h.render()
+ assert.equal(title().props.value,'Keep the existing title')
+ assert.equal(h.nodes().find(node=>node.props?.name==='description').props.value,'Replace hinges on the farm gate.')
+ assert.deepEqual(fillJobDraftFields({title:'Keep',description:'Existing',category:'Water & Drainage'},{title:'Replace',description:'New',category:'Fencing'}),{
+  fields:{title:'Keep',description:'Existing',category:'Water & Drainage'},changed:false,
+ })
+ assert.deepEqual(fillJobDraftFields({title:'',description:'',category:''},{title:'Gate',description:'Fix a hinge',category:'Fencing'}).fields,
+  {title:'Gate',description:'Fix a hinge',category:'Fencing & Gates'})
+ assert.equal(apply()({title:' ',description:'',category:'Unknown'}),false)
 })

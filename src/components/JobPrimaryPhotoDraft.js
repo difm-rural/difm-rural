@@ -57,7 +57,7 @@ export default function JobPrimaryPhotoDraft({photo,onPhoto,onSuggestion,onManua
     {result&&(result.status==='unusable'?<Text>Could not identify the work. You can enter the job details yourself.</Text>:<>
       {!!result.question&&<Text>{result.question} Add your answer to the job description.</Text>}
       <Text>{result.title}</Text><Text>{result.description}</Text>{!!result.category&&<Text>{result.category}</Text>}
-      <Button title="Use suggestion in empty fields" onPress={()=>{onSuggestion(result);setResult(null)}}/>
+      <Button title="Use suggestion in empty fields" onPress={()=>{if(onSuggestion(result)!==false)setResult(null);else setError('Could not apply this suggestion. Your details are kept.')}}/>
     </>)}
   </View>
 }

@@ -4,7 +4,7 @@ import {jobPhotoRequest,prepareJobPhoto} from '@/lib/job-primary-photo'
 
 export type PhotoSuggestion={status:string;title:string;description:string;category:string|null;question:string}
 
-export function JobPhotoDraft({file,onFile,onSuggestion,allowSuggestion=true}:{file:File|null;onFile:(file:File|null)=>void;onSuggestion:(suggestion:PhotoSuggestion)=>void;allowSuggestion?:boolean}){
+export function JobPhotoDraft({file,onFile,onSuggestion,allowSuggestion=true}:{file:File|null;onFile:(file:File|null)=>void;onSuggestion:(suggestion:PhotoSuggestion)=>boolean;allowSuggestion?:boolean}){
  const [preview,setPreview]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('')
  const [note,setNote]=useState('')
  const [suggestion,setSuggestion]=useState<PhotoSuggestion|null>(null)
@@ -47,7 +47,7 @@ export function JobPhotoDraft({file,onFile,onSuggestion,allowSuggestion=true}:{f
    {suggestion.status==='unusable'?<p>Could not identify the work in this photo. You can write the job details yourself.</p>:<>
     {suggestion.question&&<p>{suggestion.question} Add your answer to the job description.</p>}
     <p>{suggestion.title}</p><p>{suggestion.description}</p><p>{suggestion.category}</p>
-    <button type="button" className="lform-cancel" onClick={()=>{onSuggestion(suggestion);setSuggestion(null)}}>Use suggestion in empty fields</button>
+    <button type="button" className="lform-cancel" onClick={()=>{if(onSuggestion(suggestion))setSuggestion(null);else setError('Could not apply this suggestion. Your details are kept.')}}>Use suggestion in empty fields</button>
    </>}
   </div>}
  </div>

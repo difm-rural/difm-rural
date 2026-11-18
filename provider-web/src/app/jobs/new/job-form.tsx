@@ -5,7 +5,8 @@ import {JobAiChoiceCopy,JobTextDraft,revealJobAiContent} from '@/components/job-
 import {jobPhotoRequest,prepareJobPhoto} from '@/lib/job-primary-photo'
 import {JobAddressInput} from '@/components/job-address-input'
 import {JobLocationMap} from '@/components/job-location-map'
-import {CATEGORIES,jobDraftCategory} from '@shared/categories'
+import {CATEGORIES} from '@shared/categories'
+import {fillJobDraftFields} from '@shared/jobSuggestion'
 import {DateInput} from '@/components/date-input'
 import {formatMoney as nzMoney,formatDate as nzDate} from '@shared/formatting'
 import {publicAreaError} from '@shared/publicArea'
@@ -99,13 +100,17 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
  },[draft,jobId,key,ready,saved,baseline,state.jobId])
  useEffect(()=>{if(state.error){submissionLock.current=false;setSubmitting(false);try{if(hasJobDraftChanges(draft,baseline))sessionStorage.setItem(key,JSON.stringify({draft,id:jobId}))}catch{}}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'?edited=1':'?posted=1'))}},[state,key,router,mode])  // eslint-disable-line react-hooks/exhaustive-deps -- draft/jobId are re-saved only at the moment a failure arrives
  useEffect(()=>{heading.current?.focus();heading.current?.scrollIntoView({block:'start'})},[step])
- function applyPhotoSuggestion(value:Pick<PhotoSuggestion,'title'|'description'|'category'>){
-  setDraft(current=>({...current,title:current.title.trim()?current.title:value.title.slice(0,POSTING_TITLE_MAX),description:current.description||value.description.slice(0,POSTING_DESCRIPTION_MAX),
-    category:current.category||jobDraftCategory(value.category)}))
+ const [suggestionFeedback,setSuggestionFeedback]=useState('')
+ function applySuggestion(value:Pick<PhotoSuggestion,'title'|'description'|'category'>){
+  const result=fillJobDraftFields(draft,value)
+  if(!result)return false
+  setDraft(current=>({...current,...fillJobDraftFields(current,value)?.fields}))
+  setSuggestionFeedback(result.changed?'Suggestion applied. Review and edit the details as needed.':'Your existing job details were kept.')
+  return true
  }
  const canUsePhoto=mode==='new'&&!draft.photos.length&&(draft.primary_photo_required||process.env.NEXT_PUBLIC_PHOTO_TO_JOB==='true')
  const photoEditor=(allowSuggestion:boolean)=>canUsePhoto
-  ? <><JobPhotoDraft allowSuggestion={allowSuggestion} file={primaryPhoto} onFile={file=>{setPrimaryPhoto(file);setDraft(current=>({...current,primary_photo_required:true}))}} onSuggestion={applyPhotoSuggestion}/>
+  ? <><JobPhotoDraft allowSuggestion={allowSuggestion} file={primaryPhoto} onFile={file=>{setPrimaryPhoto(file);setDraft(current=>({...current,primary_photo_required:true}))}} onSuggestion={applySuggestion}/>
     {draft.primary_photo_required&&<button type="button" className="lform-cancel" onClick={()=>{setPrimaryPhoto(null);setDraft(current=>({...current,primary_photo_required:false}))}}>Continue without a photo</button>}</>:null
  const set=<K extends keyof Draft>(name:K,value:Draft[K])=>setDraft(d=>({...d,[name]:value}))
  function stepIssues(index:number):Record<string,string>{
@@ -216,9 +221,10 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
   {furthest>0&&<nav className="job-steps" aria-label="Job posting steps">{steps.map((label,i)=><button type="button" key={label} aria-current={step===i?'step':undefined} disabled={pending||busy||submitting||i>furthest} onClick={()=>{setError('');setAttempted(false);setStep(i)}}>{i+1}. {label}</button>)}</nav>}
   <div className="job-progress"><p className="eyebrow">Step {step+1} of {steps.length}{step===0&&" · Basics"}</p><progress aria-label="Job posting progress" value={step+1} max={steps.length}/></div><h2 tabIndex={-1} ref={heading}>{step===0?"What do you need done?":steps[step]}</h2>
   <input type="hidden" name="job_id" value={jobId}/>{inviteProvider&&<input type="hidden" name="invite_provider_id" value={inviteProvider.id}/>}{mode==='repeat'&&<input type="hidden" name="repeated_from_job_id" value={seed?.id}/>}
-  {Object.entries(draft).map(([name,value])=>(name==='category'||name==='schedule_type'&&step===0)?null:Array.isArray(value)?value.map((v,i)=><input type="hidden" name={name} value={v} key={name+i}/>):typeof value==='boolean'?<input type="hidden" key={name} name={name} value={value?'on':'off'}/>:<input type="hidden" key={name} name={name} value={value}/>)}
+  {Object.entries(draft).map(([name,value])=>(name==='category'||step===0&&(name==='schedule_type'||name==='title'))?null:Array.isArray(value)?value.map((v,i)=><input type="hidden" name={name} value={v} key={name+i}/>):typeof value==='boolean'?<input type="hidden" key={name} name={name} value={value?'on':'off'}/>:<input type="hidden" key={name} name={name} value={value}/>)}
   <fieldset disabled={pending||busy||submitting||!ready||!!saved} aria-busy={submitting||pending} className="work-fieldset">
-  {step===0&&<div className="lform-step job-basics"><label className="lform-field">Job title *<input maxLength={POSTING_TITLE_MAX} {...field('title')} value={draft.title} onChange={e=>set('title',e.target.value)} placeholder="e.g. Repair the back paddock fence"/>{issue('title')}<small className="muted">{draft.title.length} / {POSTING_TITLE_MAX} characters</small></label>
+  {step===0&&<div className="lform-step job-basics"><label className="lform-field">Job title *<input name="title" maxLength={POSTING_TITLE_MAX} {...field('title')} value={draft.title} onChange={e=>set('title',e.target.value)} placeholder="e.g. Repair the back paddock fence"/>{issue('title')}<small className="muted">{draft.title.length} / {POSTING_TITLE_MAX} characters</small></label>
+   {suggestionFeedback&&<p role="status" className="status-banner">{suggestionFeedback}</p>}
    {mode==='new'&&<details className="job-ai-helper">
     <summary><span><strong>Use AI to help create my job</strong><small>{canUsePhoto?'Use a photo, speak or describe what you need.':'Speak or describe what you need.'}</small></span></summary>
     <div className="job-ai-options">
@@ -228,7 +234,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
       <summary className="job-ai-choice" aria-label={primaryPhoto?'Use a photo. Photo selected.':undefined}><JobAiChoiceCopy choice="Photo"/></summary>
       <div className="job-ai-panel">{photoEditor(true)}</div>
      </details>}
-     <JobTextDraft onUse={applyPhotoSuggestion}/>
+     <JobTextDraft onUse={applySuggestion}/>
     </div>
    </details>}
    <fieldset className="job-timing">

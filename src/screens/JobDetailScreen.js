@@ -1,3 +1,4 @@
+import {JobArrangementSummary,JobStatusNotice} from '../components/JobArrangementSummary'
 import {JobPrivateGallery} from '../components/JobPrimaryImage'
 import {jobMapTarget} from '../../shared/jobMapTarget'
 import {formatOfferAvailability} from '../../shared/offers'
@@ -45,7 +46,6 @@ import ConfirmJobSheet from '../components/ConfirmJobSheet'
 import {
   addWorkToPhoneCalendar,
   fetchWorkSchedule,
-  formatArrivalWindow,
   saveArrivalWindow,
   arrivalErrorMessage,
   sendRunningLate,
@@ -102,6 +102,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const submittingBidRef = useRef(false)
+  const [offerFeedback, setOfferFeedback] = useState('')
   const [alreadyBid, setAlreadyBid] = useState(false)
   const [myBid, setMyBid] = useState(null)
   const [requesterProfile, setRequesterProfile] = useState(null)
@@ -414,8 +415,9 @@ export default function JobDetailScreen({ route, navigation }) {
     if (submittingBidRef.current) return
     submittingBidRef.current = true
     setLoading(true)
+    setOfferFeedback('')
     try {
-      const { error } = await supabase.from('bids').insert({
+      const { data, error } = await supabase.from('bids').insert({
         job_id:             job.id,
         provider_id:        currentUser.id,
         amount:             total,
@@ -426,15 +428,16 @@ export default function JobDetailScreen({ route, navigation }) {
         estimated_duration: estimatedDuration || null,
         pricing_type:       bidPricingType,
         materials:          job.materials_type === 'provider' ? bidMaterials : null,
-      })
-      if (error) {
-        Alert.alert('Error', error.message)
+      }).select('id, amount, status, message, line_items, available_from, estimated_duration, pricing_type, materials').single()
+      if (error || !data) {
+        Alert.alert('Could not send offer', error?.message || 'Your details are kept. Please try again.')
       } else {
         trackEvent('bid_placed', { job_id: job.id, amount: total })
-        Alert.alert('Offer sent!', 'Your offer has been submitted successfully.')
+        setMyBid(data)
+        setOfferFeedback('Offer sent.')
         setAlreadyBid(true)
         setEditingBid(false)
-        fetchData()
+        void fetchData().catch(() => {})
       }
     } catch (e) {
       Alert.alert("Couldn't send offer", e?.message || 'Something went wrong. Please try again.')
@@ -532,7 +535,7 @@ export default function JobDetailScreen({ route, navigation }) {
             trackEvent('bid_accepted', { job_id: job.id, provider_id: bid.provider_id })
             setJob(current => ({ ...current, status: 'accepted' }))
             setBids(current => current.map(offer => offer.id === bid.id ? { ...offer, status: 'accepted' } : offer))
-            Alert.alert('Offer accepted.', 'The provider can now confirm the arrival time.')
+            setOfferFeedback('Offer accepted.')
             void fetchData().catch(() => {})
           } catch (error) {
             Alert.alert('Could not accept offer', error?.message || 'Please try again.')
@@ -620,6 +623,8 @@ export default function JobDetailScreen({ route, navigation }) {
         )}
       </View>
       <Text style={styles.headerTitle} accessibilityRole="header">{job.title}</Text>
+      {job.status==='completed'&&(isAcceptedProvider||isJobOwner)&&<JobStatusNotice>Job completed.</JobStatusNotice>}
+      {((offerFeedback==='Offer sent.'&&job.status==='open')||(offerFeedback==='Offer accepted.'&&job.status==='accepted'))&&<JobStatusNotice>{offerFeedback}</JobStatusNotice>}
     </View>
     </View>
   )
@@ -663,7 +668,6 @@ export default function JobDetailScreen({ route, navigation }) {
         trackEvent('job_marked_complete', { job_id: job.id })
         setCompleteVisible(false)
         setJob(prev => ({ ...prev, status: 'completed' }))
-        Alert.alert('Job completed', 'You and the requester can now leave a review.')
       } catch (e) {
         setCompleteError(e?.message || 'Could not update. Please try again.')
       } finally {
@@ -734,6 +738,7 @@ export default function JobDetailScreen({ route, navigation }) {
         <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{width:'100%',height:200}}/>
+          {!isCancelled&&<JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={myBid?.estimated_duration}/>}
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
               <Text style={styles.category}>Category: {job.category}</Text>
@@ -805,12 +810,6 @@ export default function JobDetailScreen({ route, navigation }) {
             {jobReviewStatus(requesterReview === undefined ? undefined : !!requesterReview, receivedReview === undefined ? undefined : !!receivedReview, 'Requester').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
             <ReceivedReview review={receivedReview} fromLabel="requester" />
           </>}
-          {isCompleted && workSchedule?.arrival_start_at && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Confirmed arrival</Text>
-              <Text style={styles.detailValue}>{formatArrivalWindow(workSchedule)}</Text>
-            </View>
-          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Job details</Text>
@@ -1201,12 +1200,8 @@ export default function JobDetailScreen({ route, navigation }) {
 
         {isJobOwner && acceptedBid && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && (
           <>
-            {workSchedule?.arrival_start_at && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Job confirmed</Text>
-                <Text style={styles.detailValue}>{formatArrivalWindow(workSchedule)}</Text>
-              </View>
-            )}
+            <JobArrangementSummary arrival={workSchedule?.arrival_start_at}
+              duration={acceptedBid.estimated_duration}/>
             <JobPaymentHandoff
               bidId={acceptedBid.id}
               method={acceptedBid.payment_method}

@@ -1,4 +1,5 @@
 'use client'
+import {DateInput} from '@/components/date-input'
 import {useSubmitGuard} from '@/components/action-form'
 import {LoaderCircle} from 'lucide-react'
 import {useActionState,useEffect,useState} from 'react'
@@ -23,7 +24,7 @@ function ArrivalFields({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;
   <p className="muted requested-date">Requested: <strong>{days.requestedLabel}</strong></p>
   {days.chips.length>0&&<div className="payment-options">{days.chips.map(chip=>
    <button key={chip.day} type="button" aria-pressed={day===chip.day} className={'lform-kind'+(day===chip.day?' active':'')} onClick={()=>onPick(chip.day+'T'+time)}>{chip.label}</button>)}</div>}
-  <label className="lform-field">Arrival date<input type="date" lang="en-NZ" required value={day} onChange={e=>onPick(e.target.value+'T'+time)}/></label>
+  <label className="lform-field">Arrival date<DateInput required value={day} onChange={e=>onPick(e.target.value+'T'+time)}/></label>
   <label className="lform-field">Arrival time (New Zealand time)<input type="time" required value={time} onChange={e=>onPick(day+'T'+e.target.value)}/></label>
  </>
 }
@@ -43,7 +44,6 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
  if(confirmedArrival){
   return <section className="card payment-card">
    {state.success&&<p className="status-banner" role="status">{state.success}</p>}
-   <p><strong>Arriving around {nzDateTime(confirmedArrival)}</strong></p>
    <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom} arrivalStart={confirmedArrival}/></details>
    <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>

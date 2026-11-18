@@ -1,9 +1,10 @@
+import {agreedJobDetails} from '@shared/agreedJobDetails'
 import {ACTIVE_JOB_INVITATIONS, invitationLabel} from '@shared/jobInvitations'
 import {inviteConnection, respondInvitation} from '../../connections/actions'
 import {JobPrimaryImage} from '@/components/job-primary-image'
 import type {JobPrivatePhoto} from '@/components/job-edit-photos'
 import {jobMapTarget} from '@shared/jobMapTarget'
-import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate,formatWorkDateTime as nzDateTime} from '@shared/formatting'
+import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
@@ -29,9 +30,9 @@ import { PaymentSorted } from './payment-requester'
 import { agreedPaymentMethodLabels, paymentAcknowledgementActor, paymentAcknowledgementAvailable } from '@shared/paymentAcknowledgement'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
-export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string;accepted?:string}>}){
+export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string;accepted?:string;offered?:string}>}){
  const {id}=await params
- const {thread,reviewed,posted,edited,accepted}=await searchParams
+ const {thread,reviewed,posted,edited,accepted,offered}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
@@ -92,9 +93,12 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const next=nextRole?jobNextMove(job,nextRole,{otherName:nextOtherName,bidCount:own&&!offerError?offers?.filter(offer=>offer.status==='pending').length||0:0,unansweredQuestionCount:own?(questions?.filter(q=>!q.answer).length||0):0,hasPendingBid:myOffer?.status==='pending',hasArrival:!!workArrival,arrivalAt:workArrival}):null
  const confirmationCard=showPayment&&acceptedOffer&&isAcceptedProvider&&['accepted','in_progress'].includes(job.status)
    ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} schedule={jobSchedule} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>
-   : showPayment&&workArrival
-     ? <section className="card"><h2>{job.status==='completed'?'Confirmed arrival':'Job confirmed'}</h2><p>{job.status==='completed'?'Scheduled arrival':'Arriving around'} {nzDateTime(new Date(workArrival))}</p></section>
-     : null
+   : null
+ const agreed=showPayment?agreedJobDetails(workArrival,acceptedOffer?.estimated_duration):null
+ const arrangements=(agreed?.arrival||agreed?.duration)&&<section className="card"><h2>Agreed arrangements</h2>
+  {agreed.arrival&&<p><strong>Arrival:</strong> {agreed.arrival}</p>}
+  {agreed.duration&&<p><strong>Estimated duration:</strong> {agreed.duration}</p>}
+ </section>
  const paymentCard=showPayment&&acceptedOffer
    ? <PaymentSorted key={acceptedOffer.id} bidId={acceptedOffer.id} jobId={id} sortedAt={acceptedOffer.payment_sorted_at}
        actor={paymentAcknowledgementActor(acceptedOffer.payment_sorted_by,job.requester_id,acceptedProviderId)}
@@ -147,7 +151,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {own&&!offers?.length&&<p className="muted">Offers will appear here when people respond.</p>}
    {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<><Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link> · </>:null}{formatOfferAmount(b.amount,b.pricing_type)}{b.pricing_type==='fixed'?' · Fixed price':''}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{(b.line_items?.length>1||b.line_items?.some((item:{label:string})=>item.label))&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}{b.line_items.length>1?': '+nzMoney(item.amount):''}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {formatOfferAvailability(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
     {own&&job.status==='open'&&b.status!=='rejected'&&<Link className="card-link" href={'/jobs/'+id+'?thread='+b.provider_id+'#offer-'+b.id}>Message {names.get(b.provider_id)?.trim().split(/\s+/)[0] || 'this provider'}</Link>}
-    {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary>Accept this offer</summary><ActionForm action={acceptOffer} label="Accept offer"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p><label className="account-setting"><input type="checkbox" required/>I agree to accept this offer.</label></ActionForm></details>:<>
+    {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary className="lform-save">Accept this offer</summary><ActionForm action={acceptOffer} label="Confirm acceptance"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p></ActionForm></details>:<>
      <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'} schedule={jobSchedule}/></details>
      <details className="activity-action"><summary>Withdraw offer</summary><ActionForm action={changeOffer} label="Withdraw offer"><input type="hidden" name="offer_id" value={b.id}/><input type="hidden" name="intent" value="withdraw"/><p>This removes your pending offer. You can send a new offer while the job is open.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to withdraw this offer.</label></ActionForm></details></>)}
     {convPlacement==='inline'&&conversation&&convPerson===b.provider_id&&<div className="work-inline-chat"><Conversation compact context={conversation} heading={chatHeading}/></div>}
@@ -178,9 +182,10 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
 
  const mainColumn=<>
   {posted==='1'&&own&&<><p className="status-banner" role="status">Job posted.</p><PostFeedback jobId={id}/></>}
-  {accepted==='1'&&own&&job.status==='accepted'&&acceptedOffer&&<p className="status-banner" role="status">Offer accepted.</p>}
+  {accepted==='1'&&own&&job.status==='accepted'&&acceptedOffer&&<p className="status-banner job-success" role="status">Offer accepted.</p>}
   {edited==='1'&&own&&<p className="status-banner" role="status">Job changes saved.</p>}
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
+  {arrangements}
   {confirmationCard}
   {paymentCard}
   {job.visibility==='invite_only'&&<p className="account-current">Private invited job — visible to the requester and invited providers.</p>}
@@ -192,11 +197,12 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {job.status==='open'?<>{receivedSection}{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
   {job.status==='completed'&&manageRole&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'&&!!ownReview} otherReviewRole={manageRole==='requester'?'Provider':'Requester'}/>}
-  {job.status==='completed'&&<p className="home-clear" role="status">Job completed. You can find it again in History.</p>}
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}
  </>
 
  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/jobs" className="card-link">Back to Jobs</Link><header className="home-heading work-head job-head"><div><SideKicker side="job" label="Jobs · wanted"/><p className="eyebrow">{next?.badge || (manageRole?statusLabel(job.status):jobBoardStatusLabel(job.status))}</p><h1>{job.title}</h1></div><LiveRefresh/></header>
+  {job.status==='completed'&&manageRole&&<p className="status-banner job-success" role="status">Job completed. <Link href="/activity?view=history">View History</Link></p>}
+  {offered==='1'&&!own&&myOffer?.status==='pending'&&<p className="status-banner job-success" role="status">Offer sent.</p>}
   {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
  </section></AppShell>
 }

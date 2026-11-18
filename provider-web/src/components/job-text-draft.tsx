@@ -2,6 +2,7 @@
 
 import {useEffect,useRef,useState} from 'react'
 import {Camera,ChevronRight,Mic,SquarePen} from 'lucide-react'
+import {jobDraftCategory} from '@shared/categories'
 import {nzToday} from '@shared/postingDates'
 import {createClient} from '@/lib/supabase/client'
 
@@ -30,7 +31,7 @@ export function revealJobAiContent(panel:HTMLElement|null){
  if(delta>0)window.scrollBy({top:delta})
 }
 
-export function JobTextDraft({onUse}:{onUse:(draft:TextDraft)=>void}){
+export function JobTextDraft({onUse}:{onUse:(draft:TextDraft)=>boolean}){
  const [mode,setMode]=useState<'Speak'|'Describe'|null>(null)
  const [text,setText]=useState('')
  const [busy,setBusy]=useState(false)
@@ -74,8 +75,8 @@ export function JobTextDraft({onUse}:{onUse:(draft:TextDraft)=>void}){
    {draft&&<div role="status">
     <strong>{draft.title}</strong>
     <p>{draft.description}</p>
-    <p>{draft.category}</p>
-    <button type="button" className="lform-cancel" onClick={()=>{onUse(draft);setDraft(null)}}>Use suggestion in empty fields</button>
+    <p>{jobDraftCategory(draft.category)}</p>
+    <button type="button" className="lform-cancel" onClick={()=>{if(onUse(draft))setDraft(null);else setError('Could not apply this suggestion. Your details are kept.')}}>Use suggestion in empty fields</button>
    </div>}
   </div>}
  </>

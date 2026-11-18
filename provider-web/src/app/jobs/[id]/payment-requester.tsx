@@ -13,6 +13,7 @@ export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canU
   canUpdate: boolean
 }) {
   const [state, submit, pending] = useActionState(markJobPaymentSorted, { error: '' })
+  const justSorted = state.success === copy.sorted && !!sortedAt
   const dialog = useRef<HTMLDialogElement>(null)
   const feedback = useRef<HTMLParagraphElement>(null)
   const submitting = useRef(false)
@@ -36,8 +37,8 @@ export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canU
   return (
     <section className="card payment-card">
       <h2>Payment</h2>
-      {sortedAt && <p><strong>{copy.sorted}</strong></p>}
-      <p>{sortedAt ? copy.sortedDetail : copy.reminder}</p>
+      {sortedAt && <p role={justSorted ? "status" : undefined} tabIndex={justSorted ? -1 : undefined} ref={justSorted ? feedback : undefined}><strong>{copy.sorted}</strong></p>}
+      {!sortedAt && <p>{copy.reminder}</p>}
       <p className="muted">Rural Connections doesn&apos;t handle or verify payments.</p>
       {sortedAt && actor && <p>Marked by the {actor}.</p>}
       {methodLabel && <p>Agreed method: {methodLabel}</p>}
@@ -63,7 +64,7 @@ export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canU
           <button type="submit" className="lform-save payment-ack-button" disabled={pending}>{copy.undoConfirm}</button>
         </form>
       </dialog>
-      {state.success && <p className="home-clear" role="status" tabIndex={-1} ref={feedback}>{state.success}</p>}
+      {state.success && !justSorted && <p className="home-clear" role="status" tabIndex={-1} ref={feedback}>{state.success}</p>}
       {state.error && <p className="form-error" role="alert" tabIndex={-1} ref={feedback}>{state.error}</p>}
     </section>
   )

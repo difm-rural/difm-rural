@@ -1,3 +1,4 @@
+import {jobDraftCategory} from '../../shared/categories'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Keyboard, Modal, Platform, ScrollView,
@@ -87,7 +88,7 @@ export default function AiJobAssistant({ onUse }) {
 
   function handleUse() {
     if (!draft) return
-    onUse(draft)
+    if (onUse(draft) === false) { setError('Could not apply this suggestion.'); return }
     setDraft(null)
     close()
   }
@@ -143,13 +144,14 @@ export default function AiJobAssistant({ onUse }) {
                   <Text style={styles.help}>Here's what I put together. Review it, then continue to set the location and post.</Text>
                   <View style={styles.draftCard}>
                     <DraftRow label="Title" value={draft.title} />
-                    <DraftRow label="Category" value={draft.category} />
+                    <DraftRow label="Category" value={jobDraftCategory(draft.category)} />
                     <DraftRow label="Description" value={draft.description} />
                     <DraftRow label="Suggested budget" value={draftBudgetText(draft)} />
                     <DraftRow label="Estimated time" value={draft.duration} />
                     <DraftRow label="Helpful skills" value={(draft.skills || []).join(', ')} />
                     <DraftRow label="When" value={SCHEDULE_TEXT[draft.schedule_type] || draft.schedule_type} last />
                   </View>
+                  {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
                   <Button title="Use this draft" icon="checkmark" onPress={handleUse} accessibilityLabel="Use this draft" />
                   <TouchableOpacity style={styles.startOver} onPress={() => setDraft(null)} accessibilityRole="button" accessibilityLabel="Start over">
                     <Text style={styles.startOverText}>Start over</Text>

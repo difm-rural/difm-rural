@@ -32,7 +32,7 @@ export default function JobPaymentHandoff({
       if (rpcError) throw rpcError
       setSorted(!undo)
       setActor(null)
-      setFeedback(undo ? copy.removed : copy.saved)
+      setFeedback(undo ? copy.removed : '')
     } catch {
       setError(copy.error)
       return
@@ -76,8 +76,8 @@ export default function JobPaymentHandoff({
   return (
     <View style={styles.card}>
       <Text accessibilityRole="header" style={styles.title}>Payment</Text>
-      {sorted && <Text style={styles.status}>{copy.sorted}</Text>}
-      <Text style={styles.body}>{sorted ? copy.sortedDetail : copy.reminder}</Text>
+      {sorted && <Text accessibilityLiveRegion="polite" style={styles.status}>{copy.sorted}</Text>}
+      {!sorted && <Text style={styles.body}>{copy.reminder}</Text>}
       {sorted && actor && <Text style={styles.body}>Marked by the {actor}.</Text>}
       {agreedPaymentMethodLabels[method] && <Text style={styles.body}>Agreed method: {agreedPaymentMethodLabels[method]}</Text>}
       {canUpdate && (

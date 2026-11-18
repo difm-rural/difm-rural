@@ -32,7 +32,7 @@ export async function manageArrangement(_:ActionState,data:FormData):Promise<Act
     }
     revalidatePath('/');revalidatePath('/activity');revalidatePath('/listings');revalidatePath('/browse')
     revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath('/jobs/'+id)
-    return {error:'',success:intent==='request_cancel'?'Cancellation requested. The provider needs to confirm.':intent==='relist'?'Your listing is live again.':'Saved. The arrangement has been updated.'}
+    return {error:'',success:kind==='job'&&intent==='complete'?'Job completed.':intent==='request_cancel'?'Cancellation requested. The provider needs to confirm.':intent==='relist'?'Your listing is live again.':'Saved. The arrangement has been updated.'}
   }catch{return {error:'Could not save this change. Check your connection, refresh and try again.'}}
 }
 

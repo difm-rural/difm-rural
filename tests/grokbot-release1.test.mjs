@@ -1,3 +1,4 @@
+import {agreedJobDetails} from '../shared/agreedJobDetails.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {readFile} from 'node:fs/promises'
@@ -132,7 +133,8 @@ test('new web arrival requires time; Change time retains the confirmed value',as
  const {ConfirmJob}=compile(await source('../provider-web/src/app/jobs/[id]/confirm-job.tsx'),{
   react:{useState(initial){return [typeof initial==='function'?initial():initial,()=>{}]},useEffect(){},useActionState:()=>[state,()=>{},false]},
   'next/navigation':{useRouter:()=>({refresh(){}})},
-  '@/components/action-form':{useSubmitGuard:()=>()=>{}},
+  '@/components/date-input':{DateInput:props=>jsx.jsx('input',{...props,type:'date'})},
+ '@/components/action-form':{useSubmitGuard:()=>()=>{}},
   '@shared/formatting':{formatWorkDateTime:()=> '7 March, 11:35 am'},
   '@shared/arrivalTime':{...arrivalTime,arrivalInputValue:date=>arrivalTime.arrivalInputValue(new Date(+date))},'@shared/offers':offers,
   '@shared/postingDates':{nzToday:()=> '2099-03-01'},
@@ -147,7 +149,7 @@ test('new web arrival requires time; Change time retains the confirmed value',as
  }
  const fresh=nodes(ConfirmJob({...props,arrivalStart:null}))
  const freshFields=fields(fresh)
- const date=freshFields.find(node=>node.type==='input'&&node.props.type==='date')
+ const date=freshFields.find(node=>typeof node.type==='function'&&node.type.name==='DateInput')
  const time=freshFields.find(node=>node.type==='input'&&node.props.type==='time')
  assert.equal(date.props.value,'2099-03-07')
  assert.equal(time.props.value,'')
@@ -157,7 +159,7 @@ test('new web arrival requires time; Change time retains the confirmed value',as
  preselect=null
  state={error:'Could not confirm the job.'}
  const failed=nodes(ConfirmJob({...props,arrivalStart:null}))
- assert.equal(fields(failed).find(node=>node.props.type==='date').props.value,'')
+ assert.equal(fields(failed).find(node=>typeof node.type==='function'&&node.type.name==='DateInput').props.value,'')
  assert.ok(failed.some(node=>node.props.role==='alert'&&node.props.children===state.error))
  assert.ok(!failed.some(node=>node.props.role==='status'&&node.props.children))
  state={error:'',success:'Job confirmed.',arrivalStart:saved}
@@ -321,7 +323,7 @@ test('posted job displays separate category and location labels and verified acc
  const rows={jobs_public:job,bids:[bid]}
  let userId='requester'
  const {default:JobPage}=compile(await source('../provider-web/src/app/jobs/[id]/page.tsx'),new Proxy({
-  '@shared/jobMapTarget':{jobMapTarget:()=>null},'@shared/formatting':formatting,
+  '@shared/jobMapTarget':{jobMapTarget:()=>null},'@shared/agreedJobDetails':{agreedJobDetails}, '@shared/formatting':formatting,
   '@shared/nextMove':{jobNextMove:()=>null},'@shared/offers':offers,
   '@shared/paymentAcknowledgement':{paymentAcknowledgementActor:()=>null,paymentAcknowledgementAvailable:()=>true,agreedPaymentMethodLabels:{}},
   '@/components/navigation-link':{default:'a'},'@/lib/work':{statusLabel:x=>x,jobBoardStatusLabel:x=>x},
@@ -374,4 +376,37 @@ test('review submission checks eligibility, redirects after a write and reports 
  await reviewArrangement({error:''},data)
  assert.equal(redirected,'/jobs/job?reviewed=1#reviews')
  assert.equal(writes,2)
+})
+
+
+test('agreed arrangements use the latest Auckland arrival and omit missing estimates',()=>{
+ assert.deepEqual(agreedJobDetails('2026-11-19T22:00:00Z',' 2 hours '),{arrival:'Fri 20 Nov 2026, 11:00 am',duration:'2 hours'})
+ assert.deepEqual(agreedJobDetails('2026-11-20T00:00:00Z',''),{arrival:'Fri 20 Nov 2026, 1:00 pm',duration:null})
+ assert.deepEqual(agreedJobDetails(null,null),{arrival:null,duration:null})
+})
+
+test('offer submission navigates to a persistent job banner only after database success',async()=>{
+ let writeError=true,existing=false,destination
+ let writes=0
+ const {sendOffer}=compile(await source('../provider-web/src/app/work-actions.ts'),{
+  '@shared/categories':{},'@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,
+  'next/navigation':{redirect(path){destination=path;throw Error('redirect')}},'next/cache':{revalidatePath(){}},
+  '@/lib/job-input':{},'@/lib/booking-detail':{},'@/lib/offer-input':{offerInput:()=>({ok:true,value:{amount:50}})},
+  '@/lib/auth':{requireProvider:async()=>({user:{id:'provider'},supabase:{
+   from:table=>table==='jobs_public'?{select:()=>({eq:()=>({single:async()=>({data:{requester_id:'owner',status:'open'}})})})}:{
+    select:()=>({eq:()=>({eq:()=>({in:async()=>({data:existing?[{id:'offer'}]:[]})})})}),
+    insert:async()=>{writes++;return {error:writeError?{}:null}},
+   },
+  }})},
+ })
+ const data=new FormData()
+ data.set('job_id','job')
+ assert.match((await sendOffer({error:''},data)).error,/details are kept/)
+ assert.equal(destination,undefined)
+ existing=true
+ assert.match((await sendOffer({error:''},data)).error,/already have an offer/)
+ assert.equal(writes,1)
+ existing=false;writeError=false
+ await assert.rejects(sendOffer({error:''},data),/redirect/)
+ assert.equal(destination,'/jobs/job?offered=1')
 })

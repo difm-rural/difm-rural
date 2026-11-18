@@ -240,6 +240,8 @@ a.row:hover { background: var(--sage); }
 .home-onthego-more { margin: 8px 0 0; font-size: 12px; }
 .home-clear { display: flex; align-items: center; gap: 10px; color: var(--forest); font-size: 14px; line-height: 1.6; }
 /* Prominent confirmation of a just-completed action (posted / accepted / confirmed). */
+.job-success.status-banner { background: var(--forest-deep); color: #fff; margin-bottom: 12px; }
+.job-success a { color: inherit; text-decoration: underline; }
 .status-banner { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--sage); color: var(--forest-deep); font-size: 15px; font-weight: 750; }
 /* Compact "all caught up" status row (replaces attention card + tiles) */
 .home-status { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 16px; }
@@ -334,6 +336,7 @@ a.row:hover { background: var(--sage); }
 .activity-segments a[aria-current="page"] { background: var(--forest); color: white; }
 .activity-segments span { font-size: 12px; opacity: .8; }
 .activity-action { border-top: 1px solid var(--line); padding: 16px 0; }
+.activity-action summary.lform-save { min-height: 44px; color: #fff; }
 .activity-action summary { min-height: 30px; color: var(--forest-deep); cursor: pointer; font-weight: 700; }
 .activity-action .lform { margin-top: 14px; }
 .activity-confirm { display: flex; align-items: start; gap: 10px; line-height: 1.6; font-size: 14px; }

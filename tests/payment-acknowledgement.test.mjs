@@ -40,7 +40,7 @@ test('payment remains visible and shows only authorised primary actions',()=>{
   const sorted=card({canUpdate,sortedAt:'2026-11-17T03:00Z'})
   assert.ok(text(sorted,'h2','Payment'))
   assert.ok(text(sorted,'strong',copy.sorted))
-  assert.ok(text(sorted,'p',copy.sortedDetail))
+  assert.equal(text(sorted,'p',copy.reminder),false)
   assert.equal(!!button(sorted,copy.undo),canUpdate)
  }
 })
@@ -75,8 +75,10 @@ test('both failures preserve the existing status and feedback is accessible',()=
   assert.ok(failed.some(n=>n.props.role==='alert'&&n.props.children===copy.error))
   const pending=card({sortedAt,pending:true})
   assert.ok(button(pending,'Saving…').props.disabled)
-  const message=sortedAt?copy.saved:copy.removed
-  assert.ok(card({sortedAt,state:{error:'',success:message}}).some(n=>n.props.role==='status'&&n.props.children===message))
+  const message=sortedAt?copy.sorted:copy.removed
+  const updated=card({sortedAt,state:{error:'',success:message}})
+  assert.equal(updated.filter(n=>n.props.role==='status').length,1)
+  assert.ok(sortedAt?text(updated,'strong',message):text(updated,'p',message))
  }
 })
 
@@ -134,7 +136,8 @@ test('mobile mark and Undo use one RPC, preserve status on errors, and restore t
  assert.ok(act('Saving…').props.disabled)
  respond()
  await marking
- assert.ok(has(copy.sorted)&&has(copy.saved))
+ assert.ok(has(copy.sorted))
+
 
  act(copy.undo).props.onPress()
  assert.equal(confirmation[0],copy.undoTitle)

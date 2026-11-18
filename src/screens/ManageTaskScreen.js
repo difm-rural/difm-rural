@@ -1,3 +1,4 @@
+import {JobArrangementSummary,JobStatusNotice} from '../components/JobArrangementSummary'
 import { formatOfferAvailability } from '../../shared/offers'
 import {formatDate as nzDate,formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -95,6 +96,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   const { job: initialJob, bidCount = 0 } = route.params
   const [job, setJob] = useState(initialJob)
   const [acceptedBid, setAcceptedBid] = useState(null)
+  const [offerAccepted,setOfferAccepted] = useState(false)
   const [invites, setInvites] = useState([])
   const [requesterProfile, setRequesterProfile] = useState(null)
   const [loadingBid, setLoadingBid] = useState(false)
@@ -179,7 +181,7 @@ export default function ManageTaskScreen({ navigation, route }) {
   async function fetchAcceptedBid() {
     const { data: bidData } = await supabase
       .from('bids')
-      .select('id, provider_id, amount, pricing_type, materials, payment_method, payment_sorted_at, payment_sorted_by')
+      .select('id, provider_id, amount, pricing_type, estimated_duration, materials, payment_method, payment_sorted_at, payment_sorted_by')
       .eq('job_id', job.id)
       .eq('status', 'accepted')
       .single()
@@ -196,6 +198,7 @@ export default function ManageTaskScreen({ navigation, route }) {
         avatarUrl: provProfile?.avatar_url || null,
         bidAmount: bidData.amount,
         pricingType: bidData.pricing_type,
+        duration: bidData.estimated_duration,
         materials: bidData.materials,
         paymentMethod: bidData.payment_method || null,
         paymentSortedAt: bidData.payment_sorted_at || null,
@@ -266,7 +269,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                 return
               }
               setJob(prev => ({ ...prev, status: 'accepted' }))
-              Alert.alert('Offer accepted.', `${provName} has been notified.`)
+              setOfferAccepted(true)
             } catch {
               Alert.alert('Could not accept offer', 'Refresh to check whether the offer was accepted before trying again.')
             } finally {
@@ -527,6 +530,8 @@ export default function ManageTaskScreen({ navigation, route }) {
         <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
       <Text style={styles.headerTitle} accessibilityRole="header">Manage job</Text>
+      {job.status==='completed'&&<JobStatusNotice>Job completed.</JobStatusNotice>}
+      {offerAccepted&&job.status==='accepted'&&<JobStatusNotice>Offer accepted.</JobStatusNotice>}
       <Text style={styles.headerSubtitle} numberOfLines={2}>{job.title}</Text>
     </View>
     </View>
@@ -596,6 +601,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}>
 
           <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
+          {job.status!=='cancelled'&&<JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={acceptedBid?.duration}/>}
 
           {job.status === 'accepted' ? (
             (isTaskOwner && !jobConfirmed) ? (

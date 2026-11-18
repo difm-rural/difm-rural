@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AiJobAssistant, { JobAiChoice } from '../../components/AiJobAssistant'
 import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
 import { photoToJobEnabled } from '../../lib/jobPrimaryPhoto'
-import { jobDraftCategory } from '../../../shared/categories'
+import { fillJobDraftFields } from '../../../shared/jobSuggestion'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
@@ -203,12 +203,14 @@ export default function PostJobStep1JobType({ navigation, route }) {
     ? Math.max(0, Math.round((dateTo - dateFrom) / 86400000))
     : null
 
+  const [suggestionFeedback, setSuggestionFeedback] = useState('')
   function applySuggestion(suggestion) {
-    setTitle(value=>value.trim()?value:(suggestion.title || '').slice(0,POSTING_TITLE_MAX))
-    updateJobData({
-      description:jobData.description||(suggestion.description || '').slice(0,POSTING_DESCRIPTION_MAX),
-      category:jobData.category||jobDraftCategory(suggestion.category),
-    })
+    const result=fillJobDraftFields({title,description:jobData.description || '',category:jobData.category || ''},suggestion)
+    if (!result) return false
+    setTitle(result.fields.title)
+    updateJobData(result.fields)
+    setSuggestionFeedback(result.changed?'Suggestion applied. Review and edit the details as needed.':'Your existing job details were kept.')
+    return true
   }
 
   function handleBack() {
@@ -264,6 +266,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
             )}
           </View>
 
+          {!!suggestionFeedback&&<Text accessibilityLiveRegion="polite" style={styles.hintText}>{suggestionFeedback}</Text>}
           {!isEditMode && !isRepeatMode && <View style={styles.aiHelper}>
             <TouchableOpacity style={styles.aiToggle} onPress={() => setAiExpanded(value => !value)}
               accessibilityRole="button" accessibilityState={{expanded:aiExpanded}}>
@@ -289,12 +292,13 @@ export default function PostJobStep1JobType({ navigation, route }) {
               </>}
               <AiJobAssistant onUse={draft=>{
                 const suggestion=draftToJobData(draft)
-                applySuggestion(suggestion)
+                if (!applySuggestion(suggestion)) return false
                 if (!scheduleType) {
                   setScheduleType(suggestion.scheduleType)
                   setScheduledDate(suggestion.scheduledDate ? localDate(suggestion.scheduledDate) : null)
                 }
                 if (!jobData.price) updateJobData({price:suggestion.price,priceType:suggestion.priceType})
+                return true
               }}/>
             </View>
           </View>}
