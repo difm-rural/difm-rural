@@ -24,6 +24,7 @@ import JobsTabScreen     from '../screens/tabs/JobsTabScreen'
 import BrowseTabScreen   from '../screens/tabs/BrowseTabScreen'
 import ActivityTabScreen from '../screens/tabs/ActivityTabScreen'
 import AccountTabScreen  from '../screens/tabs/AccountTabScreen'
+import ConnectedAssistantsScreen from '../screens/ConnectedAssistantsScreen'
 import NotificationsScreen from '../screens/NotificationsScreen'
 import HowItWorksScreen from '../screens/HowItWorksScreen'
 import { onBadgeRefresh, requestBadgeRefresh } from '../lib/badgeEvents'
@@ -220,6 +221,7 @@ function AccountStackNav() {
       <AccountNav.Screen name="Connections"       component={ConnectionsScreen}        />
       <AccountNav.Screen name="ConnectionDetail"  component={ConnectionDetailScreen}   />
       <AccountNav.Screen name="SavedInterests"     component={SavedInterestsScreen}     />
+      <AccountNav.Screen name="ConnectedAssistants" component={ConnectedAssistantsScreen} />
       <AccountNav.Screen name="HowItWorks"         component={HowItWorksScreen}         />
     </AccountNav.Navigator>
   )

@@ -690,6 +690,10 @@ export default function AccountTabScreen({ navigation, route }) {
           onPress={() => navigation.navigate('SavedInterests')}
         />
         <HubButton
+          icon="sparkles-outline" label="Connected assistants" sub="AI assistants that can search and read your activity"
+          onPress={() => navigation.navigate('ConnectedAssistants')}
+        />
+        <HubButton
           icon="person-outline" label="Profile" sub="Photo, name, bio, skills"
           onPress={() => setSection('profile')}
         />

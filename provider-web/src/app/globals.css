@@ -827,3 +827,14 @@ a.row:hover { background: var(--sage); }
 .payment-ack-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
 .work-page .activity-action > summary:focus-visible, .work-page button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* OAuth consent + Connected assistants */
+.consent-list { margin: 14px 0; padding-left: 20px; display: grid; gap: 6px; line-height: 1.45; }
+.consent-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.consent-actions form { display: contents; }
+.consent-actions button { min-width: 120px; }
+.assistant-list { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 10px; }
+.assistant-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
+.assistant-row span { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.assistant-row small { color: var(--muted, #5d6b62); }
+@media (max-width: 620px) { .consent-actions { flex-direction: column-reverse; } .consent-actions button { width: 100%; } .assistant-row { grid-template-columns: auto 1fr; } .assistant-row form { grid-column: 1 / -1; } .assistant-row form button { width: 100%; } }
