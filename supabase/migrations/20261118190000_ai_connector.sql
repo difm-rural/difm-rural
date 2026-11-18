@@ -11,11 +11,11 @@
 -- The tools themselves then read as the member, so normal RLS applies.
 
 -- ---------------------------------------------------------------------------
--- Global switch (single row)
+-- Global switch (single row). Starts OFF: an admin turns it on in admin-web.
 -- ---------------------------------------------------------------------------
 create table public.ai_settings (
   id boolean primary key default true check (id),
-  ai_enabled boolean not null default true,
+  ai_enabled boolean not null default false,
   updated_at timestamptz not null default now(),
   updated_by uuid references auth.users (id) on delete set null
 );

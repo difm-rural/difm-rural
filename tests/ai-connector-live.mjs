@@ -3,8 +3,8 @@
 //
 //   node --import ./tests/support/ts-resolve.mjs tests/ai-connector-live.mjs
 //
-// Optional third member (otherwise only two members are checked):
-//   $env:AI_LIVE_THIRD_EMAIL='…'; $env:AI_LIVE_THIRD_PASSWORD='…'
+// Members: test.requester, test.provider and test.other @difmrural.test (all
+// created by normal sign-up, password as in tests/e2e-job-flow.js).
 //
 // What it checks, as three signed-in members (requester R, provider P, other O):
 //   1. RLS + tool rules: each tool's output only contains what that member may
@@ -52,11 +52,15 @@ function noAddress(value, label) {
 
 const R = await signIn('test.requester@difmrural.test', PASSWORD)
 const P = await signIn('test.provider@difmrural.test', PASSWORD)
-const O = process.env.AI_LIVE_THIRD_EMAIL ? await signIn(process.env.AI_LIVE_THIRD_EMAIL, process.env.AI_LIVE_THIRD_PASSWORD) : null
-const members = [R, P, O].filter(Boolean)
+const O = await signIn('test.other@difmrural.test', PASSWORD)
+const members = [R, P, O]
 console.log(`Signed in ${members.length} members: ${members.map(m => m.email).join(', ')}`)
 const ids = members.map(m => `'${m.user.id}'`).join(',')
 let jobId = null
+// ai_enabled defaults to OFF in production. Remember it, turn it on only for
+// this run (the gate refuses everything otherwise), and restore it afterwards.
+const originalEnabled = sql('select ai_enabled from public.ai_settings where id')[0]?.ai_enabled === true
+sql('update public.ai_settings set ai_enabled = true where id')
 
 try {
   // ---- Test data: a hidden-address job by R, an offer by P, a chat between them.
@@ -164,7 +168,7 @@ try {
     sql(`update public.ai_settings set ai_enabled = false where id`)
     try {
       for (const m of members) assert.equal((await runGatedTool(m.client, 'search_jobs', async () => ({}))).reason, 'denied_disabled')
-    } finally { sql(`update public.ai_settings set ai_enabled = true where id`) }
+    } finally { sql(`update public.ai_settings set ai_enabled = true where id`) } // back on for the rest of the run
     assert.equal((await runGatedTool(P.client, 'search_jobs', async () => ({}))).ok, true)
   })
 
@@ -184,7 +188,8 @@ try {
     if (error) console.log(`⚠ Could not delete test job ${jobId}: ${error.message}`)
   }
   try {
-    sql(`delete from public.ai_tool_calls where user_id in (${ids}); delete from public.ai_member_pauses where user_id in (${ids}); update public.ai_settings set ai_enabled = true where id;`)
+    sql(`delete from public.ai_tool_calls where user_id in (${ids}); delete from public.ai_member_pauses where user_id in (${ids}); update public.ai_settings set ai_enabled = ${originalEnabled} where id;`)
+    console.log(`ai_enabled restored to ${originalEnabled}`)
   } catch (err) { console.log('⚠ Cleanup of audit rows failed:', err.message) }
   for (const m of members) await m.client.auth.signOut({ scope: 'local' }).catch(() => {})
 }

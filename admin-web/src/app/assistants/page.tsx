@@ -21,7 +21,7 @@ export default async function AssistantsPage({ searchParams }: { searchParams: P
     supabase.from('ai_settings').select('ai_enabled, updated_at').eq('id', true).maybeSingle(),
     supabase.rpc('ai_admin_members'),
   ])
-  const enabled = settings?.ai_enabled !== false
+  const enabled = settings?.ai_enabled === true
   const rows = (members || []) as MemberRow[]
 
   return (

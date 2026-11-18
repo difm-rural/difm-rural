@@ -26,7 +26,7 @@ than 60 calls/minute or 1,000/day per member, and writes `ai_tool_calls`
 
 ## Turning it on (production steps, ask first)
 
-1. `supabase db push` (applies the migration).
+1. `supabase db push`: `20261118190000_ai_connector.sql` is applied (2026-11-18) with `ai_enabled` OFF. `20261118200000_assistant_tokens_read_only.sql` must be applied BEFORE the OAuth server is enabled.
 2. Dashboard → Authentication → **OAuth Server**: enable, authorization path
    `/oauth/consent`, allow dynamic client registration. The consent screen
    is provider-web's `/oauth/consent`, so the **Auth Site URL must be the

@@ -238,3 +238,18 @@ test('rc-mcp has no service-role client and reads jobs only through jobs_public'
   assert.match(files[0], /withSupabase\(\{ auth: 'user'/)
   assert.match(files[0], /client_id/)
 })
+
+test('AI access starts OFF and assistant tokens are read-only in the database', () => {
+  const connector = readFileSync(new URL('../supabase/migrations/20261118190000_ai_connector.sql', import.meta.url), 'utf8')
+  assert.match(connector, /ai_enabled boolean not null default false/)
+  const guard = readFileSync(new URL('../supabase/migrations/20261118200000_assistant_tokens_read_only.sql', import.meta.url), 'utf8')
+  assert.match(guard, /select \(auth\.jwt\(\) ->> 'client_id'\) is not null/)
+  const functions = [...guard.matchAll(/^CREATE OR REPLACE FUNCTION (public\.\w+)/gm)].map(m => m[1])
+  assert.equal(functions.length, 19)
+  assert.equal((guard.match(/perform public\.refuse_assistant_token\(\);/g) || []).length, 19)
+  for (const fn of ['accept_job_offer', 'confirm_job', 'mark_job_payment_sorted', 'set_job_payment_method', 'set_work_arrival_window', 'ai_admin_set_enabled']) assert.ok(functions.includes('public.' + fn), fn)
+  assert.ok(!functions.includes('public.ai_begin_tool_call'), 'the rc-mcp gate must stay callable')
+  for (const table of ['public.jobs', 'public.bids', 'public.bookings', 'public.messages', 'public.profiles', 'storage.objects']) {
+    for (const cmd of ['insert', 'update', 'delete']) assert.ok(guard.includes(`"Assistants cannot ${cmd}" on ${table} as restrictive`), `${table} ${cmd}`)
+  }
+})
