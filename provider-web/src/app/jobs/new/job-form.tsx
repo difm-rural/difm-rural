@@ -1,5 +1,6 @@
 'use client'
 import {JobPhotoDraft,type PhotoSuggestion} from '@/components/job-photo-draft'
+import {JobEditPhotoImage,JobEditPhotos,type JobEditablePhoto,type JobPrivatePhoto} from '@/components/job-edit-photos'
 import {JobAiChoiceCopy,JobTextDraft,revealJobAiContent} from '@/components/job-text-draft'
 import {jobPhotoRequest,prepareJobPhoto} from '@/lib/job-primary-photo'
 import {JobAddressInput} from '@/components/job-address-input'
@@ -27,8 +28,9 @@ import { createClient } from '@/lib/supabase/client'
 import { postJob, editJob } from '../../work-actions'
 
 type Draft={primary_photo_required:boolean;also_public:boolean;category:string;title:string;description:string;price_type:string;price:string;location:string;area:string;location_note:string;hide_exact_location:boolean;latitude:string;longitude:string;schedule_type:string;scheduled_date:string;date_from:string;date_to:string;materials_type:string;access_conditions:string[];photos:string[]}
-export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,privatePrimaryPhoto=false}:{userId:string;seed?:JobSeed;mode?:'new'|'edit'|'repeat';offerCount?:number;inviteProvider?:{id:string;name:string};privatePrimaryPhoto?:boolean}){
+export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,privatePhotos}:{userId:string;seed?:JobSeed;mode?:'new'|'edit'|'repeat';offerCount?:number;inviteProvider?:{id:string;name:string};privatePhotos?:JobPrivatePhoto[]}){
  const [primaryPhoto,setPrimaryPhoto]=useState<File|null>(null)
+ const [editPhotos,setEditPhotos]=useState<JobEditablePhoto[]>(privatePhotos??[])
  const [submitting,setSubmitting]=useState(false)
  const [attempted,setAttempted]=useState(false),[furthest,setFurthest]=useState(0)
  const initial:Draft={primary_photo_required:false,also_public:false,category:seed?.category || '',title:seed?.title || '',description:seed?.description || '',price_type:seed?.price_type || 'open',price:seed?.price==null?'':String(seed.price),location:seed?.location_name || '',area:seed?.location_area || '',location_note:seed?.location_note || '',hide_exact_location:seed?.hide_exact_location ?? true,latitude:seed?.latitude==null?'':String(seed.latitude),longitude:seed?.longitude==null?'':String(seed.longitude),schedule_type:editorScheduleType(seed||{}),scheduled_date:nzCalendarDay(seed?.scheduled_date) || '',date_from:seed?.date_from || '',date_to:seed?.date_to || '',materials_type:seed?.materials_type || 'none',access_conditions:seed?.access_conditions || [],photos:seed?.photos || []}
@@ -177,6 +179,14 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
     const {checksum}=await jobPhotoRequest<{checksum:string}>('job-primary-media',photo,jobId)
     data.set('primary_photo_checksum',checksum)
    }
+   if(privatePhotos){
+    const gallery=[]
+    for(const {id,slot,file} of editPhotos){
+     const upload=file?await jobPhotoRequest<{checksum:string}>('job-primary-media?action=stage-edit&job='+jobId,await prepareJobPhoto(file),id):null
+     gallery.push({id,slot,checksum:upload?.checksum})
+    }
+    data.set('private_gallery',JSON.stringify({expected:privatePhotos.map(photo=>photo.id).sort(),photos:gallery}))
+   }
    startTransition(()=>action(data))
    return true
   },()=>{setSubmitting(true);setError('')},()=>setSubmitting(false),()=>setError('Could not save the job. Your changes are kept. Check your connection and try again.'))
@@ -228,14 +238,18 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
    <label className="lform-field">Location note (optional)<textarea maxLength={2000} value={draft.location_note} onChange={e=>set('location_note',e.target.value)} placeholder="Gate, entrance or arrival directions"/></label>
   </div>}
   {step===2&&<div className="lform-step"><label className="lform-field">What needs doing? *<textarea rows={6} maxLength={POSTING_DESCRIPTION_MAX} {...field('description')} value={draft.description} onChange={e=>set('description',e.target.value)} placeholder="Describe the work, size, access and anything people should know."/>{issue('description')}<small className="muted">{draft.description.length} / {POSTING_DESCRIPTION_MAX} characters</small></label>
-   <h3>Photos (optional)</h3><p className="muted">Up to six photos. Job photos are public: leave out private details and identifying location information.</p><div className="lform-photos">{draft.photos.map((url,i)=><div className="lform-photo" key={url}><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a><button type="button" className="lform-photo-remove" aria-label={'Remove photo '+(i+1)} onClick={()=>set('photos',draft.photos.filter(p=>p!==url))}>×</button></div>)}</div>
-   {privatePrimaryPhoto&&<p className="muted">This job already has a primary photo. It will stay with the job.</p>}
-   {!privatePrimaryPhoto&&!draft.primary_photo_required&&draft.photos.length<6&&<label className="lform-field">Add photos<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{void upload(e.target.files);e.target.value=''}}/></label>}
+   <h3>Photos (optional)</h3><p className="muted">Photos help providers understand the work. Who can view them depends on your job's visibility. Add up to six photos.</p>
+   {(!privatePhotos&&!draft.primary_photo_required||draft.photos.length>0)&&<p className="muted">Photos using older public links can be opened by anyone with the link. Leave out private details.</p>}
+   {privatePhotos&&<JobEditPhotos jobId={jobId} photos={editPhotos} legacyCount={draft.photos.length} onChange={setEditPhotos} onError={setError}/>}
+   <div className="lform-photos">{draft.photos.map((url,i)=><div className="lform-photo" key={url}><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a><button type="button" className="lform-photo-remove" aria-label={'Remove photo '+(i+1)} onClick={()=>set('photos',draft.photos.filter(p=>p!==url))}>×</button></div>)}</div>
+   {!privatePhotos&&!draft.primary_photo_required&&draft.photos.length<6&&<label className="lform-field">Add photos<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{void upload(e.target.files);e.target.value=''}}/></label>}
    <h3>Site access (optional)</h3><div className="account-checkboxes">{Object.entries({...ACCESS,...Object.fromEntries(draft.access_conditions.filter(c=>!(c in ACCESS)).map(c=>[c,c]))}).map(([value,label])=><label key={value}><input type="checkbox" checked={draft.access_conditions.includes(value)} onChange={e=>set('access_conditions',e.target.checked?[...draft.access_conditions,value]:draft.access_conditions.filter(c=>c!==value))}/>{label}</label>)}</div>
   </div>}
   {step===3&&<div className="lform-step"><label className="lform-field">Budget<select value={draft.price_type} onChange={e=>set('price_type',e.target.value)}><option value="open">Open to offers</option><option value="fixed">Set a budget</option></select></label>{draft.price_type==='fixed'&&<label className="lform-field">Budget ($) *<input type="number" inputMode="decimal" min="0.01" max={MAX_POSTING_AMOUNT} step="0.01" {...field('price')} value={draft.price} onChange={e=>set('price',e.target.value)}/>{issue('price')}</label>}<label className="lform-field">Materials<select value={draft.materials_type} onChange={e=>set('materials_type',e.target.value)}>{Object.entries(MATERIALS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><p className="muted">Agree the final scope, timing and payment directly with the provider. Rural Connections does not handle payments.</p></div>}
   <input type="hidden" name="category" value={CATEGORIES.includes(selectedCategory)?selectedCategory:''}/>
-  {step===4&&<article className="card work-detail"><h3>{draft.title}</h3>{draft.primary_photo_required&&photoEditor(false)}<label className="lform-field">Category<select value={selectedCategory} onChange={e=>set('category',e.target.value)}>
+  {step===4&&<article className="card work-detail"><h3>{draft.title}</h3>{draft.primary_photo_required&&photoEditor(false)}
+   {editPhotos.length>0&&<div className="lform-photos">{editPhotos.map(photo=><div className="lform-photo" key={photo.id}><JobEditPhotoImage jobId={jobId} photo={photo}/></div>)}</div>}
+   <label className="lform-field">Category<select value={selectedCategory} onChange={e=>set('category',e.target.value)}>
     {!selectedCategory&&<option value="" disabled>Choosing a category…</option>}
     {selectedCategory&&!CATEGORIES.includes(selectedCategory)&&<option value={selectedCategory}>{selectedCategory}</option>}
     {CATEGORIES.map(value=><option key={value} value={value}>{value}</option>)}

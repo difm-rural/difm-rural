@@ -1,14 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { validId } from '@/lib/job-input'
 
-export async function GET(_:Request,{params}:{params:Promise<{id:string}>}) {
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}) {
  const {id}=await params
+ const photo=new URL(request.url).searchParams.get('photo')
  const headers={'Cache-Control':'private, no-store','Vary':'Cookie','X-Content-Type-Options':'nosniff'}
- if(!validId(id))return new Response(null,{status:404,headers})
+ if(!validId(id)||(photo!==null&&!validId(photo)))return new Response(null,{status:404,headers})
  try{
   const client=await createClient()
   const {data:{session}}=await client.auth.getSession()
-  const image=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/job-primary-media?job='+id,{
+  const image=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/job-primary-media?job='+id+(photo?'&photo='+photo:''),{
    headers:{apikey:process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,...(session?{Authorization:'Bearer '+session.access_token}:{})},
    cache:'no-store',signal:AbortSignal.timeout(12000),
   })

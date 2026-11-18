@@ -34,7 +34,18 @@ Deno.test('mocked Edge transport validates image bytes, authorization, retry and
       const body=await request.json()
       return Response.json(visible&&body.p_job===job?key:null)
     }
+    if(path.endsWith('/read_job_gallery_photo')){
+      const body=await request.json()
+      return Response.json(visible&&body.p_job===job&&body.p_photo===lease?key:null)
+    }
     if(path.endsWith('/reserve_job_primary_media'))return Response.json(key)
+    if(path.endsWith('/reserve_job_edit_photo')){
+      const body=await request.json()
+      assert.equal(body.p_owner,requester)
+      assert.equal(body.p_job,lease)
+      assert.equal(body.p_draft,job)
+      return Response.json(key)
+    }
     if(path.endsWith('/confirm_job_primary_upload')){
       const body=await request.json()
       assert.equal(body.p_owner,requester)
@@ -95,6 +106,8 @@ Deno.test('mocked Edge transport validates image bytes, authorization, retry and
   assert.ok(!new TextDecoder().decode(uploaded).includes('GPS marker fixture'))
   const upload=await first.json()
   assert.deepEqual(await (await media(imageRequest())).json(),upload)
+  const editStage=new Request('https://fixture.test/?action=stage-edit&job='+lease,imageRequest())
+  assert.deepEqual(await (await media(editStage)).json(),upload)
   const publication=(headers:HeadersInit=auth, overrides={})=>new Request('https://fixture.test/?action=publish',{
     method:'POST',headers:{...headers,'Content-Type':'application/json'},
     body:JSON.stringify({draftId:job,checksum:upload.checksum,details:{title:'Fix gate'},ownerId:job,
@@ -119,7 +132,10 @@ Deno.test('mocked Edge transport validates image bytes, authorization, retry and
   const allowed=await media(read())
   assert.equal(allowed.status,200)
   assert.equal(allowed.headers.get('Cache-Control'),'private, no-store')
+  const galleryRead=()=>new Request('https://fixture.test/?job='+job+'&photo='+lease)
+  assert.equal((await media(galleryRead())).status,200)
   visible=false
+  assert.equal((await media(galleryRead())).status,404)
   assert.equal((await media(read())).status,404)
   assert.equal((await ai(imageRequest({}))).status,401)
   assert.equal((await ai(imageRequest({...auth,'x-job-photo-note':'%bad%'}))).status,400)

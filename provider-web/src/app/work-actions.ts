@@ -54,8 +54,19 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
   const moved=!!current && (input.value.location_name!==current.location_name || input.value.latitude!==current.latitude || input.value.longitude!==current.longitude)
   const areaPatch=moved?{area_polygon:null,area_hectares:null}:{}
   if(editing){
-    const {data:rows,error}=await supabase.from('jobs').update({...input.value,category:await resolveCategory(),...areaPatch}).eq('id',id).eq('requester_id',user.id).eq('status','open').select('id')
-    if(error || !rows?.length)return {error:'Could not save. The job may have changed or been accepted. Your changes remain in the form; refresh its status before retrying.'}
+    const details={...input.value,category:await resolveCategory()}
+    const gallery=text(data,'private_gallery')
+    if(gallery){
+      let edit
+      try{edit=JSON.parse(gallery)}catch{return {error:'Could not read your photo changes. Refresh and try again.'}}
+      if(!Array.isArray(edit?.expected)||!Array.isArray(edit.photos)||edit.expected.length>6||edit.photos.length>6)
+        return {error:'Choose up to six job photos.'}
+      const {data:saved,error}=await supabase.rpc('save_job_with_private_photos',{p_job:id,p_details:details,p_expected:edit.expected,p_photos:edit.photos})
+      if(error||saved!==id)return {error:'Could not save the job and photos. The job may have changed, or a photo may need uploading again. Your changes are kept.'}
+    }else{
+      const {data:rows,error}=await supabase.from('jobs').update({...details,...areaPatch}).eq('id',id).eq('requester_id',user.id).eq('status','open').select('id')
+      if(error || !rows?.length)return {error:'Could not save. The job may have changed or been accepted. Your changes remain in the form; refresh its status before retrying.'}
+    }
     // Tidy the card thumbnails of photos removed in this edit (missing ones are fine).
     const removed=removedThumbPaths(current?.photos,input.value.photos,'job-photos')
     if(removed.length){try{await supabase.storage.from('job-photos').remove(removed)}catch{/* ignore */}}

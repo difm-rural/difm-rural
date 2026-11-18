@@ -16,7 +16,7 @@ const source=await readFile(new URL('../provider-web/src/app/jobs/new/job-form.t
 const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
 function harness(storage,seed,{
  check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}}),jobExists=false,
- photoEnabled=false,uploadPhoto=async()=>({checksum:'a'.repeat(64)}),
+ photoEnabled=false,uploadPhoto=async()=>({checksum:'a'.repeat(64)}),privatePhotos,
 }={}){
  const state=[],refs=[],effects=[],dependencies=[],cleanups=[],submissions=[],destinations=[]
  let index=0,refIndex=0,effectIndex=0,tree,actionState={error:''}
@@ -31,6 +31,7 @@ function harness(storage,seed,{
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='@/components/job-address-input')return {JobAddressInput:'job-address'}
   if(name==='@/components/job-photo-draft')return {JobPhotoDraft:'job-photo-draft'}
+  if(name==='@/components/job-edit-photos')return {JobEditPhotos:'job-edit-photos',JobEditPhotoImage:'job-edit-photo-image'}
   if(name==='@/components/job-text-draft')return {JobTextDraft:'job-text-draft',JobAiChoiceCopy:'job-ai-choice-copy'}
   if(name==='@/lib/job-primary-photo')return {prepareJobPhoto:async file=>file,jobPhotoRequest:uploadPhoto}
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
@@ -57,7 +58,7 @@ function harness(storage,seed,{
  },Date,console,process:{env:{NEXT_PUBLIC_PHOTO_TO_JOB:photoEnabled?'true':'false'}},AbortController,
  FormData:class {constructor(fields){Object.assign(this,fields)}set(key,value){this[key]=value}},
  sessionStorage:storage,crypto:{randomUUID:()=> 'test-job-id'},document:{querySelector:()=>null}})
- const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new'});effects.splice(0).forEach(fn=>fn())}
+ const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new',privatePhotos});effects.splice(0).forEach(fn=>fn())}
  const nodes=(node=tree)=>!node||typeof node!=='object'?[]:[node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
  const click=label=>{nodes().find(n=>n.type==='button'&&(text(n)===label||label==='Next'&&text(n)==='Next — Location')).props.onClick();render()}
@@ -169,6 +170,34 @@ test('invalid public area is highlighted and cannot advance to Details',()=>{
 })
 
 const datedJob={id:'edit-job',title:'Repair fence',description:'Fence repair',category:categories.CATEGORIES[0],schedule_type:'specific',scheduled_date:'2030-12-01',location_area:'Waitoki'}
+test('private gallery changes stay local until Save and retry with the same staged ID',async()=>{
+ const original={id:'old-photo',slot:0},replacement={id:'replacement',slot:0,file:{name:'gate.jpg'}}
+ const uploads=[]
+ let fail=true
+ const h=harness(storageWith(),datedJob,{privatePhotos:[original],uploadPhoto:async(endpoint,file,id)=>{
+  uploads.push({endpoint,id})
+  if(fail)throw Error('Temporary upload failure')
+  return {checksum:'a'.repeat(64)}
+ }})
+ await h.flush()
+ h.click('Next');h.click('Next')
+ const editor=h.nodes().find(n=>n.type==='job-edit-photos')
+ assert.equal(editor.props.photos[0],original)
+ editor.props.onChange([replacement]);h.render()
+ assert.equal(uploads.length,0)
+ h.click('Next');h.click('Next')
+ await h.submit()
+ h.render()
+ assert.equal(h.submissions.length,0)
+ fail=false
+ await h.submit()
+ assert.equal(uploads.length,2)
+ assert.deepEqual(uploads[0],uploads[1])
+ assert.equal(uploads[1].endpoint,'job-primary-media?action=stage-edit&job=edit-job')
+ assert.deepEqual(JSON.parse(h.submissions[0].private_gallery),{
+  expected:['old-photo'],photos:[{id:'replacement',slot:0,checksum:'a'.repeat(64)}],
+ })
+})
 test('specific-date editing exposes the saved choice and submits exactly one matching timing field',()=>{
  const h=harness(undefined,datedJob)
  const timing=h.nodes().find(n=>n.props?.name==='schedule_type'&&n.props.checked)

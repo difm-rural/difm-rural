@@ -36,21 +36,26 @@ Deno.serve(async request => {
     const user = token ? (await authClient.auth.getUser(token)).data.user : null
     if (auth && !user) return answer(401,{error:'unauthorised'})
     if (request.method === 'GET') {
-      const job = new URL(request.url).searchParams.get('job')
-      if (!uuid(job)) return answer(404,{error:'not_found'})
-      const {data:key,error} = await serviceClient.rpc('read_job_primary_media',{p_job:job,p_viewer:user?.id ?? null})
+      const params = new URL(request.url).searchParams
+      const job = params.get('job'), photo = params.get('photo')
+      if (!uuid(job) || (photo!==null&&!uuid(photo))) return answer(404,{error:'not_found'})
+      const read = () => photo
+        ? serviceClient.rpc('read_job_gallery_photo',{p_job:job,p_viewer:user?.id ?? null,p_photo:photo})
+        : serviceClient.rpc('read_job_primary_media',{p_job:job,p_viewer:user?.id ?? null})
+      const {data:key,error} = await read()
       if (error) return answer(503,{error:'unavailable'})
       if (!key) return answer(404,{error:'not_found'})
       const {data:blob,error:readError} = await storage.download(key)
       if (readError || !blob) return answer(404,{error:'not_found'})
-      const {data:current} = await serviceClient.rpc('read_job_primary_media',{p_job:job,p_viewer:user?.id ?? null})
+      const {data:current} = await read()
       if (current!==key) return answer(404,{error:'not_found'})
       return new Response(blob,{headers:{...cors,'Content-Type':'image/jpeg','X-Content-Type-Options':'nosniff'}})
     }
     if (request.method !== 'POST') return answer(405,{error:'method_not_allowed'})
     if (!user) return answer(401,{error:'unauthorised'})
     if (Deno.env.get('PHOTO_TO_JOB_ENABLED') !== 'true') return answer(503,{error:'disabled'})
-    const action = new URL(request.url).searchParams.get('action')
+    const params = new URL(request.url).searchParams
+    const action = params.get('action')
     if (action === 'publish') {
       let body
       try { body = JSON.parse(new TextDecoder().decode(await readBoundedBody(request,65536))) }
@@ -65,14 +70,19 @@ Deno.serve(async request => {
       })
       return error || id!==body.draftId ? answer(409,{error:'publication_unavailable'}) : answer(200,{id})
     }
-    if (action!==null) return answer(400,{error:'invalid_action'})
+    if (action!==null&&action!=='stage-edit') return answer(400,{error:'invalid_action'})
     const draft = request.headers.get('x-draft-id')
     if (!uuid(draft)) return answer(400,{error:'invalid_draft'})
+    const editJob = action==='stage-edit' ? params.get('job') : null
+    if (action==='stage-edit'&&!uuid(editJob)) return answer(400,{error:'invalid_job'})
     let photo: Uint8Array
     try { photo = await verifiedPhoto(request) } catch { return answer(400,{error:'invalid_photo'}) }
     const digest = await crypto.subtle.digest('SHA-256',new Uint8Array(photo))
     const checksum = Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')
-    const {data:key,error} = await serviceClient.rpc('reserve_job_primary_media',{p_owner:user.id,p_draft:draft,p_checksum:checksum})
+    const reservation = {p_owner:user.id,p_draft:draft,p_checksum:checksum}
+    const {data:key,error} = editJob
+      ? await serviceClient.rpc('reserve_job_edit_photo',{...reservation,p_job:editJob})
+      : await serviceClient.rpc('reserve_job_primary_media',reservation)
     if (error) return answer(409,{error:'photo_reservation_unavailable'})
     if (key) {
       const {error:uploadError} = await storage.upload(key,new Uint8Array(photo),{contentType:'image/jpeg',upsert:false,cacheControl:'0'})

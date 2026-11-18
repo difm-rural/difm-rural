@@ -1,4 +1,5 @@
 import {JobPrimaryImage} from '@/components/job-primary-image'
+import type {JobPrivatePhoto} from '@/components/job-edit-photos'
 import {jobMapTarget} from '@shared/jobMapTarget'
 import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate,formatWorkDateTime as nzDateTime} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
@@ -33,6 +34,10 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
  if(error)throw new Error('Could not load this job. Refresh to try again.');if(!job)notFound()
+ const {data:gallery}=process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'
+  ? await supabase.rpc('list_job_private_photos',{p_job:id})
+  : {data:null}
+ const additionalPhotos=(gallery as JobPrivatePhoto[]|null)?.filter(photo=>photo.slot!==0)??[]
  const {data:watched,error:watchError}=await supabase.from('watchlist').select('id').eq('user_id',user.id).eq('job_id',id).maybeSingle()
  const own=job.requester_id===user.id
  const canAskQuestion=!own&&job.status==='open'
@@ -122,7 +127,11 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    {job.hide_exact_location&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}
    {job.materials_type&&<p>Materials: {MATERIALS[job.materials_type as keyof typeof MATERIALS] || job.materials_type}</p>}
    {job.access_conditions?.length>0&&<p>Site access: {job.access_conditions.map((a:string)=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}
-   {process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&!job.photos?.length&&<div className="job-photo-grid"><JobPrimaryImage key={id} jobId={id}/></div>}
+   {process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&(!job.photos?.length||gallery?.some((photo:JobPrivatePhoto)=>photo.slot===0))&&<div className="job-photo-grid"><JobPrimaryImage key={id} jobId={id}/></div>}
+   {additionalPhotos.length>0&&<div className="job-photo-grid">{additionalPhotos.map((photo,index)=>{
+    const url='/job-media/'+id+'?photo='+photo.id
+    return <a href={url} key={photo.id} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Additional job photo '+(index+1)}/></a>
+   })}</div>}
    {job.photos?.length>0&&<div className="job-photo-grid">{job.photos.map((url:string,i:number)=><a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Job photo '+(i+1)}/></a>)}</div>}
    {!paymentCard&&<p className="muted">Arrange payment directly with the other person. Rural Connections doesn&apos;t handle or verify payments.</p>}
   </article>
