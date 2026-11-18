@@ -17,7 +17,7 @@ import { supabase } from '../lib/supabase'
 import { jobStatusLabel } from '../lib/lifecycle'
 import { jobNextMove } from '../lib/nextMove'
 import { markJobComplete, acceptBid } from '../lib/jobActions'
-import { HOURLY_OFFER_GUIDANCE, initialOfferLines, OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
+import { HOURLY_OFFER_GUIDANCE, initialOfferLines, updateOfferPricingDescription, editOfferPriceDescription, OFFER_PRICING_TYPES, OFFER_MATERIALS_OPTIONS, OFFER_MATERIALS_LABELS, formatOfferAmount, offerStatusLabel } from '../lib/offers'
 import { jobReviewStatus } from '../../shared/jobReviewStatus'
 import ReceivedReview from '../components/ReceivedReview'
 import Icon from '../components/Icon'
@@ -359,7 +359,15 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   function updateLineItem(index, field, value) {
-    setLineItems(prev => prev.map((li, i) => i === index ? { ...li, [field]: value } : li))
+    setLineItems(prev => prev.map((li, i) => {
+      if (i !== index) return li
+      return field === 'label' ? editOfferPriceDescription(li, value) : { ...li, amount: value }
+    }))
+  }
+
+  function changeBidPricingType(pricingType) {
+    setBidPricingType(pricingType)
+    setLineItems(prev => updateOfferPricingDescription(prev, pricingType))
   }
 
   function removeLineItem(index) {
@@ -372,7 +380,7 @@ export default function JobDetailScreen({ route, navigation }) {
 
   function buildLineItemsPayload() {
     return lineItems
-      .filter(li => li.label || li.amount)
+      .filter(li => li.amount || (!li.automaticLabel && li.label))
       .map(li => ({ label: li.label, amount: parseFloat(li.amount) || 0 }))
   }
 
@@ -964,7 +972,7 @@ export default function JobDetailScreen({ route, navigation }) {
           <TouchableOpacity
             key={o.id}
             style={[styles.offerSeg, bidPricingType === o.id && styles.offerSegActive]}
-            onPress={() => setBidPricingType(o.id)}
+            onPress={() => changeBidPricingType(o.id)}
             accessibilityRole="button"
             accessibilityState={{ selected: bidPricingType === o.id }}>
             <Text style={[styles.offerSegText, bidPricingType === o.id && styles.offerSegTextActive]}>{o.label}</Text>

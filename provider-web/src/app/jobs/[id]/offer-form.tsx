@@ -3,7 +3,7 @@ import {useSubmitGuard} from '@/components/action-form'
 import {useState,useEffect,useRef,useActionState} from 'react'
 import {useRouter} from 'next/navigation'
 import Link from '@/components/navigation-link'
-import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,HOURLY_OFFER_GUIDANCE,initialOfferLines,formatOfferAmount} from '@shared/offers'
+import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,HOURLY_OFFER_GUIDANCE,initialOfferLines,updateOfferPricingDescription,editOfferPriceDescription,formatOfferAmount} from '@shared/offers'
 import {formatNzDateOnly,toLocalIsoDate} from '@shared/dates'
 import type {JobSchedule} from '@shared/postingDates'
 import {offerDefaultDay,requestedLabel} from '@shared/requestedDate'
@@ -20,6 +20,10 @@ export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string
  const [materials,setMaterials]=useState(offer?.materials || 'included')
  const [available,setAvailable]=useState(()=>formatNzDateOnly(availableDefault))
  const [duration,setDuration]=useState(offer?.estimated_duration || '')
+ function changePricing(value:string){
+  setPricing(value)
+  setItems(current=>updateOfferPricingDescription(current,value))
+ }
  const guardSubmit=useSubmitGuard(state,pending)
  const total=items.reduce((sum,i)=>sum+(Number(i.amount)||0),0)
  // On success the server has revalidated the job page; a refresh re-renders it
@@ -30,8 +34,8 @@ export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string
  if(state.success)return <div className="lform"><p className="home-clear" role="status" tabIndex={-1} ref={statusRef}>{state.success}</p><Link href="/activity" className="card-link">Track in Activity →</Link></div>
  return <form action={submit} className="lform" aria-busy={pending} onSubmit={guardSubmit}><fieldset disabled={pending} className="work-fieldset">
   <input name="job_id" type="hidden" value={jobId}/>{offer&&<><input name="offer_id" type="hidden" value={offer.id}/><input name="intent" type="hidden" value="edit"/></>}
-  <p className="muted">Your offer is private to you and the requester.</p><label className="lform-field">Pricing basis<select name="pricing_type" value={pricing} onChange={e=>setPricing(e.target.value)}>{OFFER_PRICING_TYPES.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
-  {items.map((item,i)=><div className="lform-repeat" key={i}><div className="lform-repeat-grid"><label className="lform-field">Price line {i+1}<input name="item_label" maxLength={120} placeholder="e.g. Labour" value={item.label} required onChange={e=>setItems(items.map((v,n)=>n===i?{...v,label:e.target.value}:v))}/></label><label className="lform-field">Amount ($)<input name="item_amount" type="number" min="0" max="10000000" step="0.01" required value={item.amount} onChange={e=>setItems(items.map((v,n)=>n===i?{...v,amount:e.target.value}:v))}/></label></div>{items.length>1&&<button type="button" className="lform-repeat-remove" onClick={()=>setItems(items.filter((_,n)=>n!==i))}>Remove line {i+1}</button>}</div>)}
+  <p className="muted">Your offer is private to you and the requester.</p><label className="lform-field">Pricing basis<select name="pricing_type" value={pricing} onChange={e=>changePricing(e.target.value)}>{OFFER_PRICING_TYPES.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
+  {items.map((item,i)=><div className="lform-repeat" key={i}><div className="lform-repeat-grid"><label className="lform-field">Price line {i+1}<input name="item_label" maxLength={120} placeholder="e.g. Labour" value={item.label} required onChange={e=>setItems(items.map((v,n)=>n===i?editOfferPriceDescription(v,e.target.value):v))}/></label><label className="lform-field">Amount ($)<input name="item_amount" type="number" min="0" max="10000000" step="0.01" required value={item.amount} onChange={e=>setItems(items.map((v,n)=>n===i?{...v,amount:e.target.value}:v))}/></label></div>{items.length>1&&<button type="button" className="lform-repeat-remove" onClick={()=>setItems(items.filter((_,n)=>n!==i))}>Remove line {i+1}</button>}</div>)}
   {items.length<12&&<button type="button" className="lform-add" onClick={()=>setItems([...items,{label:'',amount:''}])}>Add price line</button>}
   <strong>Offer: {formatOfferAmount(total,pricing)}</strong>{pricing==='hourly'&&<p className="muted">{HOURLY_OFFER_GUIDANCE}</p>}
   {providerMaterials&&<label className="lform-field">Materials pricing<select name="materials" value={materials} onChange={e=>setMaterials(e.target.value)}>{OFFER_MATERIALS_OPTIONS.map(m=><option value={m.id} key={m.id}>{m.label}</option>)}</select></label>}

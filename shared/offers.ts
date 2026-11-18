@@ -67,7 +67,24 @@ export function paymentLine(amount:number|string|null|undefined, pricingType:str
 }
 export const HOURLY_OFFER_GUIDANCE = 'Enter the price for one hour of work.'
 
-export function initialOfferLines(offer?: { line_items?: { label: string; amount: number }[] | null; amount?: number | null }) {
+export type OfferPriceLine = { label: string; amount: string; automaticLabel?: boolean }
+
+function defaultPriceDescription(pricingType: string) {
+  if (pricingType === 'fixed') return 'Fixed price'
+  if (pricingType === 'hourly') return 'Labour'
+  return ''
+}
+
+export function initialOfferLines(offer?: { line_items?: { label: string; amount: number }[] | null; amount?: number | null }): OfferPriceLine[] {
   if (offer?.line_items?.length) return offer.line_items.map(line => ({ label: line.label, amount: String(line.amount) }))
-  return [{ label: '', amount: offer?.amount == null ? '' : String(offer.amount) }]
+  if (offer) return [{ label: '', amount: offer.amount == null ? '' : String(offer.amount) }]
+  return [{ label: defaultPriceDescription('fixed'), amount: '', automaticLabel: true }]
+}
+
+export function updateOfferPricingDescription(lines: OfferPriceLine[], pricingType: string): OfferPriceLine[] {
+  return lines.map(line => line.automaticLabel ? { ...line, label: defaultPriceDescription(pricingType) } : line)
+}
+
+export function editOfferPriceDescription(line: OfferPriceLine, label: string): OfferPriceLine {
+  return { ...line, label, automaticLabel: false }
 }

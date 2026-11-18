@@ -50,7 +50,7 @@ test('offer form keeps entered values and shows pricing guidance only for hourly
  const slots=[]
  let cursor=0,state={error:''}
  const {OfferForm}=compile(await source('../provider-web/src/app/jobs/[id]/offer-form.tsx'),{
-  react:{useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return [slots[i],value=>slots[i]=value]},useEffect(){},useRef:()=>({current:null}),useActionState:()=>[state,()=>{},false]},
+  react:{useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return [slots[i],value=>slots[i]=typeof value==='function'?value(slots[i]):value]},useEffect(){},useRef:()=>({current:null}),useActionState:()=>[state,()=>{},false]},
   'next/navigation':{useRouter:()=>({refresh(){}})},
   '@/components/action-form':{useSubmitGuard:()=>()=>{}},
   '@/components/navigation-link':{default:'a'},
@@ -62,11 +62,17 @@ test('offer form keeps entered values and shows pricing guidance only for hourly
  const field=(tree,name)=>tree.find(node=>node.props.name===name)
  const hasGuidance=tree=>tree.some(node=>node.props.children===offers.HOURLY_OFFER_GUIDANCE)
  const change=(name,value)=>field(render(),name).props.onChange({target:{value}})
- assert.equal(field(render(),'item_label').props.value,'')
+ assert.equal(field(render(),'item_label').props.value,'Fixed price')
  assert.equal(field(render(),'item_label').props.placeholder,'e.g. Labour')
  assert.equal(hasGuidance(render()),false)
+ change('item_amount','25')
  change('pricing_type','hourly')
+ assert.equal(field(render(),'item_label').props.value,'Labour')
+ assert.equal(field(render(),'item_amount').props.value,'25')
  assert.equal(hasGuidance(render()),true)
+ change('pricing_type','fixed')
+ assert.equal(field(render(),'item_label').props.value,'Fixed price')
+ change('pricing_type','hourly')
  change('item_label','Fence repair')
  change('item_amount','25')
  change('available_from','07/03/2026')
@@ -82,10 +88,26 @@ test('offer form keeps entered values and shows pricing guidance only for hourly
 
  slots.length=0
  state={error:''}
- const editing=render({id:'offer',line_items:[{label:'Travel',amount:90}],available_from:'2026-03-07',pricing_type:'fixed'})
- assert.equal(field(editing,'item_label').props.value,'Travel')
+ const saved={id:'offer',line_items:[{label:'Fixed price',amount:90}],available_from:'2026-03-07',pricing_type:'fixed'}
+ const editing=render(saved)
+ assert.equal(field(editing,'item_label').props.value,'Fixed price')
+ field(editing,'pricing_type').props.onChange({target:{value:'hourly'}})
+ assert.equal(field(render(saved),'item_label').props.value,'Fixed price')
  assert.equal(field(editing,'item_amount').props.value,'90')
  assert.equal(field(editing,'available_from').props.value,'07/03/2026')
+})
+
+test('shared offer defaults distinguish automatic text from manual and saved labels',()=>{
+ const [first]=offers.initialOfferLines()
+ const priced={...first,amount:'120.50'}
+ assert.deepEqual(offers.updateOfferPricingDescription([priced],'hourly'),[{...priced,label:'Labour'}])
+ const manual=offers.editOfferPriceDescription(priced,'Labour')
+ const cleared=offers.editOfferPriceDescription(priced,'')
+ const extra={label:'Travel',amount:'15'}
+ const existing=offers.initialOfferLines({line_items:[{label:'Labour',amount:90}]})
+ assert.deepEqual(offers.updateOfferPricingDescription([manual,cleared,extra,...existing],'fixed'),[manual,cleared,extra,...existing])
+ assert.deepEqual(offers.updateOfferPricingDescription(offers.initialOfferLines({amount:90}),'fixed'),[{label:'',amount:'90'}])
+ assert.equal(offers.updateOfferPricingDescription([first],'quote')[0].label,'')
 })
 
 test('standard web save guard blocks duplicates and allows a retry after failure',async()=>{
