@@ -26,6 +26,7 @@ import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../../../shared/homeMode'
+import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary} from '../../../shared/homeSummary'
 import {loadPropertyNetwork,propertyAreas,propertySpokes} from '../../../shared/propertyNetwork'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
@@ -65,12 +66,13 @@ export default function HomeTabScreen({ navigation }) {
     if(userId)void AsyncStorage.setItem(homeModeKey(userId),value).catch(()=>{})
   }
   const [notifications, setNotifications] = useState([])
-  const [invitedJobs, setInvitedJobs]   = useState([])
+  const [invitedJobs, setInvitedJobs]   = useState(null)
+  const [customerCount,setCustomerCount]=useState(null)
   const [seasonalReminders, setSeasonalReminders] = useState([])
   const [seasonalExpanded, setSeasonalExpanded] = useState(false)
   // Everything in flight with a next move; "Needs attention" is the subset
   // that needs your action, "On the go" ranks them all.
-  const [activeMoves, setActiveMoves]     = useState([])
+  const [activeMoves, setActiveMoves]     = useState(null)
   const [loading, setLoading]           = useState(true)
   const [loadError,setLoadError]=useState(false)
   const [refreshing, setRefreshing]     = useState(false)
@@ -99,18 +101,20 @@ export default function HomeTabScreen({ navigation }) {
       }).catch(()=>{})
     }
 
-    const [notifs, invited, reminders, active, propertyNetwork] = await Promise.all([
+    const [notifs, invited, reminders, active, propertyNetwork, customers] = await Promise.all([
       fetchNotifications(8),
-      fetchInvitedJobsForProvider(user.id),
+      fetchInvitedJobsForProvider(user.id,{strict:true}).catch(()=>null),
       fetchSeasonalReminders(),
-      fetchActiveNextMoves(user.id,true),
+      fetchActiveNextMoves(user.id,true,{strict:true}).catch(()=>null),
       loadPropertyNetwork(supabase,user.id).catch(()=>null),
+      homeCustomerCount(supabase,user.id),
     ])
     setNotifications(notifs)
     setInvitedJobs(invited)
     setSeasonalReminders(reminders)
     setActiveMoves(active)
     setNetwork(propertyNetwork)
+    setCustomerCount(customers)
     reminders.forEach(reminder => recordSeasonalEvent(reminder.id, 'impression'))
     }catch{setLoadError(true)}
     finally{setLoading(false);setRefreshing(false)}
@@ -138,16 +142,19 @@ export default function HomeTabScreen({ navigation }) {
   }
 
   const propertyMode=mode==='property'
-  const workItems=activeMoves.filter(item=>item.viewerRole==='provider')
+  const workItems=(activeMoves||[]).filter(item=>item.viewerRole==='provider')
   const pendingOffers=workItems.filter(item=>item.entityType==='job'&&item.item.status==='open').length
-  const upcoming=workItems.filter(item=>item.nextMove.tone==='scheduled').length
-  const invitationCount=invitedJobs.filter(invite=>invite.status==='pending'||invite.status==='seen').length
-  const modeItems=activeMoves.filter(item=>item.viewerRole===homeRole(mode))
+  const upcoming=workItems.filter(item=>homeUpcoming(item.nextMove.tone,item.entityType,item.arrivalAt)).length
+  const work=homeWorkSummary({
+    invitations:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null,
+    offers:activeMoves?pendingOffers:null,upcoming:activeMoves?upcoming:null,
+    work:activeMoves?workItems.length-pendingOffers:null,
+  })
+  const modeItems=(activeMoves||[]).filter(item=>item.viewerRole===homeRole(mode))
   const areas=network?propertyAreas(network).filter(area=>area.active):[]
   const preview=areas.slice(0,6)
   const spokes=propertySpokes(preview.length)
-  const linked=areas.filter(area=>area.linkedCount).length
-  const gaps=areas.filter(area=>area.needsHelp).length
+  const networkSummary=network?homeNetworkSummary(areas):null
   const unread=notifications.filter(n=>!n.read)
   const nextMoves=modeItems.filter(item=>item.nextMove.needsAction)
   const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
@@ -217,11 +224,10 @@ export default function HomeTabScreen({ navigation }) {
         showsVerticalScrollIndicator={false}>
 
         <Text style={styles.title} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
-        {loadError&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
+        {(loadError||!activeMoves||(!propertyMode&&work.unavailable&&work.indicators.length>0))&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
           <Text style={styles.subtitle}>Find local help and manage the people supporting your property.</Text>
-          <TouchableOpacity style={styles.networkPreview} onPress={()=>navigation.navigate('PropertyNetwork')}
-            accessibilityRole="button" accessibilityLabel="Open My Property Network">
+          <View style={styles.networkPreview}>
             <View style={styles.networkArt} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               {preview.map((area,index)=><View key={area.id} style={[styles.miniNode,area.needsHelp&&styles.miniGap,
                 {left:spokes[index].x+'%',top:spokes[index].y+'%'}]}>
@@ -230,11 +236,18 @@ export default function HomeTabScreen({ navigation }) {
               <View style={styles.miniCentre}><Icon name="home-outline" size={19} color={colors.white}/></View>
             </View>
             <View style={{flex:1}}><Text style={styles.sectionTitle}>My Property Network</Text>
-              <Text style={styles.subtitle}>{linked||gaps?linked+' areas with providers · '+gaps+' areas need help':
-                network?'Set up support areas and keep your local people together.':'Open your network to view support areas and providers.'}</Text>
-              <Text style={[styles.sectionLink,{marginTop:8}]}>Open My Property Network</Text>
+              {networkSummary?<><Text style={styles.subtitle}>{networkSummary.counts}</Text><Text style={styles.subtitle}>{networkSummary.detail}</Text></>
+                :<Text style={styles.subtitle}>Network summary unavailable. Open your network to view support areas.</Text>}
+              <View style={styles.networkActions}>
+                <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('PropertyNetwork')}>
+                  <Text style={styles.sectionLink}>My Network</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'locals'})}>
+                  <Text style={styles.sectionLink}>My People</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </TouchableOpacity>
+          </View>
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Post a job" subtitle="Get help with something that needs doing."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Home'}})}/>
@@ -242,13 +255,15 @@ export default function HomeTabScreen({ navigation }) {
               onPress={()=>navigation.getParent()?.navigate('Browse',{screen:'BrowseMain'})}/>
           </View>
         </> : <>
-          <View style={styles.workSummary}>
-            {[[workItems.length-pendingOffers,'Active work'],[pendingOffers,'Offers awaiting replies'],[upcoming,'Upcoming confirmed'],[invitationCount,'Invitations to review']].map(([count,label],index)=>
-              <TouchableOpacity key={label} style={styles.workMetric} accessibilityRole="button" accessibilityLabel={count+' '+label}
-                onPress={()=>index===3?navigation.navigate('InvitedJobs'):navigation.getParent()?.navigate('Activity')}>
-                <Text style={styles.metricNumber}>{count}</Text><Text style={styles.metricLabel}>{label}</Text>
+          {work.indicators.length>0?<View style={styles.workSummary}>
+            {work.indicators.map(item=>
+              <TouchableOpacity key={item.id} style={styles.workMetric} accessibilityRole="button" accessibilityLabel={item.count+' '+item.label}
+                onPress={()=>item.id==='invitations'?navigation.navigate('InvitedJobs'):
+                  navigation.getParent()?.navigate('Activity',{screen:'ActivityMain',params:{homeFocus:item.id}})}>
+                <Text style={styles.metricNumber}>{item.count}</Text><Text style={styles.metricLabel}>{item.label}</Text>
               </TouchableOpacity>)}
-          </View>
+          </View>:<Text style={styles.workEmpty}>{work.unavailable?'Work summary unavailable. Pull down to try again.':
+            "You're all caught up. Explore available jobs or create a listing."}</Text>}
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Find work" subtitle="Browse available jobs."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'JobsBoard'})}/>
@@ -256,7 +271,10 @@ export default function HomeTabScreen({ navigation }) {
               onPress={()=>navigation.navigate('CreateService',{newListing:Date.now()})}/>
           </View>
           <TouchableOpacity style={styles.connCard} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'customers'})}>
-            <Icon name="people-outline" size={22} color={colors.primary}/><Text style={styles.connCardTitle}>My Customers</Text>
+            <Icon name="people-outline" size={22} color={colors.primary}/>
+            <View style={{flex:1}}><Text style={styles.connCardTitle}>My Customers</Text>
+              {customerCount>0&&<Text style={styles.subtitle}>{customerCount} previous {customerCount===1?'customer':'customers'}</Text>}
+            </View>
             <Icon name="chevron-forward" size={17} color={colors.textMuted}/>
           </TouchableOpacity>
         </>}
@@ -372,8 +390,8 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         )}
 
-        {!loadError&&attention.length===0&&onTheGo.total===0&&<EmptyState compact icon="leaf-outline"
-          title="No active work yet" body={propertyMode?'Post a job or find local help to get started.':'Find work or create a listing to get started.'}/>}
+        {propertyMode&&activeMoves&&!loadError&&attention.length===0&&onTheGo.total===0&&<EmptyState compact icon="leaf-outline"
+          title="No active work yet" body="Post a job or find local help to get started."/>}
 
         {seasonalReminders.length > 0 && (
           <View style={styles.seasonalSection}>
@@ -440,10 +458,13 @@ const styles = StyleSheet.create({
   modeLabelSelected:{color:colors.white},
   networkPreview:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:colors.primaryLight,borderRadius:16,marginVertical:16},
   networkArt:{width:96,height:106,position:'relative'},
+  networkActions:{flexDirection:'row',flexWrap:'wrap',columnGap:12},
+  networkAction:{minHeight:44,justifyContent:'center'},
   miniNode:{position:'absolute',width:23,height:23,marginLeft:-11.5,marginTop:-11.5,borderRadius:12,backgroundColor:colors.white,alignItems:'center',justifyContent:'center'},
   miniGap:{backgroundColor:colors.warningLight},
   miniCentre:{position:'absolute',left:'50%',top:'50%',marginLeft:-15,marginTop:-15,width:30,height:30,borderRadius:15,backgroundColor:colors.primaryDark,alignItems:'center',justifyContent:'center'},
   workSummary:{flexDirection:'row',flexWrap:'wrap',marginVertical:14,backgroundColor:colors.primaryLight,borderRadius:14},
+  workEmpty:{marginVertical:14,color:colors.textSecondary,lineHeight:20},
   workMetric:{width:'50%',padding:12,minHeight:55},
   metricNumber:{fontSize:19,fontWeight:'800',color:colors.primaryDark},
   metricLabel:{fontSize:13,color:colors.textPrimary},
@@ -484,7 +505,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  connCardTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  connCardTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
 
   notifRow: {
     flexDirection: 'row',

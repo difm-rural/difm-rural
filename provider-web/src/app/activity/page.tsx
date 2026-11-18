@@ -7,6 +7,7 @@ import { statusLabel } from '@/lib/work'
 import { bookingNextMove, jobNextMove, nextMoveHeading, type NextMove } from '@shared/nextMove'
 import { activityIsActive } from '@/lib/activity-policy'
 import { loadInbox, unreadNotices } from '@/lib/messaging-data'
+import {homeUpcoming,homeWorkFocus,homeWorkLabel} from '@shared/homeSummary'
 export const dynamic='force-dynamic'
 // Top label on an activity card: whose turn + what's next ("Waiting on you to
 // confirm") when there is a next move; otherwise the status word, which is what
@@ -17,9 +18,10 @@ function TurnLabel({next,fallback}:{next:NextMove|null;fallback:string}){
   const heading=nextMoveHeading(next)
   return <><p className={'work-badge'+(next.badgeTone==='attention'?' attention':'')}>{next.badge}</p><p className="muted work-badge-detail">{heading?heading+' · ':''}{next.detail}</p></>
 }
-export default async function ActivityPage({searchParams}:{searchParams:Promise<{view?:string}>}){
-  const {view}=await searchParams
+export default async function ActivityPage({searchParams}:{searchParams:Promise<{view?:string;focus?:string}>}){
+  const {view,focus:requestedFocus}=await searchParams
   const history=view==='history'
+  const focus=history?null:homeWorkFocus(requestedFocus)
   const {supabase,user,profile}=await requireProvider()
   const [jobs,offers,bookings]=await Promise.all([
     supabase.from('jobs').select('id,title,status,created_at,scheduled_date,date_from').eq('requester_id',user.id).order('created_at',{ascending:false}),
@@ -28,7 +30,7 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
   ])
   const jobIds=[...new Set((offers.data || []).map(o=>o.job_id))]
   const offerJobs=jobIds.length?await supabase.from('jobs_public').select('id,title,status,requester_id,scheduled_date,date_from').in('id',jobIds):{data:[],error:null}
-  const shownJobs=(jobs.data || []).filter(j=>activityIsActive('job',j.status)!==history)
+  const shownJobs=focus?[]:(jobs.data || []).filter(j=>activityIsActive('job',j.status)!==history)
   const jobsById=new Map(shownJobs.map(job=>[job.id,job]))
   const questions=shownJobs.length ? await supabase.from('job_questions')
     .select('id,job_id,asker_id,question,answer').in('job_id',shownJobs.map(job=>job.id))
@@ -47,12 +49,24 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
   ])]
   const people=nameIds.length?await supabase.from('profiles_public').select('id,full_name').in('id',nameIds):{data:[]}
   const names=new Map((people.data || []).map(p=>[p.id,p.full_name]))
-  const hasError=[jobs,offers,bookings,offerJobs].some(r=>r.error)
   const activeJobs=(jobs.data || []).filter(j=>activityIsActive('job',j.status))
+  const offerJobById=new Map((offerJobs.data||[]).map(job=>[job.id,job]))
   const activeOffers=(offers.data || []).filter(o=>activityIsActive('offer',o.status,offerJobs.data?.find(j=>j.id===o.job_id)?.status))
   const activeBookings=(bookings.data || []).filter(b=>activityIsActive('booking',b.status))
-  const shownOffers=(offers.data || []).filter(o=>activityIsActive('offer',o.status,offerJobs.data?.find(j=>j.id===o.job_id)?.status)!==history)
-  const shownBookings=(bookings.data || []).filter(b=>activityIsActive('booking',b.status)!==history)
+  const scheduledIds=focus==='upcoming'?activeOffers.filter(offer=>offer.status==='accepted').map(offer=>offer.job_id):[]
+  const schedules=scheduledIds.length?await supabase.from('work_schedules').select('job_id,arrival_start_at').in('job_id',scheduledIds):{data:[],error:null}
+  const arrivals=new Map((schedules.data||[]).map(row=>[row.job_id,row.arrival_start_at]))
+  const hasError=[jobs,offers,bookings,offerJobs,schedules].some(r=>r.error)
+  const shownOffers=focus?activeOffers.filter(offer=>{
+   if(focus==='offers')return offer.status==='pending'
+   if(offer.status!=='accepted')return false
+   if(focus==='work')return true
+   const arrivalAt=arrivals.get(offer.job_id)
+   return !!arrivalAt&&homeUpcoming(jobNextMove(offerJobById.get(offer.job_id),'provider',{hasArrival:true,arrivalAt})?.tone||'','job',arrivalAt)
+  }):(offers.data || []).filter(o=>activityIsActive('offer',o.status,offerJobById.get(o.job_id)?.status)!==history)
+  const shownBookings=focus?activeBookings.filter(booking=>booking.provider_id===user.id&&focus!=='offers'&&
+   (focus!=='upcoming'||bookingNextMove(booking,'provider')?.tone==='scheduled')):
+   (bookings.data || []).filter(b=>activityIsActive('booking',b.status)!==history)
   const activeWork=activeJobs.length+activeOffers.length+activeBookings.length
   const historyCount=(jobs.data?.length || 0)+(offers.data?.length || 0)+(bookings.data?.length || 0)-activeWork
   // Unread messages per job/booking, and listing enquiry threads split by owner.
@@ -68,11 +82,12 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
   const activeCount=activeWork+ownerThreads.length+yourEnquiries.length
   // Render only populated sections; prompt or empty-state the rest.
   const someWorkEmpty=!shownJobs.length || !shownOffers.length || !shownBookings.length
-  const anyItems=shownJobs.length>0 || shownOffers.length>0 || shownBookings.length>0 || !!questions.data?.length || ownerThreads.length>0 || yourEnquiries.length>0
+  const anyItems=shownJobs.length>0 || shownOffers.length>0 || shownBookings.length>0 || (!focus&&(!!questions.data?.length || ownerThreads.length>0 || yourEnquiries.length>0))
   const ctaLinks=<><Link className="card-link" href="/jobs/new">Post a job</Link> · <Link className="card-link" href="/jobs">Find jobs</Link> · <Link className="card-link" href="/browse">Browse listings</Link></>
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><header className="home-heading"><div><h1>Activity</h1></div><LiveRefresh/></header>
     <nav className="activity-segments" aria-label="Activity view"><Link href="/activity" aria-current={!history?'page':undefined}>Active {!hasError && <span>{activeCount}</span>}</Link><Link href="/activity?view=history" aria-current={history?'page':undefined}>History {!hasError && <span>{historyCount}</span>}</Link></nav>
-    <p className="muted">{history?'Completed and closed arrangements, with your reviews.':'Track your jobs, offers, booking requests and agreed work.'}</p>
+    {focus?<div className="lform-actions"><h2>{homeWorkLabel(focus)}</h2><Link href="/activity" className="card-link">Show all activity</Link></div>:
+     <p className="muted">{history?'Completed and closed arrangements, with your reviews.':'Track your jobs, offers, booking requests and agreed work.'}</p>}
     {hasError && <p className="home-load-error" role="alert">Some activity could not be loaded. Refresh to try again.</p>}
     {(questions.error || !!questions.data?.length) && <section>
       <h2>Questions from providers</h2>
@@ -101,9 +116,10 @@ export default async function ActivityPage({searchParams}:{searchParams:Promise<
         <Link href={'/bookings/'+b.id+'#conversation'} className="card-link">Open conversation →</Link>
       </article>})}</div>
     </section>}
-    {!history && ownerThreads.length>0 && <section><h2>Enquiries on your listings</h2><div className="work-grid">{ownerThreads.map(t=><Link className="card" key={t.key} href={'/listings/'+t.id+'?thread='+t.person+'#enquiries'}><h3>{t.name}{t.unread>0&&<span className="web-badge" aria-label={t.unread+' unread messages'}> {t.unread}</span>}</h3><p className="muted">{t.title} · {nzDateTime(new Date(t.updatedAt))}</p><p className="work-description">{t.preview}</p><span className="card-link">Open enquiry →</span></Link>)}</div></section>}
-    {!history && yourEnquiries.length>0 && <section><h2>Your enquiries</h2><div className="work-grid">{yourEnquiries.map(t=><Link className="card" key={t.key} href={'/listings/'+t.id+'#enquiry'}><h3>{t.name}{t.unread>0&&<span className="web-badge" aria-label={t.unread+' unread messages'}> {t.unread}</span>}</h3><p className="muted">{t.title} · {nzDateTime(new Date(t.updatedAt))}</p><p className="work-description">{t.preview}</p><span className="card-link">View listing →</span></Link>)}</div></section>}
-    {!hasError && (anyItems
+    {!focus && !history && ownerThreads.length>0 && <section><h2>Enquiries on your listings</h2><div className="work-grid">{ownerThreads.map(t=><Link className="card" key={t.key} href={'/listings/'+t.id+'?thread='+t.person+'#enquiries'}><h3>{t.name}{t.unread>0&&<span className="web-badge" aria-label={t.unread+' unread messages'}> {t.unread}</span>}</h3><p className="muted">{t.title} · {nzDateTime(new Date(t.updatedAt))}</p><p className="work-description">{t.preview}</p><span className="card-link">Open enquiry →</span></Link>)}</div></section>}
+    {!focus && !history && yourEnquiries.length>0 && <section><h2>Your enquiries</h2><div className="work-grid">{yourEnquiries.map(t=><Link className="card" key={t.key} href={'/listings/'+t.id+'#enquiry'}><h3>{t.name}{t.unread>0&&<span className="web-badge" aria-label={t.unread+' unread messages'}> {t.unread}</span>}</h3><p className="muted">{t.title} · {nzDateTime(new Date(t.updatedAt))}</p><p className="work-description">{t.preview}</p><span className="card-link">View listing →</span></Link>)}</div></section>}
+    {!hasError&&focus&&!anyItems&&<p className="muted">No matching work is currently active.</p>}
+    {!focus&&!hasError && (anyItems
       ? someWorkEmpty && <p className="muted">Nothing else on the go — {ctaLinks}</p>
       : <div className="home-empty"><h2>{history?'Nothing in your history yet':'Nothing on the go yet'}</h2><p>{history?'Completed and closed work will show here.':'Post a job, make an offer or book a listing to get started.'}</p><p className="muted">{ctaLinks}</p></div>)}
   </section></AppShell>

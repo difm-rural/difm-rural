@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import {homeUpcoming,homeWorkFocus,homeWorkLabel} from '../../../shared/homeSummary'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded, isBookingWithdrawable, isBookingUnderway, isBookingDismissable } from '../../lib/lifecycle'
@@ -182,7 +183,7 @@ function BookingWorkCard({
   )
 }
 
-export default function ActivityTabScreen({ navigation }) {
+export default function ActivityTabScreen({ navigation,route }) {
   const insets = useSafeAreaInsets()
   const [profile, setProfile] = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
@@ -199,13 +200,18 @@ export default function ActivityTabScreen({ navigation }) {
   const [completedJobs, setCompletedJobs] = useState([])
   const [completedBookings, setCompletedBookings] = useState([])
   const [activityView, setActivityView] = useState('progress')  // 'progress' | 'history'
+  const focus=homeWorkFocus(route.params?.homeFocus)
+  const [arrivalError,setArrivalError]=useState(false)
   const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [reviewContext, setReviewContext] = useState(null)
   const [savingReview, setSavingReview] = useState(false)
   const [cancelBookingTarget, setCancelBookingTarget] = useState(null)
 
-  useFocusEffect(useCallback(() => { load() }, []))
+  useFocusEffect(useCallback(() => {
+    if(focus)setActivityView('progress')
+    load()
+  }, [focus]))
   useFocusEffect(useCallback(() => {
     let active = true
     const unsubscribe = onBadgeRefresh(async () => {
@@ -339,6 +345,10 @@ export default function ActivityTabScreen({ navigation }) {
         || (b.status === 'accepted' && isJobAwarded(b.jobs.status))
       )
     )
+    const scheduledIds=focus==='upcoming'?activeBids.filter(b=>b.status==='accepted').map(b=>b.job_id):[]
+    const schedules=scheduledIds.length?await supabase.from('work_schedules').select('job_id,arrival_start_at').in('job_id',scheduledIds):{data:[]}
+    setArrivalError(!!schedules.error)
+    const arrivals=new Map((schedules.data||[]).map(row=>[row.job_id,row.arrival_start_at]))
     const requesterIds = [...new Set(activeBids.map(b => b.jobs?.requester_id).filter(Boolean))]
     let requesterNames = {}
     if (requesterIds.length > 0) {
@@ -349,6 +359,7 @@ export default function ActivityTabScreen({ navigation }) {
       ...b.jobs,
       _bidAmount: b.amount,
       _bidStatus: b.status,
+      _arrivalAt: arrivals.get(b.job_id) || null,
       _paymentMethod: b.payment_method || null,
       _paymentSortedAt: b.payment_sorted_at || null,
       requesterName: requesterNames[b.jobs.requester_id],
@@ -587,6 +598,13 @@ export default function ActivityTabScreen({ navigation }) {
   const isRequester = true
   const isProvider  = canProvide(profile)
   const totalActive = activeJobs.length + myBookings.length + activeBidJobs.length + providerBookings.length
+  const shownProviderJobs=focus?activeBidJobs.filter(job=>{
+    if(focus==='offers')return job._bidStatus==='pending'
+    if(job._bidStatus!=='accepted')return false
+    return focus==='work'||(job._arrivalAt&&homeUpcoming(jobNextMove(job,'provider',{hasArrival:true,arrivalAt:job._arrivalAt})?.tone||'','job',job._arrivalAt))
+  }):activeBidJobs
+  const shownProviderBookings=focus?providerBookings.filter(b=>focus!=='offers'&&BOOKING_ACTIVE_STATUSES.includes(b.status)&&
+    (focus!=='upcoming'||bookingNextMove(b,'provider')?.tone==='scheduled')):providerBookings
 
   if (loading) {
     return (
@@ -642,7 +660,7 @@ export default function ActivityTabScreen({ navigation }) {
             <TouchableOpacity
               key={id}
               style={[styles.segmentBtn, activityView === id && styles.segmentBtnActive]}
-              onPress={() => setActivityView(id)}
+              onPress={() => {if(focus)navigation.setParams({homeFocus:null});setActivityView(id)}}
               accessibilityRole="button"
               accessibilityState={{ selected: activityView === id }}>
               <Text style={[styles.segmentText, activityView === id && styles.segmentTextActive]}>{label}</Text>
@@ -665,7 +683,15 @@ export default function ActivityTabScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* Empty state */}
-        {activityView === 'progress' && totalActive === 0 && (
+        {focus&&<View style={styles.cardSection}>
+          <Text accessibilityRole="header" style={styles.sectionLabel}>{homeWorkLabel(focus)}</Text>
+          <TouchableOpacity style={styles.myJobsBtn} accessibilityRole="button" onPress={()=>navigation.setParams({homeFocus:null})}>
+            <Text style={styles.myJobsBtnText}>Show all activity</Text>
+          </TouchableOpacity>
+          {focus==='upcoming'&&arrivalError?<Text accessibilityRole="alert">Could not load confirmed arrival times.</Text>:
+           !shownProviderJobs.length&&!shownProviderBookings.length&&<Text>No matching work is currently active.</Text>}
+        </View>}
+        {!focus&&activityView === 'progress' && totalActive === 0 && (
           <EmptyState
             tone="positive"
             icon="checkmark-circle-outline"
@@ -686,7 +712,7 @@ export default function ActivityTabScreen({ navigation }) {
         {activityView === 'progress' && (
         <>
         {/* Requester: Posted tasks */}
-        {isRequester && activeJobs.length > 0 && (
+        {!focus&&isRequester && activeJobs.length > 0 && (
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Posted jobs</Text>
             <FlatList
@@ -719,7 +745,7 @@ export default function ActivityTabScreen({ navigation }) {
         )}
 
         {/* Requester: Booked services */}
-        {isRequester && myBookings.length > 0 && (
+        {!focus&&isRequester && myBookings.length > 0 && (
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Your requests and bookings</Text>
             <FlatList
@@ -745,12 +771,12 @@ export default function ActivityTabScreen({ navigation }) {
         )}
 
         {/* Provider: Jobs doing */}
-        {isProvider && activeBidJobs.length > 0 && (
+        {isProvider && shownProviderJobs.length > 0 && (
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Your jobs and offers</Text>
             <FlatList
               horizontal
-              data={activeBidJobs}
+              data={shownProviderJobs}
               keyExtractor={job => `bid-job-${job.id}`}
               renderItem={({ item: job }) => (
                 <JobServiceCard
@@ -762,6 +788,7 @@ export default function ActivityTabScreen({ navigation }) {
                     hasPendingBid: job._bidStatus === 'pending',
                     paymentMethod: job._paymentMethod,
                     paymentSortedAt: job._paymentSortedAt,
+                    ...(focus==='upcoming'?{hasArrival:!!job._arrivalAt,arrivalAt:job._arrivalAt}:{}),
                   })}
                   onPress={() => navigation.navigate('JobDetail', { job })}
                 />
@@ -777,12 +804,12 @@ export default function ActivityTabScreen({ navigation }) {
         )}
 
         {/* Provider: Service bookings */}
-        {isProvider && providerBookings.length > 0 && (
+        {isProvider && shownProviderBookings.length > 0 && (
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Received requests and bookings</Text>
             <FlatList
               horizontal
-              data={providerBookings}
+              data={shownProviderBookings}
               keyExtractor={b => `prov-booking-${b.id}`}
               renderItem={({ item: b }) => (
                 <BookingWorkCard
@@ -810,7 +837,7 @@ export default function ActivityTabScreen({ navigation }) {
         )}
 
         {/* ── History view — completed jobs & services ── */}
-        {activityView === 'history' && (
+        {!focus&&activityView === 'history' && (
           completedCount === 0 ? (
             <EmptyState
               tone="positive"

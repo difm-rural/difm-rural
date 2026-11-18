@@ -16,7 +16,7 @@ export async function fetchActionableNextMoves(userId, isProvider) {
 // on open jobs, jobs you're doing, and bookings on either side. Home's "On the
 // go" ranks these (shared/onTheGo). Each item carries `updatedAt`: the
 // timestamps that mark activity on it (there is no updated_at column).
-export async function fetchActiveNextMoves(userId, isProvider) {
+export async function fetchActiveNextMoves(userId, isProvider, {strict=false}={}) {
   if (!userId) return []
 
   const [jobsResult, requesterBookingsResult, providerBookingsResult, providerJobBidsResult] = await Promise.all([
@@ -54,10 +54,10 @@ export async function fetchActiveNextMoves(userId, isProvider) {
   const jobs = jobsResult.data || []
   // Pending offers: ids first, then the public job view (never embed base jobs
   // for offers that haven't been accepted — see CLAUDE.md location privacy).
-  const { data: pendingBids } = await supabase
+  const { data: pendingBids,error: pendingOffersError } = await supabase
     .from('bids').select('id, job_id, created_at').eq('provider_id', userId).eq('status', 'pending')
   const pendingJobIds = [...new Set((pendingBids || []).map(bid => bid.job_id).filter(Boolean))]
-  const { data: pendingJobsData } = pendingJobIds.length
+  const { data: pendingJobsData,error: pendingJobsError } = pendingJobIds.length
     ? await supabase.from('jobs_public').select('*').in('id', pendingJobIds).eq('status', 'open')
     : { data: [] }
   const pendingJobs = new Map((pendingJobsData || []).map(job => [job.id, job]))
@@ -72,6 +72,8 @@ export async function fetchActiveNextMoves(userId, isProvider) {
   const schedules=scheduledIds.length
     ? await supabase.from('work_schedules').select('job_id,arrival_start_at').in('job_id',scheduledIds)
     : {data:[]}
+  if(strict&&([jobsResult,requesterBookingsResult,providerBookingsResult,providerJobBidsResult,schedules].some(result=>result.error)
+    ||pendingOffersError||pendingJobsError))throw new Error('Could not load active work')
   const arrivals=new Map((schedules.data||[]).map(row=>[row.job_id,row.arrival_start_at]))
   const confirmation=id=>schedules.error?{}:{hasArrival:!!arrivals.get(id),arrivalAt:arrivals.get(id)}
   const otherIds = [
@@ -167,6 +169,7 @@ export async function fetchActiveNextMoves(userId, isProvider) {
     if (nextMove) {
       items.push({
         id: `next-provider-job-${job.id}`,
+        arrivalAt: arrivals.get(job.id),
         entityType: 'job',
         entityId: job.id,
         viewerRole: 'provider',

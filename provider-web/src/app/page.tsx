@@ -4,6 +4,7 @@ import {notificationSide, sideTag} from '@shared/marketSide'
 import {bookingNextMove,jobNextMove,type NextMove} from '@shared/nextMove'
 import {rankOnTheGo} from '@shared/onTheGo'
 import {HomeModes} from '@/components/home-modes'
+import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary} from '@shared/homeSummary'
 import {loadPropertyNetwork,propertyAreas,propertySpokes} from '@shared/propertyNetwork'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
@@ -29,7 +30,7 @@ const INFORMATIONAL_NOTICES = new Set([
 
 export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
-  const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations] = await Promise.all([
+  const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations, customerCount] = await Promise.all([
     supabase.from('jobs').select('id,title,status,created_at,accepted_at,scheduled_date,date_from').eq('requester_id', user.id).in('status', ACTIVE_JOBS),
     supabase.from('bookings').select('id,status,provider_id,requester_id,created_at,quote_sent_at,quote_accepted_at,scheduled_date,service:services(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
     supabase.from('bids').select('id,job_id,status,created_at,payment_method,payment_sorted_at,payment_details_sent_at').eq('provider_id', user.id).in('status', ['pending','accepted']),
@@ -39,6 +40,7 @@ export default async function HomePage() {
     loadPropertyNetwork(supabase,user.id).catch(()=>null),
     supabase.from('job_invites').select('id,job:jobs!inner(status)',{count:'exact',head:true})
       .eq('provider_id',user.id).in('status',['pending','seen']).eq('job.status','open'),
+    homeCustomerCount(supabase,user.id),
   ])
   const offerIds = [...new Set((offers.data || []).map(o => o.job_id))]
   const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status,requester_id,created_at,scheduled_date,date_from').in('id',offerIds) : {data:[],error:null}
@@ -76,7 +78,7 @@ export default async function HomePage() {
   ].filter(Boolean))]
   const people = nameIds.length ? await supabase.from('profiles_public').select('id,full_name').in('id', nameIds) : {data:[],error:null}
   const names = new Map((people.data || []).map(person => [person.id, person.full_name as string | null]))
-  type GoItem = {key:string;viewerRole:'requester'|'provider';pendingOffer?:boolean;side:'job'|'listing';own:boolean;title:string;href:string;next:NextMove;needsAction:boolean;updatedAt:unknown[]}
+  type GoItem = {key:string;viewerRole:'requester'|'provider';pendingOffer?:boolean;arrivalAt?:string|null;side:'job'|'listing';own:boolean;title:string;href:string;next:NextMove;needsAction:boolean;updatedAt:unknown[]}
   const goItems: GoItem[] = []
   for (const job of ownJobs) {
     const accepted = acceptedOnOwn.get(job.id)
@@ -88,7 +90,7 @@ export default async function HomePage() {
     // Pending offers on open jobs, and accepted offers you're doing.
     if (!job || !((offer.status === 'pending' && job.status === 'open') || (offer.status === 'accepted' && job.status === 'accepted'))) continue
     const next = jobNextMove(job, 'provider', {...confirmation(job.id),otherName: names.get(job.requester_id), hasPendingBid: offer.status === 'pending', paymentMethod: offer.payment_method, paymentSortedAt: offer.payment_sorted_at})
-    if (next) goItems.push({viewerRole:'provider',pendingOffer:offer.status==='pending',key: 'offer:' + offer.id, side: 'job', own: false, title: job.title || 'Job', href: '/jobs/' + job.id, next, needsAction: next.needsAction, updatedAt: [offer.created_at, acceptedAtByJob.get(job.id), offer.payment_details_sent_at, offer.payment_sorted_at]})
+    if (next) goItems.push({viewerRole:'provider',pendingOffer:offer.status==='pending',arrivalAt:arrivals.get(job.id),key: 'offer:' + offer.id, side: 'job', own: false, title: job.title || 'Job', href: '/jobs/' + job.id, next, needsAction: next.needsAction, updatedAt: [offer.created_at, acceptedAtByJob.get(job.id), offer.payment_details_sent_at, offer.payment_sorted_at]})
   }
   for (const booking of bookings.data || []) {
     const providing = booking.provider_id === user.id
@@ -100,12 +102,16 @@ export default async function HomePage() {
   const areas=network?propertyAreas(network).filter(area=>area.active):[]
   const preview=areas.slice(0,6)
   const spokes=propertySpokes(preview.length)
-  const linked=areas.filter(area=>area.linkedCount).length
-  const gaps=areas.filter(area=>area.needsHelp).length
+  const networkSummary=network?homeNetworkSummary(areas):null
   const workItems=goItems.filter(item=>item.viewerRole==='provider')
   const pendingOffers=workItems.filter(item=>item.pendingOffer).length
-  const upcoming=workItems.filter(item=>item.next.tone==='scheduled').length
-  const invitationCount=invitations.count||0
+  const upcoming=workItems.filter(item=>homeUpcoming(item.next.tone,item.side==='job'?'job':'booking',item.arrivalAt)).length
+  const work=homeWorkSummary({
+   invitations:invitations.error?null:invitations.count??null,
+   offers:offers.error||offerJobs.error?null:pendingOffers,
+   upcoming:offers.error||offerJobs.error||bookings.error||schedules.error?null:upcoming,
+   work:offers.error||offerJobs.error||bookings.error?null:workItems.length-pendingOffers,
+  })
   function actions(work:boolean){
    const items=work?[
     {title:'Find work',text:'Browse available jobs.',href:'/jobs',icon:Search},
@@ -135,7 +141,7 @@ export default async function HomePage() {
         <ul className="list">{onTheGo.shown.map(item => <li key={item.key}><Link className="row" href={item.href}><span className={'attention-icon ' + item.side}>{item.side === 'job' ? <Briefcase size={18}/> : <Tag size={18}/>}</span><span className="row-main"><span className={'side-tag ' + item.side}>{(item.own ? 'YOUR ' : '') + (item.side === 'job' ? 'JOB' : 'LISTING')}</span><strong>{item.title}</strong><span className={'work-badge' + (item.next.badgeTone === 'attention' ? ' attention' : '')}>{item.next.badge}</span></span><ArrowRight size={16}/></Link></li>)}</ul>
         {onTheGo.more > 0 && <p className="muted home-onthego-more">+{onTheGo.more} more in Activity</p>}
       </section>}
-      {caughtUp&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>{role==='provider'?'Find work or create a listing to get started.':'Post a job or find local help to get started.'}</p></div>}
+      {role==='requester'&&caughtUp&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or find local help to get started.</p></div>}
    </>
   }
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page home-v2">
@@ -149,23 +155,24 @@ export default async function HomePage() {
       <span className="home-network-mini-centre"><House size={21}/></span>
      </div>
      <div><h2>My Property Network</h2>
-      <p>{linked||gaps?linked+' areas with providers · '+gaps+' areas need help':network?'Set up support areas and keep your local people together.':'Open your network to view support areas and providers.'}</p>
-      <Link href="/property-network" className="card-link">Open My Property Network <ArrowRight size={16}/></Link>
+      {networkSummary?<><p>{networkSummary.counts}</p><p>{networkSummary.detail}</p></>:<p>Network summary unavailable. Open your network to view support areas.</p>}
+      <div className="home-network-actions">
+       <Link href="/property-network" className="card-link">My Network <ArrowRight size={16}/></Link>
+       <Link href="/connections?view=locals" className="card-link">My People <ArrowRight size={16}/></Link>
+      </div>
      </div>
     </section>
     {actions(false)}
     {activity('requester')}
    </>} work={<>
     <header className="home-heading"><div><h1>Your work, your opportunities</h1></div></header>
-    <section className="home-work-summary" aria-label="My Work overview">
-     <Link href="/activity" className="home-summary-item"><strong>{workItems.length-pendingOffers}</strong> Active work</Link>
-     <Link href="/activity" className="home-summary-item"><strong>{pendingOffers}</strong> Offers awaiting replies</Link>
-     <Link href="/activity" className="home-summary-item"><strong>{upcoming}</strong> Upcoming confirmed</Link>
-     <Link href="/connections/invitations" className="home-summary-item"><strong>{invitations.error?'—':invitationCount}</strong> Invitations to review</Link>
-    </section>
+    {work.indicators.length>0?<section className="home-work-summary" aria-label="My Work overview">
+     {work.indicators.map(item=><Link key={item.id} href={item.href} className="home-summary-item"><strong>{item.count}</strong> {item.label}</Link>)}
+    </section>:<p className="home-work-empty">{work.unavailable?'Work summary unavailable. Refresh to try again.':"You're all caught up. Explore available jobs or create a listing."}</p>}
     {actions(true)}
     <div className="home-work-links">
-     <Link href="/connections?view=customers" className="card home-quick"><UsersRound size={22}/><span><strong>My Customers</strong><small>People you’ve completed work for</small></span><ArrowRight size={17}/></Link>
+     <Link href="/connections?view=customers" className="card home-quick"><UsersRound size={22}/><span><strong>My Customers</strong>
+      {customerCount!==null&&customerCount>0&&<small>{customerCount} previous {customerCount===1?'customer':'customers'}</small>}</span><ArrowRight size={17}/></Link>
      <Link href="/listings" className="card home-quick"><ListChecks size={22}/><span><strong>My listings</strong><small>{listings.error?'Manage your listings':(listings.data||[]).filter(listing=>listing.is_active&&!listing.closed_at).length+' live listings'}</small></span><ArrowRight size={17}/></Link>
     </div>
     {activity('provider')}

@@ -4,6 +4,40 @@ import {readFileSync} from 'node:fs'
 import {createRequire} from 'node:module'
 import {runInNewContext} from 'node:vm'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../shared/homeMode.ts'
+import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkFocus,homeWorkSummary} from '../shared/homeSummary.ts'
+
+test('network preview reports real gap names, omits unconfigured gaps and caps named areas',()=>{
+ const area=(label,needsHelp=false,linkedCount=0,configured=needsHelp)=>({label,needsHelp,linkedCount,configured})
+ assert.deepEqual(homeNetworkSummary([area('Water',true),area('Pasture & Land',true,1),area('Fencing'),area('Machinery',true)]),{
+  counts:'1 area with providers · 3 areas need help',detail:'Water, Pasture & Land and 1 more need support.',
+ })
+ assert.match(homeNetworkSummary([area('Water')]).detail,/Start building/)
+ assert.match(homeNetworkSummary([area('Water',false,1)]).detail,/No support gaps marked/)
+ assert.equal(homeNetworkSummary([area('Water',true)]).detail,'Water needs support.')
+})
+
+test('Work filters empty metrics, prioritises actionable items and distinguishes failed reads',()=>{
+ const empty={work:0,upcoming:0,offers:0,invitations:0}
+ assert.deepEqual(homeWorkSummary(empty),{indicators:[],unavailable:false})
+ assert.deepEqual(homeWorkSummary({...empty,upcoming:null}),{indicators:[],unavailable:true})
+ const result=homeWorkSummary({work:4,upcoming:2,offers:1,invitations:3})
+ assert.deepEqual(result.indicators.map(row=>row.id),['invitations','offers','upcoming','work'])
+ assert.deepEqual(result.indicators.slice(1).map(row=>homeWorkFocus(new URL(row.href,'https://example.com').searchParams.get('focus'))),['offers','upcoming','work'])
+ assert.equal(homeWorkFocus('history'),null)
+ assert.equal(homeUpcoming('scheduled','job','2026-11-18T07:00:00Z',Date.parse('2026-11-18T08:00:00Z')),false)
+ assert.equal(homeUpcoming('scheduled','job','2026-11-18T09:00:00Z',Date.parse('2026-11-18T08:00:00Z')),true)
+})
+
+test('customer count uses the member-scoped completed relationship view and returns counts only',async()=>{
+ const calls=[]
+ const db={from(table){calls.push(table);return {select(field,options){calls.push([field,options]);return {
+  eq(key,value){calls.push([key,value]);return this},
+  neq(key,value){calls.push([key,value]);return Promise.resolve({count:3,error:null})},
+ }}}}}
+ assert.equal(await homeCustomerCount(db,'viewer'),3)
+ assert.deepEqual(calls,['connections',['requester_id',{head:true,count:'exact'}],['provider_id','viewer'],['requester_id','viewer']])
+ assert.equal(await homeCustomerCount({},'viewer'),null)
+})
 
 test('Home defaults to Property, restores Work and separates transaction directions',()=>{
  assert.equal(homeMode(null),'property')

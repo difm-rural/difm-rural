@@ -15,7 +15,7 @@ export function respondToJobInvitation(invite,action){
 
 // Open jobs the given provider has been privately invited to, newest first.
 // Each row carries the embedded `job` and the inviting `requester` profile.
-export async function fetchInvitedJobsForProvider(uid) {
+export async function fetchInvitedJobsForProvider(uid, {strict=false}={}) {
   if (!uid) return []
   let rows
   try{
@@ -30,7 +30,7 @@ export async function fetchInvitedJobsForProvider(uid) {
       data?.forEach(job=>jobs.set(job.id,job))
     }
     rows=invites.filter(item=>jobs.has(item.job_id)).map(item=>({...item,created_at:item.sent_at,job:jobs.get(item.job_id)}))
-  }catch{return []}
+  }catch(error){if(strict)throw error;return []}
   if (rows.length === 0) return []
 
   const requesterIds = [...new Set(rows.map(r => r.job.requester_id).filter(Boolean))]
