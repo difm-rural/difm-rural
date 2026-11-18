@@ -28,7 +28,7 @@ test('hidden and re-added areas preserve custom services and multiple provider l
  assert.equal(water.active,false)
  assert.equal(water.needsHelp,true)
  assert.equal(water.hasProvider,true)
- assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['2 linked','Needs support'])
+ assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['2 local providers','Find help'])
  assert.deepEqual(linkedPropertyProviders(data,service).map(person=>person.id),['a','b'])
  data.preferences[0].active=true
  water=propertyAreas(data)[0]

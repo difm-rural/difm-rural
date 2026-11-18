@@ -20,6 +20,7 @@ import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
 import { repeatJobToJobData } from '../../lib/repeatJob'
 import { isHouseSitting } from '../../lib/categories'
+import { CATEGORIES } from '../../../shared/categories'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import Button from '../../components/Button'
@@ -146,6 +147,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
       // still-mounted Step 1 would otherwise re-sync stale values into context.
       resetJobData()
       setTitle(prefill?.title || '')
+      if(CATEGORIES.includes(prefill?.category))updateJobData({category:prefill.category})
       setScheduleType('')
       setScheduledDate(null)
       setDateFrom(null)

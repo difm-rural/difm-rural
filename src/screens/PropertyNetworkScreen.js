@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react'
-import {Alert,BackHandler,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
+import {Alert,BackHandler,Image,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
@@ -10,7 +10,8 @@ import {fetchConnections} from '../lib/connections'
 import {newJobId} from '../lib/draftId'
 import {sendJobInvitation} from '../lib/invites'
 import {colors} from '../theme/tokens'
-import {loadInviteChoices,loadSavedProviders,providerInviteJobs} from '../../shared/trustedLocals'
+import {loadInviteChoices,loadSavedProviders,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
+import {loadPropertyMatches,matchLocality,propertyNeed} from '../../shared/propertyMatching'
 import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_RATIO,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyProviderName,propertyServiceCategory,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
@@ -62,6 +63,15 @@ export default function PropertyNetworkScreen({navigation,route}){
  const [list,setList]=useState(false)
  const [selected,setSelected]=useState(route.params?.area || '')
  const [statusFor,setStatusFor]=useState('')
+ const [matchKey,setMatchKey]=useState('')
+ const [locality,setLocality]=useState('')
+ const [region,setRegion]=useState('')
+ const [widen,setWiden]=useState(false)
+ const [matches,setMatches]=useState(null)
+ const [matchBusy,setMatchBusy]=useState(false)
+ const [matchError,setMatchError]=useState('')
+ const matchRequest=useRef(0)
+ const preferredLoaded=useRef(false)
  const [highlight,setHighlight]=useState(route.params?.area || '')
  const [serviceName,setServiceName]=useState('')
  const [providerSearch,setProviderSearch]=useState('')
@@ -83,6 +93,11 @@ export default function PropertyNetworkScreen({navigation,route}){
    const id=auth.user.id
    const network=await loadPropertyNetwork(supabase,id)
    setOwner(id);setData(network)
+   if(!preferredLoaded.current){
+    preferredLoaded.current=true
+    const {data:profile}=await supabase.from('profiles').select('region').eq('id',id).maybeSingle()
+    setLocality(value=>value||matchLocality(profile?.region)||'')
+   }
   }catch{setError('Could not load My Property Network. Try again.')}
  },[])
  useFocusEffect(useCallback(()=>{void load()},[load]))
@@ -91,6 +106,7 @@ export default function PropertyNetworkScreen({navigation,route}){
  const area=active.find(item=>item.id===selected)
 
  function selectArea(id){
+  closeMatches()
   pickerRequest.current++
   setSelected(id);if(id)setHighlight(id);setPicker('');setStatusFor('');setServiceName('')
   navigation.setParams({area:id})
@@ -103,9 +119,25 @@ export default function PropertyNetworkScreen({navigation,route}){
  function browse(category){
   navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category}})
  }
- function post(person){
+ function post(person,category){
   setTarget(null)
-  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:{}})
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category}}:{}})
+ }
+ function closeMatches(){
+  matchRequest.current++;setMatchKey('');setMatchBusy(false);setMatches(null)
+ }
+ async function findMatches(service,category){
+  const request=++matchRequest.current
+  setMatchKey(service.service_key);setMatches(null);setMatchError('')
+  if(!matchLocality(locality)&&!(widen&&matchLocality(region))){setMatchBusy(false);return}
+  setMatchBusy(true)
+  try{
+   const [saved,worked]=await Promise.all([loadSavedProviders(supabase,owner),fetchConnections(owner,'locals')])
+   const result=await loadPropertyMatches(supabase,owner,propertyNeed(service,category),locality,widen?region:'',
+    saved.map(person=>person.id),worked.flatMap(row=>row.person?[row.person.id]:[]))
+   if(request===matchRequest.current)setMatches(result)
+  }catch{if(request===matchRequest.current)setMatchError('Could not find providers. Try again.')}
+  finally{if(request===matchRequest.current)setMatchBusy(false)}
  }
  async function mutate(action,message){
   if(lock.current)return false
@@ -203,13 +235,47 @@ export default function PropertyNetworkScreen({navigation,route}){
      {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
      {area.services.map(service=>{
       const linked=linkedPropertyProviders(data,service)
+      const category=propertyServiceCategory(area,service)
+      const postCategory=propertyNeed(service,category).categories[0]||category
       return <View style={styles.service} key={service.service_key}>
        <Text accessibilityRole="header" style={styles.serviceTitle}>{service.name}</Text>
        <Text style={service.status==='needs_help'?styles.gap:styles.muted}>
-        {service.status==='needs_help'?'Needs support':service.status==='has_provider'&&linked.length?'Provider linked':PROPERTY_SERVICE_STATES[service.status]||'Not configured'}
+        {service.status==='needs_help'?'Find help':service.status==='has_provider'&&linked.length?'Provider linked':PROPERTY_SERVICE_STATES[service.status]||'Not set up'}
        </Text>
        {!!linked.length&&<Text style={styles.muted}>{linked.map(propertyProviderName).join(', ')}</Text>}
-       {service.status==='needs_help'&&<LocalAction label="Find local help" onPress={()=>browse(propertyServiceCategory(area,service))}/>}
+       {(service.status==='needs_help'||matchKey===service.service_key)&&<LocalAction label={matchKey===service.service_key?'Close provider search':'Find local help'}
+        onPress={()=>matchKey===service.service_key?closeMatches():findMatches(service,category)}/>}
+       {matchKey===service.service_key&&<View style={styles.picker}>
+        <Text accessibilityRole="header" style={styles.serviceTitle}>Find providers for {service.name}</Text>
+        <Text style={styles.nodeLabel}>Town or locality</Text>
+        <TextInput accessibilityLabel="Town or locality" style={styles.input} maxLength={70} value={locality} onChangeText={setLocality}/>
+        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{checked:widen}} style={styles.statusRow} onPress={()=>setWiden(value=>!value)}>
+         <Icon name={widen?'checkbox-outline':'square-outline'} size={20} color={colors.primary}/>
+         <Text style={styles.statusText}>Include a wider region</Text>
+        </TouchableOpacity>
+        {widen&&<><Text style={styles.nodeLabel}>Region</Text>
+         <TextInput accessibilityLabel="Region" style={styles.input} maxLength={70} value={region} onChangeText={setRegion}/></>}
+        <LocalAction label="Search providers" disabled={matchBusy||!(matchLocality(locality)||(widen&&matchLocality(region)))} onPress={()=>findMatches(service,category)}/>
+        {matchBusy&&<Text accessibilityLiveRegion="polite">Finding providers…</Text>}
+        {!!matchError&&<Text accessibilityRole="alert">{matchError}</Text>}
+        {matches?.length===0&&<Text accessibilityLiveRegion="polite">No matching providers advertise services in the selected area. Try including a wider region.</Text>}
+        {matches?.map(person=><View key={person.id} style={styles.service}>
+         <View style={styles.row}>{person.avatar_url&&<Image source={{uri:person.avatar_url}} style={styles.matchAvatar}/>}
+          <Text accessibilityRole="header" style={styles.serviceTitle}>{propertyProviderName(person)}</Text></View>
+         <Text>{person.services.join(' · ')}</Text><Text style={styles.muted}>{person.reason}</Text>
+         {!!person.rating&&<Text>{person.rating} out of 5 · {person.reviewCount} provider reviews</Text>}
+         {(person.saved||person.worked)&&<Text>{[person.saved?'Saved':'',person.worked?'Worked together':''].filter(Boolean).join(' · ')}</Text>}
+         <LocalAction label="View profile" onPress={()=>profile(person)}/>
+         {!person.saved&&<LocalAction label="Save to My Locals" disabled={busy} onPress={async()=>{
+          if(await mutate(()=>setProviderSaved(supabase,owner,person.id,true),'Saved to My Locals.'))
+           setMatches(rows=>rows?.map(row=>row.id===person.id?{...row,saved:true}:row))
+         }}/>}
+         <LocalAction label={linked.some(row=>row.id===person.id)?'Added to Property Network':'Add to Property Network'}
+          disabled={busy||linked.some(row=>row.id===person.id)} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')}/>
+         <LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
+        </View>)}
+        <LocalAction label="Post a job" onPress={()=>post(null,postCategory)}/>
+       </View>}
        <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:statusFor===service.service_key}}
         onPress={()=>{setPicker('');setStatusFor(statusFor===service.service_key?'':service.service_key)}} style={styles.disclosure}>
         <Text style={styles.actionText}>{statusFor===service.service_key?'Done':linked.length?'View or change provider':service.status?'Change support':'Set up'}</Text>
@@ -227,7 +293,7 @@ export default function PropertyNetworkScreen({navigation,route}){
          <Icon name={value===service.status?'radio-button-on':'radio-button-off'} color={colors.primary} size={20}/>
          <Text style={styles.statusText}>{label}</Text>
         </TouchableOpacity>)}</View>
-       {service.status==='needs_help'&&<LocalAction label="Post a job" onPress={()=>post(null)}/>}
+       {service.status==='needs_help'&&<LocalAction label="Post a job" onPress={()=>post(null,postCategory)}/>}
        {linked.map(person=><View key={person.id} style={styles.linked}>
         <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
         <View style={styles.row}><LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
@@ -295,6 +361,7 @@ const styles=StyleSheet.create({
  diagramLabel:{fontSize:12,textAlign:'center'},
  badge:{fontSize:11,fontWeight:'600',textAlign:'center',color:colors.textSecondary},
  linkedBadge:{color:colors.primaryDark},
+ matchAvatar:{height:38,width:38,borderRadius:19},
  areaHeading:{flexDirection:'row',alignItems:'center',gap:10,marginTop:12},
  libraryHeading:{marginTop:20},
  libraryTile:{flexDirection:'row',alignItems:'center',padding:12,marginTop:8,gap:12,backgroundColor:colors.white,borderRadius:14},

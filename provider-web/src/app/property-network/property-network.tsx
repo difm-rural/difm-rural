@@ -4,7 +4,8 @@ import {useCallback,useEffect,useRef,useState} from 'react'
 import Link from '@/components/navigation-link'
 import {createClient} from '@/lib/supabase/client'
 import {loadConnections} from '@/lib/connections-data'
-import {loadInviteChoices,loadSavedProviders} from '@shared/trustedLocals'
+import {loadInviteChoices,loadSavedProviders,setProviderSaved} from '@shared/trustedLocals'
+import {loadPropertyMatches,matchLocality,propertyNeed,type PropertyMatch} from '@shared/propertyMatching'
 import {ProviderInviteAction} from '../connections/provider-actions'
 import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_RATIO,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
@@ -22,12 +23,20 @@ function AreaBadges({area}:{area:ReturnType<typeof propertyAreas>[number]}){
  )}</span>
 }
 
-export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:string}){
+export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;initialArea?:string;preferredArea?:string|null}){
  const [client]=useState(createClient)
  const [data,setData]=useState<NetworkData|null>(null)
  const [selected,setSelected]=useState(initialArea || '')
  const [highlight,setHighlight]=useState(initialArea || '')
  const [statusFor,setStatusFor]=useState('')
+ const [matchKey,setMatchKey]=useState('')
+ const [locality,setLocality]=useState(matchLocality(preferredArea)||'')
+ const [region,setRegion]=useState('')
+ const [widen,setWiden]=useState(false)
+ const [matches,setMatches]=useState<PropertyMatch[]|null>(null)
+ const [matchBusy,setMatchBusy]=useState(false)
+ const [matchError,setMatchError]=useState('')
+ const matchRequest=useRef(0)
  const [providerSearch,setProviderSearch]=useState('')
  const [providerLimit,setProviderLimit]=useState(12)
  const [list,setList]=useState(false)
@@ -59,6 +68,7 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
  const spokes=propertySpokes(active.length)
 
  function selectArea(id:AreaId|''){
+  closeMatches()
   pickerRequest.current++
   setSelected(id);if(id)setHighlight(id);setPicker(null);setStatusFor('');setServiceName('')
   window.history.replaceState(null,'',id?'?area='+id:window.location.pathname)
@@ -67,6 +77,24 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
    else (overview.current?.querySelector<HTMLButtonElement>('[data-area="'+highlight+'"]')
     ||overview.current?.querySelector<HTMLButtonElement>('[data-view-toggle]'))?.focus()
   })
+ }
+
+ function closeMatches(){
+  matchRequest.current++;setMatchKey('');setMatchBusy(false);setMatches(null)
+ }
+
+ async function findMatches(service:PropertyService,category:string){
+  const request=++matchRequest.current
+  setMatchKey(service.service_key);setMatches(null);setMatchError('')
+  if(!matchLocality(locality)&&!(widen&&matchLocality(region))){setMatchBusy(false);return}
+  setMatchBusy(true)
+  try{
+   const [saved,worked]=await Promise.all([loadSavedProviders(client,owner),loadConnections(client,owner,'locals')])
+   const result=await loadPropertyMatches(client,owner,propertyNeed(service,category),locality,widen?region:'',
+    saved.map(person=>person.id),worked.flatMap(row=>row.person?[row.person.id]:[]))
+   if(request===matchRequest.current)setMatches(result)
+  }catch{if(request===matchRequest.current)setMatchError('Could not find providers. Try again.')}
+  finally{if(request===matchRequest.current)setMatchBusy(false)}
  }
 
  async function mutate(action:()=>Promise<void>,message:string){
@@ -180,18 +208,50 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
     {current.services.map(service=>{
      const linked=linkedPropertyProviders(data,service)
      const category=propertyServiceCategory(current,service)
+     const postPath='/jobs/new?'+new URLSearchParams({category:propertyNeed(service,category).categories[0]||category})
      return <article className="property-service" key={service.service_key}>
       <h3>{service.name}</h3>
-      <p className={service.status==='needs_help'?'property-gap':'muted'}>{service.status==='needs_help'?'Needs support':
-       service.status==='has_provider'&&linked.length?'Provider linked':service.status?PROPERTY_SERVICE_STATES[service.status]:'Not configured'}</p>
+      <p className={service.status==='needs_help'?'property-gap':'muted'}>{service.status==='needs_help'?'Find help':
+       service.status==='has_provider'&&linked.length?'Provider linked':service.status?PROPERTY_SERVICE_STATES[service.status]:'Not set up'}</p>
       {!!linked.length&&<p className="muted">{linked.map(propertyProviderName).join(', ')}</p>}
       <div className="lform-actions">
-       {service.status==='needs_help'&&<Link href={propertyDiscoveryPath(category)} className="card-link">Find local help</Link>}
+       {(service.status==='needs_help'||matchKey===service.service_key)&&<button type="button" className="lform-cancel" aria-expanded={matchKey===service.service_key}
+        onClick={()=>matchKey===service.service_key?closeMatches():void findMatches(service,category)}>Find local help</button>}
        <button type="button" className="lform-cancel" aria-expanded={statusFor===service.service_key}
         onClick={()=>{setPicker(null);setStatusFor(statusFor===service.service_key?'':service.service_key)}}>
         {statusFor===service.service_key?'Done':linked.length?'View or change provider':service.status?'Change support':'Set up'}
        </button>
       </div>
+      {matchKey===service.service_key&&<section className="property-picker" aria-label={'Providers for '+service.name}>
+       <h4>Find providers for {service.name}</h4>
+       <form onSubmit={event=>{event.preventDefault();void findMatches(service,category)}}>
+        <label className="lform-field">Town or locality<input value={locality} maxLength={70} onChange={event=>setLocality(event.target.value)}/></label>
+        <label className="account-setting"><input type="checkbox" checked={widen} onChange={event=>setWiden(event.target.checked)}/>Include a wider region</label>
+        {widen&&<label className="lform-field">Region<input value={region} maxLength={70} onChange={event=>setRegion(event.target.value)}/></label>}
+        <button type="submit" className="lform-cancel" disabled={matchBusy||!(matchLocality(locality)||(widen&&matchLocality(region)))}>Search providers</button>
+       </form>
+       {matchBusy&&<p role="status">Finding providers…</p>}
+       {matchError&&<p role="alert">{matchError}</p>}
+       {matches?.length===0&&<p role="status">No matching providers advertise services in the selected area. Try including a wider region.</p>}
+       {matches?.map(person=><article className="property-service" key={person.id}>
+        <h5>{person.avatar_url&&<img className="account-avatar" alt="" src={person.avatar_url}/>} {propertyProviderName(person)}</h5>
+        <p>{person.services.join(' · ')}</p><p className="muted">{person.reason}</p>
+        {person.rating&&<p>{person.rating} out of 5 · {person.reviewCount} provider reviews</p>}
+        {(person.saved||person.worked)&&<p>{[person.saved?'Saved':'',person.worked?'Worked together':''].filter(Boolean).join(' · ')}</p>}
+        <div className="lform-actions">{providerLink(person)}
+         {!person.saved&&<button type="button" className="lform-cancel" disabled={busy} onClick={async()=>{
+          if(await mutate(()=>setProviderSaved(client,owner,person.id,true),'Saved to My Locals.'))
+           setMatches(rows=>rows?.map(row=>row.id===person.id?{...row,saved:true}:row)??null)
+         }}>Save to My Locals</button>}
+         <button type="button" className="lform-cancel" disabled={busy||linked.some(row=>row.id===person.id)} onClick={()=>void mutate(
+          ()=>setPropertyProvider(client,owner,service,person.id,true),'Provider linked.')}>
+          {linked.some(row=>row.id===person.id)?'Added to Property Network':'Add to Property Network'}</button>
+         {choices?<ProviderInviteAction provider={person.id} choices={choices} initiallyOpen={inviteTarget===person.id}/>
+          :<button type="button" className="lform-cancel" disabled={loadingInvites} onClick={()=>void refreshInviteChoices(person.id)}>Invite to job</button>}
+        </div>
+       </article>)}
+       <Link href={postPath} className="card-link">Post a job</Link>
+      </section>}
       {statusFor===service.service_key&&<>
       <fieldset className="property-status-options" disabled={busy}>
        <legend>Support status for {service.name}</legend>
@@ -204,7 +264,7 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
         {label}
        </label>)}
       </fieldset>
-      {service.status==='needs_help'&&<Link href="/jobs/new" className="card-link">Post a job</Link>}
+      {service.status==='needs_help'&&<Link href={postPath} className="card-link">Post a job</Link>}
       {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
        {providerLink(person)}
        <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void mutate(()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.')}>Remove link</button>

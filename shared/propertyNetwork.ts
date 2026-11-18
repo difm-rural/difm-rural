@@ -69,15 +69,15 @@ export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'li
  })
 }
 
-export const PROPERTY_DIAGRAM_RATIO=1.55
+export const PROPERTY_DIAGRAM_RATIO=1.65
 export const PROPERTY_NODE_WIDTH=25.5
-export const PROPERTY_NODE_HEIGHT=84
+export const PROPERTY_NODE_HEIGHT=94
 
 export function propertyAreaStatus(area:{linkedCount:number;needsHelp:boolean;configured:boolean}){
  const badges=[]
- if(area.linkedCount)badges.push({label:area.linkedCount+' linked',tone:'linked'})
- if(area.needsHelp)badges.push({label:'Needs support',tone:'gap'})
- if(!badges.length)badges.push({label:area.configured?'Configured':'Not configured',tone:'neutral'})
+ if(area.linkedCount)badges.push({label:area.linkedCount+(area.linkedCount===1?' local provider':' local providers'),tone:'linked'})
+ if(area.needsHelp)badges.push({label:'Find help',tone:'gap'})
+ if(!badges.length)badges.push({label:area.configured?'Configured':'Not set up',tone:'neutral'})
  return badges
 }
 
