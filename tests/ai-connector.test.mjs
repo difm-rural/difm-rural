@@ -253,3 +253,12 @@ test('AI access starts OFF and assistant tokens are read-only in the database', 
     for (const cmd of ['insert', 'update', 'delete']) assert.ok(guard.includes(`"Assistants cannot ${cmd}" on ${table} as restrictive`), `${table} ${cmd}`)
   }
 })
+
+test('public-web forwards /oauth/consent to the console consent screen', async () => {
+  const { GET } = await import('../public-web/src/app/oauth/consent/route.ts')
+  const ok = GET(new Request('https://ruralconnections.nz/oauth/consent?authorization_id=abc_DEF-123456'))
+  assert.equal(ok.status, 302)
+  assert.equal(ok.headers.get('location'), 'https://dev.ruralconnections.nz/oauth/consent?authorization_id=abc_DEF-123456')
+  const bad = GET(new Request('https://ruralconnections.nz/oauth/consent?authorization_id=%22%3E%3Cscript%3E'))
+  assert.equal(bad.headers.get('location'), 'https://dev.ruralconnections.nz/oauth/consent')
+})
