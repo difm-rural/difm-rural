@@ -7,7 +7,7 @@ import {loadConnections} from '@/lib/connections-data'
 import {loadInviteChoices,loadSavedProviders} from '@shared/trustedLocals'
 import {ProviderInviteAction} from '../connections/provider-actions'
 import {
- PROPERTY_SERVICE_STATES,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
+ PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_RATIO,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiscoveryPath,propertyProviderName,propertyServiceCategory,propertySpokes,
  savePropertyService,setPropertyArea,setPropertyProvider,
  type AreaId,type NetworkData,type PropertyProvider,type PropertyService,type ServiceStatus,
@@ -16,10 +16,18 @@ import {
 type ProviderGroup={label:string;people:PropertyProvider[]}
 type InviteChoices=Awaited<ReturnType<typeof loadInviteChoices>>
 
+function AreaBadges({area}:{area:ReturnType<typeof propertyAreas>[number]}){
+ return <span className="property-badges">{propertyAreaStatus(area).map(badge=>
+  <span key={badge.tone} className={'property-badge '+badge.tone}>{badge.label}</span>
+ )}</span>
+}
+
 export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:string}){
  const [client]=useState(createClient)
  const [data,setData]=useState<NetworkData|null>(null)
  const [selected,setSelected]=useState(initialArea || '')
+ const [highlight,setHighlight]=useState(initialArea || '')
+ const [statusFor,setStatusFor]=useState('')
  const [providerSearch,setProviderSearch]=useState('')
  const [providerLimit,setProviderLimit]=useState(12)
  const [list,setList]=useState(false)
@@ -34,6 +42,8 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
  const [inviteTarget,setInviteTarget]=useState('')
  const [loadingInvites,setLoadingInvites]=useState(false)
  const inviteLock=useRef(false)
+ const overview=useRef<HTMLElement>(null)
+ const propertyInfo=useRef<HTMLDialogElement>(null)
  const areaHeading=useRef<HTMLHeadingElement>(null)
  const lock=useRef(false)
  const pickerRequest=useRef(0)
@@ -45,14 +55,18 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
  useEffect(()=>{void load()},[load])
  const areas=data?propertyAreas(data):[]
  const active=areas.filter(area=>area.active)
- const current=active.find(area=>area.id===selected) || active[0]
+ const current=active.find(area=>area.id===selected)
  const spokes=propertySpokes(active.length)
 
- function selectArea(id:AreaId){
+ function selectArea(id:AreaId|''){
   pickerRequest.current++
-  setSelected(id);setPicker(null);setServiceName('')
-  window.history.replaceState(null,'','?area='+id)
-  requestAnimationFrame(()=>areaHeading.current?.focus())
+  setSelected(id);if(id)setHighlight(id);setPicker(null);setStatusFor('');setServiceName('')
+  window.history.replaceState(null,'',id?'?area='+id:window.location.pathname)
+  requestAnimationFrame(()=>{
+   if(id)areaHeading.current?.focus()
+   else (overview.current?.querySelector<HTMLButtonElement>('[data-area="'+highlight+'"]')
+    ||overview.current?.querySelector<HTMLButtonElement>('[data-view-toggle]'))?.focus()
+  })
  }
 
  async function mutate(action:()=>Promise<void>,message:string){
@@ -118,57 +132,79 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
   {feedback&&<p role="status">{feedback}</p>}
   {!data&&!error&&<p role="status">Loading My Property Network…</p>}
   {data&&<div className="property-layout">
-   <section>
+   <section hidden={!!current} ref={overview}>
     <div className="lform-actions" aria-label="Network view">
-     <button className="lform-cancel" type="button" aria-pressed={!list} onClick={()=>setList(false)}>Diagram</button>
+     <button className="lform-cancel" type="button" data-view-toggle aria-pressed={!list} onClick={()=>setList(false)}>Diagram</button>
      <button className="lform-cancel" type="button" aria-pressed={list} onClick={()=>setList(true)}>List</button>
     </div>
-    {!active.length?<p>Add a support area to get started.</p>:list?<ul className="property-area-list">{active.map(area=>
-     <li key={area.id}><button type="button" aria-pressed={current?.id===area.id} onClick={()=>selectArea(area.id)}>{area.label}</button>
-      <small>{area.hasProvider?'Providers linked':'No providers linked'}{area.needsHelp?' · Needs support':''}</small></li>
-    )}</ul>:<div className="property-diagram" aria-label="Property diagram">
+    <dialog ref={propertyInfo} className="property-info" aria-labelledby="property-info-title">
+     <h2 id="property-info-title">My Property</h2>
+     <p>Map-based property setup is coming. You can manage your support areas in My Property Network.</p>
+     <form method="dialog"><button className="lform-cancel">Close</button></form>
+    </dialog>
+    {list?<ul className="property-area-list">
+     <li><button type="button" onClick={()=>propertyInfo.current?.showModal()}>My Property</button></li>
+     {active.map(area=>
+     <li key={area.id}><button type="button" data-area={area.id} aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
+      <span aria-hidden="true">{area.glyph}</span> {area.label} <AreaBadges area={area}/>
+     </button></li>
+    )}</ul>:<div className="property-diagram" aria-label="Property diagram" style={{aspectRatio:1/PROPERTY_DIAGRAM_RATIO}}>
      {active.map((area,index)=><span key={area.id} aria-hidden="true" className={'property-spoke'+(area.hasProvider?' linked':'')}
-      style={{transform:'rotate('+spokes[index].angle+'deg)'}}/>)}
-     <div className="property-centre">My Property</div>
-     {active.map((area,index)=><button type="button" className={'property-node'+(area.needsHelp?' gap':'')}
-      style={{left:spokes[index].x+'%',top:spokes[index].y+'%'}} key={area.id}
-      aria-label={area.label+(area.hasProvider?', providers linked':'')+(area.needsHelp?', needs support':'')}
-      aria-pressed={current?.id===area.id} onClick={()=>selectArea(area.id)}>
-      <span aria-hidden="true">{area.glyph}{area.needsHelp?' · !':''}</span>{area.label}
+      style={{width:spokes[index].length+'%',transform:'rotate('+spokes[index].angle+'deg)'}}/>)}
+     <button type="button" className="property-centre" onClick={()=>propertyInfo.current?.showModal()}>My Property</button>
+     {active.map((area,index)=><button type="button" className="property-node" data-area={area.id}
+      style={{left:spokes[index].x+'%',top:spokes[index].y+'%',width:PROPERTY_NODE_WIDTH+'%',minHeight:PROPERTY_NODE_HEIGHT}} key={area.id}
+      aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
+      <span aria-hidden="true" className="property-glyph">{area.glyph}</span>{area.label}<AreaBadges area={area}/>
      </button>)}
     </div>}
-    {!list&&active.length>0&&<p className="muted property-legend">Solid lines show linked providers. <strong>!</strong> marks an area needing support.</p>}
-    <details className="activity-action">
-     <summary>Manage support areas</summary>
-     <div className="property-area-list">{areas.map(area=><label className="account-setting" key={area.id}>
-      <input type="checkbox" checked={area.active} disabled={busy}
-       onChange={event=>void mutate(()=>setPropertyArea(client,owner,area.id,event.target.checked),area.active?'Support area hidden.':'Support area added.')}/>
-      {area.label}
-     </label>)}</div>
-    </details>
+    {!active.length&&<p>Add a support area to get started.</p>}
+    <section className="property-library" aria-labelledby="property-library-heading">
+     <h2 id="property-library-heading">Grow your network</h2>
+     <p className="muted">Add other areas where you may need help.</p>
+     <div className="property-library-tiles">{areas.filter(area=>!area.active).map(area=>
+      <button className="property-library-tile" type="button" key={area.id} aria-label={'Add '+area.label}
+       disabled={busy} onClick={()=>void mutate(()=>setPropertyArea(client,owner,area.id,true),area.label+' added.')}>
+       <span aria-hidden="true" className="property-glyph">{area.glyph}</span>
+       <span><strong>{area.label}</strong><small>{PROPERTY_AREA_DESCRIPTIONS[area.id]}</small></span>
+       <span aria-hidden="true" className="property-glyph">+</span>
+      </button>
+     )}</div>
+     {areas.every(area=>area.active)&&<p className="muted">All support areas are in your network.</p>}
+    </section>
    </section>
-   {current&&<section aria-labelledby="property-area-heading">
-    <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}>{current.label}</h2>
-    <p className="muted">Choose what support you need for each service.</p>
+   {current&&<section className="property-area-panel" aria-labelledby="property-area-heading">
+    <button type="button" className="lform-cancel" onClick={()=>selectArea('')}>Back to My Property Network</button>
+    <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}><span aria-hidden="true">{current.glyph} </span>{current.label}</h2>
+    <p className="muted">{PROPERTY_AREA_DESCRIPTIONS[current.id]}</p>
     {current.services.map(service=>{
      const linked=linkedPropertyProviders(data,service)
      const category=propertyServiceCategory(current,service)
      return <article className="property-service" key={service.service_key}>
       <h3>{service.name}</h3>
-      <label className="lform-field">Support status
-       <select value={service.status || ''} disabled={busy} onChange={event=>{
-        const status=event.target.value as ServiceStatus
-        void mutate(()=>savePropertyService(client,owner,{...service,status}),'Support status saved.')
-       }}>
-        <option value="" disabled>Choose a status</option>
-        {Object.entries(PROPERTY_SERVICE_STATES).map(([value,label])=><option value={value} key={value}>{label}</option>)}
-       </select>
-      </label>
-      {service.status==='needs_help'&&<div className="lform-actions">
-       <strong className="property-gap">Needs support</strong>
-       <Link href={propertyDiscoveryPath(category)} className="card-link">Find local help</Link>
-       <Link href="/jobs/new" className="card-link">Post a job</Link>
-      </div>}
+      <p className={service.status==='needs_help'?'property-gap':'muted'}>{service.status==='needs_help'?'Needs support':
+       service.status==='has_provider'&&linked.length?'Provider linked':service.status?PROPERTY_SERVICE_STATES[service.status]:'Not configured'}</p>
+      {!!linked.length&&<p className="muted">{linked.map(propertyProviderName).join(', ')}</p>}
+      <div className="lform-actions">
+       {service.status==='needs_help'&&<Link href={propertyDiscoveryPath(category)} className="card-link">Find local help</Link>}
+       <button type="button" className="lform-cancel" aria-expanded={statusFor===service.service_key}
+        onClick={()=>{setPicker(null);setStatusFor(statusFor===service.service_key?'':service.service_key)}}>
+        {statusFor===service.service_key?'Done':linked.length?'View or change provider':service.status?'Change support':'Set up'}
+       </button>
+      </div>
+      {statusFor===service.service_key&&<>
+      <fieldset className="property-status-options" disabled={busy}>
+       <legend>Support status for {service.name}</legend>
+       {Object.entries(PROPERTY_SERVICE_STATES).map(([value,label])=><label key={value} className="property-status-option">
+        <input type="radio" name={'support-'+service.service_key} checked={service.status===value} onChange={async()=>{
+         if(!await mutate(()=>savePropertyService(client,owner,{...service,status:value as ServiceStatus}),'Support status saved.'))return
+         if(value==='has_provider')void openPicker(service,category)
+         else{pickerRequest.current++;setPicker(null)}
+        }}/>
+        {label}
+       </label>)}
+      </fieldset>
+      {service.status==='needs_help'&&<Link href="/jobs/new" className="card-link">Post a job</Link>}
       {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
        {providerLink(person)}
        <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void mutate(()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.')}>Remove link</button>
@@ -200,12 +236,15 @@ export function PropertyNetwork({owner,initialArea}:{owner:string;initialArea?:s
         })}
        <Link href={propertyDiscoveryPath(category)} className="card-link">Browse more providers</Link>
       </section>}
+      </>}
      </article>
     })}
     <form className="lform" onSubmit={addService}>
      <label className="lform-field">Custom service<input value={serviceName} onChange={event=>setServiceName(event.target.value)} maxLength={80} required/></label>
      <button className="lform-save" disabled={busy||!serviceName.trim()}>Add service</button>
     </form>
+    <button type="button" className="lform-cancel" disabled={busy}
+     onClick={async()=>{if(await mutate(()=>setPropertyArea(client,owner,current.id,false),current.label+' removed.'))selectArea('')}}>Remove support area</button>
    </section>}
   </div>}
  </section>

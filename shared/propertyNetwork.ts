@@ -18,6 +18,17 @@ export const PROPERTY_SERVICE_STATES={
  irrelevant:'Not relevant to my property',
 } as const
 
+export const PROPERTY_AREA_DESCRIPTIONS={
+ water:'Water supply, pumps, tanks and troughs.',
+ land:'Paddock care, weeds and pasture improvement.',
+ fencing:'Fences, gates and electric fencing.',
+ livestock:'Stock handling, shearing and animal care.',
+ access:'Driveways, gravel and drainage.',
+ upkeep:'Buildings, gutters and general maintenance.',
+ trees:'Tree trimming, removal and firewood.',
+ machinery:'Equipment hire, repairs and tractor work.',
+}
+
 export type AreaId=typeof SUPPORT_AREAS[number]['id']
 export type ServiceStatus=keyof typeof PROPERTY_SERVICE_STATES
 export type PropertyService={area:AreaId;service_key:string;name:string;status:ServiceStatus|null}
@@ -50,18 +61,34 @@ export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'li
    return stored.get(key) ?? {area:area.id,service_key:key,name,status:null}
   })
   services.push(...[...stored.values()].filter(service=>service.service_key.startsWith('custom-')))
+  const linkedCount=new Set(data.links.filter(row=>row.area===area.id).map(row=>row.provider_id)).size
   return {...area,services,active:data.preferences.find(row=>row.area===area.id)?.active??index<6,
-   hasProvider:data.links.some(row=>row.area===area.id),
-   needsHelp:services.some(service=>service.status==='needs_help')}
+   hasProvider:linkedCount>0,linkedCount,
+   needsHelp:services.some(service=>service.status==='needs_help'),
+   configured:services.some(service=>service.status!==null)}
  })
 }
 
-// Percent coordinates let both clients use the same layout at any viewport size.
+export const PROPERTY_DIAGRAM_RATIO=1.55
+export const PROPERTY_NODE_WIDTH=25.5
+export const PROPERTY_NODE_HEIGHT=84
+
+export function propertyAreaStatus(area:{linkedCount:number;needsHelp:boolean;configured:boolean}){
+ const badges=[]
+ if(area.linkedCount)badges.push({label:area.linkedCount+' linked',tone:'linked'})
+ if(area.needsHelp)badges.push({label:'Needs support',tone:'gap'})
+ if(!badges.length)badges.push({label:area.configured?'Configured':'Not configured',tone:'neutral'})
+ return badges
+}
+
+// Offset the denser ring to leave room for paired nodes above and below the hub.
 export function propertySpokes(count:number){
  return Array.from({length:count},(_,index)=>{
-  const angle=360*index/count-90
-  const radians=angle*Math.PI/180
-  return {angle,x:50+36*Math.cos(radians),y:50+36*Math.sin(radians)}
+  const dense=count>=7
+  const radians=(360*index/(dense?8:count)-(dense?67.5:90))*Math.PI/180
+  const dx=36*Math.cos(radians),dy=39*Math.sin(radians)
+  return {angle:Math.atan2(dy*PROPERTY_DIAGRAM_RATIO,dx)*180/Math.PI,
+   length:Math.hypot(dx,dy*PROPERTY_DIAGRAM_RATIO),x:50+dx,y:50+dy}
  })
 }
 

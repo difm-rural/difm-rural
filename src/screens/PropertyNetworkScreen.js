@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react'
-import {Alert,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
+import {Alert,BackHandler,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
@@ -12,29 +12,31 @@ import {sendJobInvitation} from '../lib/invites'
 import {colors} from '../theme/tokens'
 import {loadInviteChoices,loadSavedProviders,providerInviteJobs} from '../../shared/trustedLocals'
 import {
- PROPERTY_SERVICE_STATES,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
+ PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_RATIO,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyProviderName,propertyServiceCategory,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
 } from '../../shared/propertyNetwork'
 
 function AreaButton({area,selected,onPress,style,diagram=false}){
+ const badges=propertyAreaStatus(area)
  return <TouchableOpacity accessibilityRole="button" accessibilityState={{selected}} onPress={onPress}
-  accessibilityLabel={area.label+(area.hasProvider?', providers linked':'')+(area.needsHelp?', needs support':'')}
+  accessibilityLabel={[area.label,...badges.map(badge=>badge.label)].join(', ')}
   style={[styles.areaButton,diagram?styles.diagramNode:styles.listNode,selected&&styles.selected,style]}>
-  <Icon name={area.icon} size={18} color={selected?colors.white:colors.primary}/>
-  <Text style={[styles.nodeLabel,selected&&styles.selectedText]}>{area.label}{diagram&&area.needsHelp?' !':''}</Text>
-  {!diagram&&<Text style={selected?styles.selectedText:styles.muted}>{area.hasProvider?'Providers linked':'No providers linked'}{area.needsHelp?' · Needs support':''}</Text>}
+  <Icon name={area.icon} size={22} color={selected?colors.white:colors.primary}/>
+  <Text style={[styles.nodeLabel,diagram&&styles.diagramLabel,selected&&styles.selectedText]}>{area.label}</Text>
+  {badges.map(badge=><Text key={badge.tone} style={[styles.badge,badge.tone==='linked'&&styles.linkedBadge,
+   badge.tone==='gap'&&styles.gap,selected&&styles.selectedText]}>{badge.label}</Text>)}
  </TouchableOpacity>
 }
 
-function PropertyDiagram({areas,selected,onSelect}){
+function PropertyDiagram({areas,selected,onSelect,onOpenProperty}){
  const spots=propertySpokes(areas.length)
  const [size,setSize]=useState(0)
  return <View style={styles.diagram} onLayout={event=>setSize(event.nativeEvent.layout.width)}>
   {size>0&&areas.map((area,index)=>{
-   const point=spots[index],length=size*.36,angle=point.angle*Math.PI/180
+   const point=spots[index],length=size*point.length/100,angle=point.angle*Math.PI/180
    return <View pointerEvents="none" key={area.id} style={{position:'absolute',
     left:size*.5 + length*.5*Math.cos(angle)-length/2,
-    top:size*.5 + length*.5*Math.sin(angle)-1,
+    top:size*PROPERTY_DIAGRAM_RATIO*.5 + length*.5*Math.sin(angle)-1,
     width:length,height:2,transform:[{rotate:point.angle+'deg'}],
     flexDirection:'row',justifyContent:'space-between',
    }}>
@@ -42,11 +44,11 @@ function PropertyDiagram({areas,selected,onSelect}){
      :Array.from({length:9},(_,dash)=><View key={dash} style={{width:'7%',height:2,backgroundColor:'#72847a'}}/>)}
    </View>
   })}
-  <View style={styles.centre}><Text style={styles.centreText}>My Property</Text></View>
+  <TouchableOpacity style={styles.centre} accessibilityRole="button" accessibilityLabel="My Property" onPress={onOpenProperty}><Icon name="home-outline" size={22} color={colors.white}/><Text style={styles.centreText}>My Property</Text></TouchableOpacity>
   {size>0&&areas.map((area,index)=>{
-   const pt=spots[index],width=size*.22
+   const pt=spots[index],width=size*PROPERTY_NODE_WIDTH/100
    return <AreaButton key={area.id} diagram area={area} selected={area.id===selected} onPress={()=>onSelect(area.id)}
-    style={{width,left:size*pt.x/100-width/2,top:size*pt.y/100-25}}/>
+    style={{width,left:size*pt.x/100-width/2,top:size*PROPERTY_DIAGRAM_RATIO*pt.y/100-PROPERTY_NODE_HEIGHT/2}}/>
   })}
  </View>
 }
@@ -58,9 +60,9 @@ export default function PropertyNetworkScreen({navigation,route}){
  const [error,setError]=useState('')
  const [feedback,setFeedback]=useState('')
  const [list,setList]=useState(false)
- const [manage,setManage]=useState(false)
  const [selected,setSelected]=useState(route.params?.area || '')
  const [statusFor,setStatusFor]=useState('')
+ const [highlight,setHighlight]=useState(route.params?.area || '')
  const [serviceName,setServiceName]=useState('')
  const [providerSearch,setProviderSearch]=useState('')
  const [providerLimit,setProviderLimit]=useState(12)
@@ -70,8 +72,6 @@ export default function PropertyNetworkScreen({navigation,route}){
  const [busy,setBusy]=useState(false)
  const [target,setTarget]=useState(null)
  const [choices,setChoices]=useState(null)
- const scroll=useRef(null)
- const serviceOffset=useRef(0)
  const lock=useRef(false)
  const pickerRequest=useRef(0)
  const addingService=useRef(null)
@@ -88,14 +88,18 @@ export default function PropertyNetworkScreen({navigation,route}){
  useFocusEffect(useCallback(()=>{void load()},[load]))
  const areas=data?propertyAreas(data):[]
  const active=areas.filter(area=>area.active)
- const area=active.find(item=>item.id===selected)||active[0]
+ const area=active.find(item=>item.id===selected)
 
  function selectArea(id){
   pickerRequest.current++
-  setSelected(id);setPicker('');setStatusFor('');setServiceName('')
+  setSelected(id);if(id)setHighlight(id);setPicker('');setStatusFor('');setServiceName('')
   navigation.setParams({area:id})
-  requestAnimationFrame(()=>scroll.current?.scrollTo({y:serviceOffset.current,animated:false}))
  }
+ useFocusEffect(useCallback(()=>{
+  if(!selected)return
+  const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{selectArea('');return true})
+  return ()=>subscription.remove()
+ },[selected,navigation]))
  function browse(category){
   navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category}})
  }
@@ -153,15 +157,18 @@ export default function PropertyNetworkScreen({navigation,route}){
  function profile(person){
   navigation.navigate('ProviderProfile',{providerId:person.id})
  }
+ function openProperty(){
+  Alert.alert('My Property','Map-based property setup is coming. You can manage your support areas in My Property Network.')
+ }
 
  return <View style={[styles.screen,{paddingTop:insets.top}]}>
-  <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}>
+  <ScrollView style={area?{display:'none'}:undefined} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}>
    <LocalAction label="Back" icon="chevron-back" onPress={()=>navigation.goBack()}/>
    <Text accessibilityRole="header" style={styles.title}>My Property Network</Text>
    <Text style={styles.muted}>See who helps with your property and where you still need support.</Text>
    <LocalAction label="My Locals" onPress={()=>navigation.navigate('Connections',{side:'locals'})}/>
-   {!!error&&<View><Text accessibilityRole="alert">{error}</Text><LocalAction label="Retry" onPress={()=>{setError('');void load()}}/></View>}
-   {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
+   {!area&&!!error&&<View><Text accessibilityRole="alert">{error}</Text><LocalAction label="Retry" onPress={()=>{setError('');void load()}}/></View>}
+   {!area&&!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
    {!data&&!error&&<Loading label="Loading My Property Network…"/>}
    {data&&<>
     <View style={styles.row}>
@@ -170,38 +177,57 @@ export default function PropertyNetworkScreen({navigation,route}){
       <Text style={list===(view==='List')?styles.selectedText:styles.nodeLabel}>{view}</Text>
      </TouchableOpacity>)}
     </View>
-    {active.length===0?<Text style={styles.muted}>Add a support area to get started.</Text>
-     :list?active.map(item=><AreaButton key={item.id} area={item} selected={item.id===area?.id} onPress={()=>selectArea(item.id)}/>)
-     :<><PropertyDiagram areas={active} selected={area?.id} onSelect={selectArea}/>
-       <Text style={styles.legend}>Solid lines show linked providers. ! marks an area needing support.</Text></>}
-    <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:manage}}
-     onPress={()=>setManage(value=>!value)} style={styles.disclosure}>
-     <Text style={styles.sectionTitle}>Manage support areas</Text>
-     <Icon name={manage?'chevron-up':'chevron-down'} size={18} color={colors.primary}/>
-    </TouchableOpacity>
-    {manage&&areas.map(item=><LocalAction key={item.id} label={(item.active?'Hide ':'Add ')+item.label}
-     icon={item.active?'checkmark-circle-outline':'add-circle-outline'} disabled={busy}
-     onPress={()=>void mutate(()=>setPropertyArea(supabase,owner,item.id,!item.active),item.active?'Support area hidden.':'Support area added.')}/>)}
-    {area&&<View onLayout={event=>{serviceOffset.current=event.nativeEvent.layout.y}} style={{marginTop:14}}>
-     <Text accessibilityRole="header" style={styles.sectionTitle}>{area.label}</Text>
-     <Text style={styles.muted}>Choose what support you need for each service.</Text>
+    {list?<><LocalAction label="My Property" onPress={openProperty}/>
+     {active.map(item=><AreaButton key={item.id} area={item} selected={item.id===highlight} onPress={()=>selectArea(item.id)}/>)}</>
+     :<PropertyDiagram areas={active} selected={highlight} onSelect={selectArea} onOpenProperty={openProperty}/>}
+    {!active.length&&<Text style={styles.muted}>Add a support area to get started.</Text>}
+    <Text accessibilityRole="header" style={[styles.sectionTitle,styles.libraryHeading]}>Grow your network</Text>
+    <Text style={styles.muted}>Add other areas where you may need help.</Text>
+    {areas.filter(item=>!item.active).map(item=><TouchableOpacity key={item.id} style={styles.libraryTile}
+     accessibilityRole="button" accessibilityLabel={'Add '+item.label} disabled={busy}
+     onPress={()=>void mutate(()=>setPropertyArea(supabase,owner,item.id,true),item.label+' added.')}>
+     <Icon name={item.icon} color={colors.primary} size={25}/>
+     <View style={styles.libraryCopy}><Text style={styles.nodeLabel}>{item.label}</Text>
+      <Text style={styles.muted}>{PROPERTY_AREA_DESCRIPTIONS[item.id]}</Text></View>
+     <Icon name="add-circle-outline" color={colors.primary} size={24}/>
+    </TouchableOpacity>)}
+    {areas.every(item=>item.active)&&<Text style={styles.muted}>All support areas are in your network.</Text>}
+   </>}
+  </ScrollView>
+  {area&&<ScrollView key={area.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}>
+     <LocalAction label="Back to My Property Network" icon="chevron-back" onPress={()=>selectArea('')}/>
+     <View style={styles.areaHeading}><Icon name={area.icon} size={32} color={colors.primary}/>
+      <Text accessibilityRole="header" style={styles.title}>{area.label}</Text></View>
+     <Text style={styles.muted}>{PROPERTY_AREA_DESCRIPTIONS[area.id]}</Text>
+     {!!error&&<Text accessibilityRole="alert">{error}</Text>}
+     {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
      {area.services.map(service=>{
       const linked=linkedPropertyProviders(data,service)
       return <View style={styles.service} key={service.service_key}>
        <Text accessibilityRole="header" style={styles.serviceTitle}>{service.name}</Text>
+       <Text style={service.status==='needs_help'?styles.gap:styles.muted}>
+        {service.status==='needs_help'?'Needs support':service.status==='has_provider'&&linked.length?'Provider linked':PROPERTY_SERVICE_STATES[service.status]||'Not configured'}
+       </Text>
+       {!!linked.length&&<Text style={styles.muted}>{linked.map(propertyProviderName).join(', ')}</Text>}
+       {service.status==='needs_help'&&<LocalAction label="Find local help" onPress={()=>browse(propertyServiceCategory(area,service))}/>}
        <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:statusFor===service.service_key}}
-        onPress={()=>setStatusFor(statusFor===service.service_key?'':service.service_key)} style={styles.disclosure}>
-        <Text style={styles.nodeLabel}>{PROPERTY_SERVICE_STATES[service.status] || 'Choose a status'}</Text>
-        <Icon name="chevron-down" size={16} color={colors.primary}/>
+        onPress={()=>{setPicker('');setStatusFor(statusFor===service.service_key?'':service.service_key)}} style={styles.disclosure}>
+        <Text style={styles.actionText}>{statusFor===service.service_key?'Done':linked.length?'View or change provider':service.status?'Change support':'Set up'}</Text>
+        <Icon name={statusFor===service.service_key?'chevron-up':'chevron-forward'} size={16} color={colors.primary}/>
        </TouchableOpacity>
-       {statusFor===service.service_key&&Object.entries(PROPERTY_SERVICE_STATES).map(([value,label])=>
-        <LocalAction key={value} label={label} icon={value===service.status?'checkmark':''} disabled={busy}
-         onPress={async()=>{if(await mutate(()=>savePropertyService(supabase,owner,{...service,status:value}),'Support status saved.'))setStatusFor('')}}/>)}
-       {service.status==='needs_help'&&<View style={styles.row}>
-        <Text style={styles.gap}>Needs support</Text>
-        <LocalAction label="Find local help" onPress={()=>browse(propertyServiceCategory(area,service))}/>
-        <LocalAction label="Post a job" onPress={()=>post(null)}/>
-       </View>}
+       {statusFor===service.service_key&&<>
+       <View accessibilityRole="radiogroup">{Object.entries(PROPERTY_SERVICE_STATES).map(([value,label])=>
+        <TouchableOpacity key={value} accessibilityRole="radio" accessibilityState={{checked:value===service.status,disabled:busy}}
+         disabled={busy} style={[styles.statusRow,value===service.status&&styles.statusSelected]}
+         onPress={async()=>{
+          if(value!==service.status&&!await mutate(()=>savePropertyService(supabase,owner,{...service,status:value}),'Support status saved.'))return
+          if(value==='has_provider')void openPicker(service)
+          else{pickerRequest.current++;setPicker('')}
+         }}>
+         <Icon name={value===service.status?'radio-button-on':'radio-button-off'} color={colors.primary} size={20}/>
+         <Text style={styles.statusText}>{label}</Text>
+        </TouchableOpacity>)}</View>
+       {service.status==='needs_help'&&<LocalAction label="Post a job" onPress={()=>post(null)}/>}
        {linked.map(person=><View key={person.id} style={styles.linked}>
         <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
         <View style={styles.row}><LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
@@ -231,15 +257,16 @@ export default function PropertyNetworkScreen({navigation,route}){
          })}
         <LocalAction label="Browse more providers" onPress={()=>browse(propertyServiceCategory(area,service))}/>
        </View>}
+       </>}
       </View>
      })}
      <Text style={styles.nodeLabel}>Custom service</Text>
      <TextInput accessibilityLabel="Custom service" style={styles.input} placeholder="e.g. Check the spring intake"
       placeholderTextColor={colors.textSecondary} value={serviceName} onChangeText={setServiceName} maxLength={80}/>
      <LocalAction label="Add service" icon="add" disabled={busy||!serviceName.trim()} onPress={addService}/>
-    </View>}
-   </>}
-  </ScrollView>
+     <LocalAction label="Remove support area" icon="remove-circle-outline" disabled={busy}
+      onPress={async()=>{if(await mutate(()=>setPropertyArea(supabase,owner,area.id,false),area.label+' removed.'))selectArea('')}}/>
+  </ScrollView>}
   <LocalInvitePicker person={target} jobs={target&&choices?providerInviteJobs(choices.jobs,choices.invites,target.id):[]}
    failed={!choices} busy={busy} onInvite={invite} onClose={()=>{if(!lock.current)setTarget(null)}} onPost={()=>post(target)}/>
  </View>
@@ -254,18 +281,28 @@ const styles=StyleSheet.create({
  feedback:{color:colors.primaryDark,fontWeight:'700',marginBottom:8},
  row:{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:8},
  viewButton:{padding:10,borderRadius:10,backgroundColor:colors.primaryLight},
- diagram:{alignSelf:'center',width:'100%',maxWidth:430,aspectRatio:1,borderRadius:240,backgroundColor:colors.primaryLight,marginTop:12},
- centre:{position:'absolute',left:'38%',top:'38%',width:'24%',height:'24%',borderRadius:80,backgroundColor:colors.primaryDark,padding:6,justifyContent:'center'},
+ diagram:{alignSelf:'center',width:'100%',maxWidth:430,aspectRatio:1/PROPERTY_DIAGRAM_RATIO,borderRadius:240,backgroundColor:colors.primaryLight,marginTop:12},
+ centre:{position:'absolute',left:'38%',top:'42%',width:'24%',height:'16%',borderRadius:80,backgroundColor:colors.primaryDark,padding:6,justifyContent:'center',alignItems:'center'},
  centreText:{color:colors.white,textAlign:'center',fontWeight:'700'},
- areaButton:{backgroundColor:colors.white,borderRadius:10},
- diagramNode:{position:'absolute',minHeight:50,paddingHorizontal:3,paddingVertical:4,alignItems:'center',justifyContent:'center'},
+ areaButton:{backgroundColor:colors.white,borderRadius:14},
+ diagramNode:{position:'absolute',minHeight:PROPERTY_NODE_HEIGHT,paddingHorizontal:3,paddingVertical:4,alignItems:'center',justifyContent:'center'},
  listNode:{gap:4,padding:12,marginTop:8},
  nodeLabel:{color:colors.textPrimary,fontWeight:'700'},
  selected:{backgroundColor:colors.primary},
  selectedText:{color:colors.white,fontWeight:'700'},
- legend:{textAlign:'center',color:colors.textSecondary,marginTop:8,fontSize:13},
  disclosure:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',minHeight:44,marginTop:5},
- service:{borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:colors.border,paddingVertical:14},
+ service:{backgroundColor:colors.white,borderRadius:14,padding:14,marginTop:12},
+ diagramLabel:{fontSize:12,textAlign:'center'},
+ badge:{fontSize:11,fontWeight:'600',textAlign:'center',color:colors.textSecondary},
+ linkedBadge:{color:colors.primaryDark},
+ areaHeading:{flexDirection:'row',alignItems:'center',gap:10,marginTop:12},
+ libraryHeading:{marginTop:20},
+ libraryTile:{flexDirection:'row',alignItems:'center',padding:12,marginTop:8,gap:12,backgroundColor:colors.white,borderRadius:14},
+ libraryCopy:{flex:1},
+ actionText:{color:colors.primaryDark,fontWeight:'700'},
+ statusRow:{minHeight:46,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,borderRadius:8},
+ statusSelected:{backgroundColor:colors.primaryLight},
+ statusText:{flex:1,color:colors.textPrimary},
  gap:{color:colors.jobInk,fontWeight:'700'},
  linked:{paddingLeft:12,marginBottom:8},
  picker:{padding:12,backgroundColor:colors.primaryLight,borderRadius:10},
