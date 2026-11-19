@@ -1,3 +1,4 @@
+import PropertyMapScreen from '../screens/PropertyMapScreen'
 import PropertyNetworkScreen from '../screens/PropertyNetworkScreen'
 import {publicAreaError} from '../../shared/publicArea'
 import {postingTextError} from '../../shared/postingText'
@@ -115,6 +116,7 @@ function HomeStackNav() {
       <HomeNav.Screen name="AreaTracer"          component={AreaTracerScreen}         />
       <HomeNav.Screen name="JobMap"              component={JobMapScreen}             />
       <HomeNav.Screen name="Notifications"       component={NotificationsScreen}      />
+      <HomeNav.Screen name="PropertyMap"         component={PropertyMapScreen} />
       <HomeNav.Screen name="PropertyNetwork"     component={PropertyNetworkScreen} />
       <HomeNav.Screen name="Connections"         component={ConnectionsScreen}        />
       <HomeNav.Screen name="ConnectionDetail"    component={ConnectionDetailScreen}   />

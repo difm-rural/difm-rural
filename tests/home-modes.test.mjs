@@ -85,5 +85,5 @@ test('native Home keeps modes role-independent and the requester relationship ro
  assert.doesNotMatch(native,/canProvide|My Locals/)
  const network=read('provider-web/src/app/property-network/property-network.tsx')
  assert.match(network,/href="\/connections\?view=locals">My People/)
- assert.match(network,/Map-based property setup is coming/)
+ assert.match(network,/href="\/property-network\/map"/)
 })

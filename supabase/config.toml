@@ -427,3 +427,6 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # gateway check is off to let unauthenticated clients reach OAuth discovery.
 [functions.rc-mcp]
 verify_jwt = false
+
+[functions.property-address-search]
+verify_jwt = true

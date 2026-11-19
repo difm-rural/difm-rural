@@ -87,17 +87,15 @@ test('gap discovery links reuse the canonical listing categories',()=>{
  assert.equal(new URL(propertyDiscoveryPath(category),'https://example.test').searchParams.get('category'),category)
 })
 
-test('My Property offers the same map-independent information in the diagram and list',()=>{
+test('My Property opens the map from diagram and list on both clients',()=>{
  const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
  const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
- assert.match(web,/className="property-centre" onClick=\{\(\)=>propertyInfo.current\?\.showModal\(\)\}/)
- assert.match(web,/method="dialog"/)
+ assert.match(web,/className="property-centre" href="\/property-network\/map"/)
+ assert.match(web,/<li><Link href="\/property-network\/map">My Property/)
  assert.match(native,/onOpenProperty=\{openProperty\}/)
  assert.match(native,/label="My Property" onPress=\{openProperty\}/)
- for(const source of [web,native]){
-  assert.match(source,/Map-based property setup is coming/)
-  assert.doesNotMatch(source,/\/property-network\/map|navigate\('PropertyMap'\)/)
- }
+ assert.match(native,/navigate\('PropertyMap'\)/)
+ for(const source of [web,native])assert.doesNotMatch(source,/Map-based property setup is coming/)
 })
 
 test('network reads scope every private table to its owner and mutations reuse the guarded RPC',async()=>{

@@ -190,7 +190,7 @@ export default function PropertyNetworkScreen({navigation,route}){
   navigation.navigate('ProviderProfile',{providerId:person.id})
  }
  function openProperty(){
-  Alert.alert('My Property','Map-based property setup is coming. You can manage your support areas in My Property Network.')
+  navigation.navigate('PropertyMap')
  }
 
  return <View style={[styles.screen,{paddingTop:insets.top}]}>

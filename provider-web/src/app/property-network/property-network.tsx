@@ -57,7 +57,6 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  const [loadingInvites,setLoadingInvites]=useState(false)
  const inviteLock=useRef(false)
  const overview=useRef<HTMLElement>(null)
- const propertyInfo=useRef<HTMLDialogElement>(null)
  const areaHeading=useRef<HTMLHeadingElement>(null)
  const lock=useRef(false)
  const pickerRequest=useRef(0)
@@ -171,13 +170,8 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      <button className="lform-cancel" type="button" data-view-toggle aria-pressed={!list} onClick={()=>setList(false)}>Diagram</button>
      <button className="lform-cancel" type="button" aria-pressed={list} onClick={()=>setList(true)}>List</button>
     </div>
-    <dialog ref={propertyInfo} className="property-info" aria-labelledby="property-info-title">
-     <h2 id="property-info-title">My Property</h2>
-     <p>Map-based property setup is coming. You can manage your support areas in My Property Network.</p>
-     <form method="dialog"><button className="lform-cancel">Close</button></form>
-    </dialog>
     {list?<ul className="property-area-list">
-     <li><button type="button" onClick={()=>propertyInfo.current?.showModal()}>My Property</button></li>
+     <li><Link href="/property-network/map">My Property</Link></li>
      {active.map(area=>
      <li key={area.id}><button type="button" data-area={area.id} aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
       <PropertyAreaIcon area={area.id} size={20}/> {area.label} <AreaBadges area={area}/>
@@ -185,7 +179,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
     )}</ul>:<div className="property-diagram" aria-label="Property diagram" style={{aspectRatio:1/propertyDiagramRatio(active.length)}}>
      {active.map((area,index)=><span key={area.id} aria-hidden="true" className={'property-spoke'+(area.hasProvider?' linked':'')}
       style={{width:spokes[index].length+'%',transform:'rotate('+spokes[index].angle+'deg)'}}/>)}
-     <button type="button" className="property-centre" onClick={()=>propertyInfo.current?.showModal()}>My Property</button>
+     <Link className="property-centre" href="/property-network/map">My Property</Link>
      {active.map((area,index)=><button type="button" className="property-node" data-area={area.id}
       style={{left:spokes[index].x+'%',top:spokes[index].y+'%',width:PROPERTY_NODE_WIDTH+'%',minHeight:PROPERTY_NODE_HEIGHT}} key={area.id}
       aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
