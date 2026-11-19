@@ -5,12 +5,14 @@ import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_DIAGRAM_MIN_WIDTH,PROPERTY_DIAGRAM_RATIO,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,propertyAreaStatus,propertyDiagramRatio,
  filterPropertyProviders,propertyAreas,propertySpokes,propertyServiceCategory,propertyServiceTarget,propertyJobCategory,propertyDiscoveryPath,linkedPropertyProviders,
  setPropertyArea,savePropertyService,setPropertyProvider,loadPropertyNetwork,discoverPropertyProviders,
+ linkedPropertyContacts,propertyContactFields,propertyContactInviteText,propertyContactPhoneHref,propertyContactEmailHref,propertyContactServices,
+ createPropertyContact,updatePropertyContact,deletePropertyContact,setPropertyContact,replacePropertyContact,PROPERTY_SITE_URL,
 } from '../shared/propertyNetwork.ts'
 import {CATEGORIES,LISTING_CATEGORIES} from '../shared/categories.ts'
 import {discovery} from './web-discovery-modules.mjs'
 const {discoveryFilters}=discovery
 
-const empty=()=>({preferences:[],services:[],links:[],people:[]})
+const empty=()=>({preferences:[],services:[],links:[],people:[],contacts:[],contactLinks:[]})
 
 test('six default areas display without treating untouched services as gaps',()=>{
  const areas=propertyAreas(empty())
@@ -109,7 +111,8 @@ test('network reads scope every private table to its owner and mutations reuse t
   upsert:async(row,options)=>{writes.push([table,row,options]);return {error:null}},
  }),rpc:async(name,args)=>{writes.push([name,args]);return {error:null}}}
  assert.deepEqual(await loadPropertyNetwork(db,'owner'),empty())
- assert.equal(filters.length,3)
+ assert.equal(filters.length,5)
+ assert.deepEqual(filters.map(([table])=>table).slice(3),['property_network_contacts','property_network_contact_links'])
  assert.ok(filters.every(([,column,id])=>column==='owner_id'&&id==='owner'))
  const service={area:'water',service_key:'custom-test',name:'Spring',status:'needs_help'}
  await setPropertyArea(db,'owner','water',false)
@@ -199,4 +202,101 @@ test('web area icons are one Lucide icon per area with no emoji glyphs left',()=
  assert.equal(new Set(SUPPORT_AREAS.map(area=>area.icon)).size,SUPPORT_AREAS.length)
  for(const file of ['shared/propertyNetwork.ts','provider-web/src/app/property-network/property-network.tsx','provider-web/src/app/page.tsx'])
   assert.doesNotMatch(readFileSync(new URL('../'+file,import.meta.url),'utf8'),/glyph/)
+})
+
+test('contact fields trim, lowercase email, turn blanks into null and reject what the database rejects',()=>{
+ assert.deepEqual(propertyContactFields({name:'  Bob Smith ',phone:' 021  555 0101 ',email:' Bob@Example.CO.NZ ',note:'   '}),
+  {value:{name:'Bob Smith',phone:'021 555 0101',email:'bob@example.co.nz',note:null},errors:{},valid:true})
+ assert.deepEqual(propertyContactFields({name:'Ann'}).value,{name:'Ann',phone:null,email:null,note:null})
+ assert.ok(propertyContactFields({name:'X',phone:'+64 (21) 555-0101'}).valid)
+ const bad=(input,field)=>{const result=propertyContactFields({name:'X',...input});assert.equal(result.valid,false,JSON.stringify(input));assert.ok(result.errors[field],field)}
+ bad({name:'   '},'name')
+ bad({name:'x'.repeat(81)},'name')
+ bad({phone:'call me'},'phone')
+ bad({phone:'()-'},'phone')
+ bad({phone:'1'.repeat(31)},'phone')
+ bad({email:'not-an-email'},'email')
+ bad({email:'a b@example.test'},'email')
+ bad({email:'a@b'},'email')
+ bad({email:'a'.repeat(250)+'@x.nz'},'email')
+ bad({note:'n'.repeat(201)},'note')
+ // Same rules as the table checks in the migration.
+ const sql=readFileSync(new URL('../supabase/migrations/20261119022010_property_network_contacts.sql',import.meta.url),'utf8')
+ for(const rule of ["phone ~ '^[0-9 +()-]+$'","email=lower(email)","'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'","between 1 and 80","between 1 and 30","<=254","between 1 and 200"])
+  assert.ok(sql.includes(rule),rule)
+})
+
+test('contacts count as linked providers and are listed per service',()=>{
+ const data=empty()
+ data.contacts.push({id:'c1',name:'Bob',phone:null,email:null,note:null},{id:'c2',name:'Ann',phone:null,email:null,note:null})
+ data.contactLinks.push({area:'fencing',service_key:'suggested-1',contact_id:'c1'},{area:'water',service_key:'suggested-2',contact_id:'c1'})
+ data.links.push({area:'fencing',service_key:'suggested-2',provider_id:'m1'})
+ const fencing=propertyAreas(data).find(area=>area.id==='fencing')
+ assert.equal(fencing.hasProvider,true)
+ assert.equal(fencing.linkedCount,2)
+ assert.deepEqual(propertyAreaStatus(fencing).map(badge=>badge.label),['2 local providers'])
+ const water=propertyAreas(data).find(area=>area.id==='water')
+ assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['1 local provider'])
+ assert.deepEqual(linkedPropertyContacts(data,{area:'fencing',service_key:'suggested-1'}).map(contact=>contact.id),['c1'])
+ assert.deepEqual(linkedPropertyContacts(data,{area:'fencing',service_key:'suggested-2'}),[])
+ assert.equal(propertyContactServices(data,'c1').length,2)
+ assert.equal(propertyAreas({preferences:[],services:[],links:[]})[0].linkedCount,0)
+})
+
+test('contact writes are owner-scoped, validated and use the guarded RPCs',async()=>{
+ const writes=[]
+ const chain=entry=>{const query={eq:(column,value)=>{entry.filters.push([column,value]);return query},then:resolve=>resolve({error:null})};return query}
+ const db={from:table=>({
+  upsert:async(row,options)=>{writes.push(['upsert',table,row,options]);return {error:null}},
+  update:row=>{const entry={op:'update',table,row,filters:[]};writes.push(entry);return chain(entry)},
+  delete:()=>{const entry={op:'delete',table,filters:[]};writes.push(entry);return chain(entry)},
+ }),rpc:async(name,args)=>{writes.push(['rpc',name,args]);return {error:null}}}
+ const service={area:'fencing',service_key:'suggested-1',name:'Fence repairs',status:null}
+ await createPropertyContact(db,'owner','c1',{name:' Bob ',email:'BOB@X.NZ'})
+ assert.deepEqual(writes[0],['upsert','property_network_contacts',{id:'c1',owner_id:'owner',name:'Bob',phone:null,email:'bob@x.nz',note:null},{ignoreDuplicates:true}])
+ await assert.rejects(createPropertyContact(db,'owner','c2',{name:'X',phone:'call me'}))
+ assert.equal(writes.length,1)
+ await updatePropertyContact(db,'owner','c1',{name:'Bob',note:' Gate code 12 '})
+ assert.deepEqual(writes[1].row,{name:'Bob',phone:null,email:null,note:'Gate code 12'})
+ assert.deepEqual(writes[1].filters,[['owner_id','owner'],['id','c1']])
+ await deletePropertyContact(db,'owner','c1')
+ assert.deepEqual([writes[2].op,writes[2].table,writes[2].filters],['delete','property_network_contacts',[['owner_id','owner'],['id','c1']]])
+ await setPropertyContact(db,'owner',service,'c1',true)
+ assert.deepEqual(writes[3],['rpc','link_property_network_contact',{p_area:'fencing',p_service:'suggested-1',p_name:'Fence repairs',p_contact:'c1'}])
+ await setPropertyContact(db,'owner',service,'c1',false)
+ assert.deepEqual(writes[4].filters,[['owner_id','owner'],['area','fencing'],['service_key','suggested-1'],['contact_id','c1']])
+ await replacePropertyContact(db,'c1','member')
+ assert.deepEqual(writes[5],['rpc','replace_property_network_contact',{p_contact:'c1',p_provider:'member'}])
+})
+
+test('contact actions: call, email and a shareable invitation with no server send',()=>{
+ assert.equal(propertyContactPhoneHref('+64 (21) 555-0101'),'tel:+64215550101')
+ assert.equal(propertyContactEmailHref('bob@x.nz'),'mailto:bob@x.nz')
+ const text=propertyContactInviteText({name:'Bob Smith'})
+ assert.match(text,/^Hi Bob,/)
+ assert.ok(text.endsWith(PROPERTY_SITE_URL))
+ assert.ok(text.length<220)
+ const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
+ const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ for(const source of [web,native]){
+  for(const label of ['Add someone not on Rural Connections','Not on Rural Connections','Invite to Rural Connections','Replace with member','Remove link','Edit'])
+   assert.ok(source.includes(label),label)
+  assert.match(source,/propertyContactPhoneHref/)
+  assert.match(source,/propertyContactEmailHref/)
+  assert.match(source,/replacePropertyContact/)
+ }
+ assert.match(web,/type:'tel'/)
+ assert.match(web,/type:'email'/)
+ assert.match(web,/navigator\.share/)
+ assert.match(web,/navigator\.clipboard\.writeText/)
+ assert.match(native,/keyboardType:'phone-pad'/)
+ assert.match(native,/keyboardType:'email-address',autoCapitalize:'none'/)
+ assert.match(native,/Share\.share\(\{message:propertyContactInviteText/)
+ // Contacts have no profile and cannot be invited to jobs.
+ const contactBlock=native.slice(native.indexOf('{contacts.map(contact=>'),native.indexOf('No provider linked yet'))
+ assert.ok(contactBlock.length>200)
+ assert.doesNotMatch(contactBlock,/openInvite|profile\(/)
+ const webBlock=web.slice(web.indexOf('{contacts.length>0&&'),web.indexOf('No provider linked yet'))
+ assert.ok(webBlock.length>200)
+ assert.doesNotMatch(webBlock,/ProviderInviteAction|refreshInviteChoices|providerLink/)
 })

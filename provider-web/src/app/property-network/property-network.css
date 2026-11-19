@@ -36,3 +36,7 @@
 .property-status-option:has(input:checked) { background: #fff; font-weight: 700; }
 .property-picker { margin: 12px 0; padding: 12px; background: #fff; border-radius: 8px; }
 .property-picker section + section { margin-top: 12px; }
+.property-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #fff; color: var(--forest-deep); font-size: 12px; font-weight: 650; }
+.property-contact { flex-direction: column; align-items: stretch !important; }
+.property-contact-details { overflow-wrap: anywhere; }
+.property-contact-form .lform-field input[aria-invalid=true] { border-color: #7a4f00; }
