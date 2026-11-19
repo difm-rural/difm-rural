@@ -1,4 +1,11 @@
 begin;
+
+-- Exercise RLS through an invoker RPC too. All fixture grants/functions roll back.
+create function public.map_security_test_write(p_owner uuid,p_profile jsonb)
+returns void language sql security invoker set search_path='' as $$
+ insert into public.private_property_maps values(p_owner,p_profile,1);
+$$;
+grant execute on function public.map_security_test_write(uuid,jsonb) to authenticated;
 do $$
 declare
  owner uuid:=gen_random_uuid();
@@ -52,6 +59,11 @@ begin
  begin
   insert into public.private_property_maps values(owner,fixture,1);
   raise exception 'Assistant inserted private map' using errcode='P9000';
+ exception when insufficient_privilege then null;
+ end;
+ begin
+  perform public.map_security_test_write(owner,fixture);
+  raise exception 'Assistant bypassed map RLS through invoker RPC' using errcode='P9000';
  exception when insufficient_privilege then null;
  end;
  -- A security-invoker RPC cannot turn an assistant into an owner writer.

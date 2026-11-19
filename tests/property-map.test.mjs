@@ -94,6 +94,25 @@ test('the pending map keeps its authenticated web route and native screen regist
  assert.match(native,/name="PropertyMap"\s+component=\{PropertyMapScreen\}/)
 })
 
+test('address search refuses assistant tokens before authentication or LINZ access',async()=>{
+ const source=readFileSync(new URL('../supabase/functions/property-address-search/index.ts',import.meta.url),'utf8')
+ const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
+ const {refuseAssistantToken}=await import('../supabase/functions/_shared/assistant-token.ts')
+ let handler
+ runInNewContext(code,{exports:{},Response,Headers,Request,JSON,TextDecoder,
+  Deno:{serve(fn){handler=fn},env:{get(){throw Error('Read secret before refusal')}}},
+  require(name){
+   if(name.includes('assistant-token'))return {refuseAssistantToken}
+   if(name.includes('supabase-js'))return {createClient(){throw Error('Authenticated assistant before refusal')}}
+   return {}
+  },fetch(){throw Error('Called LINZ before refusal')},
+ })
+ const token=['e30',Buffer.from(JSON.stringify({sub:'owner',client_id:'assistant'})).toString('base64url'),'sig'].join('.')
+ const response=await handler(new Request('https://example.test/',{method:'POST',headers:{Authorization:'Bearer '+token}}))
+ assert.equal(response.status,403)
+ assert.equal((await response.json()).error,'assistant_read_only')
+})
+
 test('the browser editor distinguishes tap placement from map panning and keyboard zoom',()=>{
  const source=readFileSync(new URL('../provider-web/src/app/property-network/map/property-aerial-map.tsx',import.meta.url),'utf8')
  const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
