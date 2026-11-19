@@ -70,7 +70,11 @@ export type PropertyService={area:AreaId;service_key:string;name:string;status:S
 export type PropertyProvider={id:string;full_name:string|null;display_name:string|null;region:string|null}
 type AreaPreference={area:AreaId;active:boolean}
 type ProviderLink={area:AreaId;service_key:string;provider_id:string}
-export type NetworkData={preferences:AreaPreference[];services:PropertyService[];links:ProviderLink[];people:PropertyProvider[]}
+// A private contact: someone the owner uses who is not on Rural Connections.
+export type PropertyContact={id:string;name:string;phone:string|null;email:string|null;note:string|null}
+type ContactLink={area:AreaId;service_key:string;contact_id:string}
+export type NetworkData={preferences:AreaPreference[];services:PropertyService[];links:ProviderLink[];people:PropertyProvider[];
+ contacts:PropertyContact[];contactLinks:ContactLink[]}
 type Query<T>={
  eq(column:string,value:string|boolean):Query<T>
  in(column:string,values:string[]):Query<T>
@@ -83,17 +87,20 @@ type Client={
  from(table:string):{
   select<T>(fields:string):Query<T>
   delete():DeleteQuery
+  update(row:Record<string,unknown>):DeleteQuery
   upsert(row:Record<string,unknown>,options?:{ignoreDuplicates:boolean}):PromiseLike<{error:unknown}>
  }
  rpc(name:string,args:Record<string,unknown>):PromiseLike<{error:unknown}>
 }
 
-export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'links'>){
+export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'links'>&{contactLinks?:ContactLink[]}){
  return SUPPORT_AREAS.map((area,index)=>{
   const stored=new Map(data.services.filter(service=>service.area===area.id).map(service=>[service.service_key,service]))
   const services:PropertyService[]=area.services.map(({key,name})=>stored.get(key) ?? {area:area.id,service_key:key,name,status:null})
   services.push(...[...stored.values()].filter(service=>service.service_key.startsWith('custom-')))
+  // Members and private contacts both count as local providers.
   const linkedCount=new Set(data.links.filter(row=>row.area===area.id).map(row=>row.provider_id)).size
+   +new Set((data.contactLinks??[]).filter(row=>row.area===area.id).map(row=>row.contact_id)).size
   return {...area,services,active:data.preferences.find(row=>row.area===area.id)?.active??index<6,
    hasProvider:linkedCount>0,linkedCount,
    needsHelp:services.some(service=>service.status==='needs_help'),
@@ -180,6 +187,41 @@ export function linkedPropertyProviders(data:NetworkData,service:PropertyService
  return data.people.filter(person=>ids.has(person.id))
 }
 
+export function linkedPropertyContacts(data:Pick<NetworkData,'contacts'|'contactLinks'>,service:Pick<PropertyService,'area'|'service_key'>){
+ const ids=new Set(data.contactLinks.filter(link=>link.area===service.area&&link.service_key===service.service_key).map(link=>link.contact_id))
+ return data.contacts.filter(contact=>ids.has(contact.id))
+}
+// Every service a contact covers, as {area, service_key} pairs.
+export const propertyContactServices=(data:Pick<NetworkData,'contactLinks'>,contactId:string)=>
+ data.contactLinks.filter(link=>link.contact_id===contactId)
+
+// Contact validation shared by the app, the web and the database checks.
+export const PROPERTY_CONTACT_LIMITS={name:80,phone:30,email:254,note:200} as const
+export type PropertyContactInput={name?:string|null;phone?:string|null;email?:string|null;note?:string|null}
+type ContactField=keyof typeof PROPERTY_CONTACT_LIMITS
+const blank=(value:string|null|undefined)=>{const text=(value??'').trim();return text||null}
+export function propertyContactFields(input:PropertyContactInput){
+ const name=blank(input.name),phone=blank(input.phone)?.replace(/\s+/g,' ')??null,email=blank(input.email)?.toLowerCase()??null,note=blank(input.note)
+ const errors:Partial<Record<ContactField,string>>={}
+ if(!name)errors.name='Enter a name.'
+ else if(name.length>PROPERTY_CONTACT_LIMITS.name)errors.name='Use 80 characters or fewer.'
+ if(phone&&(phone.length>PROPERTY_CONTACT_LIMITS.phone||!/^[0-9 +()-]+$/.test(phone)||!/[0-9]/.test(phone)))
+  errors.phone='Use digits, spaces, + ( ) and - only (30 characters or fewer).'
+ if(email&&(email.length>PROPERTY_CONTACT_LIMITS.email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)))errors.email='Enter an email address like name@example.co.nz.'
+ if(note&&note.length>PROPERTY_CONTACT_LIMITS.note)errors.note='Use 200 characters or fewer.'
+ return {value:{name:name??'',phone,email,note},errors,valid:!Object.keys(errors).length}
+}
+const contactRow=(input:PropertyContactInput)=>{
+ const result=propertyContactFields(input)
+ if(!result.valid)throw new Error(Object.values(result.errors)[0])
+ return result.value
+}
+export const propertyContactPhoneHref=(phone:string)=>'tel:'+phone.replace(/[^0-9+]/g,'')
+export const propertyContactEmailHref=(email:string)=>'mailto:'+email
+export const PROPERTY_SITE_URL='https://ruralconnections.nz'
+export const propertyContactInviteText=(contact:Pick<PropertyContact,'name'>)=>
+ 'Hi '+contact.name.split(' ')[0]+', I use Rural Connections to keep track of the locals who help on my property. Join so people nearby can find you: '+PROPERTY_SITE_URL
+
 async function loadPeople(db:Client,ids:string[]){
  const people:PropertyProvider[]=[]
  const unique=[...new Set(ids)]
@@ -192,13 +234,15 @@ async function loadPeople(db:Client,ids:string[]){
 
 export async function loadPropertyNetwork(client:unknown,owner:string):Promise<NetworkData>{
  const db=client as Client
- const [preferences,services,links]=await Promise.all([
+ const [preferences,services,links,contacts,contactLinks]=await Promise.all([
   allRows(()=>db.from('property_network_areas').select<AreaPreference>('area,active').eq('owner_id',owner).order('area')),
   allRows(()=>db.from('property_network_services').select<PropertyService>('area,service_key,name,status').eq('owner_id',owner).order('area').order('service_key')),
   allRows(()=>db.from('property_network_providers').select<ProviderLink>('area,service_key,provider_id').eq('owner_id',owner).order('area').order('service_key').order('provider_id')),
+  allRows(()=>db.from('property_network_contacts').select<PropertyContact>('id,name,phone,email,note').eq('owner_id',owner).order('name').order('id')),
+  allRows(()=>db.from('property_network_contact_links').select<ContactLink>('area,service_key,contact_id').eq('owner_id',owner).order('area').order('service_key').order('contact_id')),
  ])
  const people=await loadPeople(db,links.map(link=>link.provider_id))
- return {preferences,services,links,people}
+ return {preferences,services,links,people,contacts,contactLinks}
 }
 
 export async function discoverPropertyProviders(client:unknown,owner:string,category:string,kind:ListingKind='service'){
@@ -224,5 +268,37 @@ export async function setPropertyProvider(client:unknown,owner:string,service:Pr
   ?await db.rpc('link_property_network_provider',{p_area:service.area,p_service:service.service_key,p_name:service.name,p_provider:providerId})
   :await db.from('property_network_providers').delete().eq('owner_id',owner).eq('area',service.area)
    .eq('service_key',service.service_key).eq('provider_id',providerId)
+ if(error)throw error
+}
+
+// `id` comes from the caller so a retried save cannot create a duplicate.
+export async function createPropertyContact(client:unknown,owner:string,id:string,input:PropertyContactInput){
+ const {error}=await (client as Client).from('property_network_contacts').upsert({id,owner_id:owner,...contactRow(input)},{ignoreDuplicates:true})
+ if(error)throw error
+}
+
+export async function updatePropertyContact(client:unknown,owner:string,id:string,input:PropertyContactInput){
+ const {error}=await (client as Client).from('property_network_contacts').update(contactRow(input)).eq('owner_id',owner).eq('id',id)
+ if(error)throw error
+}
+
+export async function deletePropertyContact(client:unknown,owner:string,id:string){
+ const {error}=await (client as Client).from('property_network_contacts').delete().eq('owner_id',owner).eq('id',id)
+ if(error)throw error
+}
+
+export async function setPropertyContact(client:unknown,owner:string,service:PropertyService,contactId:string,link:boolean){
+ const db=client as Client
+ const {error}=link
+  ?await db.rpc('link_property_network_contact',{p_area:service.area,p_service:service.service_key,p_name:service.name,p_contact:contactId})
+  :await db.from('property_network_contact_links').delete().eq('owner_id',owner).eq('area',service.area)
+   .eq('service_key',service.service_key).eq('contact_id',contactId)
+ if(error)throw error
+}
+
+// "They've joined": the member takes over every service the contact covers and
+// the contact is deleted, in one transaction.
+export async function replacePropertyContact(client:unknown,contactId:string,providerId:string){
+ const {error}=await (client as Client).rpc('replace_property_network_contact',{p_contact:contactId,p_provider:providerId})
  if(error)throw error
 }

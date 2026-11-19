@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react'
-import {Alert,BackHandler,Image,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
+import {Alert,BackHandler,Image,Linking,ScrollView,Share,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
@@ -15,7 +15,39 @@ import {loadPropertyMatches,matchLocality,propertyNeed} from '../../shared/prope
 import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiagramRatio,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
+ PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
+ propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
 } from '../../shared/propertyNetwork'
+
+// Add or edit a private contact: someone who is not on Rural Connections.
+function ContactForm({initial,busy,onSave,onCancel,onDelete}){
+ const [fields,setFields]=useState({name:initial?.name||'',phone:initial?.phone||'',email:initial?.email||'',note:initial?.note||''})
+ const [errors,setErrors]=useState({})
+ const field=(key,label,props)=><View key={key} style={{marginTop:8}}>
+  <Text style={styles.nodeLabel}>{label}</Text>
+  <TextInput accessibilityLabel={label} style={styles.input} value={fields[key]} maxLength={PROPERTY_CONTACT_LIMITS[key]}
+   onChangeText={value=>setFields(current=>({...current,[key]:value}))} {...props}/>
+  {!!errors[key]&&<Text accessibilityRole="alert" style={styles.gap}>{errors[key]}</Text>}
+ </View>
+ function save(){
+  const result=propertyContactFields(fields)
+  setErrors(result.errors)
+  if(result.valid)onSave(result.value)
+ }
+ return <View style={styles.picker}>
+  <Text accessibilityRole="header" style={styles.serviceTitle}>{initial?'Edit '+initial.name:'Add someone not on Rural Connections'}</Text>
+  <Text style={styles.muted}>Only you can see these details.</Text>
+  {field('name','Name',{autoCapitalize:'words',textContentType:'name'})}
+  {field('phone','Phone (optional)',{keyboardType:'phone-pad',textContentType:'telephoneNumber'})}
+  {field('email','Email (optional)',{keyboardType:'email-address',autoCapitalize:'none',autoCorrect:false,textContentType:'emailAddress'})}
+  {field('note','Note (optional)',{multiline:true})}
+  <View style={styles.row}>
+   <LocalAction label={initial?'Save contact':'Save and link'} disabled={busy} onPress={save}/>
+   <LocalAction label="Cancel" onPress={onCancel}/>
+   {onDelete&&<LocalAction label="Delete contact" icon="trash-outline" disabled={busy} onPress={onDelete}/>}
+  </View>
+ </View>
+}
 
 function AreaButton({area,selected,onPress,style,diagram=false}){
  const badges=propertyAreaStatus(area)
@@ -82,9 +114,12 @@ export default function PropertyNetworkScreen({navigation,route}){
  const [busy,setBusy]=useState(false)
  const [target,setTarget]=useState(null)
  const [choices,setChoices]=useState(null)
+ const [contactForm,setContactForm]=useState(null)
+ const [replacing,setReplacing]=useState(null)
  const lock=useRef(false)
  const pickerRequest=useRef(0)
  const addingService=useRef(null)
+ const addingContact=useRef(null)
 
  const load=useCallback(async()=>{
   try{
@@ -108,7 +143,7 @@ export default function PropertyNetworkScreen({navigation,route}){
  function selectArea(id){
   closeMatches()
   pickerRequest.current++
-  setSelected(id);if(id)setHighlight(id);setPicker('');setStatusFor('');setServiceName('')
+  setSelected(id);if(id)setHighlight(id);setPicker('');setStatusFor('');setServiceName('');setContactForm(null);setReplacing(null)
   navigation.setParams({area:id})
  }
  useFocusEffect(useCallback(()=>{
@@ -186,6 +221,43 @@ export default function PropertyNetworkScreen({navigation,route}){
   const added=await mutate(()=>savePropertyService(supabase,owner,{area:area.id,service_key:key,name,status:null},true),'Service added.')
   if(added){addingService.current=null;setServiceName('')}
  }
+ async function saveContact(service,value){
+  const editing=contactForm?.contact
+  if(editing){
+   if(await mutate(()=>updatePropertyContact(supabase,owner,editing.id,value),'Contact saved.'))setContactForm(null)
+   return
+  }
+  const previous=addingContact.current
+  const id=previous?.name===value.name?previous.id:newJobId()
+  addingContact.current={id,name:value.name}
+  if(await mutate(async()=>{
+   await createPropertyContact(supabase,owner,id,value)
+   await setPropertyContact(supabase,owner,service,id,true)
+  },value.name+' added.')){addingContact.current=null;setContactForm(null);setPicker('')}
+ }
+ function deleteContact(contact){
+  const count=propertyContactServices(data,contact.id).length
+  Alert.alert('Delete '+contact.name+'?',count>1?'They will be removed from '+count+' services.':'They will be removed from My Property Network.',[
+   {text:'Cancel',style:'cancel'},
+   {text:'Delete',style:'destructive',onPress:async()=>{if(await mutate(()=>deletePropertyContact(supabase,owner,contact.id),'Contact deleted.'))setContactForm(null)}},
+  ])
+ }
+ async function inviteContact(contact){
+  try{await Share.share({message:propertyContactInviteText(contact)})}catch{}
+ }
+ function openContactLink(url){
+  Linking.openURL(url).catch(()=>Alert.alert('Could not open','Check this device can make calls or send email.'))
+ }
+ function startReplace(service,contact){
+  setContactForm(null);setReplacing(contact);openPicker(service)
+ }
+ async function replaceContact(person){
+  const contact=replacing,count=propertyContactServices(data,contact.id).length
+  if(await mutate(()=>replacePropertyContact(supabase,contact.id,person.id),
+   propertyProviderName(person)+' now covers '+(count===1?'this service':count+' services')+' instead of '+contact.name+'.')){
+   setReplacing(null);setPicker('')
+  }
+ }
  function profile(person){
   navigation.navigate('ProviderProfile',{providerId:person.id})
  }
@@ -238,14 +310,17 @@ export default function PropertyNetworkScreen({navigation,route}){
      {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
      {area.services.map(service=>{
       const linked=linkedPropertyProviders(data,service)
+      const contacts=linkedPropertyContacts(data,service)
+      const covered=linked.length+contacts.length
+      const replacingHere=replacing&&picker===service.service_key
       const category=propertyServiceTarget(area,service).category
       const postCategory=propertyJobCategory(area,service)
       return <View style={styles.service} key={service.service_key}>
        <Text accessibilityRole="header" style={styles.serviceTitle}>{service.name}</Text>
        <Text style={service.status==='needs_help'?styles.gap:styles.muted}>
-        {service.status==='needs_help'?'Find help':service.status==='has_provider'&&linked.length?'Provider linked':PROPERTY_SERVICE_STATES[service.status]||'Not set up'}
+        {service.status==='needs_help'?'Find help':service.status==='has_provider'&&covered?'Provider linked':PROPERTY_SERVICE_STATES[service.status]||'Not set up'}
        </Text>
-       {!!linked.length&&<Text style={styles.muted}>{linked.map(propertyProviderName).join(', ')}</Text>}
+       {!!covered&&<Text style={styles.muted}>{[...linked.map(propertyProviderName),...contacts.map(contact=>contact.name)].join(', ')}</Text>}
        {(service.status==='needs_help'||matchKey===service.service_key)&&<LocalAction label={matchKey===service.service_key?'Close provider search':'Find local help'}
         onPress={()=>matchKey===service.service_key?closeMatches():findMatches(service,category)}/>}
        {matchKey===service.service_key&&<View style={styles.picker}>
@@ -280,8 +355,8 @@ export default function PropertyNetworkScreen({navigation,route}){
         <LocalAction label="Post a job" onPress={()=>post(null,postCategory)}/>
        </View>}
        <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:statusFor===service.service_key}}
-        onPress={()=>{setPicker('');setStatusFor(statusFor===service.service_key?'':service.service_key)}} style={styles.disclosure}>
-        <Text style={styles.actionText}>{statusFor===service.service_key?'Done':linked.length?'View or change provider':service.status?'Change support':'Set up'}</Text>
+        onPress={()=>{setPicker('');setReplacing(null);setContactForm(null);setStatusFor(statusFor===service.service_key?'':service.service_key)}} style={styles.disclosure}>
+        <Text style={styles.actionText}>{statusFor===service.service_key?'Done':covered?'View or change provider':service.status?'Change support':'Set up'}</Text>
         <Icon name={statusFor===service.service_key?'chevron-up':'chevron-forward'} size={16} color={colors.primary}/>
        </TouchableOpacity>
        {statusFor===service.service_key&&<>
@@ -302,11 +377,29 @@ export default function PropertyNetworkScreen({navigation,route}){
         <View style={styles.row}><LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
          <LocalAction label="Remove link" disabled={busy} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,false),'Provider link removed.')}/></View>
        </View>)}
-       {service.status==='has_provider'&&!linked.length&&<Text style={styles.muted}>No provider linked yet.</Text>}
+       {contacts.map(contact=><View key={contact.id} style={styles.linked}>
+        <Text style={styles.serviceTitle}>{contact.name}</Text>
+        <Text style={styles.tag}>Not on Rural Connections</Text>
+        {!!contact.phone&&<Text style={styles.muted}>{contact.phone}</Text>}
+        {!!contact.email&&<Text style={styles.muted}>{contact.email}</Text>}
+        {!!contact.note&&<Text style={styles.muted}>{contact.note}</Text>}
+        <View style={styles.row}>
+         {!!contact.phone&&<LocalAction label="Call" icon="call-outline" onPress={()=>openContactLink(propertyContactPhoneHref(contact.phone))}/>}
+         {!!contact.email&&<LocalAction label="Email" icon="mail-outline" onPress={()=>openContactLink(propertyContactEmailHref(contact.email))}/>}
+         <LocalAction label="Edit" icon="create-outline" disabled={busy} onPress={()=>setContactForm({serviceKey:service.service_key,contact})}/>
+         <LocalAction label="Invite to Rural Connections" icon="share-outline" onPress={()=>inviteContact(contact)}/>
+         <LocalAction label="Replace with member" icon="swap-horizontal-outline" disabled={busy} onPress={()=>startReplace(service,contact)}/>
+         <LocalAction label="Remove link" disabled={busy} onPress={()=>void mutate(()=>setPropertyContact(supabase,owner,service,contact.id,false),'Contact link removed.')}/>
+        </View>
+        {contactForm?.contact?.id===contact.id&&contactForm.serviceKey===service.service_key&&<ContactForm key={contact.id} initial={contact} busy={busy}
+         onSave={value=>saveContact(service,value)} onCancel={()=>setContactForm(null)} onDelete={()=>deleteContact(contact)}/>}
+       </View>)}
+       {service.status==='has_provider'&&!covered&&<Text style={styles.muted}>No provider linked yet.</Text>}
        {service.status==='has_provider'&&<LocalAction label={picker===service.service_key?'Close provider chooser':'Link a provider'}
-        icon="person-add-outline" disabled={busy} onPress={()=>picker===service.service_key?setPicker(''):openPicker(service)}/>}
+        icon="person-add-outline" disabled={busy} onPress={()=>{setReplacing(null);setContactForm(null);picker===service.service_key?setPicker(''):openPicker(service)}}/>}
        {picker===service.service_key&&<View style={styles.picker}>
-        <Text style={styles.serviceTitle}>Choose a provider</Text>
+        <Text style={styles.serviceTitle}>{replacingHere?'Choose the member who replaces '+replacing.name:'Choose a provider'}</Text>
+        {replacingHere&&<Text style={styles.muted}>They will be linked to every service {replacing.name} covers, and {replacing.name}'s private contact details will be deleted.</Text>}
         {groups&&<TextInput accessibilityLabel="Find by name or region" placeholder="Find by name or region"
          placeholderTextColor={colors.textSecondary} value={providerSearch} style={styles.input}
          onChangeText={value=>{setProviderSearch(value);setProviderLimit(12)}}/>}
@@ -319,12 +412,24 @@ export default function PropertyNetworkScreen({navigation,route}){
            {!available.length&&<Text style={styles.muted}>No providers to link here.</Text>}
            {available.slice(0,providerLimit).map(person=><View key={person.id} style={styles.row}>
             <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
-            <LocalAction label="Link to service" disabled={busy} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')}/>
+            {replacingHere?<LocalAction label={'Replace '+replacing.name} disabled={busy} onPress={()=>void replaceContact(person)}/>
+             :<LocalAction label="Link to service" disabled={busy} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')}/>}
            </View>)}
            {available.length>providerLimit&&<LocalAction label="Show more providers" onPress={()=>setProviderLimit(value=>value+12)}/>}
           </View>
          })}
-        <LocalAction label="Browse more providers" onPress={()=>browse(propertyServiceTarget(area,service))}/>
+        {!replacingHere&&<View style={{marginTop:10}}>
+         <Text accessibilityRole="header" style={styles.nodeLabel}>Not on Rural Connections</Text>
+         {data.contacts.filter(contact=>!contacts.some(row=>row.id===contact.id)).map(contact=><View key={contact.id} style={styles.row}>
+          <Text style={styles.statusText}>{contact.name}</Text>
+          <LocalAction label="Link to service" disabled={busy} onPress={()=>void mutate(()=>setPropertyContact(supabase,owner,service,contact.id,true),contact.name+' linked.')}/>
+         </View>)}
+         {contactForm?.serviceKey===service.service_key&&!contactForm.contact
+          ?<ContactForm busy={busy} onSave={value=>saveContact(service,value)} onCancel={()=>setContactForm(null)}/>
+          :<LocalAction label="Add someone not on Rural Connections" icon="person-add-outline" onPress={()=>setContactForm({serviceKey:service.service_key})}/>}
+        </View>}
+        {replacingHere?<LocalAction label="Cancel replacing" onPress={()=>{setReplacing(null);setPicker('')}}/>
+         :<LocalAction label="Browse more providers" onPress={()=>browse(propertyServiceTarget(area,service))}/>}
        </View>}
        </>}
       </View>
@@ -375,6 +480,7 @@ const styles=StyleSheet.create({
  statusText:{flex:1,color:colors.textPrimary},
  gap:{color:colors.jobInk,fontWeight:'700'},
  linked:{paddingLeft:12,marginBottom:8},
+ tag:{alignSelf:'flex-start',marginTop:4,paddingHorizontal:8,paddingVertical:2,borderRadius:10,backgroundColor:colors.primaryLight,color:colors.primaryDark,fontSize:12,fontWeight:'600'},
  picker:{padding:12,backgroundColor:colors.primaryLight,borderRadius:10},
  input:{marginTop:6,backgroundColor:colors.white,borderWidth:1,borderColor:colors.border,borderRadius:8,padding:12,color:colors.textPrimary},
 })
