@@ -5,7 +5,7 @@ import {createRequire} from 'node:module'
 import vm from 'node:vm'
 import {rankOnTheGo} from '../shared/onTheGo.ts'
 import {jobNextMove,bookingNextMove} from '../shared/nextMove.ts'
-import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary} from '../shared/homeSummary.ts'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary} from '../shared/homeSummary.ts'
 
 const require=createRequire(import.meta.url),ts=require('typescript')
 const webRequire=createRequire(new URL('../provider-web/package.json',import.meta.url))
@@ -53,9 +53,9 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@shared/formatting':{formatDate:()=>''},
   '@shared/notificationBody':{},'@shared/marketSide':{},
   '@shared/nextMove':{jobNextMove,bookingNextMove},'@shared/onTheGo':{rankOnTheGo},
-  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyAreas:()=>[],propertySpokes:()=>[]},
+  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[]},
   './property-network/area-icon':{PropertyAreaIcon:()=>null},
-  '@shared/homeSummary':{homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary},
+  '@shared/homeSummary':{homeCustomerCount,homeUpcoming,homeWorkSummary},
   '@/components/home-modes':{HomeModes:({work})=>work},
   '@/components/seasonal-reminders':{SeasonalReminders:()=>null},
   '@/lib/seasonal-reminders':{loadSeasonalReminders:()=>[]},

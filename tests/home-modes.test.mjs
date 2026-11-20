@@ -4,17 +4,7 @@ import {readFileSync} from 'node:fs'
 import {createRequire} from 'node:module'
 import {runInNewContext} from 'node:vm'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../shared/homeMode.ts'
-import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkFocus,homeWorkSummary} from '../shared/homeSummary.ts'
-
-test('network preview reports real gap names, omits unconfigured gaps and caps named areas',()=>{
- const area=(label,needsHelp=false,linkedCount=0,configured=needsHelp)=>({label,needsHelp,linkedCount,configured})
- assert.deepEqual(homeNetworkSummary([area('Water',true),area('Pasture & Land',true,1),area('Fencing'),area('Machinery',true)]),{
-  counts:'1 area with providers · 3 areas need help',detail:'Water, Pasture & Land and 1 more need support.',
- })
- assert.match(homeNetworkSummary([area('Water')]).detail,/Start building/)
- assert.match(homeNetworkSummary([area('Water',false,1)]).detail,/No support gaps marked/)
- assert.equal(homeNetworkSummary([area('Water',true)]).detail,'Water needs support.')
-})
+import {homeCustomerCount,homeUpcoming,homeWorkFocus,homeWorkSummary} from '../shared/homeSummary.ts'
 
 test('Work filters empty metrics, prioritises actionable items and distinguishes failed reads',()=>{
  const empty={work:0,upcoming:0,offers:0,invitations:0}

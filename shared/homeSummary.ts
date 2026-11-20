@@ -1,14 +1,3 @@
-type PreviewArea={label:string;linkedCount:number;needsHelp:boolean;configured:boolean}
-export function homeNetworkSummary(areas:PreviewArea[]){
- const linked=areas.filter(area=>area.linkedCount>0).length
- const gaps=areas.filter(area=>area.needsHelp)
- const counts=linked+' '+(linked===1?'area':'areas')+' with providers · '+gaps.length+' '+(gaps.length===1?'area needs':'areas need')+' help'
- const detail=gaps.length
-  ?gaps.slice(0,2).map(area=>area.label).join(gaps.length>2?', ':' and ')+(gaps.length>2?' and '+(gaps.length-2)+' more need support.':gaps.length===1?' needs support.':' need support.')
-  :linked||areas.some(area=>area.configured)?'No support gaps marked.':'Start building your network by setting up a support area.'
- return {counts,detail}
-}
-
 export const HOME_WORK_INDICATORS=[
  {id:'invitations',label:'Invitations to review',href:'/connections/invitations'},
  {id:'offers',label:'Offers awaiting replies',href:'/activity?focus=offers'},

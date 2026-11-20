@@ -26,8 +26,8 @@ import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../../../shared/homeMode'
-import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary} from '../../../shared/homeSummary'
-import {loadPropertyNetwork,propertyAreas,propertySpokes} from '../../../shared/propertyNetwork'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary} from '../../../shared/homeSummary'
+import {loadPropertyNetwork,propertyNetworkHomeLines} from '../../../shared/propertyNetwork'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
@@ -151,10 +151,7 @@ export default function HomeTabScreen({ navigation }) {
     work:activeMoves?workItems.length-pendingOffers:null,
   })
   const modeItems=(activeMoves||[]).filter(item=>item.viewerRole===homeRole(mode))
-  const areas=network?propertyAreas(network).filter(area=>area.active):[]
-  const preview=areas.slice(0,6)
-  const spokes=propertySpokes(preview.length)
-  const networkSummary=network?homeNetworkSummary(areas):null
+  const networkLines=network?propertyNetworkHomeLines(network):[]
   const unread=notifications.filter(n=>!n.read)
   const nextMoves=modeItems.filter(item=>item.nextMove.needsAction)
   const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
@@ -227,26 +224,21 @@ export default function HomeTabScreen({ navigation }) {
         {(loadError||!activeMoves||(!propertyMode&&work.unavailable&&work.indicators.length>0))&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
           <Text style={styles.subtitle}>Find local help and manage the people supporting your property.</Text>
-          <View style={styles.networkPreview}>
-            <View style={styles.networkArt} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              {preview.map((area,index)=><View key={area.id} style={[styles.miniNode,area.needsHelp&&styles.miniGap,
-                {left:spokes[index].x+'%',top:spokes[index].y+'%'}]}>
-                <Icon name={area.icon} size={13} color={colors.primaryDark}/>
-              </View>)}
-              <View style={styles.miniCentre}><Icon name="home-outline" size={19} color={colors.white}/></View>
-            </View>
+          {/* A line only once the network has something in it: no setup prompt. */}
+          {networkLines.length>0&&<TouchableOpacity style={styles.networkPreview} accessibilityRole="button"
+            accessibilityLabel={'My Property Network, '+networkLines.join(', ')} onPress={()=>navigation.navigate('PropertyNetwork')}>
+            <Icon name="people-outline" size={22} color={colors.primary}/>
             <View style={{flex:1}}><Text style={styles.sectionTitle}>My Property Network</Text>
-              {networkSummary?<><Text style={styles.subtitle}>{networkSummary.counts}</Text><Text style={styles.subtitle}>{networkSummary.detail}</Text></>
-                :<Text style={styles.subtitle}>Network summary unavailable. Open your network to view support areas.</Text>}
-              <View style={styles.networkActions}>
-                <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('PropertyNetwork')}>
-                  <Text style={styles.sectionLink}>My Network</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'locals'})}>
-                  <Text style={styles.sectionLink}>My People</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+              {networkLines.map(line=><Text key={line} style={styles.subtitle}>{line}</Text>)}</View>
+            <Icon name="chevron-forward" size={18} color={colors.primary}/>
+          </TouchableOpacity>}
+          <View style={[styles.networkActions,networkLines.length===0&&{marginVertical:12}]}>
+            <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('PropertyNetwork')}>
+              <Text style={styles.sectionLink}>My Network</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'locals'})}>
+              <Text style={styles.sectionLink}>My People</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Post a job" subtitle="Get help with something that needs doing."

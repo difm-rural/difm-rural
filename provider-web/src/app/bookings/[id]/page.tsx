@@ -15,6 +15,7 @@ import { loadConversation } from '@/lib/messaging-data'
 import { Conversation } from '@/components/conversation/conversation'
 import { ManageActions } from '@/components/work/manage-actions'
 import { ReviewsSection } from '@/components/work/reviews-section'
+import { PropertyNetworkSuggestion } from '@/components/work/property-network-suggestion'
 
 // The booking workspace — the single home for a service booking: details,
 // schedule, management, reviews and the conversation (sticky side panel). Mirrors
@@ -69,6 +70,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
     {work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
     <ManageActions kind="booking" id={id} actions={actions} otherFirst={otherFirst}/>
     {work.status==='completed'&&<ReviewsSection kind="booking" id={id} actions={actions} personName={person?.full_name || null} personId={other} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'}/>}
+    {work.status==='completed'&&role==='requester'&&ownReview&&other&&<PropertyNetworkSuggestion owner={user.id} providerId={other} providerName={person?.full_name||null} category={(b.service as {category?:string|null}|null)?.category} kind={work.listingKind} title={work.title}/>}
     {work.status==='completed'&&<p className="home-clear">Booking complete. You can find it again in History.</p>}
   </>
 

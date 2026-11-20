@@ -9,6 +9,7 @@ import {
  createPropertyContact,updatePropertyContact,deletePropertyContact,setPropertyContact,replacePropertyContact,PROPERTY_SITE_URL,
  propertyServiceChoice,propertyChoiceStatus,propertyWhoMeStatus,propertyStatusAfterUnlink,propertySetupStarted,savePropertyAreas,
  propertyBulkServices,savePropertyServices,propertyAreaProgress,propertyAreaWho,propertyGaps,PROPERTY_AREA_DESCRIPTIONS as HINTS,
+ PROPERTY_CATEGORY_AREAS,propertyWorkTarget,propertySuggestion,propertySuggestionText,acceptPropertySuggestion,dismissPropertySuggestion,propertyNetworkHomeLines,
 } from '../shared/propertyNetwork.ts'
 import {CATEGORIES,LISTING_CATEGORIES} from '../shared/categories.ts'
 import {discovery} from './web-discovery-modules.mjs'
@@ -412,4 +413,104 @@ test('the gaps list and area cards count what needs help, what is sorted and wha
  const partly=propertyAreaProgress({services:[{status:'sorted'},{status:null},{status:null}]})
  assert.deepEqual([partly.tag,partly.summary],['2 to check','1 of 3 sorted'])
  assert.equal(propertyAreaProgress({services:[{status:'irrelevant'}]}).tag,'All sorted')
+})
+
+test('completed work maps its category (and title) to a part of the property and a service',()=>{
+ const target=work=>{const found=propertyWorkTarget(work);return found&&found.area+'/'+found.name}
+ // Every category except General Rural Help has an area, and every mapped area exists.
+ for(const category of CATEGORIES){
+  if(category==='General Rural Help'){assert.equal(propertyWorkTarget({category,title:'Odd jobs'}),null);continue}
+  if(category==='Transport & Delivery')continue
+  const found=propertyWorkTarget({category,title:''})
+  assert.ok(found,category)
+  assert.ok(SUPPORT_AREAS.find(area=>area.id===found.area).services.some(service=>service.key===found.service_key),category)
+ }
+ for(const areas of Object.values(PROPERTY_CATEGORY_AREAS))for(const id of areas)assert.ok(SUPPORT_AREAS.some(area=>area.id===id),id)
+ assert.equal(target({category:'Fencing & Gates',title:'Fix the boundary'}),'fencing/Fence repairs')
+ assert.equal(target({category:'Fencing & Gates',title:'New gate for the yards'}),'fencing/Gates')
+ assert.equal(target({category:'Water & Drainage',title:'Pump stopped – pump repair'}),'water/Pump repairs')
+ assert.equal(target({category:'Water & Drainage',title:'Clear the culvert'}),'access/Drainage and culverts')
+ assert.equal(target({category:'Land & Vegetation',title:'Tree removal by the shed'}),'trees/Tree removal')
+ assert.equal(target({category:'Land & Vegetation',title:'Topping the back paddock'}),'land/Paddock mowing')
+ assert.equal(target({category:'Spraying & Pest Control',title:'Possum control'}),'spraying/Possum/rabbit control')
+ assert.equal(target({category:'Animals & Farm Sitting',title:'Shearing 40 ewes'}),'livestock/Shearing')
+ assert.equal(target({category:'Property & House Sitting',title:'House sitting over Christmas'}),'sitting/House sitting')
+ assert.equal(target({category:'Earthworks & Driveways',title:'Driveway'}),'access/Grading')
+ assert.equal(target({category:'Buildings & Maintenance',title:'Fix the shed door'}),'upkeep/General maintenance')
+ // Transport is too broad to guess: only offered when the title says what it was.
+ assert.equal(target({category:'Transport & Delivery',title:'Gravel delivery'}),'access/Gravel delivery')
+ assert.equal(target({category:'Transport & Delivery',title:'Move a couch'}),null)
+ // Bookings of hire and for-sale listings use their own categories.
+ assert.equal(target({category:'Machinery',kind:'hire',title:'Digger'}),'machinery/Equipment hire')
+ assert.equal(target({category:'Hay & baleage',kind:'for_sale',title:'Round bales'}),'feed/Hay & baleage supply')
+ assert.equal(target({category:null,title:'x'}),null)
+ assert.equal(target({category:'Invented',title:'x'}),null)
+})
+
+test('the offer is skipped once the provider is in that area or the member said Not now',()=>{
+ const work={category:'Fencing & Gates',title:'Fence repairs',providerId:'p1'}
+ const data=empty()
+ const offer=propertySuggestion(data,[],work)
+ assert.deepEqual(offer,{area:'fencing',service_key:'suggested-1',name:'Fence repairs',providerId:'p1',areaLabel:'Fences & gates'})
+ assert.equal(propertySuggestionText('Andy Smith',offer),'Add Andy Smith to your property network for Fences & gates?')
+ assert.equal(propertySuggestion(data,[{provider_id:'p1',area:'fencing'}],work),null)
+ // A dismissal is per provider and area.
+ assert.ok(propertySuggestion(data,[{provider_id:'p2',area:'fencing'},{provider_id:'p1',area:'water'}],work))
+ data.links.push({area:'fencing',service_key:'suggested-3',provider_id:'p1'})
+ assert.equal(propertySuggestion(data,[],work),null)
+ assert.equal(propertySuggestion(empty(),[],{...work,providerId:null}),null)
+ assert.equal(propertySuggestion(empty(),[],{...work,category:'General Rural Help'}),null)
+})
+
+test('accepting uses one guarded RPC; Not now stores a dismissal for that provider and area',async()=>{
+ const calls=[]
+ const db={rpc:async(name,args)=>{calls.push(['rpc',name,args]);return {error:null}},
+  from:table=>({upsert:async(row,options)=>{calls.push(['upsert',table,row,options]);return {error:null}}})}
+ const offer=propertySuggestion(empty(),[],{category:'Water & Drainage',title:'Tank cleaning',providerId:'p1'})
+ await acceptPropertySuggestion(db,offer)
+ assert.deepEqual(calls[0],['rpc','accept_property_network_suggestion',{p_area:'water',p_service:'suggested-4',p_name:'Tank cleaning',p_provider:'p1'}])
+ await dismissPropertySuggestion(db,'owner',offer)
+ assert.deepEqual(calls[1],['upsert','property_network_suggestion_dismissals',{owner_id:'owner',provider_id:'p1',area:'water'},{ignoreDuplicates:true}])
+ await assert.rejects(acceptPropertySuggestion({rpc:async()=>({error:new Error('offline')})},offer))
+ // The RPC switches the area on and links the provider (has_provider) in one transaction.
+ const sql=readFileSync(new URL('../supabase/migrations/20261120083245_property_network_suggestions.sql',import.meta.url),'utf8')
+ assert.match(sql,/insert into public\.property_network_areas\(owner_id,area,active\) values\(actor,p_area,true\)\s+on conflict\(owner_id,area\) do update set active=true;/)
+ assert.match(sql,/perform public\.link_property_network_provider\(p_area,p_service,p_name,p_provider\)/)
+ assert.match(sql,/perform public\.refuse_assistant_token\(\)/)
+ assert.match(sql,/primary key\(owner_id,provider_id,area\)/)
+ for(const policy of ['Assistants cannot insert','Assistants cannot update','Assistants cannot delete'])assert.ok(sql.includes(policy),policy)
+})
+
+test('the offer appears only after the requester has reviewed completed work',()=>{
+ const read=file=>readFileSync(new URL('../'+file,import.meta.url),'utf8')
+ assert.match(read('src/screens/ManageTaskScreen.js'),/showCompletedActions && isTaskOwner && !!providerReview && !!acceptedBid\?\.providerId && \(\s*<PropertyNetworkSuggestion/)
+ assert.match(read('src/screens/ServiceBookingDetailScreen.js'),/viewerRole === 'requester' && booking\.status === 'completed' && !!myReview && !!booking\.provider_id && \(\s*<PropertyNetworkSuggestion/)
+ assert.match(read('provider-web/src/app/jobs/[id]/page.tsx'),/job\.status==='completed'&&manageRole==='requester'&&ownReview&&otherId&&<PropertyNetworkSuggestion/)
+ assert.match(read('provider-web/src/app/bookings/[id]/page.tsx'),/work\.status==='completed'&&role==='requester'&&ownReview&&other&&<PropertyNetworkSuggestion/)
+})
+
+test('Home shows a network line only once there is something in it, with no setup prompt',()=>{
+ const data=empty()
+ assert.deepEqual(propertyNetworkHomeLines(data),[])
+ data.preferences.push({area:'fencing',active:true},{area:'water',active:false})
+ assert.deepEqual(propertyNetworkHomeLines(data),[])
+ data.links.push({area:'fencing',service_key:'suggested-1',provider_id:'p1'},{area:'fencing',service_key:'suggested-2',provider_id:'p1'},
+  {area:'water',service_key:'suggested-1',provider_id:'p9'})
+ data.contactLinks.push({area:'fencing',service_key:'suggested-1',contact_id:'c1'})
+ assert.deepEqual(propertyNetworkHomeLines(data),['2 people in your property network'])
+ data.services.push({area:'fencing',service_key:'suggested-3',name:'Gates',status:'needs_help'})
+ assert.deepEqual(propertyNetworkHomeLines(data),['2 people in your property network','1 thing you need help with'])
+ data.links.length=1;data.contactLinks.length=0
+ assert.deepEqual(propertyNetworkHomeLines(data)[0],'1 person in your property network')
+ for(const file of ['src/screens/tabs/HomeTabScreen.js','provider-web/src/app/page.tsx']){
+  const source=readFileSync(new URL('../'+file,import.meta.url),'utf8')
+  assert.match(source,/networkLines\.length>0&&/)
+  assert.doesNotMatch(source,/Start building|setting up a support area|What.s on your property/)
+ }
+ // Setup only lives in My Property Network (and its map), never in onboarding or posting.
+ for(const file of ['src/screens/OnboardingScreen.js','src/screens/PostJobScreen.js','provider-web/src/app/setup/page.tsx','provider-web/src/app/jobs/new/job-form.tsx']){
+  let source=''
+  try{source=readFileSync(new URL('../'+file,import.meta.url),'utf8')}catch{continue}
+  assert.doesNotMatch(source,/propertySetupStarted|savePropertyAreas|What.s on your property/,file)
+ }
 })

@@ -4,13 +4,12 @@ import {notificationSide, sideTag} from '@shared/marketSide'
 import {bookingNextMove,jobNextMove,type NextMove} from '@shared/nextMove'
 import {rankOnTheGo} from '@shared/onTheGo'
 import {HomeModes} from '@/components/home-modes'
-import {homeCustomerCount,homeNetworkSummary,homeUpcoming,homeWorkSummary} from '@shared/homeSummary'
-import {loadPropertyNetwork,propertyAreas,propertySpokes} from '@shared/propertyNetwork'
-import {PropertyAreaIcon} from './property-network/area-icon'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary} from '@shared/homeSummary'
+import {loadPropertyNetwork,propertyNetworkHomeLines} from '@shared/propertyNetwork'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
-import { ArrowRight, Plus, Search, Leaf, MessageSquare, Bell, ListChecks, UsersRound, Briefcase, Tag, House } from 'lucide-react'
+import { ArrowRight, Plus, Search, Leaf, MessageSquare, Bell, ListChecks, UsersRound, Briefcase, Tag } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
@@ -100,10 +99,7 @@ export default async function HomePage() {
     if (next) goItems.push({viewerRole:providing?'provider':'requester',key: 'booking:' + booking.id, side: 'listing', own: providing, title: service?.title || 'Booking', href: '/bookings/' + booking.id, next, needsAction: next.needsAction, updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at]})
   }
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes, schedules, invitations].some(r => r.error)
-  const areas=network?propertyAreas(network).filter(area=>area.active):[]
-  const preview=areas.slice(0,6)
-  const spokes=propertySpokes(preview.length)
-  const networkSummary=network?homeNetworkSummary(areas):null
+  const networkLines=network?propertyNetworkHomeLines(network):[]
   const workItems=goItems.filter(item=>item.viewerRole==='provider')
   const pendingOffers=workItems.filter(item=>item.pendingOffer).length
   const upcoming=workItems.filter(item=>homeUpcoming(item.next.tone,item.side==='job'?'job':'booking',item.arrivalAt)).length
@@ -150,19 +146,15 @@ export default async function HomePage() {
    {hasError&&<div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
    <HomeModes owner={user.id} refresh={<LiveRefresh/>} property={<>
     <header className="home-heading"><div><h1>Your property, your people</h1><p className="muted">Find local help and manage the people supporting your property.</p></div></header>
-    <section className="home-network-preview">
-     <div className="home-network-art" aria-hidden="true">
-      {preview.map((area,index)=><span key={area.id} className={'home-network-mini-node'+(area.needsHelp?' gap':'')} style={{left:spokes[index].x+'%',top:spokes[index].y+'%'}}><PropertyAreaIcon area={area.id} size={13}/></span>)}
-      <span className="home-network-mini-centre"><House size={21}/></span>
-     </div>
-     <div><h2>My Property Network</h2>
-      {networkSummary?<><p>{networkSummary.counts}</p><p>{networkSummary.detail}</p></>:<p>Network summary unavailable. Open your network to view support areas.</p>}
-      <div className="home-network-actions">
-       <Link href="/property-network" className="card-link">My Network <ArrowRight size={16}/></Link>
-       <Link href="/connections?view=locals" className="card-link">My People <ArrowRight size={16}/></Link>
-      </div>
-     </div>
-    </section>
+    {/* A line only once the network has something in it: no setup prompt. */}
+    {networkLines.length>0&&<Link href="/property-network" className="home-network-line">
+     <UsersRound size={22} aria-hidden="true"/><span><strong>My Property Network</strong>{networkLines.map(line=><span key={line}>{line}</span>)}</span>
+     <ArrowRight size={18} aria-hidden="true"/>
+    </Link>}
+    <div className="home-network-actions">
+     <Link href="/property-network" className="card-link">My Network <ArrowRight size={16}/></Link>
+     <Link href="/connections?view=locals" className="card-link">My People <ArrowRight size={16}/></Link>
+    </div>
     {actions(false)}
     {activity('requester')}
    </>} work={<>

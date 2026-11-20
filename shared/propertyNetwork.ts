@@ -1,6 +1,7 @@
 import {allRows} from './relationshipHistory'
 import {CATEGORIES} from './categories'
 import type {ListingKind} from './listingPricing'
+import {PROPERTY_NEEDS} from './propertyMatching'
 
 type ServiceDef={key:string;name:string;category:string;kind?:ListingKind}
 const services=(category:string,...names:(string|[string,string,ListingKind?])[])=>names.map((entry,slot):ServiceDef=>
@@ -376,4 +377,111 @@ export function propertyAreaWho(data:NetworkData,area:Pick<AreaView,'id'|'servic
 // Everything marked Need help across the areas on the property, in area order.
 export function propertyGaps(areas:readonly AreaView[]){
  return areas.filter(area=>area.active).flatMap(area=>area.services.filter(service=>service.status==='needs_help').map(service=>({area,service})))
+}
+
+// ---------------------------------------------------------------------------
+// Grow the network from completed work.
+
+// The part of the property a completed job or booking belongs to, by category.
+// Where a category spans several areas the title picks one (via the services'
+// search terms), otherwise the first. General Rural Help has no area.
+export const PROPERTY_CATEGORY_AREAS:Readonly<Record<string,readonly AreaId[]>>={
+ 'Fencing & Gates':['fencing'],
+ 'Animals & Farm Sitting':['livestock','sitting'],
+ 'Water & Drainage':['water','access'],
+ 'Spraying & Pest Control':['spraying','land'],
+ 'Land & Vegetation':['land','trees'],
+ 'Cropping, Hay & Feed':['feed','land','livestock'],
+ 'Earthworks & Driveways':['access'],
+ 'Machinery & Repairs':['machinery'],
+ 'Buildings & Maintenance':['upkeep'],
+ 'Transport & Delivery':['access','water','feed','trees'],
+ 'Property & House Sitting':['sitting'],
+ // Hire and for-sale listings use their own categories.
+ 'Machinery':['machinery'],
+ 'Implements':['machinery'],
+ 'Hay & baleage':['feed'],
+ 'Feed & supplement':['feed'],
+}
+// The catch-all service where an area has one (e.g. "Fix the shed door").
+const PROPERTY_AREA_FALLBACK:Partial<Record<AreaId,string>>={upkeep:'suggested-3'}
+// Too broad to guess from the category alone: only offered when the title matches.
+const TITLE_REQUIRED=new Set(['Transport & Delivery'])
+
+const words=(value:string)=>' '+value.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('en-NZ').replace(/[^a-z0-9]+/g,' ').trim()+' '
+export type PropertyWork={category:string|null|undefined;kind?:string|null;title?:string|null}
+export type PropertyWorkTarget={area:AreaId;service_key:string;name:string}
+
+export function propertyWorkTarget(work:PropertyWork):PropertyWorkTarget|null{
+ const areas=PROPERTY_CATEGORY_AREAS[work.category??'']
+ if(!areas?.length)return null
+ const title=words(work.title??'')
+ const definitions=(id:AreaId)=>SUPPORT_AREAS.find(area=>area.id===id)!.services as readonly ServiceDef[]
+ const target=(area:AreaId,service:ServiceDef)=>({area,service_key:service.key,name:service.name})
+ // 1. A service whose search terms (or name) appear in the title.
+ for(const area of areas){
+  for(const service of definitions(area)){
+   const terms=[...(PROPERTY_NEEDS[area]?.[service.key]?.terms??[]),service.name]
+   if(terms.some(term=>{const needle=words(term);return needle.trim()&&title.includes(needle)}))return target(area,service)
+  }
+ }
+ if(TITLE_REQUIRED.has(work.category??''))return null
+ // 2. Otherwise the first service in the first area of the same kind and category.
+ const kind=work.kind||'service'
+ const first=definitions(areas[0])
+ const fallback=PROPERTY_AREA_FALLBACK[areas[0]]
+ const match=first.find(service=>service.key===fallback&&(service.kind??'service')===kind&&service.category===work.category)
+  ??first.find(service=>(service.kind??'service')===kind&&service.category===work.category)
+  ??first.find(service=>(service.kind??'service')===kind)??first[0]
+ return target(areas[0],match)
+}
+
+type Dismissal={provider_id:string;area:string}
+export type PropertySuggestion=PropertyWorkTarget&{areaLabel:string;providerId:string}
+// What to offer after completed work, or null: nothing maps, the provider is
+// already in the network for that area, or the member said "Not now" before.
+export function propertySuggestion(data:Pick<NetworkData,'links'>,dismissals:readonly Dismissal[],work:PropertyWork&{providerId:string|null|undefined}):PropertySuggestion|null{
+ const target=propertyWorkTarget(work)
+ const providerId=work.providerId
+ if(!target||!providerId)return null
+ if(dismissals.some(row=>row.provider_id===providerId&&row.area===target.area))return null
+ if(data.links.some(row=>row.provider_id===providerId&&row.area===target.area))return null
+ return {...target,providerId,areaLabel:SUPPORT_AREAS.find(area=>area.id===target.area)!.label}
+}
+export const propertySuggestionText=(providerName:string,suggestion:Pick<PropertySuggestion,'areaLabel'>)=>
+ 'Add '+providerName+' to your property network for '+suggestion.areaLabel+'?'
+
+export async function loadPropertySuggestionState(client:unknown,owner:string){
+ const db=client as Client
+ const [network,dismissals]=await Promise.all([
+  loadPropertyNetwork(client,owner),
+  allRows(()=>db.from('property_network_suggestion_dismissals').select<Dismissal>('provider_id,area').eq('owner_id',owner).order('area')),
+ ])
+ return {network,dismissals}
+}
+// Accepting switches the area on if needed and links the provider (has_provider), in one transaction.
+export async function acceptPropertySuggestion(client:unknown,suggestion:PropertySuggestion){
+ const {error}=await (client as Client).rpc('accept_property_network_suggestion',
+  {p_area:suggestion.area,p_service:suggestion.service_key,p_name:suggestion.name,p_provider:suggestion.providerId})
+ if(error)throw error
+}
+// "Not now": never ask again for this provider and area.
+export async function dismissPropertySuggestion(client:unknown,owner:string,suggestion:Pick<PropertySuggestion,'providerId'|'area'>){
+ const {error}=await (client as Client).from('property_network_suggestion_dismissals')
+  .upsert({owner_id:owner,provider_id:suggestion.providerId,area:suggestion.area},{ignoreDuplicates:true})
+ if(error)throw error
+}
+
+// Home shows a line only once the network has something in it.
+export function propertyNetworkHomeLines(data:NetworkData){
+ const areas=propertyAreas(data),active=new Set(areas.filter(area=>area.active).map(area=>area.id))
+ const people=new Set([
+  ...data.links.filter(row=>active.has(row.area)).map(row=>'member:'+row.provider_id),
+  ...data.contactLinks.filter(row=>active.has(row.area)).map(row=>'contact:'+row.contact_id),
+ ]).size
+ const help=propertyGaps(areas).length
+ const lines:string[]=[]
+ if(people)lines.push(people+(people===1?' person':' people')+' in your property network')
+ if(help)lines.push(help+(help===1?' thing':' things')+' you need help with')
+ return lines
 }
