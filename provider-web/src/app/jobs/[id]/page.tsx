@@ -24,6 +24,7 @@ import { loadConversation } from '@/lib/messaging-data'
 import { Conversation } from '@/components/conversation/conversation'
 import { ManageActions } from '@/components/work/manage-actions'
 import { ReviewsSection } from '@/components/work/reviews-section'
+import { PropertyNetworkSuggestion } from '@/components/work/property-network-suggestion'
 import { PostFeedback } from '@/components/post-feedback'
 import { ConfirmJob } from './confirm-job'
 import { PaymentSorted } from './payment-requester'
@@ -197,6 +198,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {job.status==='open'?<>{receivedSection}{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
   <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
   {job.status==='completed'&&manageRole&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'&&!!ownReview} otherReviewRole={manageRole==='requester'?'Provider':'Requester'}/>}
+  {job.status==='completed'&&manageRole==='requester'&&ownReview&&otherId&&<PropertyNetworkSuggestion owner={user.id} providerId={otherId} providerName={names.get(otherId)||null} category={job.category} title={job.title}/>}
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}
  </>
 

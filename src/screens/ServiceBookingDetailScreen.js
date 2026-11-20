@@ -20,6 +20,7 @@ import { bookingPricingType } from '../lib/listingEstimate'
 import { bookingStatusLabel, BOOKING_STATUS, BOOKING_UNDERWAY_STATUSES, isBookingUnderway, isBookingDismissable } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
+import PropertyNetworkSuggestion from '../components/PropertyNetworkSuggestion'
 import ReceivedReview from '../components/ReceivedReview'
 import ReputationCard from '../components/ReputationCard'
 import Icon from '../components/Icon'
@@ -476,6 +477,16 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
         {canReview && (
           <ReceivedReview review={receivedReview} fromLabel={otherRoleLabel.toLowerCase()} />
+        )}
+
+        {/* After the review: offer to add the provider to My Property Network. */}
+        {viewerRole === 'requester' && booking.status === 'completed' && !!myReview && !!booking.provider_id && (
+          <PropertyNetworkSuggestion
+            providerId={booking.provider_id}
+            providerName={provider?.full_name}
+            work={{ category: service.category, kind: service.kind, title: service.title }}
+            onOpenNetwork={area => navigation.getParent()?.navigate('Home', { screen: 'PropertyNetwork', params: { area } })}
+          />
         )}
 
         <View style={styles.card}>

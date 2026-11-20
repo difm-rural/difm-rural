@@ -20,6 +20,7 @@ import { cancelJob, deleteJob, acceptBid as apiAcceptBid } from '../lib/jobActio
 import { OFFER_MATERIALS_LABELS, formatOfferAmount } from '../lib/offers'
 import { colors } from '../theme/tokens'
 import ReviewModal from '../components/ReviewModal'
+import PropertyNetworkSuggestion from '../components/PropertyNetworkSuggestion'
 import CancelModal from '../components/CancelModal'
 import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
@@ -864,6 +865,16 @@ export default function ManageTaskScreen({ navigation, route }) {
           {showCompletedActions && isTaskOwner && jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview, 'Provider')
             .filter(Boolean).map(label => <Text key={label} style={styles.waitBody}>{label}</Text>)}
         </View>
+
+        {/* After the review: offer to add the provider to My Property Network. */}
+        {showCompletedActions && isTaskOwner && !!providerReview && !!acceptedBid?.providerId && (
+          <PropertyNetworkSuggestion
+            providerId={acceptedBid.providerId}
+            providerName={acceptedBid.providerName}
+            work={{ category: job.category, title: job.title }}
+            onOpenNetwork={area => navigation.getParent()?.navigate('Home', { screen: 'PropertyNetwork', params: { area } })}
+          />
+        )}
 
         {/* Offered to — providers this job was privately offered to */}
         {invites.length > 0 && (
