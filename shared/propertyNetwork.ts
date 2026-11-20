@@ -16,52 +16,56 @@ const services=(category:string,...names:(string|[string,string,ListingKind?])[]
 export const SUPPORT_AREAS = [
  {id:'water',label:'Water',icon:'water-outline',category:'Water & Drainage',
   services:services('Water & Drainage','Water delivery','Pump repairs','Trough and pipe repairs','Tank cleaning')},
- {id:'land',label:'Pasture & Land',icon:'leaf-outline',category:'Land & Vegetation',
+ {id:'land',label:'Paddocks',icon:'leaf-outline',category:'Land & Vegetation',
   // suggested-1 (Weed spraying) moved to Spraying & Pests, keeping its key.
   services:[{key:'suggested-2',name:'Lime spreading',category:'Cropping, Hay & Feed'},
    {key:'suggested-3',name:'Pasture advice',category:'Land & Vegetation'},
    {key:'suggested-4',name:'Paddock mowing',category:'Land & Vegetation'}]},
- {id:'fencing',label:'Fencing',icon:'reorder-four-outline',category:'Fencing & Gates',
+ {id:'fencing',label:'Fences & gates',icon:'reorder-four-outline',category:'Fencing & Gates',
   services:services('Fencing & Gates','Fence repairs','New fencing','Gates','Electric fencing')},
- {id:'livestock',label:'Livestock',icon:'paw-outline',category:'Animals & Farm Sitting',
+ {id:'livestock',label:'Animals',icon:'paw-outline',category:'Animals & Farm Sitting',
   services:services('Animals & Farm Sitting','Stock handling','Shearing','Animal care','Grazing advice')},
- {id:'access',label:'Access & Driveways',icon:'trail-sign-outline',category:'Earthworks & Driveways',
+ {id:'access',label:'Driveway & tracks',icon:'trail-sign-outline',category:'Earthworks & Driveways',
   services:services('Earthworks & Driveways',['Gravel delivery','Transport & Delivery'],'Grading',['Drainage and culverts','Water & Drainage'])},
- {id:'upkeep',label:'Property Upkeep',icon:'hammer-outline',category:'Buildings & Maintenance',
+ {id:'upkeep',label:'Sheds & buildings',icon:'hammer-outline',category:'Buildings & Maintenance',
   services:services('Buildings & Maintenance','Gutter cleaning','Roof repairs','General maintenance')},
- {id:'trees',label:'Trees & Firewood',icon:'mci:tree-outline',category:'Land & Vegetation',
+ {id:'trees',label:'Trees & firewood',icon:'mci:tree-outline',category:'Land & Vegetation',
   services:services('Land & Vegetation','Tree trimming','Tree removal','Firewood')},
  {id:'machinery',label:'Machinery',icon:'cog-outline',category:'Machinery & Repairs',
   services:services('Machinery & Repairs','Tractor work','Equipment repairs',['Equipment hire','Machinery','hire'])},
- {id:'spraying',label:'Spraying & Pests',icon:'bug-outline',category:'Spraying & Pest Control',
+ {id:'spraying',label:'Weeds & pests',icon:'bug-outline',category:'Spraying & Pest Control',
   services:[{key:'suggested-1',name:'Weed spraying',category:'Spraying & Pest Control'},
    {key:'suggested-2',name:'Pest control',category:'Spraying & Pest Control'},
    {key:'suggested-3',name:'Possum/rabbit control',category:'Spraying & Pest Control'}]},
- {id:'feed',label:'Hay & Feed',icon:'mci:barley',category:'Cropping, Hay & Feed',
+ {id:'feed',label:'Hay & feed',icon:'mci:barley',category:'Cropping, Hay & Feed',
   services:services('Cropping, Hay & Feed','Hay & baleage supply','Silage/baleage making','Feed delivery')},
- {id:'sitting',label:'House & Property Sitting',icon:'key-outline',category:'Property & House Sitting',
+ {id:'sitting',label:'Time away',icon:'key-outline',category:'Property & House Sitting',
   services:services('Property & House Sitting','House sitting','Property checks','Animal feeding while away')},
 ] as const satisfies readonly {id:string;label:string;icon:string;category:string;services:readonly ServiceDef[]}[]
 
+// Stored statuses. People pick one of three choices (see propertyServiceChoice);
+// `self` and `has_provider` also record who does it.
 export const PROPERTY_SERVICE_STATES={
- has_provider:'I have a local provider',
- self:'I do this myself',
- needs_help:'I need to find someone',
- irrelevant:'Not relevant to my property',
+ sorted:'Sorted',
+ self:'Sorted · I do this myself',
+ has_provider:'Sorted · a local provider does it',
+ needs_help:'Need help',
+ irrelevant:'Not applicable',
 } as const
 
+// The short hint under each area's name.
 export const PROPERTY_AREA_DESCRIPTIONS={
- water:'Water supply, pumps, tanks and troughs.',
- land:'Paddock care, lime and pasture improvement.',
- fencing:'Fences, gates and electric fencing.',
- livestock:'Stock handling, shearing and animal care.',
- access:'Driveways, gravel and drainage.',
- upkeep:'Buildings, gutters and general maintenance.',
- trees:'Tree trimming, removal and firewood.',
- machinery:'Equipment hire, repairs and tractor work.',
- spraying:'Weed spraying, pest control and possum and rabbit control.',
- feed:'Hay and baleage supply, silage making and feed delivery.',
- sitting:'House sitting, property checks and feeding animals while you are away.',
+ water:'Tanks, bore, troughs',
+ land:'Pasture, mowing, lime',
+ fencing:'Boundaries, electric',
+ livestock:'Stock, horses, pets',
+ access:'Gravel, culverts',
+ upkeep:'Roofs, gutters, repairs',
+ trees:'Shelter belts, wood',
+ machinery:'Tractor, repairs, hire',
+ spraying:'Spraying, possums',
+ feed:'Baleage, supplements',
+ sitting:'House & animal sitting',
 } satisfies Record<AreaId,string>
 
 export type AreaId=typeof SUPPORT_AREAS[number]['id']
@@ -88,20 +92,20 @@ type Client={
   select<T>(fields:string):Query<T>
   delete():DeleteQuery
   update(row:Record<string,unknown>):DeleteQuery
-  upsert(row:Record<string,unknown>,options?:{ignoreDuplicates:boolean}):PromiseLike<{error:unknown}>
+  upsert(row:Record<string,unknown>|Record<string,unknown>[],options?:{ignoreDuplicates:boolean}):PromiseLike<{error:unknown}>
  }
  rpc(name:string,args:Record<string,unknown>):PromiseLike<{error:unknown}>
 }
 
 export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'links'>&{contactLinks?:ContactLink[]}){
- return SUPPORT_AREAS.map((area,index)=>{
+ return SUPPORT_AREAS.map(area=>{
   const stored=new Map(data.services.filter(service=>service.area===area.id).map(service=>[service.service_key,service]))
   const services:PropertyService[]=area.services.map(({key,name})=>stored.get(key) ?? {area:area.id,service_key:key,name,status:null})
   services.push(...[...stored.values()].filter(service=>service.service_key.startsWith('custom-')))
   // Members and private contacts both count as local providers.
   const linkedCount=new Set(data.links.filter(row=>row.area===area.id).map(row=>row.provider_id)).size
    +new Set((data.contactLinks??[]).filter(row=>row.area===area.id).map(row=>row.contact_id)).size
-  return {...area,services,active:data.preferences.find(row=>row.area===area.id)?.active??index<6,
+  return {...area,services,active:data.preferences.find(row=>row.area===area.id)?.active??false,
    hasProvider:linkedCount>0,linkedCount,
    needsHelp:services.some(service=>service.status==='needs_help'),
    configured:services.some(service=>service.status!==null)}
@@ -301,4 +305,75 @@ export async function setPropertyContact(client:unknown,owner:string,service:Pro
 export async function replacePropertyContact(client:unknown,contactId:string,providerId:string){
  const {error}=await (client as Client).rpc('replace_property_network_contact',{p_contact:contactId,p_provider:providerId})
  if(error)throw error
+}
+
+// ---------------------------------------------------------------------------
+// Simpler setup: three choices per service, onboarding, progress and gaps.
+
+export type PropertyChoice='sorted'|'help'|'na'
+// What a stored status shows as. Unset services show no choice.
+export function propertyServiceChoice(status:ServiceStatus|null|undefined):PropertyChoice|null{
+ if(status==='sorted'||status==='self'||status==='has_provider')return 'sorted'
+ if(status==='needs_help')return 'help'
+ if(status==='irrelevant')return 'na'
+ return null
+}
+// The status to save when a choice is tapped: tapping the current choice clears it.
+export function propertyChoiceStatus(current:ServiceStatus|null|undefined,choice:PropertyChoice):ServiceStatus|null{
+ if(propertyServiceChoice(current)===choice)return null
+ return choice==='sorted'?'sorted':choice==='help'?'needs_help':'irrelevant'
+}
+// "Who does it?" Me → self; a member or a private contact → has_provider (set by the
+// link RPCs). Tapping Me again, or removing the last link, goes back to plain sorted.
+export const propertyWhoMeStatus=(current:ServiceStatus|null|undefined):ServiceStatus=>current==='self'?'sorted':'self'
+export const propertyStatusAfterUnlink=(current:ServiceStatus|null|undefined,remainingLinks:number):ServiceStatus|null|undefined=>
+ current==='has_provider'&&remainingLinks===0?'sorted':current
+
+// First visit: no saved area rows means the member hasn't set up yet.
+export const propertySetupStarted=(data:Pick<NetworkData,'preferences'>)=>data.preferences.length>0
+// Saves every area in one call: the chosen ones active, the rest hidden (their
+// services and links are kept for when they come back).
+export async function savePropertyAreas(client:unknown,owner:string,active:readonly string[]){
+ const rows=SUPPORT_AREAS.map(area=>({owner_id:owner,area:area.id,active:active.includes(area.id)}))
+ const {error}=await (client as Client).from('property_network_areas').upsert(rows)
+ if(error)throw error
+}
+
+type AreaView=ReturnType<typeof propertyAreas>[number]
+// Bulk "All sorted" / "None of this applies": only services with no status change.
+export function propertyBulkServices(services:readonly PropertyService[],status:ServiceStatus){
+ const unset=services.filter(service=>!service.status)
+ return {updates:unset.map(service=>({...service,status})),kept:services.length-unset.length}
+}
+export async function savePropertyServices(client:unknown,owner:string,services:readonly PropertyService[]){
+ if(!services.length)return
+ const {error}=await (client as Client).from('property_network_services').upsert(services.map(service=>({...service,owner_id:owner})))
+ if(error)throw error
+}
+
+// One area card: counts, the tag and the summary line.
+export function propertyAreaProgress(area:Pick<AreaView,'services'>,who:readonly string[]=[]){
+ const choices=area.services.map(service=>propertyServiceChoice(service.status))
+ const sorted=choices.filter(choice=>choice==='sorted').length,help=choices.filter(choice=>choice==='help').length
+ const na=choices.filter(choice=>choice==='na').length,total=area.services.length-na,left=total-sorted-help
+ const started=choices.some(Boolean)
+ const tag=help?help+' needs help':!started?'Not started':left===0?'All sorted':left+' to check'
+ const tone:'help'|'done'|'neutral'=help?'help':started&&left===0?'done':'neutral'
+ const names=who.length>2?who.slice(0,2).join(', ')+' +'+(who.length-2):who.join(', ')
+ const summary=started?sorted+' of '+total+' sorted'+(names?' · '+names:''):'Tap to set up — about 30 seconds'
+ return {sorted,help,na,left,total,started,tag,tone,summary}
+}
+// Who covers an area: "You" when the owner does something, then members and contacts.
+export function propertyAreaWho(data:NetworkData,area:Pick<AreaView,'id'|'services'>){
+ const names:string[]=[]
+ if(area.services.some(service=>service.status==='self'))names.push('You')
+ for(const service of area.services){
+  for(const person of linkedPropertyProviders(data,service))names.push(propertyProviderName(person))
+  for(const contact of linkedPropertyContacts(data,service))names.push(contact.name)
+ }
+ return [...new Set(names)]
+}
+// Everything marked Need help across the areas on the property, in area order.
+export function propertyGaps(areas:readonly AreaView[]){
+ return areas.filter(area=>area.active).flatMap(area=>area.services.filter(service=>service.status==='needs_help').map(service=>({area,service})))
 }

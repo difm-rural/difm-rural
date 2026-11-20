@@ -7,20 +7,23 @@ import {loadConnections} from '@/lib/connections-data'
 import {loadInviteChoices,loadSavedProviders,setProviderSaved} from '@shared/trustedLocals'
 import {loadPropertyMatches,matchLocality,propertyNeed,type PropertyMatch} from '@shared/propertyMatching'
 import {ProviderInviteAction} from '../connections/provider-actions'
-import {Plus} from 'lucide-react'
+import {Check} from 'lucide-react'
 import {PropertyAreaIcon} from './area-icon'
 import {
- PROPERTY_AREA_DESCRIPTIONS,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,PROPERTY_SERVICE_STATES,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
+ PROPERTY_AREA_DESCRIPTIONS,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiagramRatio,propertyDiscoveryPath,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,
  savePropertyService,setPropertyArea,setPropertyProvider,
- type AreaId,type NetworkData,type PropertyProvider,type PropertyService,type ServiceStatus,
+ type AreaId,type NetworkData,type PropertyProvider,type PropertyService,
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  type PropertyContact,type PropertyContactInput,
+ propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
+ propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,type PropertyChoice,
 } from '@shared/propertyNetwork'
 import type {ListingKind} from '@shared/listingPricing'
-import {
-} from '@shared/propertyNetwork'
+
+type AreaView=ReturnType<typeof propertyAreas>[number]
+const PROPERTY_CHOICES:[PropertyChoice,string][]=[['sorted','Sorted'],['help','Need help'],['na','N/A']]
 
 type ProviderGroup={label:string;people:PropertyProvider[]}
 type InviteChoices=Awaited<ReturnType<typeof loadInviteChoices>>
@@ -70,7 +73,11 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  const [data,setData]=useState<NetworkData|null>(null)
  const [selected,setSelected]=useState(initialArea || '')
  const [highlight,setHighlight]=useState(initialArea || '')
- const [statusFor,setStatusFor]=useState('')
+ const [setupOpen,setSetupOpen]=useState(false)
+ const [skipped,setSkipped]=useState(false)
+ const [picks,setPicks]=useState<string[]>([])
+ const [pickerMode,setPickerMode]=useState<'provider'|'contact'>('provider')
+ const [addingOpen,setAddingOpen]=useState(false)
  const [matchKey,setMatchKey]=useState('')
  const [locality,setLocality]=useState(matchLocality(preferredArea)||'')
  const [region,setRegion]=useState('')
@@ -81,7 +88,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  const matchRequest=useRef(0)
  const [providerSearch,setProviderSearch]=useState('')
  const [providerLimit,setProviderLimit]=useState(12)
- const [list,setList]=useState(false)
+ const [list,setList]=useState(true)
  const [busy,setBusy]=useState(false)
  const [error,setError]=useState('')
  const [feedback,setFeedback]=useState('')
@@ -114,7 +121,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  function selectArea(id:AreaId|''){
   closeMatches()
   pickerRequest.current++
-  setSelected(id);if(id)setHighlight(id);setPicker(null);setStatusFor('');setServiceName('');setContactForm(null);setReplacing(null)
+  setSelected(id);if(id)setHighlight(id);setPicker(null);setServiceName('');setAddingOpen(false);setContactForm(null);setReplacing(null);setSetupOpen(false)
   window.history.replaceState(null,'',id?'?area='+id:window.location.pathname)
   requestAnimationFrame(()=>{
    if(id)areaHeading.current?.focus()
@@ -179,7 +186,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
   addingService.current={area:current.id,name,key}
   if(await mutate(()=>savePropertyService(client,owner,{area:current.id,service_key:key,name,status:null},true),'Service added.')){
    addingService.current=null
-   setServiceName('')
+   setServiceName('');setAddingOpen(false)
   }
  }
 
@@ -227,7 +234,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  }
 
  function startReplace(service:PropertyService,contact:PropertyContact,target:{category:string;kind:ListingKind}){
-  setContactForm(null);setReplacing(contact);void openPicker(service,target)
+  setContactForm(null);setReplacing(contact);setPickerMode('provider');void openPicker(service,target)
  }
 
  async function replaceContact(person:PropertyProvider){
@@ -243,74 +250,207 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
   return <Link href={'/people/'+person.id} className="card-link">{propertyProviderName(person)}</Link>
  }
 
+ // ---- Simpler setup -------------------------------------------------------
+ const started=data?propertySetupStarted(data):false
+ const showSetup=!!data&&!current&&(setupOpen||(!started&&!skipped))
+ const gaps=propertyGaps(areas)
+
+ function openSetup(){
+  setPicks(active.map(area=>area.id));setSetupOpen(true);setFeedback('')
+  requestAnimationFrame(()=>document.getElementById('property-setup-heading')?.focus())
+ }
+
+ async function saveSetup(){
+  if(await mutate(()=>savePropertyAreas(client,owner,picks),'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
+ }
+
+ // From the gaps list: open the area and start the local search for that service.
+ function findHelp(area:AreaView,service:PropertyService){
+  selectArea(area.id)
+  void findMatches(service,propertyServiceTarget(area,service).category)
+ }
+
+ async function tapChoice(service:PropertyService,choice:PropertyChoice){
+  const status=propertyChoiceStatus(service.status,choice)
+  closeMatches();pickerRequest.current++;setPicker(null);setContactForm(null);setReplacing(null)
+  await mutate(()=>savePropertyService(client,owner,{...service,status}),
+   status?service.name+': '+PROPERTY_CHOICES.find(([value])=>value===choice)?.[1]+'.':service.name+' cleared.')
+ }
+
+ function togglePicker(service:PropertyService,target:{category:string;kind:ListingKind},mode:'provider'|'contact'){
+  setReplacing(null);setContactForm(null)
+  if(picker===service.service_key&&pickerMode===mode){pickerRequest.current++;setPicker(null);return}
+  setPickerMode(mode)
+  if(mode==='provider')void openPicker(service,target)
+  else{pickerRequest.current++;setPicker(service.service_key)}
+ }
+
+ // Removing the last provider or contact puts the service back to plain Sorted.
+ async function unlink(service:PropertyService,remaining:number,action:()=>Promise<void>,message:string){
+  await mutate(async()=>{
+   await action()
+   const status=propertyStatusAfterUnlink(service.status,remaining)
+   if(status!==service.status)await savePropertyService(client,owner,{...service,status:status??null})
+  },message)
+ }
+
+ async function bulk(area:AreaView,status:'sorted'|'irrelevant'){
+  const {updates,kept}=propertyBulkServices(area.services,status)
+  if(!updates.length)return
+  const label=status==='sorted'?'Sorted':'N/A'
+  if(kept&&!window.confirm('Mark the '+updates.length+' unanswered '+(updates.length===1?'service':'services')+' as '+label+'? The '+kept+' you have already answered stay as they are.'))return
+  await mutate(()=>savePropertyServices(client,owner,updates),updates.length+' '+(updates.length===1?'service':'services')+' marked '+label+'.')
+ }
+
+ async function removeArea(area:AreaView){
+  if(!window.confirm('Remove '+area.label+' from your property? Your answers are kept if you add it back.'))return
+  if(await mutate(()=>setPropertyArea(client,owner,area.id,false),area.label+' removed from your property.'))selectArea('')
+ }
+
  return <section className="page work-page property-network">
-  <header className="home-heading"><div><h1>My Property Network</h1><p className="muted">See who helps with your property and where you still need support.</p></div></header>
+  <header className="home-heading"><div><h1>My Property Network</h1><p className="muted">Who helps with your property, and what still needs someone.</p></div></header>
   <nav className="activity-segments" aria-label="My Property"><Link href="/property-network" aria-current="page">My Network</Link>
    <Link href="/connections?view=locals">My People</Link></nav>
   {error&&<p role="alert">{error} <button className="lform-cancel" type="button" onClick={()=>{setError('');void load()}}>Retry</button></p>}
   {feedback&&<p role="status">{feedback}</p>}
   {!data&&!error&&<p role="status">Loading My Property Network…</p>}
   {data&&<div className="property-layout">
-   <section hidden={!!current} ref={overview}>
-    <div className="lform-actions" aria-label="Network view">
-     <button className="lform-cancel" type="button" data-view-toggle aria-pressed={!list} onClick={()=>setList(false)}>Diagram</button>
-     <button className="lform-cancel" type="button" aria-pressed={list} onClick={()=>setList(true)}>List</button>
-    </div>
-    {list?<ul className="property-area-list">
-     <li><Link href="/property-network/map">My Property</Link></li>
-     {active.map(area=>
-     <li key={area.id}><button type="button" data-area={area.id} aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
-      <PropertyAreaIcon area={area.id} size={20}/> {area.label} <AreaBadges area={area}/>
-     </button></li>
-    )}</ul>:<div className="property-diagram" aria-label="Property diagram" style={{aspectRatio:1/propertyDiagramRatio(active.length)}}>
-     {active.map((area,index)=><span key={area.id} aria-hidden="true" className={'property-spoke'+(area.hasProvider?' linked':'')}
-      style={{width:spokes[index].length+'%',transform:'rotate('+spokes[index].angle+'deg)'}}/>)}
-     <Link className="property-centre" href="/property-network/map">My Property</Link>
-     {active.map((area,index)=><button type="button" className="property-node" data-area={area.id}
-      style={{left:spokes[index].x+'%',top:spokes[index].y+'%',width:PROPERTY_NODE_WIDTH+'%',minHeight:PROPERTY_NODE_HEIGHT}} key={area.id}
-      aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
-      <PropertyAreaIcon area={area.id}/>{area.label}<AreaBadges area={area}/>
-     </button>)}
-    </div>}
-    {!active.length&&<p>Add a support area to get started.</p>}
-    <section className="property-library" aria-labelledby="property-library-heading">
-     <h2 id="property-library-heading">Grow your network</h2>
-     <p className="muted">Add other areas where you may need help.</p>
-     <div className="property-library-tiles">{areas.filter(area=>!area.active).map(area=>
-      <button className="property-library-tile" type="button" key={area.id} aria-label={'Add '+area.label}
-       disabled={busy} onClick={()=>void mutate(()=>setPropertyArea(client,owner,area.id,true),area.label+' added.')}>
-       <PropertyAreaIcon area={area.id}/>
-       <span><strong>{area.label}</strong><small>{PROPERTY_AREA_DESCRIPTIONS[area.id]}</small></span>
-       <Plus size={22} strokeWidth={2} aria-hidden="true" className="property-area-icon"/>
+   {showSetup&&<section className="property-setup" aria-labelledby="property-setup-heading">
+    <h2 id="property-setup-heading" tabIndex={-1}>What&apos;s on your property?</h2>
+    <p className="muted">Tap everything that applies. We&apos;ll set up your network to match. You can change it any time.</p>
+    <div className="property-setup-tiles" role="group" aria-label="What's on your property">
+     {SUPPORT_AREAS.map(area=>{
+      const on=picks.includes(area.id)
+      return <button type="button" key={area.id} className="property-setup-tile" aria-pressed={on}
+       onClick={()=>setPicks(current=>on?current.filter(id=>id!==area.id):[...current,area.id])}>
+       <span className="property-setup-top"><strong>{area.label}</strong>
+        <span aria-hidden="true" className="property-check">{on&&<Check size={13} strokeWidth={3}/>}</span></span>
+       <small>{PROPERTY_AREA_DESCRIPTIONS[area.id]}</small>
       </button>
-     )}</div>
-     {areas.every(area=>area.active)&&<p className="muted">All support areas are in your network.</p>}
+     })}
+    </div>
+    <div className="property-setup-actions">
+     <button type="button" className="lform-save" disabled={busy||!picks.length} onClick={()=>void saveSetup()}>
+      {picks.length?'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')':'Choose at least one'}</button>
+     <button type="button" className="lform-cancel" onClick={()=>{if(started)setSetupOpen(false);else setSkipped(true)}}>{started?'Cancel':'Skip for now'}</button>
+    </div>
+   </section>}
+   {!showSetup&&<section hidden={!!current} ref={overview} className="property-overview">
+    {gaps.length>0?<section className="property-gaps" aria-labelledby="property-gaps-heading">
+     <h2 id="property-gaps-heading">You need help with {gaps.length} {gaps.length===1?'thing':'things'}</h2>
+     <ul>{gaps.map(({area,service})=><li key={area.id+service.service_key} className="property-gap-row">
+      <span><strong>{service.name}</strong><small>{area.label}</small></span>
+      <button type="button" className="lform-save" onClick={()=>findHelp(area,service)}>Find help</button>
+     </li>)}</ul>
+    </section>:active.length>0&&<p className="muted property-quiet">Nothing needs help right now.</p>}
+    <section aria-labelledby="property-parts-heading">
+     <div className="property-parts-head">
+      <h2 id="property-parts-heading">Your property</h2>
+      {active.length>0&&<span role="group" aria-label="Network view" className="property-view-switch">
+       <button type="button" data-view-toggle aria-pressed={list} onClick={()=>setList(true)}>List</button>
+       <button type="button" aria-pressed={!list} onClick={()=>setList(false)}>Diagram</button>
+      </span>}
+     </div>
+     {!active.length?<div className="property-empty">
+      <p>Tell us what&apos;s on your property and we&apos;ll set up your network to match.</p>
+      <button type="button" className="lform-save" onClick={openSetup}>Choose what&apos;s on your property</button>
+     </div>:list?<ul className="property-area-cards">
+      {active.map(area=>{
+       const progress=propertyAreaProgress(area,propertyAreaWho(data,area))
+       return <li key={area.id}><button type="button" className="property-area-card" data-area={area.id} onClick={()=>selectArea(area.id)}>
+        <span className="property-card-top"><span className="property-card-title"><PropertyAreaIcon area={area.id} size={20}/>{area.label}</span>
+         <span className={'property-status-tag '+progress.tone}>{progress.tag}</span></span>
+        <span aria-hidden="true" className="property-bar">
+         {progress.sorted>0&&<span className="sorted" style={{flexGrow:progress.sorted}}/>}
+         {progress.help>0&&<span className="help" style={{flexGrow:progress.help}}/>}
+         {progress.left>0&&<span className="left" style={{flexGrow:progress.left}}/>}
+        </span>
+        <small className="muted">{progress.summary}</small>
+       </button></li>
+      })}
+      <li><Link href="/property-network/map" className="property-map-link">My Property map</Link></li>
+     </ul>:<div className="property-diagram" aria-label="Property diagram" style={{aspectRatio:1/propertyDiagramRatio(active.length)}}>
+      {active.map((area,index)=><span key={area.id} aria-hidden="true" className={'property-spoke'+(area.hasProvider?' linked':'')}
+       style={{width:spokes[index].length+'%',transform:'rotate('+spokes[index].angle+'deg)'}}/>)}
+      <Link className="property-centre" href="/property-network/map">My Property</Link>
+      {active.map((area,index)=><button type="button" className="property-node" data-area={area.id}
+       style={{left:spokes[index].x+'%',top:spokes[index].y+'%',width:PROPERTY_NODE_WIDTH+'%',minHeight:PROPERTY_NODE_HEIGHT}} key={area.id}
+       aria-pressed={highlight===area.id} onClick={()=>selectArea(area.id)}>
+       <PropertyAreaIcon area={area.id}/>{area.label}<AreaBadges area={area}/>
+      </button>)}
+     </div>}
+     {active.length>0&&<>
+      <button type="button" className="property-add-area" onClick={openSetup}>+ Add another part of your property</button>
+      <button type="button" className="lform-cancel property-update-link" onClick={openSetup}>Update what&apos;s on your property</button>
+     </>}
     </section>
-   </section>
+   </section>}
    {current&&<section className="property-area-panel" aria-labelledby="property-area-heading">
     <button type="button" className="lform-cancel" onClick={()=>selectArea('')}>Back to My Property Network</button>
     <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}><PropertyAreaIcon area={current.id} size={26}/> {current.label}</h2>
-    <p className="muted">{PROPERTY_AREA_DESCRIPTIONS[current.id]}</p>
+    <p className="muted">One tap each. Tell us who does it if you like.</p>
+    <div className="property-bulk">
+     <button type="button" className="property-pill" disabled={busy||!current.services.some(service=>!service.status)} onClick={()=>void bulk(current,'sorted')}>All sorted</button>
+     <button type="button" className="property-pill quiet" disabled={busy||!current.services.some(service=>!service.status)} onClick={()=>void bulk(current,'irrelevant')}>None of this applies</button>
+    </div>
     {current.services.map(service=>{
      const linked=linkedPropertyProviders(data,service)
      const contacts=linkedPropertyContacts(data,service)
      const covered=linked.length+contacts.length
+     const choice=propertyServiceChoice(service.status)
      const replacingHere=replacing&&picker===service.service_key?replacing:null
      const target=propertyServiceTarget(current,service),category=target.category
      const postPath='/jobs/new?'+new URLSearchParams({category:propertyJobCategory(current,service)})
+     const providerOpen=picker===service.service_key&&(pickerMode==='provider'||!!replacingHere)
+     const contactOpen=picker===service.service_key&&pickerMode==='contact'&&!replacingHere
      return <article className="property-service" key={service.service_key}>
       <h3>{service.name}</h3>
-      <p className={service.status==='needs_help'?'property-gap':'muted'}>{service.status==='needs_help'?'Find help':
-       service.status==='has_provider'&&covered?'Provider linked':service.status?PROPERTY_SERVICE_STATES[service.status]:'Not set up'}</p>
-      {!!covered&&<p className="muted">{[...linked.map(propertyProviderName),...contacts.map(contact=>contact.name)].join(', ')}</p>}
-      <div className="lform-actions">
-       {(service.status==='needs_help'||matchKey===service.service_key)&&<button type="button" className="lform-cancel" aria-expanded={matchKey===service.service_key}
-        onClick={()=>matchKey===service.service_key?closeMatches():void findMatches(service,category)}>Find local help</button>}
-       <button type="button" className="lform-cancel" aria-expanded={statusFor===service.service_key}
-        onClick={()=>{setPicker(null);setReplacing(null);setContactForm(null);setStatusFor(statusFor===service.service_key?'':service.service_key)}}>
-        {statusFor===service.service_key?'Done':covered?'View or change provider':service.status?'Change support':'Set up'}
-       </button>
+      <div role="group" aria-label={service.name+' status'} className="property-choices">
+       {PROPERTY_CHOICES.map(([value,label])=><button type="button" key={value} className={'property-choice '+value}
+        aria-pressed={choice===value} disabled={busy} onClick={()=>void tapChoice(service,value)}>{label}</button>)}
       </div>
+      {choice==='sorted'&&<div className="property-who">
+       <span className="muted">Who does it? (optional)</span>
+       <div className="property-who-chips">
+        <button type="button" className="property-chip" aria-pressed={service.status==='self'} disabled={busy}
+         onClick={()=>void mutate(()=>savePropertyService(client,owner,{...service,status:propertyWhoMeStatus(service.status)}),'Saved.')}>Me</button>
+        <button type="button" className="property-chip" aria-pressed={linked.length>0} aria-expanded={providerOpen}
+         onClick={()=>togglePicker(service,target,'provider')}>{linked.length?linked.map(propertyProviderName).join(', ')+' ✓':'A provider…'}</button>
+        <button type="button" className="property-chip" aria-pressed={contacts.length>0} aria-expanded={contactOpen}
+         onClick={()=>togglePicker(service,target,'contact')}>{contacts.length?contacts.map(contact=>contact.name).join(', ')+' ✓':'Someone not on RC'}</button>
+       </div>
+       {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
+        {providerLink(person)}
+        <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void unlink(service,covered-1,
+         ()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.')}>Remove link</button>
+        {choices?<ProviderInviteAction provider={person.id} choices={choices} initiallyOpen={inviteTarget===person.id}/>
+         :<button type="button" className="lform-cancel" disabled={loadingInvites} onClick={()=>void refreshInviteChoices(person.id)}>
+           {loadingInvites?'Loading open jobs…':'Invite to job'}
+          </button>}
+       </li>)}</ul>}
+       {contacts.length>0&&<ul className="property-linked">{contacts.map(contact=><li key={contact.id} className="property-contact">
+        <span><strong>{contact.name}</strong> <span className="property-tag">Not on Rural Connections</span></span>
+        {(contact.phone||contact.email||contact.note)&&<span className="muted property-contact-details">
+         {[contact.phone,contact.email,contact.note].filter(Boolean).join(' · ')}</span>}
+        <span className="lform-actions">
+         {contact.phone&&<a className="card-link" href={propertyContactPhoneHref(contact.phone)}>Call</a>}
+         {contact.email&&<a className="card-link" href={propertyContactEmailHref(contact.email)}>Email</a>}
+         <button className="lform-cancel" type="button" disabled={busy} aria-expanded={contactForm?.contact?.id===contact.id}
+          onClick={()=>setContactForm({serviceKey:service.service_key,contact})}>Edit</button>
+         <button className="lform-cancel" type="button" onClick={()=>void inviteContact(contact)}>Invite to Rural Connections</button>
+         <button className="lform-cancel" type="button" disabled={busy} onClick={()=>startReplace(service,contact,target)}>Replace with member</button>
+         <button className="lform-cancel" type="button" disabled={busy}
+          onClick={()=>void unlink(service,covered-1,()=>setPropertyContact(client,owner,service,contact.id,false),'Contact link removed.')}>Remove link</button>
+        </span>
+        {contactForm?.contact?.id===contact.id&&contactForm.serviceKey===service.service_key&&<ContactForm key={contact.id} initial={contact} busy={busy}
+         onSave={value=>void saveContact(service,value)} onCancel={()=>setContactForm(null)} onDelete={()=>void deleteContact(contact)}/>}
+       </li>)}</ul>}
+      </div>}
+      {choice==='help'&&<div className="lform-actions">
+       <button type="button" className="lform-save" aria-expanded={matchKey===service.service_key}
+        onClick={()=>matchKey===service.service_key?closeMatches():void findMatches(service,category)}>Find local help</button>
+       <Link href={postPath} className="property-post-job">Post a job</Link>
+      </div>}
       {matchKey===service.service_key&&<section className="property-picker" aria-label={'Providers for '+service.name}>
        <h4>Find providers for {service.name}</h4>
        <form onSubmit={event=>{event.preventDefault();void findMatches(service,category)}}>
@@ -341,49 +481,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        </article>)}
        <Link href={postPath} className="card-link">Post a job</Link>
       </section>}
-      {statusFor===service.service_key&&<>
-      <fieldset className="property-status-options" disabled={busy}>
-       <legend>Support status for {service.name}</legend>
-       {Object.entries(PROPERTY_SERVICE_STATES).map(([value,label])=><label key={value} className="property-status-option">
-        <input type="radio" name={'support-'+service.service_key} checked={service.status===value} onChange={async()=>{
-         if(!await mutate(()=>savePropertyService(client,owner,{...service,status:value as ServiceStatus}),'Support status saved.'))return
-         if(value==='has_provider')void openPicker(service,target)
-         else{pickerRequest.current++;setPicker(null)}
-        }}/>
-        {label}
-       </label>)}
-      </fieldset>
-      {service.status==='needs_help'&&<Link href={postPath} className="card-link">Post a job</Link>}
-      {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
-       {providerLink(person)}
-       <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void mutate(()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.')}>Remove link</button>
-       {choices?<ProviderInviteAction provider={person.id} choices={choices} initiallyOpen={inviteTarget===person.id}/>
-        :<button type="button" className="lform-cancel" disabled={loadingInvites} onClick={()=>void refreshInviteChoices(person.id)}>
-          {loadingInvites?'Loading open jobs…':'Invite to job'}
-         </button>}
-      </li>)}</ul>}
-      {contacts.length>0&&<ul className="property-linked">{contacts.map(contact=><li key={contact.id} className="property-contact">
-       <span><strong>{contact.name}</strong> <span className="property-tag">Not on Rural Connections</span></span>
-       {(contact.phone||contact.email||contact.note)&&<span className="muted property-contact-details">
-        {[contact.phone,contact.email,contact.note].filter(Boolean).join(' · ')}</span>}
-       <span className="lform-actions">
-        {contact.phone&&<a className="card-link" href={propertyContactPhoneHref(contact.phone)}>Call</a>}
-        {contact.email&&<a className="card-link" href={propertyContactEmailHref(contact.email)}>Email</a>}
-        <button className="lform-cancel" type="button" disabled={busy} aria-expanded={contactForm?.contact?.id===contact.id}
-         onClick={()=>setContactForm({serviceKey:service.service_key,contact})}>Edit</button>
-        <button className="lform-cancel" type="button" onClick={()=>void inviteContact(contact)}>Invite to Rural Connections</button>
-        <button className="lform-cancel" type="button" disabled={busy} onClick={()=>startReplace(service,contact,target)}>Replace with member</button>
-        <button className="lform-cancel" type="button" disabled={busy}
-         onClick={()=>void mutate(()=>setPropertyContact(client,owner,service,contact.id,false),'Contact link removed.')}>Remove link</button>
-       </span>
-       {contactForm?.contact?.id===contact.id&&contactForm.serviceKey===service.service_key&&<ContactForm key={contact.id} initial={contact} busy={busy}
-        onSave={value=>void saveContact(service,value)} onCancel={()=>setContactForm(null)} onDelete={()=>void deleteContact(contact)}/>}
-      </li>)}</ul>}
-      {service.status==='has_provider'&&!covered&&<p className="muted">No provider linked yet.</p>}
-      {service.status==='has_provider'&&<button className="lform-cancel" type="button" disabled={busy}
-       aria-expanded={picker===service.service_key}
-       onClick={()=>{setReplacing(null);setContactForm(null);if(picker===service.service_key)setPicker(null);else void openPicker(service,target)}}>Link a provider</button>}
-      {picker===service.service_key&&<section className="property-picker">
+      {providerOpen&&<section className="property-picker">
        <h4>{replacingHere?'Choose the member who replaces '+replacingHere.name:'Choose a provider'}</h4>
        {replacingHere&&<p className="muted">They will be linked to every service {replacingHere.name} covers, and {replacingHere.name}&apos;s private contact details will be deleted.</p>}
        {providerGroups&&<label className="lform-field">Find by name or region
@@ -403,31 +501,30 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
           {available.length>providerLimit&&<button className="lform-cancel" type="button" onClick={()=>setProviderLimit(value=>value+12)}>Show more providers</button>}
          </section>
         })}
-       {!replacingHere&&<section aria-labelledby={'contacts-'+service.service_key}>
-        <h5 id={'contacts-'+service.service_key}>Not on Rural Connections</h5>
-        {data.contacts.some(contact=>!contacts.some(row=>row.id===contact.id))&&<ul className="property-linked">
-         {data.contacts.filter(contact=>!contacts.some(row=>row.id===contact.id)).map(contact=><li key={contact.id}>
-          {contact.name}
-          <button type="button" className="lform-cancel" disabled={busy}
-           onClick={()=>void mutate(()=>setPropertyContact(client,owner,service,contact.id,true),contact.name+' linked.')}>Link to service</button>
-         </li>)}
-        </ul>}
-        {contactForm?.serviceKey===service.service_key&&!contactForm.contact
-         ?<ContactForm busy={busy} onSave={value=>void saveContact(service,value)} onCancel={()=>setContactForm(null)}/>
-         :<button type="button" className="lform-cancel" onClick={()=>setContactForm({serviceKey:service.service_key})}>Add someone not on Rural Connections</button>}
-       </section>}
        {replacingHere?<button type="button" className="lform-cancel" onClick={()=>{setReplacing(null);setPicker(null)}}>Cancel replacing</button>
         :<Link href={propertyDiscoveryPath(category,target.kind)} className="card-link">Browse more providers</Link>}
       </section>}
-      </>}
+      {contactOpen&&<section className="property-picker" aria-labelledby={'contacts-'+service.service_key}>
+       <h4 id={'contacts-'+service.service_key}>Not on Rural Connections</h4>
+       {data.contacts.some(contact=>!contacts.some(row=>row.id===contact.id))&&<ul className="property-linked">
+        {data.contacts.filter(contact=>!contacts.some(row=>row.id===contact.id)).map(contact=><li key={contact.id}>
+         {contact.name}
+         <button type="button" className="lform-cancel" disabled={busy}
+          onClick={()=>void mutate(()=>setPropertyContact(client,owner,service,contact.id,true),contact.name+' linked.')}>Link to service</button>
+        </li>)}
+       </ul>}
+       {contactForm?.serviceKey===service.service_key&&!contactForm.contact
+        ?<ContactForm busy={busy} onSave={value=>void saveContact(service,value)} onCancel={()=>setContactForm(null)}/>
+        :<button type="button" className="lform-cancel" onClick={()=>setContactForm({serviceKey:service.service_key})}>Add someone not on Rural Connections</button>}
+      </section>}
      </article>
     })}
-    <form className="lform" onSubmit={addService}>
-     <label className="lform-field">Custom service<input value={serviceName} onChange={event=>setServiceName(event.target.value)} maxLength={80} required/></label>
-     <button className="lform-save" disabled={busy||!serviceName.trim()}>Add service</button>
-    </form>
-    <button type="button" className="lform-cancel" disabled={busy}
-     onClick={async()=>{if(await mutate(()=>setPropertyArea(client,owner,current.id,false),current.label+' removed.'))selectArea('')}}>Remove support area</button>
+    {addingOpen?<form className="lform" onSubmit={addService}>
+     <label className="lform-field">Something else on your property<input value={serviceName} onChange={event=>setServiceName(event.target.value)} maxLength={80} required autoFocus/></label>
+     <div className="lform-actions"><button className="lform-save" disabled={busy||!serviceName.trim()}>Add</button>
+      <button type="button" className="lform-cancel" onClick={()=>{setAddingOpen(false);setServiceName('')}}>Cancel</button></div>
+    </form>:<button type="button" className="property-add-area" onClick={()=>setAddingOpen(true)}>+ Add something else</button>}
+    <button type="button" className="property-remove" disabled={busy} onClick={()=>void removeArea(current)}>Remove {current.label} from my property</button>
    </section>}
   </div>}
  </section>

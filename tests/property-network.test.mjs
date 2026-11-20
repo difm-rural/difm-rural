@@ -7,6 +7,8 @@ import {
  setPropertyArea,savePropertyService,setPropertyProvider,loadPropertyNetwork,discoverPropertyProviders,
  linkedPropertyContacts,propertyContactFields,propertyContactInviteText,propertyContactPhoneHref,propertyContactEmailHref,propertyContactServices,
  createPropertyContact,updatePropertyContact,deletePropertyContact,setPropertyContact,replacePropertyContact,PROPERTY_SITE_URL,
+ propertyServiceChoice,propertyChoiceStatus,propertyWhoMeStatus,propertyStatusAfterUnlink,propertySetupStarted,savePropertyAreas,
+ propertyBulkServices,savePropertyServices,propertyAreaProgress,propertyAreaWho,propertyGaps,PROPERTY_AREA_DESCRIPTIONS as HINTS,
 } from '../shared/propertyNetwork.ts'
 import {CATEGORIES,LISTING_CATEGORIES} from '../shared/categories.ts'
 import {discovery} from './web-discovery-modules.mjs'
@@ -14,11 +16,14 @@ const {discoveryFilters}=discovery
 
 const empty=()=>({preferences:[],services:[],links:[],people:[],contacts:[],contactLinks:[]})
 
-test('six default areas display without treating untouched services as gaps',()=>{
+test('a member with no saved areas has none active and sees the first-visit setup',()=>{
  const areas=propertyAreas(empty())
- assert.deepEqual(areas.filter(area=>area.active).map(area=>area.id),['water','land','fencing','livestock','access','upkeep'])
- assert.deepEqual(areas.filter(area=>!area.active).map(area=>area.id),['trees','machinery','spraying','feed','sitting'])
+ assert.deepEqual(areas.filter(area=>area.active),[])
+ assert.equal(propertySetupStarted(empty()),false)
+ assert.equal(propertySetupStarted({preferences:[{area:'water',active:false}]}),true)
  assert.ok(areas.every(area=>!area.needsHelp&&!area.hasProvider))
+ assert.deepEqual(areas.map(area=>area.label),['Water','Paddocks','Fences & gates','Animals','Driveway & tracks','Sheds & buildings',
+  'Trees & firewood','Machinery','Weeds & pests','Hay & feed','Time away'])
  assert.equal(areas[0].services[0].name,'Water delivery')
 })
 
@@ -71,9 +76,12 @@ test('diagram nodes stay inside, clear of each other and of the hub for one thro
   assert.match(source,/My Property/)
   assert.match(source,/Diagram/)
   assert.match(source,/List/)
-  assert.match(source,/Grow your network/)
+  assert.doesNotMatch(source,/Grow your network|type="radio"|accessibilityRole="radio"|PROPERTY_SERVICE_STATES/)
+  for(const text of ["What's on your property?",'Skip for now','Set up my network (','You need help with','Nothing needs help right now',
+   'Your property','+ Add another part of your property',"Update what's on your property",'All sorted','None of this applies',
+   'Who does it? (optional)','A provider…','Someone not on RC','+ Add something else','from my property','Post a job'])
+   assert.ok(source.includes(text)||source.includes(text.replaceAll("'",'&apos;')),filename+': '+text)
   assert.match(source,/Back to My Property Network/)
-  assert.match(source,/type="radio"|accessibilityRole="radio"/)
   assert.match(source,/Find local help/)
   assert.match(source,/Invite to job|ProviderInviteAction/)
  }
@@ -93,9 +101,9 @@ test('My Property opens the map from diagram and list on both clients',()=>{
  const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
  const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
  assert.match(web,/className="property-centre" href="\/property-network\/map"/)
- assert.match(web,/<li><Link href="\/property-network\/map">My Property/)
+ assert.match(web,/<li><Link href="\/property-network\/map" className="property-map-link">My Property map/)
  assert.match(native,/onOpenProperty=\{openProperty\}/)
- assert.match(native,/label="My Property" onPress=\{openProperty\}/)
+ assert.match(native,/label="My Property" icon="map-outline" onPress=\{openProperty\}/)
  assert.match(native,/navigate\('PropertyMap'\)/)
  for(const source of [web,native])assert.doesNotMatch(source,/Map-based property setup is coming/)
 })
@@ -293,10 +301,115 @@ test('contact actions: call, email and a shareable invitation with no server sen
  assert.match(native,/keyboardType:'email-address',autoCapitalize:'none'/)
  assert.match(native,/Share\.share\(\{message:propertyContactInviteText/)
  // Contacts have no profile and cannot be invited to jobs.
- const contactBlock=native.slice(native.indexOf('{contacts.map(contact=>'),native.indexOf('No provider linked yet'))
+ const contactBlock=native.slice(native.indexOf('{contacts.map(contact=><View key={contact.id} style={styles.linked}>'),native.indexOf("{choice==='help'&&"))
  assert.ok(contactBlock.length>200)
  assert.doesNotMatch(contactBlock,/openInvite|profile\(/)
- const webBlock=web.slice(web.indexOf('{contacts.length>0&&'),web.indexOf('No provider linked yet'))
+ const webBlock=web.slice(web.indexOf('{contacts.length>0&&'),web.indexOf("{choice==='help'&&"))
  assert.ok(webBlock.length>200)
  assert.doesNotMatch(webBlock,/ProviderInviteAction|refreshInviteChoices|providerLink/)
+})
+
+test('statuses map to Sorted, Need help and N/A and back',()=>{
+ for(const [status,choice] of [['sorted','sorted'],['self','sorted'],['has_provider','sorted'],['needs_help','help'],['irrelevant','na'],[null,null],[undefined,null]])
+  assert.equal(propertyServiceChoice(status),choice,String(status))
+ // One tap saves; tapping the current choice clears it.
+ assert.equal(propertyChoiceStatus(null,'sorted'),'sorted')
+ assert.equal(propertyChoiceStatus(null,'help'),'needs_help')
+ assert.equal(propertyChoiceStatus(null,'na'),'irrelevant')
+ for(const status of ['sorted','self','has_provider'])assert.equal(propertyChoiceStatus(status,'sorted'),null,status)
+ assert.equal(propertyChoiceStatus('needs_help','help'),null)
+ assert.equal(propertyChoiceStatus('irrelevant','na'),null)
+ assert.equal(propertyChoiceStatus('self','help'),'needs_help')
+ assert.equal(propertyChoiceStatus('needs_help','sorted'),'sorted')
+ // Who does it? Me toggles self; removing the last link goes back to plain sorted.
+ assert.equal(propertyWhoMeStatus('sorted'),'self')
+ assert.equal(propertyWhoMeStatus('has_provider'),'self')
+ assert.equal(propertyWhoMeStatus('self'),'sorted')
+ assert.equal(propertyStatusAfterUnlink('has_provider',0),'sorted')
+ assert.equal(propertyStatusAfterUnlink('has_provider',1),'has_provider')
+ assert.equal(propertyStatusAfterUnlink('needs_help',0),'needs_help')
+ // The database accepts the new status.
+ const sql=readFileSync(new URL('../supabase/migrations/20261120074030_property_network_sorted_status.sql',import.meta.url),'utf8')
+ assert.match(sql,/check \(status in \('sorted','has_provider','self','needs_help','irrelevant'\)\)/)
+ for(const area of SUPPORT_AREAS)assert.ok(HINTS[area.id],area.id)
+})
+
+test('setup saves every area in one call with only the ticked ones active',async()=>{
+ const writes=[]
+ const db={from:table=>({upsert:async(rows,options)=>{writes.push([table,rows,options]);return {error:null}}})}
+ await savePropertyAreas(db,'owner',['water','spraying','sitting'])
+ assert.equal(writes.length,1)
+ const [table,rows]=writes[0]
+ assert.equal(table,'property_network_areas')
+ assert.equal(rows.length,SUPPORT_AREAS.length)
+ assert.ok(rows.every(row=>row.owner_id==='owner'))
+ assert.deepEqual(rows.filter(row=>row.active).map(row=>row.area),['water','spraying','sitting'])
+ // Once saved, the overview shows those areas and setup is done.
+ const areas=propertyAreas({preferences:rows,services:[],links:[]})
+ assert.deepEqual(areas.filter(area=>area.active).map(area=>area.id),['water','spraying','sitting'])
+ assert.equal(propertySetupStarted({preferences:rows}),true)
+ await assert.rejects(savePropertyAreas({from:()=>({upsert:async()=>({error:new Error('offline')})})},'owner',['water']))
+})
+
+test('All sorted and None of this applies only fill unanswered services',async()=>{
+ const services=[
+  {area:'fencing',service_key:'suggested-1',name:'Fence repairs',status:'needs_help'},
+  {area:'fencing',service_key:'suggested-2',name:'New fencing',status:null},
+  {area:'fencing',service_key:'suggested-3',name:'Gates',status:'self'},
+  {area:'fencing',service_key:'suggested-4',name:'Electric fencing',status:null},
+ ]
+ const {updates,kept}=propertyBulkServices(services,'sorted')
+ assert.equal(kept,2)
+ assert.deepEqual(updates.map(service=>[service.service_key,service.status]),[['suggested-2','sorted'],['suggested-4','sorted']])
+ assert.equal(services[0].status,'needs_help')
+ assert.deepEqual(propertyBulkServices(services.map(service=>({...service,status:null})),'irrelevant').kept,0)
+ assert.deepEqual(propertyBulkServices([services[0]],'irrelevant'),{updates:[],kept:1})
+ const writes=[]
+ const db={from:table=>({upsert:async(rows)=>{writes.push([table,rows]);return {error:null}}})}
+ await savePropertyServices(db,'owner',updates)
+ assert.deepEqual(writes,[['property_network_services',updates.map(service=>({...service,owner_id:'owner'}))]])
+ await savePropertyServices(db,'owner',[])
+ assert.equal(writes.length,1)
+ // Both clients ask before a bulk change only when some services are already answered.
+ const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
+ const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.match(web,/if\(kept&&!window\.confirm\(/)
+ assert.match(native,/if\(!kept\)return run\(\)/)
+})
+
+test('the gaps list and area cards count what needs help, what is sorted and what is left',()=>{
+ const data=empty()
+ data.preferences.push({area:'water',active:true},{area:'fencing',active:true},{area:'trees',active:false},{area:'livestock',active:true})
+ data.services.push(
+  {area:'water',service_key:'suggested-1',name:'Water delivery',status:'has_provider'},
+  {area:'water',service_key:'suggested-2',name:'Pump repairs',status:'self'},
+  {area:'water',service_key:'suggested-3',name:'Trough and pipe repairs',status:'needs_help'},
+  {area:'water',service_key:'suggested-4',name:'Tank cleaning',status:'irrelevant'},
+  {area:'fencing',service_key:'suggested-1',name:'Fence repairs',status:'sorted'},
+  {area:'fencing',service_key:'suggested-2',name:'New fencing',status:'sorted'},
+  {area:'fencing',service_key:'suggested-3',name:'Gates',status:'irrelevant'},
+  {area:'fencing',service_key:'suggested-4',name:'Electric fencing',status:'sorted'},
+  {area:'trees',service_key:'suggested-2',name:'Tree removal',status:'needs_help'},
+  {area:'water',service_key:'custom-x',name:'Check the spring',status:'needs_help'})
+ data.links.push({area:'water',service_key:'suggested-1',provider_id:'p1'})
+ data.people.push({id:'p1',full_name:'Ruahine Water Cartage',display_name:null,region:null})
+ data.contacts.push({id:'c1',name:'Andy',phone:null,email:null,note:null})
+ data.contactLinks.push({area:'water',service_key:'suggested-1',contact_id:'c1'})
+ const areas=propertyAreas(data)
+ // Hidden areas are not on the property, so their gaps are not listed.
+ assert.deepEqual(propertyGaps(areas).map(({area,service})=>area.id+'/'+service.name),['water/Trough and pipe repairs','water/Check the spring'])
+ const water=areas.find(area=>area.id==='water')
+ assert.deepEqual(propertyAreaWho(data,water),['You','Ruahine Water Cartage','Andy'])
+ const progress=propertyAreaProgress(water,propertyAreaWho(data,water))
+ assert.deepEqual([progress.sorted,progress.help,progress.na,progress.left,progress.total],[2,2,1,0,4])
+ assert.equal(progress.tag,'2 needs help')
+ assert.equal(progress.tone,'help')
+ assert.equal(progress.summary,'2 of 4 sorted · You, Ruahine Water Cartage +1')
+ const fencing=propertyAreaProgress(areas.find(area=>area.id==='fencing'))
+ assert.deepEqual([fencing.tag,fencing.tone,fencing.summary],['All sorted','done','3 of 3 sorted'])
+ const animals=propertyAreaProgress(areas.find(area=>area.id==='livestock'))
+ assert.deepEqual([animals.tag,animals.tone,animals.summary],['Not started','neutral','Tap to set up — about 30 seconds'])
+ const partly=propertyAreaProgress({services:[{status:'sorted'},{status:null},{status:null}]})
+ assert.deepEqual([partly.tag,partly.summary],['2 to check','1 of 3 sorted'])
+ assert.equal(propertyAreaProgress({services:[{status:'irrelevant'}]}).tag,'All sorted')
 })
