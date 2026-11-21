@@ -1,5 +1,5 @@
-import {loadSavedProviders,loadInviteChoices,providerServices,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
-import {LocalAction,LocalShare,LocalInvitePicker} from '../components/LocalProviderActions'
+import {completedWorkLabel,providerProfileUrl,loadSavedProviders,loadInviteChoices,mergeMyPeople,providerServices,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
+import {LocalAction,LocalInvitePicker,LocalMoreMenu,copyProviderLink,shareProviderProfile} from '../components/LocalProviderActions'
 import React, { useCallback, useRef, useState } from 'react'
 import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
@@ -153,37 +153,59 @@ export default function ConnectionsScreen({ navigation, route }) {
     navigation.navigate('ProviderProfile',{providerId:person.id})
   }
 
-  function providerActions(person){
-    if(!person)return null
-    const isSaved=saved.some(row=>row.id===person.id)
-    return <View style={{paddingHorizontal:12}}>
-      <View style={{flexDirection:'row',flexWrap:'wrap'}}>
-       {!savedFailed&&<LocalAction label={isSaved?'Remove from saved':'Save provider'}
-        icon={isSaved?'bookmark':'bookmark-outline'} disabled={changing} onPress={()=>toggleSaved(person,isSaved)}/>}
-       <LocalAction label="Invite to job" onPress={()=>setTarget(person)}/>
+  // My People: each provider once, with every relationship they have to you.
+  const myPeople = locals ? mergeMyPeople(saved, connections) : []
+
+  function personMenu(entry){
+    const person=entry.person, name=person.full_name||person.display_name||'Provider'
+    const actions=[]
+    if(!savedFailed)actions.push({label:entry.saved?'Remove from saved':'Save provider',icon:entry.saved?'bookmark':'bookmark-outline',
+      destructive:entry.saved,disabled:changing,onPress:()=>toggleSaved(person,entry.saved)})
+    actions.push({label:'Share profile',icon:'share-outline',onPress:async()=>{
+      if(!await shareProviderProfile(person.id))Alert.alert('Could not share','Use Copy link instead.')}})
+    actions.push({label:'Copy link',icon:'link-outline',onPress:()=>{
+      if(!copyProviderLink(person.id))Alert.alert('Profile link',providerProfileUrl(person.id))}})
+    if(entry.work)actions.push({label:'Work history',icon:'time-outline',onPress:()=>openConnection(entry.work)})
+    return <LocalMoreMenu title={name} actions={actions}/>
+  }
+
+  function renderPerson({ item: entry }) {
+    const person=entry.person, work=entry.work
+    const name=person.full_name||person.display_name||'Provider'
+    const services=providerServices(person)
+    const done=completedWorkLabel(work)
+    return <View style={styles.personCard}>
+      <TouchableOpacity style={styles.personTop} accessibilityRole="button" onPress={()=>openProfile(person)}
+        accessibilityLabel={[name,entry.saved?'Saved':'',work?'Worked together':'',done].filter(Boolean).join(', ')+'. Opens profile'}>
+        <ConnectionAvatar name={name} avatarUrl={person.avatar_url}/>
+        <View style={{flex:1}}>
+          <Text style={styles.name}>{name}</Text>
+          <View style={styles.badges}>
+            {entry.saved&&<View style={styles.badge}><Icon name="bookmark" size={11} color={colors.primary}/><Text style={styles.badgeText}>Saved</Text></View>}
+            {!!work&&<View style={styles.badge}><Icon name="checkmark-circle-outline" size={12} color={colors.primary}/><Text style={styles.badgeText}>Worked together</Text></View>}
+          </View>
+          {!!person.region&&<Text style={styles.meta}>{person.region}</Text>}
+          {!!done&&<Text style={styles.meta}>{done}{work?.last_engaged_at?' · most recent '+formatLastWorked(work.last_engaged_at):''}</Text>}
+          {work?.categories?.length>0&&<Text style={styles.categories}>Recent work: {work.categories.filter(Boolean).join(' · ')}</Text>}
+          {!!services&&<Text style={styles.categories}>Offers: {services}</Text>}
+        </View>
+      </TouchableOpacity>
+      <View style={styles.personActions}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Invite '+name+' to a job'} style={styles.inviteBtn} onPress={()=>setTarget(person)}>
+          <Icon name="paper-plane-outline" size={16} color={colors.white}/><Text style={styles.inviteText}>Invite to job</Text>
+        </TouchableOpacity>
+        {personMenu(entry)}
       </View>
-      <LocalShare providerId={person.id}/>
     </View>
   }
 
-  const localSections = <View>
-    <Text style={styles.name} accessibilityRole="header">Saved</Text>
-    {savedFailed?<LocalAction label="Could not load saved providers. Retry" onPress={onRefresh}/>
-     :!saved.length?<View style={{paddingVertical:12}}>
-      <Text style={styles.meta}>No saved providers yet. Browse local providers and save the ones you’d like to use again.</Text>
-      <LocalAction label="Browse local providers" onPress={()=>navigation.getParent()?.navigate('Browse')}/>
-     </View>:saved.map(person=><View key={person.id} style={{marginVertical:6}}>
-      <TouchableOpacity style={styles.row} accessibilityRole="button" onPress={()=>openProfile(person)}>
-       <ConnectionAvatar name={person.full_name||person.display_name||'Provider'} avatarUrl={person.avatar_url}/>
-       <View style={{flex:1}}><Text style={styles.name}>{person.full_name||person.display_name||'Provider'}</Text>
-        {!!person.region&&<Text style={styles.meta}>{person.region}</Text>}
-        {!!providerServices(person)&&<Text style={styles.categories}>{providerServices(person)}</Text>}
-       </View>
-      </TouchableOpacity>
-      {providerActions(person)}
-     </View>)}
-    <Text style={[styles.name,{marginTop:16}]} accessibilityRole="header">Worked together</Text>
+  const localHeader = <View>
+    {savedFailed&&<LocalAction label="Could not load saved providers. Retry" onPress={onRefresh}/>}
     {failed&&<LocalAction label="Could not load work history. Retry" onPress={onRefresh}/>}
+  </View>
+  const localEmpty = failed||savedFailed?null:<View style={{paddingVertical:12}}>
+    <Text style={styles.meta}>No providers yet. Save providers you’d like to use again; people you complete jobs or bookings with appear here too.</Text>
+    <LocalAction label="Browse local providers" onPress={()=>navigation.getParent()?.navigate('Browse')}/>
   </View>
 
   function renderItem({ item }) {
@@ -211,10 +233,6 @@ export default function ConnectionsScreen({ navigation, route }) {
         </View>
         <Icon name="chevron-forward" size={18} color={colors.textMuted} />
       </TouchableOpacity>
-      {locals&&item.person&&<>
-        <LocalAction label="View provider profile" onPress={()=>openProfile(item.person)}/>
-        {providerActions(item.person)}
-      </>}
       </View>
     )
   }
@@ -313,9 +331,9 @@ export default function ConnectionsScreen({ navigation, route }) {
       {loading ? (
         <Loading label={`Loading ${relationshipLabels[side]}…`} />
       ) : locals ? (
-        <FlatList data={connections} ListHeaderComponent={localSections} renderItem={renderItem}
-         ListEmptyComponent={!failed?<Text style={styles.meta}>Completed jobs and bookings appear here.</Text>:null}
-         keyExtractor={item=>item.personId}
+        <FlatList data={myPeople} ListHeaderComponent={localHeader} renderItem={renderPerson}
+         ListEmptyComponent={localEmpty}
+         keyExtractor={entry=>entry.id}
          contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}
          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary}/>}/>
       ) : failed ? (
@@ -382,6 +400,14 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   meta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   categories: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
+  personCard: { backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 10, gap: 10 },
+  personTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primaryLight, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeText: { fontSize: 12, fontWeight: '600', color: colors.primaryDark },
+  personActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  inviteBtn: { flex: 1, minHeight: 44, borderRadius: 10, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  inviteText: { color: colors.white, fontWeight: '700', fontSize: 15 },
 
   legend: {
     backgroundColor: colors.white,

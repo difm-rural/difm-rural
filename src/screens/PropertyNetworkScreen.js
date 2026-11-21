@@ -524,7 +524,7 @@ function PropertyNetworkScreen({navigation,route}){
         {widen&&<><Text style={styles.nodeLabel}>Region</Text>
          {!!regionHint&&<Text style={styles.small}>{regionHint}</Text>}
          <View style={[styles.row,{marginTop:6}]} accessibilityLabel="Region">
-          {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="radio" accessibilityState={{checked:region===item}}
+          {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="button" accessibilityState={{selected:region===item}}
            style={[styles.chip,region===item&&styles.chipOn]} onPress={()=>{setRegion(item);setRegionHint('')}}>
            <Text style={styles.chipText}>{item}</Text></TouchableOpacity>)}
          </View></>}

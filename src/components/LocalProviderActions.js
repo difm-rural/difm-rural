@@ -12,24 +12,56 @@ export function LocalAction({label,icon,onPress,disabled=false}){
  </TouchableOpacity>
 }
 
+// Share or copy a provider's public profile link. Returns false when the
+// device could not do it, so the caller can show the link to copy by hand.
+export async function shareProviderProfile(providerId){
+ try{await Share.share({message:PROVIDER_SHARE_MESSAGE+'\n'+providerProfileUrl(providerId)});return true}
+ catch{return false}
+}
+export function copyProviderLink(providerId){
+ try{Clipboard.setString(providerProfileUrl(providerId));Alert.alert('Profile link copied');return true}
+ catch{return false}
+}
+
 export function LocalShare({providerId}){
  const [copy,setCopy]=useState(false)
  const url=providerProfileUrl(providerId)
- function copyLink(){
-  try{Clipboard.setString(url);Alert.alert('Profile link copied')}
-  catch{setCopy(true)}
- }
- async function share(){
-  try{await Share.share({message:PROVIDER_SHARE_MESSAGE+'\n'+url})}
-  catch{setCopy(true)}
- }
  return <View>
   <View style={{flexDirection:'row',flexWrap:'wrap'}}>
-   <LocalAction label="Share profile" icon="share-outline" onPress={share}/>
-   <LocalAction label="Copy link" onPress={copyLink}/>
+   <LocalAction label="Share profile" icon="share-outline" onPress={async()=>{if(!await shareProviderProfile(providerId))setCopy(true)}}/>
+   <LocalAction label="Copy link" onPress={()=>{if(!copyProviderLink(providerId))setCopy(true)}}/>
   </View>
   {copy&&<Text selectable style={{color:colors.textPrimary,paddingBottom:10}} accessibilityLabel="Public profile link">{url}</Text>}
  </View>
+}
+
+// Compact "More" menu for a provider's secondary actions.
+// actions: [{label, icon, onPress, destructive?, disabled?}]
+export function LocalMoreMenu({title,actions}){
+ const [open,setOpen]=useState(false)
+ return <>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'More actions for '+title} hitSlop={{top:8,bottom:8,left:8,right:8}}
+   onPress={()=>setOpen(true)} style={{minHeight:44,minWidth:44,alignItems:'center',justifyContent:'center'}}>
+   <Icon name="ellipsis-horizontal" size={22} color={colors.primary}/>
+  </TouchableOpacity>
+  <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
+   <TouchableOpacity accessible={false} activeOpacity={1} onPress={()=>setOpen(false)}
+    style={{flex:1,backgroundColor:'rgba(0,0,0,.35)',justifyContent:'flex-end'}}>
+    <View accessibilityViewIsModal style={{backgroundColor:colors.white,borderTopLeftRadius:16,borderTopRightRadius:16,padding:18,paddingBottom:28}}>
+     <Text accessibilityRole="header" numberOfLines={2} style={{fontSize:17,fontWeight:'700',color:colors.textPrimary,marginBottom:4}}>{title}</Text>
+     {actions.map(action=><TouchableOpacity key={action.label} accessibilityRole="button" accessibilityState={{disabled:!!action.disabled}}
+      disabled={action.disabled} onPress={()=>{setOpen(false);action.onPress()}}
+      style={{flexDirection:'row',alignItems:'center',gap:10,minHeight:48,opacity:action.disabled?.5:1}}>
+      {action.icon&&<Icon name={action.icon} size={19} color={action.destructive?colors.danger:colors.primary}/>}
+      <Text style={{fontSize:15,fontWeight:'600',color:action.destructive?colors.danger:colors.textPrimary}}>{action.label}</Text>
+     </TouchableOpacity>)}
+     <TouchableOpacity accessibilityRole="button" onPress={()=>setOpen(false)} style={{minHeight:48,justifyContent:'center'}}>
+      <Text style={{fontSize:15,fontWeight:'600',color:colors.textSecondary}}>Cancel</Text>
+     </TouchableOpacity>
+    </View>
+   </TouchableOpacity>
+  </Modal>
+ </>
 }
 
 export function LocalInvitePicker({person,jobs,failed,busy,onInvite,onPost,onClose}){
