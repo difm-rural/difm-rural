@@ -20,10 +20,10 @@ import {
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
- propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,
+ propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,PROPERTY_STATUS_LABELS,
 } from '../../shared/propertyNetwork'
 
-const PROPERTY_CHOICES=[['sorted','Sorted'],['help','Need help'],['na','N/A']]
+const PROPERTY_CHOICES=[['sorted',PROPERTY_STATUS_LABELS.sorted],['help',PROPERTY_STATUS_LABELS.help],['na',PROPERTY_STATUS_LABELS.na]]
 
 // Add or edit a private contact: someone who is not on Rural Connections.
 function ContactForm({initial,busy,onSave,onCancel,onDelete}){
@@ -391,7 +391,7 @@ function PropertyNetworkScreen({navigation,route}){
    {!data&&!error&&<Loading label="Loading My Property Network…"/>}
    {data&&<>
     {gaps.length>0?<View style={styles.gaps}>
-     <Text accessibilityRole="header" style={[styles.sectionTitle,{color:colors.jobInk}]}>You need help with {gaps.length} {gaps.length===1?'thing':'things'}</Text>
+     <Text accessibilityRole="header" style={[styles.sectionTitle,{color:colors.jobInk}]}>Needs help ({gaps.length})</Text>
      {gaps.map(({area:item,service})=><View key={item.id+service.service_key} style={styles.gapRow}>
       <View style={{flex:1}}><Text style={styles.nodeLabel}>{service.name}</Text><Text style={styles.small}>{item.label}</Text></View>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Find help with '+service.name} style={styles.smallPrimary} onPress={()=>findHelp(item,service)}>
@@ -462,7 +462,10 @@ function PropertyNetworkScreen({navigation,route}){
       const providerOpen=picker===service.service_key&&(pickerMode==='provider'||replacingHere)
       const contactOpen=picker===service.service_key&&pickerMode==='contact'&&!replacingHere
       return <View style={styles.service} key={service.service_key}>
-       <Text accessibilityRole="header" style={styles.serviceTitle}>{service.name}</Text>
+       <View style={styles.cardTop}>
+        <Text accessibilityRole="header" style={[styles.serviceTitle,{flexShrink:1}]}>{service.name}</Text>
+        {(!choice||choice==='help')&&<Text style={[styles.statusTag,choice&&styles.tagHelp]}>{choice?PROPERTY_STATUS_LABELS.help:PROPERTY_STATUS_LABELS.unset}</Text>}
+       </View>
        <View style={styles.choices} accessibilityLabel={service.name+' status'}>
         {PROPERTY_CHOICES.map(([value,label])=><TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:choice===value,disabled:busy}}
          disabled={busy} style={[styles.choice,choice===value&&styles['choice_'+value]]} onPress={()=>void tapChoice(service,value)}>

@@ -23,7 +23,7 @@ import {
 import type {ListingKind} from '@shared/listingPricing'
 
 type AreaView=ReturnType<typeof propertyAreas>[number]
-const PROPERTY_CHOICES:[PropertyChoice,string][]=[['sorted','Sorted'],['help','Need help'],['na','N/A']]
+const PROPERTY_CHOICES:[PropertyChoice,string][]=[['sorted','Sorted'],['help','Needs help'],['na','N/A']]
 
 type ProviderGroup={label:string;people:PropertyProvider[]}
 type InviteChoices=Awaited<ReturnType<typeof loadInviteChoices>>
@@ -337,7 +337,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
    </section>}
    {!showSetup&&<section hidden={!!current} ref={overview} className="property-overview">
     {gaps.length>0?<section className="property-gaps" aria-labelledby="property-gaps-heading">
-     <h2 id="property-gaps-heading">You need help with {gaps.length} {gaps.length===1?'thing':'things'}</h2>
+     <h2 id="property-gaps-heading">Needs help ({gaps.length})</h2>
      <ul>{gaps.map(({area,service})=><li key={area.id+service.service_key} className="property-gap-row">
       <span><strong>{service.name}</strong><small>{area.label}</small></span>
       <button type="button" className="lform-save" onClick={()=>findHelp(area,service)}>Find help</button>

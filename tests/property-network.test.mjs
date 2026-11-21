@@ -39,7 +39,7 @@ test('hidden and re-added areas preserve custom services and multiple provider l
  assert.equal(water.active,false)
  assert.equal(water.needsHelp,true)
  assert.equal(water.hasProvider,true)
- assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['2 local providers','Find help'])
+ assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['2 local providers','1 needs help'])
  assert.deepEqual(linkedPropertyProviders(data,service).map(person=>person.id),['a','b'])
  data.preferences[0].active=true
  water=propertyAreas(data)[0]
@@ -78,7 +78,7 @@ test('diagram nodes stay inside, clear of each other and of the hub for one thro
   assert.match(source,/Diagram/)
   assert.match(source,/List/)
   assert.doesNotMatch(source,/Grow your network|type="radio"|accessibilityRole="radio"|PROPERTY_SERVICE_STATES/)
-  for(const text of ["What's on your property?",'Skip for now','Set up my network (','You need help with','Nothing needs help right now',
+  for(const text of ["What's on your property?",'Skip for now','Set up my network (','Needs help (','Nothing needs help right now',
    'Your property','+ Add another part of your property',"Update what's on your property",'All sorted','None of this applies',
    'Who does it? (optional)','A provider…','Someone not on RC','+ Add something else','from my property','Post a job'])
    assert.ok(source.includes(text)||source.includes(text.replaceAll("'",'&apos;')),filename+': '+text)
@@ -405,13 +405,16 @@ test('the gaps list and area cards count what needs help, what is sorted and wha
  assert.deepEqual([progress.sorted,progress.help,progress.na,progress.left,progress.total],[2,2,1,0,4])
  assert.equal(progress.tag,'2 needs help')
  assert.equal(progress.tone,'help')
- assert.equal(progress.summary,'2 of 4 sorted · You, Ruahine Water Cartage +1')
+ assert.equal(progress.summary,'2 sorted · 2 needs help · You, Ruahine Water Cartage +1')
  const fencing=propertyAreaProgress(areas.find(area=>area.id==='fencing'))
- assert.deepEqual([fencing.tag,fencing.tone,fencing.summary],['All sorted','done','3 of 3 sorted'])
+ assert.deepEqual([fencing.tag,fencing.tone,fencing.summary],['All sorted','done','3 sorted'])
  const animals=propertyAreaProgress(areas.find(area=>area.id==='livestock'))
- assert.deepEqual([animals.tag,animals.tone,animals.summary],['Not started','neutral','Tap to set up — about 30 seconds'])
+ assert.deepEqual([animals.tag,animals.tone,animals.summary.endsWith(' to check · tap to set up, about 30 seconds')],['Not started','neutral',true])
  const partly=propertyAreaProgress({services:[{status:'sorted'},{status:null},{status:null}]})
- assert.deepEqual([partly.tag,partly.summary],['2 to check','1 of 3 sorted'])
+ assert.deepEqual([partly.tag,partly.summary],['2 to check','1 sorted · 2 to check'])
+ // Needs help never hides what is still unanswered.
+ const mixed=propertyAreaProgress({services:[{status:'needs_help'},{status:null},{status:'sorted'},{status:'irrelevant'}]})
+ assert.deepEqual([mixed.tag,mixed.summary,mixed.help,mixed.left,mixed.sorted],['1 needs help','1 sorted · 1 needs help · 1 to check',1,1,1])
  assert.equal(propertyAreaProgress({services:[{status:'irrelevant'}]}).tag,'All sorted')
 })
 
