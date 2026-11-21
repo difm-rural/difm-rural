@@ -264,7 +264,7 @@ export default function PostJobStep2Location({ navigation, route }) {
             activeOpacity={0.7}
             accessibilityRole="switch"
             accessibilityState={{ checked: hideExactLocation }}
-            accessibilityLabel="Hide exact address until I accept an offer">
+            accessibilityLabel="Hide my approximate distance too">
             <View style={[styles.checkbox, hideExactLocation && styles.checkboxOn]}>
               {hideExactLocation && <Icon name="checkmark" size={14} color="#fff" />}
             </View>
@@ -275,14 +275,12 @@ export default function PostJobStep2Location({ navigation, route }) {
                   size={14}
                   color={hideExactLocation ? colors.primary : colors.textMuted}
                 />
-                <Text style={styles.privacyTitle}>Hide exact address until I accept</Text>
+                <Text style={styles.privacyTitle}>Hide my approximate distance too</Text>
               </View>
               <Text style={styles.privacySub}>
-                {hideExactLocation && shortAddr
-                  ? `Only “${shortAddr}” shows publicly. The exact address is shared with the provider you accept.`
-                  : hideExactLocation
-                    ? 'Only your area shows publicly. The exact address, map pin and access note are shared with the provider you accept.'
-                    : 'Your exact address, map pin and access note will be visible to anyone viewing this job.'}
+                {hideExactLocation
+                  ? `Providers see only ${shortAddr ? '“' + shortAddr + '”' : 'your area'}, not how far away it is. The exact address, map pin and access note go only to the provider you accept.`
+                  : `Providers see ${shortAddr ? '“' + shortAddr + '”' : 'your area'} and roughly how far away it is (to about 1 km). The exact address, map pin and access note go only to the provider you accept.`}
               </Text>
             </View>
           </TouchableOpacity>
