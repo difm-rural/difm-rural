@@ -302,7 +302,7 @@ function PropertyNetworkScreen({navigation,route}){
   setPicks(active.map(item=>item.id));setSetupOpen(true);setFeedback('')
  }
  async function saveSetup(){
-  if(await mutate(()=>savePropertyAreas(supabase,owner,picks),'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
+  if(await mutate(()=>savePropertyAreas(supabase,owner,picks),started?'Property areas saved.':'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
  }
  // From the gaps list: open the area and start the local search for that service.
  function findHelp(item,service){
@@ -323,6 +323,14 @@ function PropertyNetworkScreen({navigation,route}){
   else{pickerRequest.current++;setPicker(service.service_key)}
  }
  // Removing the last provider or contact puts the service back to plain Sorted.
+ // Removing a link deletes that association, so confirm it first.
+ function confirmUnlink(name,service,remaining,action,message){
+  Alert.alert('Remove '+name+' from '+service.name+'?',
+   (remaining?'':service.name+' goes back to plain Sorted. ')+(name?'They stay in My People.':''),[
+   {text:'Cancel',style:'cancel'},
+   {text:'Remove',style:'destructive',onPress:()=>void unlink(service,remaining,action,message)},
+  ])
+ }
  function unlink(service,remaining,action,message){
   return mutate(async()=>{
    await action()
@@ -353,7 +361,8 @@ function PropertyNetworkScreen({navigation,route}){
     {!started&&<LocalAction label="Back" icon="chevron-back" onPress={()=>navigation.goBack()}/>}
     <Text style={styles.kicker}>MY PROPERTY NETWORK</Text>
     <Text accessibilityRole="header" style={styles.title}>What's on your property?</Text>
-    <Text style={styles.muted}>Tap everything that applies. We'll set up your network to match. You can change it any time.</Text>
+    <Text style={styles.muted}>{started?'Tick the parts of your property to show. Unticking one hides it; its answers and providers are kept if you add it back.'
+     :"Tap everything that applies. We'll set up your network to match. You can change it any time."}</Text>
     {!!error&&<Text accessibilityRole="alert" style={styles.gap}>{error}</Text>}
     <View style={styles.tiles} accessibilityLabel="What's on your property">
      {SUPPORT_AREAS.map(item=>{
@@ -371,7 +380,7 @@ function PropertyNetworkScreen({navigation,route}){
    <View style={[styles.setupFooter,{paddingBottom:insets.bottom+16}]}>
     <TouchableOpacity accessibilityRole="button" accessibilityState={{disabled:busy||!picks.length}} disabled={busy||!picks.length}
      style={[styles.primaryButton,(busy||!picks.length)&&styles.disabled]} onPress={()=>void saveSetup()}>
-     <Text style={styles.primaryText}>{picks.length?'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')':'Choose at least one'}</Text>
+     <Text style={styles.primaryText}>{!picks.length?'Choose at least one':started?'Save property areas':'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')'}</Text>
     </TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={()=>{if(started)setSetupOpen(false);else setSkipped(true)}}>
      <Text style={styles.actionText}>{started?'Cancel':'Skip for now'}</Text>
@@ -489,7 +498,7 @@ function PropertyNetworkScreen({navigation,route}){
         {linked.map(person=><View key={person.id} style={styles.linked}>
          <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
          <View style={styles.row}><LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
-          <LocalAction label="Remove link" disabled={busy} onPress={()=>void unlink(service,covered-1,()=>setPropertyProvider(supabase,owner,service,person.id,false),'Provider link removed.')}/></View>
+          <LocalAction label="Remove link" disabled={busy} onPress={()=>confirmUnlink(propertyProviderName(person),service,covered-1,()=>setPropertyProvider(supabase,owner,service,person.id,false),'Provider link removed.')}/></View>
         </View>)}
         {contacts.map(contact=><View key={contact.id} style={styles.linked}>
          <Text style={styles.serviceTitle}>{contact.name}</Text>
@@ -503,7 +512,7 @@ function PropertyNetworkScreen({navigation,route}){
           <LocalAction label="Edit" icon="create-outline" disabled={busy} onPress={()=>setContactForm({serviceKey:service.service_key,contact})}/>
           <LocalAction label="Invite to Rural Connections" icon="share-outline" onPress={()=>inviteContact(contact)}/>
           <LocalAction label="Replace with member" icon="swap-horizontal-outline" disabled={busy} onPress={()=>startReplace(service,contact)}/>
-          <LocalAction label="Remove link" disabled={busy} onPress={()=>void unlink(service,covered-1,()=>setPropertyContact(supabase,owner,service,contact.id,false),'Contact link removed.')}/>
+          <LocalAction label="Remove link" disabled={busy} onPress={()=>confirmUnlink(contact.name,service,covered-1,()=>setPropertyContact(supabase,owner,service,contact.id,false),'Contact link removed.')}/>
          </View>
          {contactForm?.contact?.id===contact.id&&contactForm.serviceKey===service.service_key&&<ContactForm key={contact.id} initial={contact} busy={busy}
           onSave={value=>saveContact(service,value)} onCancel={()=>setContactForm(null)} onDelete={()=>deleteContact(contact)}/>}

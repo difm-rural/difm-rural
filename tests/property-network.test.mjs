@@ -541,3 +541,25 @@ test('Property network screen and app root are wrapped in error boundaries',()=>
  for(const field of ['screen','message','stack','componentStack','appVersion','updateId'])assert.match(boundary,new RegExp(field+':'))
  assert.match(boundary,/trackEvent\('app_crash'/)
 })
+
+test('setup says Set up my network first and Save property areas when editing, and keeps answers',async()=>{
+ for(const file of ['../src/screens/PropertyNetworkScreen.js','../provider-web/src/app/property-network/property-network.tsx']){
+  const source=readFileSync(new URL(file,import.meta.url),'utf8')
+  assert.match(source,/started\?'Save property areas':'Set up my network \('/,file)
+  assert.match(source,/its answers and providers are kept if you add it back/,file)
+ }
+ // Saving areas only flips active flags: services and links of unticked areas stay.
+ const calls=[]
+ const client={from:table=>({upsert:rows=>{calls.push([table,rows]);return Promise.resolve({error:null})},delete(){throw Error('no deletes')}})}
+ await savePropertyAreas(client,'me',['water'])
+ assert.equal(calls.length,1);assert.equal(calls[0][0],'property_network_areas')
+ assert.ok(calls[0][1].every(row=>row.active===(row.area==='water')))
+})
+
+test('removing a provider or contact link asks first on both clients',()=>{
+ const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.equal((native.match(/label="Remove link"[^\n]*confirmUnlink\(/g)||[]).length,2)
+ assert.match(native,/text:'Remove',style:'destructive',onPress:\(\)=>void unlink\(/)
+ const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
+ assert.match(web,/if\(!window\.confirm\('Remove '\+\(name\|\|'this link'\)/)
+})
