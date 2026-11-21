@@ -327,9 +327,13 @@ export function propertyServiceChoice(status:ServiceStatus|null|undefined):Prope
  if(status==='irrelevant')return 'na'
  return null
 }
-// The status to save when a choice is tapped: tapping the current choice clears it.
-export function propertyChoiceStatus(current:ServiceStatus|null|undefined,choice:PropertyChoice):ServiceStatus|null{
- if(propertyServiceChoice(current)===choice)return null
+// The status to save when a choice is tapped: tapping the current choice clears it,
+// except Sorted when someone does it (Me, a provider or a private contact): that
+// keeps the status and links. Those are removed with Me or Remove link instead.
+// `assigned` is how many providers and contacts are linked to the service.
+export function propertyChoiceStatus(current:ServiceStatus|null|undefined,choice:PropertyChoice,assigned=0):ServiceStatus|null{
+ if(propertyServiceChoice(current)===choice)
+  return choice==='sorted'&&(current!=='sorted'||assigned>0)?current??null:null
  return choice==='sorted'?'sorted':choice==='help'?'needs_help':'irrelevant'
 }
 // "Who does it?" Me → self; a member or a private contact → has_provider (set by the

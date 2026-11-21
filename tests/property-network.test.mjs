@@ -317,7 +317,24 @@ test('statuses map to Sorted, Need help and N/A and back',()=>{
  assert.equal(propertyChoiceStatus(null,'sorted'),'sorted')
  assert.equal(propertyChoiceStatus(null,'help'),'needs_help')
  assert.equal(propertyChoiceStatus(null,'na'),'irrelevant')
- for(const status of ['sorted','self','has_provider'])assert.equal(propertyChoiceStatus(status,'sorted'),null,status)
+ // Plain Sorted with nobody assigned clears; Sorted with Me, a provider or a
+ // contact keeps its status (and links), so the tap changes nothing.
+ assert.equal(propertyChoiceStatus('sorted','sorted'),null)
+ assert.equal(propertyChoiceStatus('sorted','sorted',0),null)
+ assert.equal(propertyChoiceStatus('self','sorted'),'self')
+ assert.equal(propertyChoiceStatus('self','sorted',2),'self')
+ assert.equal(propertyChoiceStatus('has_provider','sorted',1),'has_provider')
+ assert.equal(propertyChoiceStatus('has_provider','sorted'),'has_provider')
+ // Links left over from an earlier status (provider → Needs help → Sorted) still count.
+ assert.equal(propertyChoiceStatus('sorted','sorted',1),'sorted')
+ // Other choices still switch away, and Help/N/A still toggle off, assigned or not.
+ assert.equal(propertyChoiceStatus('has_provider','na',1),'irrelevant')
+ assert.equal(propertyChoiceStatus('needs_help','help',1),null)
+ for(const file of ['src/screens/PropertyNetworkScreen.js','provider-web/src/app/property-network/property-network.tsx']){
+  const source=readFileSync(new URL('../'+file,import.meta.url),'utf8')
+  assert.match(source,/tapChoice\(service,value,covered\)/,file+' passes the linked count')
+  assert.match(source,/if\(status===service\.status\)return/,file+' skips a no-op save')
+ }
  assert.equal(propertyChoiceStatus('needs_help','help'),null)
  assert.equal(propertyChoiceStatus('irrelevant','na'),null)
  assert.equal(propertyChoiceStatus('self','help'),'needs_help')

@@ -270,8 +270,9 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
   void findMatches(service,propertyServiceTarget(area,service).category)
  }
 
- async function tapChoice(service:PropertyService,choice:PropertyChoice){
-  const status=propertyChoiceStatus(service.status,choice)
+ async function tapChoice(service:PropertyService,choice:PropertyChoice,assigned=0){
+  const status=propertyChoiceStatus(service.status,choice,assigned)
+  if(status===service.status)return // Sorted with someone assigned: nothing to change
   closeMatches();pickerRequest.current++;setPicker(null);setContactForm(null);setReplacing(null)
   await mutate(()=>savePropertyService(client,owner,{...service,status}),
    status?service.name+': '+PROPERTY_CHOICES.find(([value])=>value===choice)?.[1]+'.':service.name+' cleared.')
@@ -408,7 +409,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
       <h3>{service.name}</h3>
       <div role="group" aria-label={service.name+' status'} className="property-choices">
        {PROPERTY_CHOICES.map(([value,label])=><button type="button" key={value} className={'property-choice '+value}
-        aria-pressed={choice===value} disabled={busy} onClick={()=>void tapChoice(service,value)}>{label}</button>)}
+        aria-pressed={choice===value} disabled={busy} onClick={()=>void tapChoice(service,value,covered)}>{label}</button>)}
       </div>
       {choice==='sorted'&&<div className="property-who">
        <span className="muted">Who does it? (optional)</span>

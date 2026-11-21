@@ -309,8 +309,9 @@ function PropertyNetworkScreen({navigation,route}){
   selectArea(item.id)
   findMatches(service,propertyServiceTarget(item,service).category)
  }
- async function tapChoice(service,choice){
-  const status=propertyChoiceStatus(service.status,choice)
+ async function tapChoice(service,choice,assigned=0){
+  const status=propertyChoiceStatus(service.status,choice,assigned)
+  if(status===service.status)return // Sorted with someone assigned: nothing to change
   closeMatches();pickerRequest.current++;setPicker('');setContactForm(null);setReplacing(null)
   await mutate(()=>savePropertyService(supabase,owner,{...service,status}),
    status?service.name+': '+PROPERTY_CHOICES.find(([value])=>value===choice)[1]+'.':service.name+' cleared.')
@@ -477,7 +478,7 @@ function PropertyNetworkScreen({navigation,route}){
        </View>
        <View style={styles.choices} accessibilityLabel={service.name+' status'}>
         {PROPERTY_CHOICES.map(([value,label])=><TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:choice===value,disabled:busy}}
-         disabled={busy} style={[styles.choice,choice===value&&styles['choice_'+value]]} onPress={()=>void tapChoice(service,value)}>
+         disabled={busy} style={[styles.choice,choice===value&&styles['choice_'+value]]} onPress={()=>void tapChoice(service,value,covered)}>
          <Text style={[styles.choiceText,choice===value&&styles['choiceText_'+value]]}>{label}</Text>
         </TouchableOpacity>)}
        </View>
