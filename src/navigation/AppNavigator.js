@@ -1,5 +1,6 @@
 import PropertyMapScreen from '../screens/PropertyMapScreen'
 import PropertyNetworkScreen from '../screens/PropertyNetworkScreen'
+import { setCurrentScreen } from '../lib/currentScreen'
 import {publicAreaError} from '../../shared/publicArea'
 import {postingTextError} from '../../shared/postingText'
 import {moneyInputError} from '../../shared/postingMoney'
@@ -779,7 +780,9 @@ export default function AppNavigator() {
 
   return (
     <PostJobProvider>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={navigationRef}
+        onReady={() => setCurrentScreen(navigationRef.getCurrentRoute()?.name)}
+        onStateChange={() => setCurrentScreen(navigationRef.getCurrentRoute()?.name)}>
         {session && showOnboarding
           ? <OnboardingApp profile={profile} onComplete={handleOnboardingComplete} />
           : session

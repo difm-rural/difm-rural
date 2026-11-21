@@ -5,6 +5,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
 import Icon from '../components/Icon'
 import Loading from '../components/Loading'
+import {withScreenBoundary} from '../components/ErrorBoundary'
 import {supabase} from '../lib/supabase'
 import {fetchConnections} from '../lib/connections'
 import {newJobId} from '../lib/draftId'
@@ -18,7 +19,7 @@ import {
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
- propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,
+ propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,
 } from '../../shared/propertyNetwork'
 
 const PROPERTY_CHOICES=[['sorted','Sorted'],['help','Need help'],['na','N/A']]
@@ -90,7 +91,7 @@ function PropertyDiagram({areas,selected,onSelect,onOpenProperty}){
  </View>
 }
 
-export default function PropertyNetworkScreen({navigation,route}){
+function PropertyNetworkScreen({navigation,route}){
  const insets=useSafeAreaInsets()
  const [owner,setOwner]=useState(null)
  const [data,setData]=useState(null)
@@ -135,7 +136,7 @@ export default function PropertyNetworkScreen({navigation,route}){
    if(authError||!auth.user){setOwner(null);setData(null);throw new Error('Sign in again')}
    const id=auth.user.id
    const network=await loadPropertyNetwork(supabase,id)
-   setOwner(id);setData(network)
+   setOwner(id);setData(normalizePropertyNetwork(network))
    if(!preferredLoaded.current){
     preferredLoaded.current=true
     const {data:profile}=await supabase.from('profiles').select('region').eq('id',id).maybeSingle()
@@ -550,7 +551,7 @@ export default function PropertyNetworkScreen({navigation,route}){
        </View>}
        {contactOpen&&<View style={[styles.picker,{marginTop:10}]}>
         <Text accessibilityRole="header" style={styles.serviceTitle}>Not on Rural Connections</Text>
-        {data.contacts.filter(contact=>!contacts.some(row=>row.id===contact.id)).map(contact=><View key={contact.id} style={styles.row}>
+        {(data.contacts??[]).filter(contact=>!contacts.some(row=>row.id===contact.id)).map(contact=><View key={contact.id} style={styles.row}>
          <Text style={styles.statusText}>{contact.name}</Text>
          <LocalAction label="Link to service" disabled={busy} onPress={()=>void mutate(()=>setPropertyContact(supabase,owner,service,contact.id,true),contact.name+' linked.')}/>
         </View>)}
@@ -657,3 +658,5 @@ const styles=StyleSheet.create({
  removeText:{color:'#a32d2d',fontWeight:'600'},
  input:{marginTop:6,backgroundColor:colors.white,borderWidth:1,borderColor:colors.border,borderRadius:8,padding:12,color:colors.textPrimary},
 })
+
+export default withScreenBoundary(PropertyNetworkScreen,'PropertyNetwork')

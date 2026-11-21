@@ -514,3 +514,27 @@ test('Home shows a network line only once there is something in it, with no setu
   assert.doesNotMatch(source,/propertySetupStarted|savePropertyAreas|What.s on your property/,file)
  }
 })
+
+test('missing network collections read as empty instead of crashing the screen',async()=>{
+ const {normalizePropertyNetwork}=await import('../shared/propertyNetwork.ts')
+ const empty={preferences:[],services:[],links:[],people:[],contacts:[],contactLinks:[]}
+ assert.deepEqual(normalizePropertyNetwork(null),empty)
+ assert.deepEqual(normalizePropertyNetwork({preferences:[{area:'trees',active:true}],contacts:null}),{...empty,preferences:[{area:'trees',active:true}]})
+ const partial={preferences:[{area:'trees',active:true}],services:[],links:[]}
+ const service={area:'trees',service_key:'firewood'}
+ assert.deepEqual(linkedPropertyContacts(partial,service),[])
+ assert.deepEqual(linkedPropertyProviders(partial,service),[])
+ assert.deepEqual(propertyContactServices(partial,'c1'),[])
+ assert.ok(propertyAreas(partial).find(area=>area.id==='trees').active)
+})
+
+test('Property network screen and app root are wrapped in error boundaries',()=>{
+ const screen=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.match(screen,/export default withScreenBoundary\(PropertyNetworkScreen,'PropertyNetwork'\)/)
+ assert.match(screen,/\(data\.contacts\?\?\[\]\)\.filter/)
+ const app=readFileSync(new URL('../App.js',import.meta.url),'utf8')
+ assert.match(app,/<ErrorBoundary[\s\S]*<AppNavigator \/>[\s\S]*<\/ErrorBoundary>/)
+ const boundary=readFileSync(new URL('../src/components/ErrorBoundary.js',import.meta.url),'utf8')
+ for(const field of ['screen','message','stack','componentStack','appVersion','updateId'])assert.match(boundary,new RegExp(field+':'))
+ assert.match(boundary,/trackEvent\('app_crash'/)
+})
