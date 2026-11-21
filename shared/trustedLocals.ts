@@ -22,6 +22,38 @@ type Client={
  }
 }
 
+// My People: one entry per provider, however they are related. Saved providers
+// keep their saved order; providers only worked with follow, most recent first.
+export type WorkHistory={personId:string;person:SavedProvider|null;times_worked?:number|null;jobs_count?:number|null;
+ bookings_count?:number|null;last_engaged_at?:string|null;categories?:string[]|null}
+export type MyPerson={id:string;person:SavedProvider;saved:boolean;work:WorkHistory|null}
+export function mergeMyPeople(saved:readonly SavedProvider[],worked:readonly WorkHistory[]):MyPerson[]{
+ const work=new Map<string,WorkHistory>()
+ for(const row of worked)if(row.personId&&!work.has(row.personId))work.set(row.personId,row)
+ const people:MyPerson[]=[],seen=new Set<string>()
+ for(const person of saved){
+  if(seen.has(person.id))continue
+  seen.add(person.id)
+  const history=work.get(person.id)??null
+  people.push({id:person.id,person:{...history?.person,...person,services:person.services},saved:true,work:history})
+ }
+ for(const row of work.values()){
+  if(seen.has(row.personId)||!row.person)continue
+  seen.add(row.personId)
+  people.push({id:row.personId,person:row.person,saved:false,work:row})
+ }
+ return people
+}
+// "2 jobs and 1 booking completed" — the counts behind "worked together".
+export function completedWorkLabel(work:Pick<WorkHistory,'jobs_count'|'bookings_count'|'times_worked'>|null){
+ if(!work)return ''
+ const jobs=work.jobs_count??0,bookings=work.bookings_count??0
+ const part=(n:number,word:string)=>n+' '+word+(n===1?'':'s')
+ const parts=[jobs?part(jobs,'job'):'',bookings?part(bookings,'booking'):''].filter(Boolean)
+ if(!parts.length){const n=work.times_worked??0;return n?part(n,'job')+' completed':''}
+ return parts.join(' and ')+' completed'
+}
+
 export async function loadSavedProviders(client:unknown,userId:string){
  const db=client as Client
  const saves=await allRows(()=>db.from('saved_providers').select<{provider_id:string}>('provider_id')

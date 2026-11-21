@@ -22,3 +22,10 @@ test('editor timing retains explicit saved choices and infers missing legacy tim
  assert.equal(editorScheduleType({schedule_type:'flexible',scheduled_date:'2030-12-01'}),'flexible')
  assert.equal(editorScheduleType({schedule_type:'legacy'}),'legacy')
 })
+
+test('approximate public coordinates are never offered as a pin or directions',()=>{
+ const exact={latitude:-36.654321,longitude:174.512345,location_name:'12 Kahikatea Road, Waitoki',location_area:'Waitoki'}
+ assert.ok(jobMapTarget({...exact,location_exact:true}))
+ assert.equal(jobMapTarget({latitude:-36.65,longitude:174.51,location_name:'Waitoki',location_area:'Waitoki',location_exact:false}),null)
+ assert.equal(jobMapTarget({...exact,location_exact:false}),null)
+})

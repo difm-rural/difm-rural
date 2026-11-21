@@ -39,7 +39,7 @@ test('hidden and re-added areas preserve custom services and multiple provider l
  assert.equal(water.active,false)
  assert.equal(water.needsHelp,true)
  assert.equal(water.hasProvider,true)
- assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['2 local providers','Find help'])
+ assert.deepEqual(propertyAreaStatus(water).map(badge=>badge.label),['2 local providers','1 needs help'])
  assert.deepEqual(linkedPropertyProviders(data,service).map(person=>person.id),['a','b'])
  data.preferences[0].active=true
  water=propertyAreas(data)[0]
@@ -78,7 +78,7 @@ test('diagram nodes stay inside, clear of each other and of the hub for one thro
   assert.match(source,/Diagram/)
   assert.match(source,/List/)
   assert.doesNotMatch(source,/Grow your network|type="radio"|accessibilityRole="radio"|PROPERTY_SERVICE_STATES/)
-  for(const text of ["What's on your property?",'Skip for now','Set up my network (','You need help with','Nothing needs help right now',
+  for(const text of ["What's on your property?",'Skip for now','Set up my network (','Needs help (','Nothing needs help right now',
    'Your property','+ Add another part of your property',"Update what's on your property",'All sorted','None of this applies',
    'Who does it? (optional)','A provider…','Someone not on RC','+ Add something else','from my property','Post a job'])
    assert.ok(source.includes(text)||source.includes(text.replaceAll("'",'&apos;')),filename+': '+text)
@@ -317,7 +317,24 @@ test('statuses map to Sorted, Need help and N/A and back',()=>{
  assert.equal(propertyChoiceStatus(null,'sorted'),'sorted')
  assert.equal(propertyChoiceStatus(null,'help'),'needs_help')
  assert.equal(propertyChoiceStatus(null,'na'),'irrelevant')
- for(const status of ['sorted','self','has_provider'])assert.equal(propertyChoiceStatus(status,'sorted'),null,status)
+ // Plain Sorted with nobody assigned clears; Sorted with Me, a provider or a
+ // contact keeps its status (and links), so the tap changes nothing.
+ assert.equal(propertyChoiceStatus('sorted','sorted'),null)
+ assert.equal(propertyChoiceStatus('sorted','sorted',0),null)
+ assert.equal(propertyChoiceStatus('self','sorted'),'self')
+ assert.equal(propertyChoiceStatus('self','sorted',2),'self')
+ assert.equal(propertyChoiceStatus('has_provider','sorted',1),'has_provider')
+ assert.equal(propertyChoiceStatus('has_provider','sorted'),'has_provider')
+ // Links left over from an earlier status (provider → Needs help → Sorted) still count.
+ assert.equal(propertyChoiceStatus('sorted','sorted',1),'sorted')
+ // Other choices still switch away, and Help/N/A still toggle off, assigned or not.
+ assert.equal(propertyChoiceStatus('has_provider','na',1),'irrelevant')
+ assert.equal(propertyChoiceStatus('needs_help','help',1),null)
+ for(const file of ['src/screens/PropertyNetworkScreen.js','provider-web/src/app/property-network/property-network.tsx']){
+  const source=readFileSync(new URL('../'+file,import.meta.url),'utf8')
+  assert.match(source,/tapChoice\(service,value,covered\)/,file+' passes the linked count')
+  assert.match(source,/if\(status===service\.status\)return/,file+' skips a no-op save')
+ }
  assert.equal(propertyChoiceStatus('needs_help','help'),null)
  assert.equal(propertyChoiceStatus('irrelevant','na'),null)
  assert.equal(propertyChoiceStatus('self','help'),'needs_help')
@@ -405,13 +422,16 @@ test('the gaps list and area cards count what needs help, what is sorted and wha
  assert.deepEqual([progress.sorted,progress.help,progress.na,progress.left,progress.total],[2,2,1,0,4])
  assert.equal(progress.tag,'2 needs help')
  assert.equal(progress.tone,'help')
- assert.equal(progress.summary,'2 of 4 sorted · You, Ruahine Water Cartage +1')
+ assert.equal(progress.summary,'2 sorted · 2 needs help · You, Ruahine Water Cartage +1')
  const fencing=propertyAreaProgress(areas.find(area=>area.id==='fencing'))
- assert.deepEqual([fencing.tag,fencing.tone,fencing.summary],['All sorted','done','3 of 3 sorted'])
+ assert.deepEqual([fencing.tag,fencing.tone,fencing.summary],['All sorted','done','3 sorted'])
  const animals=propertyAreaProgress(areas.find(area=>area.id==='livestock'))
- assert.deepEqual([animals.tag,animals.tone,animals.summary],['Not started','neutral','Tap to set up — about 30 seconds'])
+ assert.deepEqual([animals.tag,animals.tone,animals.summary.endsWith(' to check · tap to set up, about 30 seconds')],['Not started','neutral',true])
  const partly=propertyAreaProgress({services:[{status:'sorted'},{status:null},{status:null}]})
- assert.deepEqual([partly.tag,partly.summary],['2 to check','1 of 3 sorted'])
+ assert.deepEqual([partly.tag,partly.summary],['2 to check','1 sorted · 2 to check'])
+ // Needs help never hides what is still unanswered.
+ const mixed=propertyAreaProgress({services:[{status:'needs_help'},{status:null},{status:'sorted'},{status:'irrelevant'}]})
+ assert.deepEqual([mixed.tag,mixed.summary,mixed.help,mixed.left,mixed.sorted],['1 needs help','1 sorted · 1 needs help · 1 to check',1,1,1])
  assert.equal(propertyAreaProgress({services:[{status:'irrelevant'}]}).tag,'All sorted')
 })
 
@@ -537,4 +557,26 @@ test('Property network screen and app root are wrapped in error boundaries',()=>
  const boundary=readFileSync(new URL('../src/components/ErrorBoundary.js',import.meta.url),'utf8')
  for(const field of ['screen','message','stack','componentStack','appVersion','updateId'])assert.match(boundary,new RegExp(field+':'))
  assert.match(boundary,/trackEvent\('app_crash'/)
+})
+
+test('setup says Set up my network first and Save property areas when editing, and keeps answers',async()=>{
+ for(const file of ['../src/screens/PropertyNetworkScreen.js','../provider-web/src/app/property-network/property-network.tsx']){
+  const source=readFileSync(new URL(file,import.meta.url),'utf8')
+  assert.match(source,/started\?'Save property areas':'Set up my network \('/,file)
+  assert.match(source,/its answers and providers are kept if you add it back/,file)
+ }
+ // Saving areas only flips active flags: services and links of unticked areas stay.
+ const calls=[]
+ const client={from:table=>({upsert:rows=>{calls.push([table,rows]);return Promise.resolve({error:null})},delete(){throw Error('no deletes')}})}
+ await savePropertyAreas(client,'me',['water'])
+ assert.equal(calls.length,1);assert.equal(calls[0][0],'property_network_areas')
+ assert.ok(calls[0][1].every(row=>row.active===(row.area==='water')))
+})
+
+test('removing a provider or contact link asks first on both clients',()=>{
+ const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.equal((native.match(/label="Remove link"[^\n]*confirmUnlink\(/g)||[]).length,2)
+ assert.match(native,/text:'Remove',style:'destructive',onPress:\(\)=>void unlink\(/)
+ const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
+ assert.match(web,/if\(!window\.confirm\('Remove '\+\(name\|\|'this link'\)/)
 })

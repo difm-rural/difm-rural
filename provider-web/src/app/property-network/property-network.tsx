@@ -23,7 +23,7 @@ import {
 import type {ListingKind} from '@shared/listingPricing'
 
 type AreaView=ReturnType<typeof propertyAreas>[number]
-const PROPERTY_CHOICES:[PropertyChoice,string][]=[['sorted','Sorted'],['help','Need help'],['na','N/A']]
+const PROPERTY_CHOICES:[PropertyChoice,string][]=[['sorted','Sorted'],['help','Needs help'],['na','N/A']]
 
 type ProviderGroup={label:string;people:PropertyProvider[]}
 type InviteChoices=Awaited<ReturnType<typeof loadInviteChoices>>
@@ -261,7 +261,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  }
 
  async function saveSetup(){
-  if(await mutate(()=>savePropertyAreas(client,owner,picks),'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
+  if(await mutate(()=>savePropertyAreas(client,owner,picks),started?'Property areas saved.':'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
  }
 
  // From the gaps list: open the area and start the local search for that service.
@@ -270,8 +270,9 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
   void findMatches(service,propertyServiceTarget(area,service).category)
  }
 
- async function tapChoice(service:PropertyService,choice:PropertyChoice){
-  const status=propertyChoiceStatus(service.status,choice)
+ async function tapChoice(service:PropertyService,choice:PropertyChoice,assigned=0){
+  const status=propertyChoiceStatus(service.status,choice,assigned)
+  if(status===service.status)return // Sorted with someone assigned: nothing to change
   closeMatches();pickerRequest.current++;setPicker(null);setContactForm(null);setReplacing(null)
   await mutate(()=>savePropertyService(client,owner,{...service,status}),
    status?service.name+': '+PROPERTY_CHOICES.find(([value])=>value===choice)?.[1]+'.':service.name+' cleared.')
@@ -286,7 +287,8 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  }
 
  // Removing the last provider or contact puts the service back to plain Sorted.
- async function unlink(service:PropertyService,remaining:number,action:()=>Promise<void>,message:string){
+ async function unlink(service:PropertyService,remaining:number,action:()=>Promise<void>,message:string,name?:string){
+  if(!window.confirm('Remove '+(name||'this link')+' from '+service.name+'?'+(remaining?'':' '+service.name+' goes back to plain Sorted.')+' They stay in My People.'))return
   await mutate(async()=>{
    await action()
    const status=propertyStatusAfterUnlink(service.status,remaining)
@@ -317,7 +319,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
   {data&&<div className="property-layout">
    {showSetup&&<section className="property-setup" aria-labelledby="property-setup-heading">
     <h2 id="property-setup-heading" tabIndex={-1}>What&apos;s on your property?</h2>
-    <p className="muted">Tap everything that applies. We&apos;ll set up your network to match. You can change it any time.</p>
+    <p className="muted">{started?'Tick the parts of your property to show. Unticking one hides it; its answers and providers are kept if you add it back.':<>Tap everything that applies. We&apos;ll set up your network to match. You can change it any time.</>}</p>
     <div className="property-setup-tiles" role="group" aria-label="What's on your property">
      {SUPPORT_AREAS.map(area=>{
       const on=picks.includes(area.id)
@@ -331,13 +333,13 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
     </div>
     <div className="property-setup-actions">
      <button type="button" className="lform-save" disabled={busy||!picks.length} onClick={()=>void saveSetup()}>
-      {picks.length?'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')':'Choose at least one'}</button>
+      {!picks.length?'Choose at least one':started?'Save property areas':'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')'}</button>
      <button type="button" className="lform-cancel" onClick={()=>{if(started)setSetupOpen(false);else setSkipped(true)}}>{started?'Cancel':'Skip for now'}</button>
     </div>
    </section>}
    {!showSetup&&<section hidden={!!current} ref={overview} className="property-overview">
     {gaps.length>0?<section className="property-gaps" aria-labelledby="property-gaps-heading">
-     <h2 id="property-gaps-heading">You need help with {gaps.length} {gaps.length===1?'thing':'things'}</h2>
+     <h2 id="property-gaps-heading">Needs help ({gaps.length})</h2>
      <ul>{gaps.map(({area,service})=><li key={area.id+service.service_key} className="property-gap-row">
       <span><strong>{service.name}</strong><small>{area.label}</small></span>
       <button type="button" className="lform-save" onClick={()=>findHelp(area,service)}>Find help</button>
@@ -407,7 +409,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
       <h3>{service.name}</h3>
       <div role="group" aria-label={service.name+' status'} className="property-choices">
        {PROPERTY_CHOICES.map(([value,label])=><button type="button" key={value} className={'property-choice '+value}
-        aria-pressed={choice===value} disabled={busy} onClick={()=>void tapChoice(service,value)}>{label}</button>)}
+        aria-pressed={choice===value} disabled={busy} onClick={()=>void tapChoice(service,value,covered)}>{label}</button>)}
       </div>
       {choice==='sorted'&&<div className="property-who">
        <span className="muted">Who does it? (optional)</span>
@@ -422,7 +424,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
         {providerLink(person)}
         <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void unlink(service,covered-1,
-         ()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.')}>Remove link</button>
+         ()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.',propertyProviderName(person))}>Remove link</button>
         {choices?<ProviderInviteAction provider={person.id} choices={choices} initiallyOpen={inviteTarget===person.id}/>
          :<button type="button" className="lform-cancel" disabled={loadingInvites} onClick={()=>void refreshInviteChoices(person.id)}>
            {loadingInvites?'Loading open jobs…':'Invite to job'}
@@ -440,7 +442,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
          <button className="lform-cancel" type="button" onClick={()=>void inviteContact(contact)}>Invite to Rural Connections</button>
          <button className="lform-cancel" type="button" disabled={busy} onClick={()=>startReplace(service,contact,target)}>Replace with member</button>
          <button className="lform-cancel" type="button" disabled={busy}
-          onClick={()=>void unlink(service,covered-1,()=>setPropertyContact(client,owner,service,contact.id,false),'Contact link removed.')}>Remove link</button>
+          onClick={()=>void unlink(service,covered-1,()=>setPropertyContact(client,owner,service,contact.id,false),'Contact link removed.',contact.name)}>Remove link</button>
         </span>
         {contactForm?.contact?.id===contact.id&&contactForm.serviceKey===service.service_key&&<ContactForm key={contact.id} initial={contact} busy={busy}
          onSave={value=>void saveContact(service,value)} onCancel={()=>setContactForm(null)} onDelete={()=>void deleteContact(contact)}/>}

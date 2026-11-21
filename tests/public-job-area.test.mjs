@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {addPublicJobAreas,createPublicAreaCache,lookupPublicArea} from '../shared/publicJobArea.ts'
@@ -37,4 +38,19 @@ test('maps lookup sends only the supplied public area and fails without inventin
  assert.equal(requests[1][0],'https://maps.invalid/place-details?place_id=public-town')
  assert.equal(await lookupPublicArea('https://maps.invalid','Unknown',async()=>({ok:true,json:async()=>({suggestions:[]})})),null)
  await assert.rejects(lookupPublicArea('https://maps.invalid','Waitoki',async()=>({ok:false})),/unavailable/)
+})
+
+test('jobs_public migration masks every job to locality for non-participants',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261121093421_job_location_locality_only.sql',import.meta.url),'utf8')
+ const fn=sql.slice(sql.indexOf('create or replace function public.can_see_job_location'),sql.indexOf('create or replace view'))
+ assert.doesNotMatch(fn,/hide_exact_location/,'exact location must not depend on the opt-in flag')
+ assert.match(fn,/requester_id=auth\.uid\(\)/);assert.match(fn,/job_awarded_to/)
+ assert.match(sql,/round\(j\.latitude::numeric,2\)/);assert.match(sql,/as location_exact/)
+ assert.match(sql,/then j\.location_note end as location_note/)
+})
+
+test('Review screen describes publication at locality level, not the street address',()=>{
+ const review=readFileSync(new URL('../src/screens/postjob/PostJobStep5Review.js',import.meta.url),'utf8')
+ assert.doesNotMatch(review,/near \$\{jobAddress/)
+ assert.match(review,/They see the area only; your exact address is shared with the provider you accept\./)
 })

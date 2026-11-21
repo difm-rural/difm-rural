@@ -601,6 +601,8 @@ export default function JobDetailScreen({ route, navigation }) {
   // Hidden-location job seen by anyone who isn't the owner or the accepted
   // provider: show the suburb only and no navigation, so location stays discreet.
   const discreetHouseSit = job.hide_exact_location && !isJobOwner && !isAcceptedProvider
+  // jobs_public gives non-participants a locality and ~1 km coordinates only.
+  const approximateLocation = job.location_exact === false && !isJobOwner && !isAcceptedProvider
 
   const headerJSX = (
     <View>
@@ -1178,7 +1180,7 @@ export default function JobDetailScreen({ route, navigation }) {
           )}
 
           <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> Location: {discreetHouseSit ? (coarseSuburb(job.location_area || job.location_name) || job.location_area || 'Area shared privately') : jobLocation(job)}</Text>
-          {(discreetHouseSit || (job.hide_exact_location && !job.location_name)) ? (
+          {(discreetHouseSit || approximateLocation || (job.hide_exact_location && !job.location_name)) ? (
             <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
           ) : null}
           {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}

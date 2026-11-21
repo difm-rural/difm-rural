@@ -12,17 +12,18 @@ import {newJobId} from '../lib/draftId'
 import {sendJobInvitation} from '../lib/invites'
 import {colors} from '../theme/tokens'
 import {loadInviteChoices,loadSavedProviders,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
-import {loadPropertyMatches,matchLocality,propertyNeed} from '../../shared/propertyMatching'
+import {NZ_REGIONS,loadPropertyMatches,matchLocality,propertyNeed,regionForLocality,regionFromText} from '../../shared/propertyMatching'
+import {placesAutocomplete} from '../lib/maps'
 import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiagramRatio,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
- propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,
+ propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,PROPERTY_STATUS_LABELS,
 } from '../../shared/propertyNetwork'
 
-const PROPERTY_CHOICES=[['sorted','Sorted'],['help','Need help'],['na','N/A']]
+const PROPERTY_CHOICES=[['sorted',PROPERTY_STATUS_LABELS.sorted],['help',PROPERTY_STATUS_LABELS.help],['na',PROPERTY_STATUS_LABELS.na]]
 
 // Add or edit a private contact: someone who is not on Rural Connections.
 function ContactForm({initial,busy,onSave,onCancel,onDelete}){
@@ -108,6 +109,8 @@ function PropertyNetworkScreen({navigation,route}){
  const [locality,setLocality]=useState('')
  const [region,setRegion]=useState('')
  const [widen,setWiden]=useState(false)
+ const [regionHint,setRegionHint]=useState('')
+ const [searched,setSearched]=useState(null)
  const [matches,setMatches]=useState(null)
  const [matchBusy,setMatchBusy]=useState(false)
  const [matchError,setMatchError]=useState('')
@@ -167,6 +170,22 @@ function PropertyNetworkScreen({navigation,route}){
   setTarget(null)
   navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category}}:{}})
  }
+ // Turning on the wider region fills it in when the locality names exactly one
+ // region, directly or in the address suggestions for that place.
+ async function toggleWiden(){
+  const next=!widen
+  setWiden(next);setRegionHint('')
+  if(!next||region)return
+  const place=matchLocality(locality)
+  const direct=regionFromText(locality)
+  if(direct){setRegion(direct);setRegionHint('Region filled in from '+place+'.');return}
+  if(!place){setRegionHint('Choose the wider region to search.');return}
+  try{
+   const found=regionForLocality(place,await placesAutocomplete(place))
+   if(found){setRegion(value=>value||found);setRegionHint('Region filled in from '+place+'. Change it if that is wrong.');return}
+  }catch{}
+  setRegionHint('Choose the wider region to search.')
+ }
  function closeMatches(){
   matchRequest.current++;setMatchKey('');setMatchBusy(false);setMatches(null)
  }
@@ -179,7 +198,7 @@ function PropertyNetworkScreen({navigation,route}){
    const [saved,worked]=await Promise.all([loadSavedProviders(supabase,owner),fetchConnections(owner,'locals')])
    const result=await loadPropertyMatches(supabase,owner,propertyNeed(service,category),locality,widen?region:'',
     saved.map(person=>person.id),worked.flatMap(row=>row.person?[row.person.id]:[]))
-   if(request===matchRequest.current)setMatches(result)
+   if(request===matchRequest.current){setMatches(result);setSearched({locality:matchLocality(locality),region:widen?matchLocality(region):''})}
   }catch{if(request===matchRequest.current)setMatchError('Could not find providers. Try again.')}
   finally{if(request===matchRequest.current)setMatchBusy(false)}
  }
@@ -283,15 +302,16 @@ function PropertyNetworkScreen({navigation,route}){
   setPicks(active.map(item=>item.id));setSetupOpen(true);setFeedback('')
  }
  async function saveSetup(){
-  if(await mutate(()=>savePropertyAreas(supabase,owner,picks),'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
+  if(await mutate(()=>savePropertyAreas(supabase,owner,picks),started?'Property areas saved.':'Your network is set up.')){setSetupOpen(false);setSkipped(false);setList(true)}
  }
  // From the gaps list: open the area and start the local search for that service.
  function findHelp(item,service){
   selectArea(item.id)
   findMatches(service,propertyServiceTarget(item,service).category)
  }
- async function tapChoice(service,choice){
-  const status=propertyChoiceStatus(service.status,choice)
+ async function tapChoice(service,choice,assigned=0){
+  const status=propertyChoiceStatus(service.status,choice,assigned)
+  if(status===service.status)return // Sorted with someone assigned: nothing to change
   closeMatches();pickerRequest.current++;setPicker('');setContactForm(null);setReplacing(null)
   await mutate(()=>savePropertyService(supabase,owner,{...service,status}),
    status?service.name+': '+PROPERTY_CHOICES.find(([value])=>value===choice)[1]+'.':service.name+' cleared.')
@@ -304,6 +324,14 @@ function PropertyNetworkScreen({navigation,route}){
   else{pickerRequest.current++;setPicker(service.service_key)}
  }
  // Removing the last provider or contact puts the service back to plain Sorted.
+ // Removing a link deletes that association, so confirm it first.
+ function confirmUnlink(name,service,remaining,action,message){
+  Alert.alert('Remove '+name+' from '+service.name+'?',
+   (remaining?'':service.name+' goes back to plain Sorted. ')+(name?'They stay in My People.':''),[
+   {text:'Cancel',style:'cancel'},
+   {text:'Remove',style:'destructive',onPress:()=>void unlink(service,remaining,action,message)},
+  ])
+ }
  function unlink(service,remaining,action,message){
   return mutate(async()=>{
    await action()
@@ -334,7 +362,8 @@ function PropertyNetworkScreen({navigation,route}){
     {!started&&<LocalAction label="Back" icon="chevron-back" onPress={()=>navigation.goBack()}/>}
     <Text style={styles.kicker}>MY PROPERTY NETWORK</Text>
     <Text accessibilityRole="header" style={styles.title}>What's on your property?</Text>
-    <Text style={styles.muted}>Tap everything that applies. We'll set up your network to match. You can change it any time.</Text>
+    <Text style={styles.muted}>{started?'Tick the parts of your property to show. Unticking one hides it; its answers and providers are kept if you add it back.'
+     :"Tap everything that applies. We'll set up your network to match. You can change it any time."}</Text>
     {!!error&&<Text accessibilityRole="alert" style={styles.gap}>{error}</Text>}
     <View style={styles.tiles} accessibilityLabel="What's on your property">
      {SUPPORT_AREAS.map(item=>{
@@ -352,7 +381,7 @@ function PropertyNetworkScreen({navigation,route}){
    <View style={[styles.setupFooter,{paddingBottom:insets.bottom+16}]}>
     <TouchableOpacity accessibilityRole="button" accessibilityState={{disabled:busy||!picks.length}} disabled={busy||!picks.length}
      style={[styles.primaryButton,(busy||!picks.length)&&styles.disabled]} onPress={()=>void saveSetup()}>
-     <Text style={styles.primaryText}>{picks.length?'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')':'Choose at least one'}</Text>
+     <Text style={styles.primaryText}>{!picks.length?'Choose at least one':started?'Save property areas':'Set up my network ('+picks.length+' area'+(picks.length===1?'':'s')+')'}</Text>
     </TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={()=>{if(started)setSetupOpen(false);else setSkipped(true)}}>
      <Text style={styles.actionText}>{started?'Cancel':'Skip for now'}</Text>
@@ -372,7 +401,7 @@ function PropertyNetworkScreen({navigation,route}){
    {!data&&!error&&<Loading label="Loading My Property Network…"/>}
    {data&&<>
     {gaps.length>0?<View style={styles.gaps}>
-     <Text accessibilityRole="header" style={[styles.sectionTitle,{color:colors.jobInk}]}>You need help with {gaps.length} {gaps.length===1?'thing':'things'}</Text>
+     <Text accessibilityRole="header" style={[styles.sectionTitle,{color:colors.jobInk}]}>Needs help ({gaps.length})</Text>
      {gaps.map(({area:item,service})=><View key={item.id+service.service_key} style={styles.gapRow}>
       <View style={{flex:1}}><Text style={styles.nodeLabel}>{service.name}</Text><Text style={styles.small}>{item.label}</Text></View>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Find help with '+service.name} style={styles.smallPrimary} onPress={()=>findHelp(item,service)}>
@@ -443,10 +472,13 @@ function PropertyNetworkScreen({navigation,route}){
       const providerOpen=picker===service.service_key&&(pickerMode==='provider'||replacingHere)
       const contactOpen=picker===service.service_key&&pickerMode==='contact'&&!replacingHere
       return <View style={styles.service} key={service.service_key}>
-       <Text accessibilityRole="header" style={styles.serviceTitle}>{service.name}</Text>
+       <View style={styles.cardTop}>
+        <Text accessibilityRole="header" style={[styles.serviceTitle,{flexShrink:1}]}>{service.name}</Text>
+        {(!choice||choice==='help')&&<Text style={[styles.statusTag,choice&&styles.tagHelp]}>{choice?PROPERTY_STATUS_LABELS.help:PROPERTY_STATUS_LABELS.unset}</Text>}
+       </View>
        <View style={styles.choices} accessibilityLabel={service.name+' status'}>
         {PROPERTY_CHOICES.map(([value,label])=><TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:choice===value,disabled:busy}}
-         disabled={busy} style={[styles.choice,choice===value&&styles['choice_'+value]]} onPress={()=>void tapChoice(service,value)}>
+         disabled={busy} style={[styles.choice,choice===value&&styles['choice_'+value]]} onPress={()=>void tapChoice(service,value,covered)}>
          <Text style={[styles.choiceText,choice===value&&styles['choiceText_'+value]]}>{label}</Text>
         </TouchableOpacity>)}
        </View>
@@ -467,7 +499,7 @@ function PropertyNetworkScreen({navigation,route}){
         {linked.map(person=><View key={person.id} style={styles.linked}>
          <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
          <View style={styles.row}><LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
-          <LocalAction label="Remove link" disabled={busy} onPress={()=>void unlink(service,covered-1,()=>setPropertyProvider(supabase,owner,service,person.id,false),'Provider link removed.')}/></View>
+          <LocalAction label="Remove link" disabled={busy} onPress={()=>confirmUnlink(propertyProviderName(person),service,covered-1,()=>setPropertyProvider(supabase,owner,service,person.id,false),'Provider link removed.')}/></View>
         </View>)}
         {contacts.map(contact=><View key={contact.id} style={styles.linked}>
          <Text style={styles.serviceTitle}>{contact.name}</Text>
@@ -481,7 +513,7 @@ function PropertyNetworkScreen({navigation,route}){
           <LocalAction label="Edit" icon="create-outline" disabled={busy} onPress={()=>setContactForm({serviceKey:service.service_key,contact})}/>
           <LocalAction label="Invite to Rural Connections" icon="share-outline" onPress={()=>inviteContact(contact)}/>
           <LocalAction label="Replace with member" icon="swap-horizontal-outline" disabled={busy} onPress={()=>startReplace(service,contact)}/>
-          <LocalAction label="Remove link" disabled={busy} onPress={()=>void unlink(service,covered-1,()=>setPropertyContact(supabase,owner,service,contact.id,false),'Contact link removed.')}/>
+          <LocalAction label="Remove link" disabled={busy} onPress={()=>confirmUnlink(contact.name,service,covered-1,()=>setPropertyContact(supabase,owner,service,contact.id,false),'Contact link removed.')}/>
          </View>
          {contactForm?.contact?.id===contact.id&&contactForm.serviceKey===service.service_key&&<ContactForm key={contact.id} initial={contact} busy={busy}
           onSave={value=>saveContact(service,value)} onCancel={()=>setContactForm(null)} onDelete={()=>deleteContact(contact)}/>}
@@ -498,16 +530,24 @@ function PropertyNetworkScreen({navigation,route}){
         <Text accessibilityRole="header" style={styles.serviceTitle}>Find providers for {service.name}</Text>
         <Text style={styles.nodeLabel}>Town or locality</Text>
         <TextInput accessibilityLabel="Town or locality" style={styles.input} maxLength={70} value={locality} onChangeText={setLocality}/>
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{checked:widen}} style={styles.statusRow} onPress={()=>setWiden(value=>!value)}>
+        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{checked:widen}} style={styles.statusRow} onPress={()=>void toggleWiden()}>
          <Icon name={widen?'checkbox-outline':'square-outline'} size={20} color={colors.primary}/>
          <Text style={styles.statusText}>Include a wider region</Text>
         </TouchableOpacity>
         {widen&&<><Text style={styles.nodeLabel}>Region</Text>
-         <TextInput accessibilityLabel="Region" style={styles.input} maxLength={70} value={region} onChangeText={setRegion}/></>}
+         {!!regionHint&&<Text style={styles.small}>{regionHint}</Text>}
+         <View style={[styles.row,{marginTop:6}]} accessibilityLabel="Region">
+          {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="button" accessibilityState={{selected:region===item}}
+           style={[styles.chip,region===item&&styles.chipOn]} onPress={()=>{setRegion(item);setRegionHint('')}}>
+           <Text style={styles.chipText}>{item}</Text></TouchableOpacity>)}
+         </View></>}
+        <Text style={styles.small}>Results don't update as you type. Tap Search providers after changing the town or region.</Text>
         <LocalAction label="Search providers" disabled={matchBusy||!(matchLocality(locality)||(widen&&matchLocality(region)))} onPress={()=>findMatches(service,category)}/>
         {matchBusy&&<Text accessibilityLiveRegion="polite">Finding providers…</Text>}
         {!!matchError&&<Text accessibilityRole="alert">{matchError}</Text>}
-        {matches?.length===0&&<Text accessibilityLiveRegion="polite">No matching providers advertise services in the selected area. Try including a wider region.</Text>}
+        {matches?.length===0&&<Text accessibilityLiveRegion="polite">{searched?.region
+         ?'No providers advertise '+service.name.toLowerCase()+' in '+[...new Set([searched.locality,searched.region].filter(Boolean))].join(' or ')+'. Try another region, or post a job so local providers can offer.'
+         :'No providers advertise '+service.name.toLowerCase()+' in '+(searched?.locality||'this area')+'. Include a wider region to search further, or post a job.'}</Text>}
         {matches?.map(person=><View key={person.id} style={styles.service}>
          <View style={styles.row}>{person.avatar_url&&<Image source={{uri:person.avatar_url}} style={styles.matchAvatar}/>}
           <Text accessibilityRole="header" style={styles.serviceTitle}>{propertyProviderName(person)}</Text></View>

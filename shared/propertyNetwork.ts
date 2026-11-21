@@ -109,6 +109,7 @@ export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'li
   return {...area,services,active:(data.preferences??[]).find(row=>row.area===area.id)?.active??false,
    hasProvider:linkedCount>0,linkedCount,
    needsHelp:services.some(service=>service.status==='needs_help'),
+   helpCount:services.filter(service=>service.status==='needs_help').length,
    configured:services.some(service=>service.status!==null)}
  })
 }
@@ -125,10 +126,10 @@ export const PROPERTY_DIAGRAM_MIN_WIDTH=288
 // The hub is a circle 24% of the diagram's width.
 export const PROPERTY_HUB_SIZE=24
 
-export function propertyAreaStatus(area:{linkedCount:number;needsHelp:boolean;configured:boolean}){
+export function propertyAreaStatus(area:{linkedCount:number;needsHelp:boolean;helpCount?:number;configured:boolean}){
  const badges=[]
  if(area.linkedCount)badges.push({label:area.linkedCount+(area.linkedCount===1?' local provider':' local providers'),tone:'linked'})
- if(area.needsHelp)badges.push({label:'Find help',tone:'gap'})
+ if(area.needsHelp)badges.push({label:(area.helpCount||1)+' '+PROPERTY_STATUS_LABELS.help.toLowerCase(),tone:'gap'})
  if(!badges.length)badges.push({label:area.configured?'Configured':'Not set up',tone:'neutral'})
  return badges
 }
@@ -326,9 +327,13 @@ export function propertyServiceChoice(status:ServiceStatus|null|undefined):Prope
  if(status==='irrelevant')return 'na'
  return null
 }
-// The status to save when a choice is tapped: tapping the current choice clears it.
-export function propertyChoiceStatus(current:ServiceStatus|null|undefined,choice:PropertyChoice):ServiceStatus|null{
- if(propertyServiceChoice(current)===choice)return null
+// The status to save when a choice is tapped: tapping the current choice clears it,
+// except Sorted when someone does it (Me, a provider or a private contact): that
+// keeps the status and links. Those are removed with Me or Remove link instead.
+// `assigned` is how many providers and contacts are linked to the service.
+export function propertyChoiceStatus(current:ServiceStatus|null|undefined,choice:PropertyChoice,assigned=0):ServiceStatus|null{
+ if(propertyServiceChoice(current)===choice)
+  return choice==='sorted'&&(current!=='sorted'||assigned>0)?current??null:null
  return choice==='sorted'?'sorted':choice==='help'?'needs_help':'irrelevant'
 }
 // "Who does it?" Me → self; a member or a private contact → has_provider (set by the
@@ -360,6 +365,9 @@ export async function savePropertyServices(client:unknown,owner:string,services:
 }
 
 // One area card: counts, the tag and the summary line.
+// One set of words for a service's state, used by the list, the checklist and
+// the summaries: Sorted, Needs help, N/A, and To check for unanswered ones.
+export const PROPERTY_STATUS_LABELS={sorted:'Sorted',help:'Needs help',na:'N/A',unset:'To check'} as const
 export function propertyAreaProgress(area:Pick<AreaView,'services'>,who:readonly string[]=[]){
  const choices=area.services.map(service=>propertyServiceChoice(service.status))
  const sorted=choices.filter(choice=>choice==='sorted').length,help=choices.filter(choice=>choice==='help').length
@@ -368,7 +376,8 @@ export function propertyAreaProgress(area:Pick<AreaView,'services'>,who:readonly
  const tag=help?help+' needs help':!started?'Not started':left===0?'All sorted':left+' to check'
  const tone:'help'|'done'|'neutral'=help?'help':started&&left===0?'done':'neutral'
  const names=who.length>2?who.slice(0,2).join(', ')+' +'+(who.length-2):who.join(', ')
- const summary=started?sorted+' of '+total+' sorted'+(names?' · '+names:''):'Tap to set up — about 30 seconds'
+ const counts=[sorted?sorted+' sorted':'',help?help+' needs help':'',left?left+' to check':''].filter(Boolean).join(' · ')
+ const summary=started?(counts||'Nothing to check')+(names?' · '+names:''):left+' to check · tap to set up, about 30 seconds'
  return {sorted,help,na,left,total,started,tag,tone,summary}
 }
 // Who covers an area: "You" when the owner does something, then members and contacts.
