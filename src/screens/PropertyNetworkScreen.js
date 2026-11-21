@@ -545,7 +545,7 @@ function PropertyNetworkScreen({navigation,route}){
         {matchBusy&&<Text accessibilityLiveRegion="polite">Finding providers…</Text>}
         {!!matchError&&<Text accessibilityRole="alert">{matchError}</Text>}
         {matches?.length===0&&<Text accessibilityLiveRegion="polite">{searched?.region
-         ?'No providers advertise '+service.name.toLowerCase()+' in '+[searched.locality,searched.region].filter(Boolean).join(' or ')+'. Try another region, or post a job so local providers can offer.'
+         ?'No providers advertise '+service.name.toLowerCase()+' in '+[...new Set([searched.locality,searched.region].filter(Boolean))].join(' or ')+'. Try another region, or post a job so local providers can offer.'
          :'No providers advertise '+service.name.toLowerCase()+' in '+(searched?.locality||'this area')+'. Include a wider region to search further, or post a job.'}</Text>}
         {matches?.map(person=><View key={person.id} style={styles.service}>
          <View style={styles.row}>{person.avatar_url&&<Image source={{uri:person.avatar_url}} style={styles.matchAvatar}/>}
