@@ -1,8 +1,10 @@
-type JobLocation={latitude?:unknown;longitude?:unknown;location_name?:string|null;location_area?:string|null;area_polygon?:unknown}
+type JobLocation={location_exact?:boolean|null;latitude?:unknown;longitude?:unknown;location_name?:string|null;location_area?:string|null;area_polygon?:unknown}
 const normalise=(value:string)=>value.toLocaleLowerCase('en-NZ').replace(/[^\p{L}\p{N}]/gu,'')
 // Coordinates alone may be a geocoded town centre. Avoid presenting those as
 // directions to the property. Explicit pins without an address keep a pin label.
 export function jobMapTarget(job:JobLocation){
+ // jobs_public rounds public coordinates to ~1 km before acceptance: never a pin.
+ if(job.location_exact===false)return null
  const values=[job.latitude,job.longitude]
  if(!values.every(value=>(typeof value==='number'||typeof value==='string')&&String(value).trim()!==''))return null
  const latitude=Number(job.latitude),longitude=Number(job.longitude)

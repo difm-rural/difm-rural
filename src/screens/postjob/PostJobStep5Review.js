@@ -169,6 +169,15 @@ export default function PostJobStep5Review({ navigation, route }) {
     : (jobAddress
       || (latitude ? 'Pinned on map (no street address)' : 'No location set'))
 
+  // Providers only ever see the locality before an offer is accepted, so say so
+  // here rather than repeating the street address.
+  const publicLocality = (locationArea || localityFromAddress(jobAddress) || '').trim()
+  const publicationMessage = publicLocality
+    ? `Your job will be visible to providers near ${publicLocality} immediately. They see the area only; your exact address is shared with the provider you accept.`
+    : latitude || areaPolygon.length > 0
+      ? 'Your job will be visible to providers near your area immediately. Your exact location is shared with the provider you accept.'
+      : 'Your job will be visible to providers across the platform immediately.'
+
   const scheduleLabel   = SCHEDULE_LABELS[scheduleType] || scheduleType
   const scheduleDisplay = scheduleType === 'specific' && scheduledDate
     ? `${scheduleLabel} — ${formatDate(scheduledDate)}`
@@ -532,11 +541,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         <View style={styles.infoBox}>
           <Icon name="information-circle-outline" size={18} color={colors.info} />
           <Text style={styles.infoText}>
-            Your job will be visible to providers{' '}
-            {latitude || areaPolygon.length > 0
-              ? `near ${jobAddress || 'your location'}`
-              : 'across the platform'}{' '}
-            immediately.
+            {publicationMessage}
           </Text>
         </View>
 

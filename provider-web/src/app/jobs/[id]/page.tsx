@@ -134,7 +134,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}<p>{schedule}</p><p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
    {job.location_name&&<p>Property location: {job.location_name}</p>}{job.location_note&&<p className="work-description">Location note: {job.location_note}</p>}
    {mapTarget&&<a className="card-link" href={mapTarget.href} target="_blank" rel="noopener noreferrer">{mapTarget.label}</a>}
-   {job.hide_exact_location&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}
+   {(job.hide_exact_location||job.location_exact===false)&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}
    {job.materials_type&&<p>Materials: {MATERIALS[job.materials_type as keyof typeof MATERIALS] || job.materials_type}</p>}
    {job.access_conditions?.length>0&&<p>Site access: {job.access_conditions.map((a:string)=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}
    {process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&(!job.photos?.length||gallery?.some((photo:JobPrivatePhoto)=>photo.slot===0))&&<div className="job-photo-grid"><JobPrimaryImage key={id} jobId={id}/></div>}
