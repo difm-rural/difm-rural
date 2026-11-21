@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {CATEGORIES,LISTING_CATEGORIES} from '../shared/categories.ts'
@@ -71,4 +72,25 @@ test('queries use active public offerings, projected profiles and existing revie
  assert.ok(reads.some(([key,value])=>key==='kind'&&value==='service'))
  assert.ok(reads.some(([key,value])=>key==='closed_at'&&value===null))
  assert.doesNotMatch(JSON.stringify(reads),/private|latitude|longitude|address|profiles"/)
+})
+
+test('wider region is filled in only when the locality names exactly one supported region',async()=>{
+ const {NZ_REGIONS,regionFromText,regionForLocality}=await import('../shared/propertyMatching.ts')
+ assert.equal(NZ_REGIONS.length,16)
+ assert.equal(regionFromText('Waitoki, Auckland, New Zealand'),'Auckland')
+ assert.equal(regionFromText('Napier, Hawke’s Bay'),"Hawke's Bay")
+ assert.equal(regionFromText('Waitoki, New Zealand'),null)
+ assert.equal(regionFromText('Auckland, Waikato'),null)
+ assert.equal(regionForLocality('Waitoki',[{description:'Waitoki, Auckland, New Zealand'},{description:'Waitoki Road, Waikato, New Zealand'}]),'Auckland')
+ assert.equal(regionForLocality('Waitoki',[{description:'Waitoki, New Zealand'}]),null)
+ assert.equal(regionForLocality('Springfield',[{description:'Springfield, Canterbury, New Zealand'},{description:'Springfield, Otago, New Zealand'}]),null)
+})
+
+test('provider search explains manual searching and scope-specific empty results',()=>{
+ const screen=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.match(screen,/Tap Search providers after changing the town or region\./)
+ assert.match(screen,/Include a wider region to search further, or post a job\./)
+ assert.match(screen,/Try another region, or post a job so local providers can offer\./)
+ assert.match(screen,/NZ_REGIONS\.map/);assert.doesNotMatch(screen,/accessibilityLabel="Region" style=\{styles\.input\}/)
+ assert.match(screen,/label="Post a job"/)
 })

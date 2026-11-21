@@ -12,7 +12,8 @@ import {newJobId} from '../lib/draftId'
 import {sendJobInvitation} from '../lib/invites'
 import {colors} from '../theme/tokens'
 import {loadInviteChoices,loadSavedProviders,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
-import {loadPropertyMatches,matchLocality,propertyNeed} from '../../shared/propertyMatching'
+import {NZ_REGIONS,loadPropertyMatches,matchLocality,propertyNeed,regionForLocality,regionFromText} from '../../shared/propertyMatching'
+import {placesAutocomplete} from '../lib/maps'
 import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiagramRatio,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
@@ -108,6 +109,8 @@ function PropertyNetworkScreen({navigation,route}){
  const [locality,setLocality]=useState('')
  const [region,setRegion]=useState('')
  const [widen,setWiden]=useState(false)
+ const [regionHint,setRegionHint]=useState('')
+ const [searched,setSearched]=useState(null)
  const [matches,setMatches]=useState(null)
  const [matchBusy,setMatchBusy]=useState(false)
  const [matchError,setMatchError]=useState('')
@@ -167,6 +170,22 @@ function PropertyNetworkScreen({navigation,route}){
   setTarget(null)
   navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category}}:{}})
  }
+ // Turning on the wider region fills it in when the locality names exactly one
+ // region, directly or in the address suggestions for that place.
+ async function toggleWiden(){
+  const next=!widen
+  setWiden(next);setRegionHint('')
+  if(!next||region)return
+  const place=matchLocality(locality)
+  const direct=regionFromText(locality)
+  if(direct){setRegion(direct);setRegionHint('Region filled in from '+place+'.');return}
+  if(!place){setRegionHint('Choose the wider region to search.');return}
+  try{
+   const found=regionForLocality(place,await placesAutocomplete(place))
+   if(found){setRegion(value=>value||found);setRegionHint('Region filled in from '+place+'. Change it if that is wrong.');return}
+  }catch{}
+  setRegionHint('Choose the wider region to search.')
+ }
  function closeMatches(){
   matchRequest.current++;setMatchKey('');setMatchBusy(false);setMatches(null)
  }
@@ -179,7 +198,7 @@ function PropertyNetworkScreen({navigation,route}){
    const [saved,worked]=await Promise.all([loadSavedProviders(supabase,owner),fetchConnections(owner,'locals')])
    const result=await loadPropertyMatches(supabase,owner,propertyNeed(service,category),locality,widen?region:'',
     saved.map(person=>person.id),worked.flatMap(row=>row.person?[row.person.id]:[]))
-   if(request===matchRequest.current)setMatches(result)
+   if(request===matchRequest.current){setMatches(result);setSearched({locality:matchLocality(locality),region:widen?matchLocality(region):''})}
   }catch{if(request===matchRequest.current)setMatchError('Could not find providers. Try again.')}
   finally{if(request===matchRequest.current)setMatchBusy(false)}
  }
@@ -498,16 +517,24 @@ function PropertyNetworkScreen({navigation,route}){
         <Text accessibilityRole="header" style={styles.serviceTitle}>Find providers for {service.name}</Text>
         <Text style={styles.nodeLabel}>Town or locality</Text>
         <TextInput accessibilityLabel="Town or locality" style={styles.input} maxLength={70} value={locality} onChangeText={setLocality}/>
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{checked:widen}} style={styles.statusRow} onPress={()=>setWiden(value=>!value)}>
+        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{checked:widen}} style={styles.statusRow} onPress={()=>void toggleWiden()}>
          <Icon name={widen?'checkbox-outline':'square-outline'} size={20} color={colors.primary}/>
          <Text style={styles.statusText}>Include a wider region</Text>
         </TouchableOpacity>
         {widen&&<><Text style={styles.nodeLabel}>Region</Text>
-         <TextInput accessibilityLabel="Region" style={styles.input} maxLength={70} value={region} onChangeText={setRegion}/></>}
+         {!!regionHint&&<Text style={styles.small}>{regionHint}</Text>}
+         <View style={[styles.row,{marginTop:6}]} accessibilityLabel="Region">
+          {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="radio" accessibilityState={{checked:region===item}}
+           style={[styles.chip,region===item&&styles.chipOn]} onPress={()=>{setRegion(item);setRegionHint('')}}>
+           <Text style={styles.chipText}>{item}</Text></TouchableOpacity>)}
+         </View></>}
+        <Text style={styles.small}>Results don't update as you type. Tap Search providers after changing the town or region.</Text>
         <LocalAction label="Search providers" disabled={matchBusy||!(matchLocality(locality)||(widen&&matchLocality(region)))} onPress={()=>findMatches(service,category)}/>
         {matchBusy&&<Text accessibilityLiveRegion="polite">Finding providers…</Text>}
         {!!matchError&&<Text accessibilityRole="alert">{matchError}</Text>}
-        {matches?.length===0&&<Text accessibilityLiveRegion="polite">No matching providers advertise services in the selected area. Try including a wider region.</Text>}
+        {matches?.length===0&&<Text accessibilityLiveRegion="polite">{searched?.region
+         ?'No providers advertise '+service.name.toLowerCase()+' in '+[searched.locality,searched.region].filter(Boolean).join(' or ')+'. Try another region, or post a job so local providers can offer.'
+         :'No providers advertise '+service.name.toLowerCase()+' in '+(searched?.locality||'this area')+'. Include a wider region to search further, or post a job.'}</Text>}
         {matches?.map(person=><View key={person.id} style={styles.service}>
          <View style={styles.row}>{person.avatar_url&&<Image source={{uri:person.avatar_url}} style={styles.matchAvatar}/>}
           <Text accessibilityRole="header" style={styles.serviceTitle}>{propertyProviderName(person)}</Text></View>

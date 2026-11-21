@@ -81,6 +81,28 @@ export function matchLocality(value:string|null|undefined){
 }
 const normalize=(value:string)=>value.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('en-NZ')
  .replace(/[^a-z0-9]+/g,' ').trim()
+// Supported "wider region" values: New Zealand's 16 regions, spelled as they
+// appear in addresses. The provider search offers these instead of free text.
+export const NZ_REGIONS=['Northland','Auckland','Waikato','Bay of Plenty','Gisborne',"Hawke's Bay",'Taranaki',
+ 'Manawatū-Whanganui','Wellington','Tasman','Nelson','Marlborough','West Coast','Canterbury','Otago','Southland'] as const
+const regionKey=(value:string)=>normalize(value.replace(/[’‘]/g,"'")).replace(/ region$/,'')
+// The one region named in an address or place ("Waitoki, Auckland, New Zealand"
+// → Auckland). Null when none, or more than one, is named: never a guess.
+export function regionFromText(value:string|null|undefined):string|null{
+ if(!value)return null
+ const parts=new Set(value.split(',').map(regionKey).filter(Boolean))
+ const found=NZ_REGIONS.filter(region=>parts.has(regionKey(region)))
+ return found.length===1?found[0]:null
+}
+// The region for a locality, from autocomplete suggestions for that place.
+// Only suggestions that start with the locality count, and they must agree.
+export function regionForLocality(locality:string,suggestions:readonly {description?:string|null}[]){
+ const place=normalize(locality||'')
+ if(!place)return null
+ const regions=new Set(suggestions.filter(item=>normalize((item.description||'').split(',')[0]||'')===place)
+  .map(item=>regionFromText(item.description)).filter((value):value is string=>!!value))
+ return regions.size===1?[...regions][0]:null
+}
 type Listing={provider_id:string|null;category:string;title:string;description:string|null;location_name:string|null}
 type Person={id:string;full_name:string|null;display_name:string|null;avatar_url:string|null}
 type Rating={reviewee_id:string;rating:number}
