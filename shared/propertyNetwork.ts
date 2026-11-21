@@ -100,13 +100,13 @@ type Client={
 
 export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'links'>&{contactLinks?:ContactLink[]}){
  return SUPPORT_AREAS.map(area=>{
-  const stored=new Map(data.services.filter(service=>service.area===area.id).map(service=>[service.service_key,service]))
+  const stored=new Map((data.services??[]).filter(service=>service.area===area.id).map(service=>[service.service_key,service]))
   const services:PropertyService[]=area.services.map(({key,name})=>stored.get(key) ?? {area:area.id,service_key:key,name,status:null})
   services.push(...[...stored.values()].filter(service=>service.service_key.startsWith('custom-')))
   // Members and private contacts both count as local providers.
-  const linkedCount=new Set(data.links.filter(row=>row.area===area.id).map(row=>row.provider_id)).size
+  const linkedCount=new Set((data.links??[]).filter(row=>row.area===area.id).map(row=>row.provider_id)).size
    +new Set((data.contactLinks??[]).filter(row=>row.area===area.id).map(row=>row.contact_id)).size
-  return {...area,services,active:data.preferences.find(row=>row.area===area.id)?.active??false,
+  return {...area,services,active:(data.preferences??[]).find(row=>row.area===area.id)?.active??false,
    hasProvider:linkedCount>0,linkedCount,
    needsHelp:services.some(service=>service.status==='needs_help'),
    configured:services.some(service=>service.status!==null)}
@@ -188,17 +188,17 @@ export const propertyDiscoveryPath=(category:string,kind:ListingKind='service')=
  '/browse?'+new URLSearchParams({kind,category})
 
 export function linkedPropertyProviders(data:NetworkData,service:PropertyService){
- const ids=new Set(data.links.filter(link=>link.area===service.area&&link.service_key===service.service_key).map(link=>link.provider_id))
- return data.people.filter(person=>ids.has(person.id))
+ const ids=new Set((data.links??[]).filter(link=>link.area===service.area&&link.service_key===service.service_key).map(link=>link.provider_id))
+ return (data.people??[]).filter(person=>ids.has(person.id))
 }
 
 export function linkedPropertyContacts(data:Pick<NetworkData,'contacts'|'contactLinks'>,service:Pick<PropertyService,'area'|'service_key'>){
- const ids=new Set(data.contactLinks.filter(link=>link.area===service.area&&link.service_key===service.service_key).map(link=>link.contact_id))
- return data.contacts.filter(contact=>ids.has(contact.id))
+ const ids=new Set((data.contactLinks??[]).filter(link=>link.area===service.area&&link.service_key===service.service_key).map(link=>link.contact_id))
+ return (data.contacts??[]).filter(contact=>ids.has(contact.id))
 }
 // Every service a contact covers, as {area, service_key} pairs.
 export const propertyContactServices=(data:Pick<NetworkData,'contactLinks'>,contactId:string)=>
- data.contactLinks.filter(link=>link.contact_id===contactId)
+ (data.contactLinks??[]).filter(link=>link.contact_id===contactId)
 
 // Contact validation shared by the app, the web and the database checks.
 export const PROPERTY_CONTACT_LIMITS={name:80,phone:30,email:254,note:200} as const
@@ -237,6 +237,13 @@ async function loadPeople(db:Client,ids:string[]){
  return people
 }
 
+// Missing collections (an older cache, a partial row set) read as empty, never undefined.
+export function normalizePropertyNetwork(data:Partial<NetworkData>|null|undefined):NetworkData{
+ const list=<T,>(value:T[]|null|undefined)=>Array.isArray(value)?value:[]
+ return {preferences:list(data?.preferences),services:list(data?.services),links:list(data?.links),people:list(data?.people),
+  contacts:list(data?.contacts),contactLinks:list(data?.contactLinks)}
+}
+
 export async function loadPropertyNetwork(client:unknown,owner:string):Promise<NetworkData>{
  const db=client as Client
  const [preferences,services,links,contacts,contactLinks]=await Promise.all([
@@ -247,7 +254,7 @@ export async function loadPropertyNetwork(client:unknown,owner:string):Promise<N
   allRows(()=>db.from('property_network_contact_links').select<ContactLink>('area,service_key,contact_id').eq('owner_id',owner).order('area').order('service_key').order('contact_id')),
  ])
  const people=await loadPeople(db,links.map(link=>link.provider_id))
- return {preferences,services,links,people,contacts,contactLinks}
+ return normalizePropertyNetwork({preferences,services,links,people,contacts,contactLinks})
 }
 
 export async function discoverPropertyProviders(client:unknown,owner:string,category:string,kind:ListingKind='service'){
@@ -331,7 +338,7 @@ export const propertyStatusAfterUnlink=(current:ServiceStatus|null|undefined,rem
  current==='has_provider'&&remainingLinks===0?'sorted':current
 
 // First visit: no saved area rows means the member hasn't set up yet.
-export const propertySetupStarted=(data:Pick<NetworkData,'preferences'>)=>data.preferences.length>0
+export const propertySetupStarted=(data:Pick<NetworkData,'preferences'>)=>(data.preferences??[]).length>0
 // Saves every area in one call: the chosen ones active, the rest hidden (their
 // services and links are kept for when they come back).
 export async function savePropertyAreas(client:unknown,owner:string,active:readonly string[]){
@@ -445,7 +452,7 @@ export function propertySuggestion(data:Pick<NetworkData,'links'>,dismissals:rea
  const providerId=work.providerId
  if(!target||!providerId)return null
  if(dismissals.some(row=>row.provider_id===providerId&&row.area===target.area))return null
- if(data.links.some(row=>row.provider_id===providerId&&row.area===target.area))return null
+ if((data.links??[]).some(row=>row.provider_id===providerId&&row.area===target.area))return null
  return {...target,providerId,areaLabel:SUPPORT_AREAS.find(area=>area.id===target.area)!.label}
 }
 export const propertySuggestionText=(providerName:string,suggestion:Pick<PropertySuggestion,'areaLabel'>)=>
@@ -476,8 +483,8 @@ export async function dismissPropertySuggestion(client:unknown,owner:string,sugg
 export function propertyNetworkHomeLines(data:NetworkData){
  const areas=propertyAreas(data),active=new Set(areas.filter(area=>area.active).map(area=>area.id))
  const people=new Set([
-  ...data.links.filter(row=>active.has(row.area)).map(row=>'member:'+row.provider_id),
-  ...data.contactLinks.filter(row=>active.has(row.area)).map(row=>'contact:'+row.contact_id),
+  ...(data.links??[]).filter(row=>active.has(row.area)).map(row=>'member:'+row.provider_id),
+  ...(data.contactLinks??[]).filter(row=>active.has(row.area)).map(row=>'contact:'+row.contact_id),
  ]).size
  const help=propertyGaps(areas).length
  const lines:string[]=[]
