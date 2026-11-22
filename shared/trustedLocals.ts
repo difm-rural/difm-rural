@@ -54,6 +54,26 @@ export function completedWorkLabel(work:Pick<WorkHistory,'jobs_count'|'bookings_
  return parts.join(' and ')+' completed'
 }
 
+// What each provider advertises: the categories of their active listings, the
+// one they list most first, at most four. Used for every provider on My People.
+export async function loadAdvertisedServices(client:unknown,ids:readonly string[]){
+ const db=client as Client, result=new Map<string,string[]>()
+ for(let i=0;i<ids.length;i+=200){
+  const batch=ids.slice(i,i+200)
+  if(!batch.length)continue
+  const listings=await allRows(()=>db.from('services').select<Service>('provider_id,category').in('provider_id',batch).eq('is_active',true).is('closed_at',null).order('id'))
+  const counts=new Map<string,Map<string,number>>()
+  for(const listing of listings){
+   if(!listing.category)continue
+   const mine=counts.get(listing.provider_id)??new Map<string,number>()
+   mine.set(listing.category,(mine.get(listing.category)??0)+1)
+   counts.set(listing.provider_id,mine)
+  }
+  for(const [id,mine] of counts)result.set(id,[...mine].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([category])=>category))
+ }
+ return result
+}
+
 export async function loadSavedProviders(client:unknown,userId:string){
  const db=client as Client
  const saves=await allRows(()=>db.from('saved_providers').select<{provider_id:string}>('provider_id')
@@ -61,17 +81,11 @@ export async function loadSavedProviders(client:unknown,userId:string){
  const people=new Map<string,SavedProvider>()
  for(let i=0;i<saves.length;i+=200){
   const batch=saves.slice(i,i+200).map(row=>row.provider_id)
-  const [rows,listings]=await Promise.all([
+  const [rows,services]=await Promise.all([
    allRows(()=>db.from('profiles_public').select<SavedProvider>('id,full_name,display_name,avatar_url,region,skills').in('id',batch).order('id')),
-   allRows(()=>db.from('services').select<Service>('provider_id,category').in('provider_id',batch).eq('is_active',true).is('closed_at',null).order('id')),
+   loadAdvertisedServices(db,batch),
   ])
-  const categories=new Map<string,string[]>()
-  for(const listing of listings){
-   if(!listing.category)continue
-   const existing=categories.get(listing.provider_id) ?? []
-   if(!existing.includes(listing.category)&&existing.length<4)categories.set(listing.provider_id,[...existing,listing.category])
-  }
-  for(const person of rows)people.set(person.id,{...person,services:categories.get(person.id)})
+  for(const person of rows)people.set(person.id,{...person,services:services.get(person.id)})
  }
  return saves.flatMap(row=>people.get(row.provider_id) ?? [])
 }
@@ -82,7 +96,9 @@ export function shortList(items:readonly (string|null|undefined)[]|null|undefine
  const unique=[...new Set((items??[]).map(item=>String(item??'').trim()).filter(Boolean))]
  return unique.slice(0,max).join(' · ')+(unique.length>max?' +'+(unique.length-max)+' more':'')
 }
-export const providerServiceSummary=(person:SavedProvider)=>shortList(person.services ?? person.skills ?? [])
+// Cards show what the provider advertises, not their full skills list (which can
+// run to dozens of capabilities and read as "+58 more").
+export const providerServiceSummary=(person:Pick<SavedProvider,'services'>)=>shortList(person.services??[])
 export const providerServices=(person:SavedProvider)=>(person.services ?? person.skills ?? []).slice(0,4).join(' · ')
 
 export async function setProviderSaved(client:unknown,requester:string,provider:string,saved:boolean){
