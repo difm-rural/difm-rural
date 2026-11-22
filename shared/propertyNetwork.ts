@@ -376,7 +376,8 @@ export const propertyBulkLabel=(status:ServiceStatus,answered:number)=>
  status==='sorted'?(answered?'Rest are sorted':'All sorted'):(answered?"Rest don't apply":'None of this applies')
 export function propertyBulkMessage(updated:number,kept:number,status:ServiceStatus){
  const label=status==='sorted'?PROPERTY_STATUS_LABELS.sorted:PROPERTY_STATUS_LABELS.na
- return updated+' '+(updated===1?'service':'services')+' marked '+label+'.'+(kept?' Your other '+kept+' stay as they were.':'')
+ const kept_=kept===1?' Your other answer stays as it was.':kept>1?' Your other '+kept+' answers stay as they were.':''
+ return updated+' '+(updated===1?'service':'services')+' marked '+label+'.'+kept_
 }
 export async function savePropertyServices(client:unknown,owner:string,services:readonly PropertyService[]){
  if(!services.length)return

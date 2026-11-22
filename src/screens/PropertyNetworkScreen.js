@@ -1,4 +1,4 @@
-import React,{useCallback,useRef,useState} from 'react'
+import React,{useCallback,useEffect,useRef,useState} from 'react'
 import {Alert,BackHandler,Image,Linking,Modal,ScrollView,Share,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 import {useSafeAreaInsets} from 'react-native-safe-area-context'
@@ -125,12 +125,21 @@ function PropertyDiagram({areas,selected,onSelect,onOpenProperty}){
  </View>
 }
 
+const PROPERTY_FEEDBACK_MS=5000
+
 function PropertyNetworkScreen({navigation,route}){
  const insets=useSafeAreaInsets()
  const [owner,setOwner]=useState(null)
  const [data,setData]=useState(null)
  const [error,setError]=useState('')
  const [feedback,setFeedback]=useState('')
+ // Success messages ("Saved.", "Provider linked.") are a short confirmation, not
+ // a standing notice: they clear after a few seconds. Errors stay until fixed.
+ useEffect(()=>{
+  if(!feedback)return
+  const timer=setTimeout(()=>setFeedback(''),PROPERTY_FEEDBACK_MS)
+  return ()=>clearTimeout(timer)
+ },[feedback])
  const [list,setList]=useState(true)
  const [selected,setSelected]=useState(route.params?.area || '')
  const [setupOpen,setSetupOpen]=useState(false)
@@ -419,7 +428,7 @@ function PropertyNetworkScreen({navigation,route}){
     </TouchableOpacity>
    </View>
   </View>}
-  {!showSetup&&<ScrollView style={area?{display:'none'}:undefined} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}>
+  {!showSetup&&<ScrollView style={area?{display:'none'}:undefined} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+32}}>
    <LocalAction label="Back" icon="chevron-back" onPress={()=>navigation.goBack()}/>
    <Text accessibilityRole="header" style={styles.title}>My Property Network</Text>
    <Text style={styles.muted}>Who helps with your property, and what still needs someone.</Text>
@@ -478,7 +487,7 @@ function PropertyNetworkScreen({navigation,route}){
     </>}
    </>}
   </ScrollView>}
-  {area&&<ScrollView key={area.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+24}}>
+  {area&&<ScrollView key={area.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+32}}>
      <LocalAction label="Back to My Property Network" icon="chevron-back" onPress={()=>selectArea('')}/>
      <View style={styles.areaHeading}><Icon name={area.icon} size={32} color={colors.primary}/>
       <Text accessibilityRole="header" style={styles.title}>{area.label}</Text></View>
