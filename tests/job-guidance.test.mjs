@@ -48,7 +48,7 @@ test('Step 3 shows the guidance, keeps it optional, and the Property Network pas
  assert.match(step3,/jobDescriptionGuidance\(/)
  assert.match(step3,/Add these to the description/)
  // Once added, the box says where to answer and that blank lines go; the list isn't repeated.
- assert.match(step3,/Type your answers after each colon in the box below\. Lines you leave blank are removed when you continue\./)
+ assert.match(step3,/Type your answers after each colon in the box below\. When you continue, they become sentences and blank lines are removed./)
  assert.match(step3,/!guidanceAdded \? \(/)
  assert.match(step3,/>Optional</)
  assert.match(step3,/if \(finalDescription !== description\) setDescription\(finalDescription\)/)

@@ -47,6 +47,9 @@ const CATEGORIES:Record<string,readonly string[]>={
  'General Rural Help':GENERAL,
 }
 
+// Every prompt, each once: how Step 3 recognises its own lines.
+export const JOB_PROMPTS:readonly string[]=[...new Set([...GENERAL,...Object.values(SERVICES).flat(),...Object.values(CATEGORIES).flat()])]
+
 export function jobDescriptionGuidance({category,service}:{category?:string|null;service?:string|null}):Guidance{
  const byService=service?SERVICES[service.trim().toLocaleLowerCase('en-NZ')]:undefined
  if(byService)return {heading:'For '+service!.trim().toLocaleLowerCase('en-NZ')+', it helps to mention',prompts:byService}

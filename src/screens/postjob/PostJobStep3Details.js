@@ -1,6 +1,7 @@
 import { JobPrivateGallery } from '../../components/JobPrimaryImage'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
-import {addGuidanceToDescription,jobDescriptionGuidance,removeUnusedGuidance,JOB_PHOTO_HINT,JOB_PHOTO_LIMIT_LABEL} from '../../../shared/jobGuidance'
+import {addGuidanceToDescription,jobDescriptionGuidance,JOB_PHOTO_HINT,JOB_PHOTO_LIMIT_LABEL} from '../../../shared/jobGuidance'
+import {finishJobDescription} from '../../../shared/jobAnswers'
 import React, { useEffect, useState } from 'react'
 import {
   Alert, Image, Keyboard, KeyboardAvoidingView, Platform,
@@ -79,12 +80,13 @@ export default function PostJobStep3Details({ navigation, route }) {
       ? `${jobData.areaHectares} ha traced`
       : jobData.latitude ? 'Location set' : null
 
-  const guidance = jobDescriptionGuidance({
-    category: jobData.category,
-    // Service prompts only while the category is still the one it came with.
-    service: jobData.propertyServiceCategory === jobData.category ? jobData.propertyService : '',
-  })
-  const finalDescription = removeUnusedGuidance(description, guidance.prompts)
+  // Service prompts only while the category is still the one it came with.
+  const service = jobData.propertyServiceCategory === jobData.category ? jobData.propertyService : ''
+  const guidance = jobDescriptionGuidance({ category: jobData.category, service })
+  // What Next saves: answered prompts as sentences, blank ones gone. When editing
+  // a posted job, prompt lines already on it stay as they were posted.
+  const finalDescription = finishJobDescription(description, { service, title: jobData.title,
+    skip: route.params?.mode === 'edit' ? route.params?.job?.description || '' : '' })
   const guidanceAdded = guidance.prompts.every(prompt => description.includes(prompt + ':'))
   const charsLeft = 8 - finalDescription.length
 
@@ -175,7 +177,7 @@ export default function PostJobStep3Details({ navigation, route }) {
             ) : (
               <View style={[styles.guide, styles.guideAdded]}>
                 <Icon name="create-outline" size={15} color={colors.primary} />
-                <Text style={[styles.guideItem, {flex: 1}]}>Type your answers after each colon in the box below. Lines you leave blank are removed when you continue.</Text>
+                <Text style={[styles.guideItem, {flex: 1}]}>Type your answers after each colon in the box below. When you continue, they become sentences and blank lines are removed.</Text>
               </View>
             )}
             <TextInput
