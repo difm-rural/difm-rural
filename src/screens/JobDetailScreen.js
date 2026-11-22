@@ -25,7 +25,7 @@ import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
 import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
-import { colors } from '../theme/tokens'
+import { colors, spacing, radius, touchTarget, typography } from '../theme/tokens'
 import PressableCard from '../components/PressableCard'
 import ReviewModal from '../components/ReviewModal'
 import { trackEvent } from '../lib/analytics'
@@ -164,6 +164,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const [answerText,   setAnswerText]   = useState('')
   const [submittingQ,  setSubmittingQ]  = useState(false)
 
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const openJobScrollRef = useRef(null)
+  const questionFocusPending = useRef(false)
   const bidMessageRef = useRef(null)
 
   useEffect(() => { if (focused) fetchData() }, [initialJob.id, focused])
@@ -590,6 +593,22 @@ export default function JobDetailScreen({ route, navigation }) {
   }
 
   const isJobOwner        = currentUser?.id === job.requester_id
+  const requesterOpen = isJobOwner && job.status === 'open'
+  const unansweredQuestions = questions.filter(question => !question.answer)
+  const answeredQuestions = questions.filter(question => !!question.answer)
+  const focusQuestions = route.params?.focusQuestions === true
+
+  // The first unanswered question is the first scroll content below the title.
+  // Re-arm on return from Manage, but never steal scroll after posting an answer.
+  useEffect(() => {
+    questionFocusPending.current = focused && focusQuestions
+  }, [focused, focusQuestions, job.id])
+  useEffect(() => {
+    if (!requesterOpen || !unansweredQuestions.length || !questionFocusPending.current) return
+    openJobScrollRef.current?.scrollTo({ y: 0, animated: false })
+    questionFocusPending.current = false
+  }, [focused, focusQuestions, requesterOpen, unansweredQuestions.length])
+
   const canProvideJobs    = canProvide(profile)
   const canBid            = !isJobOwner && job.status === 'open' && canProvideJobs
   // Requester-only account looking at an open job they don't own: offer needs
@@ -1092,158 +1111,8 @@ export default function JobDetailScreen({ route, navigation }) {
     </>
   )
 
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {headerJSX}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
+  const renderQuestion = q => (
 
-        {myInvite && (
-          <View style={styles.invitedBanner}>
-            <Icon name="mail-open-outline" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.invitedBannerTitle}>{myInvite.status === 'accepted' ? 'Invitation accepted' : 'Invitation received'}</Text>
-              <Text style={styles.invitedBannerSub}>
-                {(requesterProfile?.full_name?.split(' ')[0] || 'The requester')} invited you directly. You can make an offer below.
-              </Text>
-            </View>
-            {myInvite.status !== 'accepted' && <TouchableOpacity accessibilityRole="button" onPress={async () => {
-              const { error } = await respondToJobInvitation(myInvite, 'accept')
-              if (error) Alert.alert('Could not accept invitation', error.message)
-              else setMyInvite({ ...myInvite, status: 'accepted' })
-            }}><Text style={styles.declineLink}>Accept</Text></TouchableOpacity>}
-            <TouchableOpacity
-              onPress={handleDeclineInvite}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Decline this invitation">
-              <Text style={styles.declineLink}>Decline</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Job card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.category}>Category: {job.category}</Text>
-            <Text style={styles.price}>
-              {jobBudget(job)}
-            </Text>
-          </View>
-          <Text style={styles.title} accessibilityRole="header">{job.title}</Text>
-          <Text style={styles.description}>{job.description}</Text>
-
-          {/* Feature 1: materials/access */}
-          {job.materials_type && (
-            <View style={styles.accessRow}>
-              <Icon name="construct-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.accessText}>{MATERIALS_LABELS[job.materials_type] || job.materials_type}</Text>
-            </View>
-          )}
-          {job.access_conditions?.length > 0 && (
-            <View style={styles.accessRow}>
-              <Icon name="car-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.accessText}>{job.access_conditions.map(c => ACCESS_LABELS[c] || c).join(', ')}</Text>
-            </View>
-          )}
-          {job.location_note ? (
-            <View style={styles.accessRow}>
-              <Icon name="document-text-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.accessText}>{job.location_note}</Text>
-            </View>
-          ) : null}
-
-          <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{width:'100%',height:200}}/>
-          {job.photos?.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.photoStrip} style={styles.photoStripWrap}>
-              {job.photos.map((url, i) => (
-                <Image key={i} source={{ uri: url }} style={styles.photoStripImg} />
-              ))}
-            </ScrollView>
-          )}
-
-          {!!jobMapTarget(job) && !discreetHouseSit && (
-            <TouchableOpacity style={styles.mapThumbWrap}
-              onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
-              activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="View job location pin on map">
-              <Image source={{ uri: jobStaticMapUrl(job) }} style={styles.mapThumbImg} resizeMode="cover" />
-              {job.area_hectares ? (
-                <View style={styles.mapAreaBadge}>
-                  <Text style={styles.mapAreaBadgeText}>{job.area_hectares} ha</Text>
-                </View>
-              ) : null}
-              <View style={styles.mapTapHint}>
-                <Text style={styles.mapTapHintText}>Tap to navigate <Icon name="arrow-forward" size={12} color={colors.white} /></Text>
-              </View>
-            </TouchableOpacity>
-          )}
-
-          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> Location: {discreetHouseSit ? (coarseSuburb(job.location_area || job.location_name) || job.location_area || 'Area shared privately') : jobLocation(job)}</Text>
-          {(discreetHouseSit || approximateLocation || (job.hide_exact_location && !job.location_name)) ? (
-            <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
-          ) : null}
-          {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}
-          <Text style={styles.locationNote}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Requested: {jobRequested(job)}</Text>
-          <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
-        </View>
-
-        {/* Owner shortcut to the management screen (edit / share / cancel / delete).
-            Hidden when we arrived from Manage, so Back just returns there. */}
-        {isJobOwner && !fromManage && (
-          <Button
-            icon="settings-outline"
-            title="Manage job"
-            onPress={() => navigation.navigate('ManageTask', { job, bidCount: bids.length })}
-            style={{ marginBottom: 16 }}
-            accessibilityLabel="Manage this job"
-          />
-        )}
-
-        {isJobOwner && acceptedBid && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && (
-          <>
-            <JobArrangementSummary arrival={workSchedule?.arrival_start_at}
-              duration={acceptedBid.estimated_duration}/>
-            <JobPaymentHandoff
-              bidId={acceptedBid.id}
-              method={acceptedBid.payment_method}
-              sortedAt={acceptedBid.payment_sorted_at}
-              sortedBy={acceptedBid.payment_sorted_by}
-              requesterId={job.requester_id}
-              providerId={acceptedBid.provider_id}
-              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner)}
-              onChanged={fetchData}
-            />
-          </>
-        )}
-
-        {/* Requester: completed — leave / edit the provider review */}
-        {isJobOwner && job.status === 'completed' && acceptedBid && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Reviews</Text>
-            {jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview === undefined ? undefined : !!receivedReview, 'Provider').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
-            <ReceivedReview review={receivedReview} fromLabel="provider" />
-            <Button
-              title={providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
-              onPress={() => setProviderReviewVisible(true)}
-              accessibilityLabel={providerReview ? 'Edit provider review' : 'Review provider'}
-            />
-          </View>
-        )}
-
-        {/* Feature 2: Q&A section */}
-        {job.status === 'open' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Questions & Answers</Text>
-            {questions.length === 0 && (
-              <EmptyState
-                compact
-                icon="chatbubbles-outline"
-                title="No questions yet"
-                body="Questions about this job will show up here."
-              />
-            )}
-            {questions.map(q => (
               <View key={q.id} style={styles.questionCard}>
                 <View style={styles.questionRow}>
                   <Text style={styles.questionAsker}>{q.askerName}</Text>
@@ -1284,15 +1153,31 @@ export default function JobDetailScreen({ route, navigation }) {
                     </View>
                   ) : (
                     <TouchableOpacity onPress={() => { setAnsweringId(q.id); setAnswerText('') }}
-                      style={styles.answerBtn}>
-                      <Text style={styles.answerBtnText}>Answer this question</Text>
+                      style={requesterOpen ? styles.requesterAnswerBtn : styles.answerBtn}
+                      accessibilityRole="button" accessibilityLabel={`Answer this question: ${q.question}`}>
+                      <Text style={requesterOpen ? styles.requesterAnswerBtnText : styles.answerBtnText}>Answer this question</Text>
                     </TouchableOpacity>
                   )
                 ) : (
                   <Text style={styles.pendingAnswerText}>Awaiting answer from requester</Text>
                 )}
               </View>
-            ))}
+  )
+  const questionsJSX = (
+    <>
+        {/* Feature 2: Q&A section */}
+        {job.status === 'open' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Questions & Answers</Text>
+            {questions.length === 0 && (
+              <EmptyState
+                compact
+                icon="chatbubbles-outline"
+                title="No questions yet"
+                body="Questions about this job will show up here."
+              />
+            )}
+            {(requesterOpen ? unansweredQuestions : questions).map(renderQuestion)}
             {!isJobOwner && currentUser && (
               showAskInput ? (
                 <View>
@@ -1332,73 +1217,10 @@ export default function JobDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Features 3 & 4: Bid section for providers */}
-        {canBid && (
-          <View style={styles.section}>
-            {alreadyBid && !editingBid ? (
-              <>
-                <Text style={styles.sectionTitle}>Your offer</Text>
-                <View style={styles.myBidSummary}>
-                  <Text style={styles.myBidAmount}>{formatOfferAmount(Number(myBid?.amount || 0).toFixed(2), myBid?.pricing_type)}</Text>
-                  {myBid?.line_items?.length > 1 && (
-                    <View style={styles.lineItemsBreakdown}>
-                      {myBid.line_items.map((li, i) => (
-                        <View key={i} style={styles.breakdownRow}>
-                          <Text style={styles.breakdownLabel}>{li.label}</Text>
-                          <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  {myBid?.message ? <Text style={styles.myBidMessage}>{myBid.message}</Text> : null}
-                  {myBid?.available_from && (
-                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {formatOfferAvailability(myBid.available_from)}</Text>
-                  )}
-                  {myBid?.estimated_duration && (
-                    <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
-                  )}
-                  {myBid?.materials && (
-                    <Text style={styles.myBidMeta}><Icon name="construct-outline" size={12} color={colors.textMuted} /> {OFFER_MATERIALS_LABELS[myBid.materials] || myBid.materials}</Text>
-                  )}
-                  <Text style={styles.myBidStatus}>{offerStatusLabel(myBid?.status)}</Text>
-                </View>
-                {myBid?.status === 'pending' && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    title="Edit offer"
-                    onPress={() => setEditingBid(true)}
-                    style={{ marginTop: 4 }}
-                    accessibilityLabel="Edit your offer"
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                <Text style={styles.sectionTitle}>{editingBid ? 'Edit your offer' : 'Make an Offer'}</Text>
-                {bidFormJSX}
-              </>
-            )}
-          </View>
-        )}
-
-        {/* Requester-only account: prompt to enable providing before offering */}
-        {needsProviderOptIn && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Make an offer</Text>
-            <Text style={styles.optInBody}>
-              Offering on jobs is a provider feature. Enable providing on your account to make an offer — you can still request help as usual.
-            </Text>
-            <Button
-              title="Enable providing"
-              icon="briefcase-outline"
-              onPress={handleEnableProviding}
-              style={{ marginTop: 12 }}
-              accessibilityLabel="Enable providing to make an offer"
-            />
-          </View>
-        )}
-
+    </>
+  )
+  const offersJSX = (
+    <>
         {/* Bids list for job owner */}
         {isJobOwner && (
           <View style={styles.section}>
@@ -1503,6 +1325,244 @@ export default function JobDetailScreen({ route, navigation }) {
             ))}
           </View>
         )}
+    </>
+  )
+  const jobDetailsJSX = (
+    <>
+        {/* Job card */}
+        <View style={styles.card}>
+          {!requesterOpen && <View style={styles.cardHeader}>
+            <Text style={styles.category}>Category: {job.category}</Text>
+            <Text style={styles.price}>
+              {jobBudget(job)}
+            </Text>
+          </View>}
+          {!requesterOpen && <Text style={styles.title} accessibilityRole="header">{job.title}</Text>}
+          <Text style={styles.description}>{job.description}</Text>
+
+          {/* Feature 1: materials/access */}
+          {job.materials_type && (
+            <View style={styles.accessRow}>
+              <Icon name="construct-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.accessText}>{MATERIALS_LABELS[job.materials_type] || job.materials_type}</Text>
+            </View>
+          )}
+          {job.access_conditions?.length > 0 && (
+            <View style={styles.accessRow}>
+              <Icon name="car-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.accessText}>{job.access_conditions.map(c => ACCESS_LABELS[c] || c).join(', ')}</Text>
+            </View>
+          )}
+          {job.location_note ? (
+            <View style={styles.accessRow}>
+              <Icon name="document-text-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.accessText}>{job.location_note}</Text>
+            </View>
+          ) : null}
+
+          <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{width:'100%',height:200}}/>
+          {job.photos?.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.photoStrip} style={styles.photoStripWrap}>
+              {job.photos.map((url, i) => (
+                <Image key={i} source={{ uri: url }} style={styles.photoStripImg} />
+              ))}
+            </ScrollView>
+          )}
+
+          {!!jobMapTarget(job) && !discreetHouseSit && (
+            <TouchableOpacity style={styles.mapThumbWrap}
+              onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
+              activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="View job location pin on map">
+              <Image source={{ uri: jobStaticMapUrl(job) }} style={styles.mapThumbImg} resizeMode="cover" />
+              {job.area_hectares ? (
+                <View style={styles.mapAreaBadge}>
+                  <Text style={styles.mapAreaBadgeText}>{job.area_hectares} ha</Text>
+                </View>
+              ) : null}
+              <View style={styles.mapTapHint}>
+                <Text style={styles.mapTapHintText}>Tap to navigate <Icon name="arrow-forward" size={12} color={colors.white} /></Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> Location: {discreetHouseSit ? (coarseSuburb(job.location_area || job.location_name) || job.location_area || 'Area shared privately') : jobLocation(job)}</Text>
+          {(discreetHouseSit || approximateLocation || (job.hide_exact_location && !job.location_name)) ? (
+            <Text style={styles.locationNote}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /> Exact address is shared once your offer is accepted.</Text>
+          ) : null}
+          {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}
+          <Text style={styles.locationNote}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Requested: {jobRequested(job)}</Text>
+          <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
+        </View>
+
+    </>
+  )
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {headerJSX}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
+      <ScrollView ref={openJobScrollRef} style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
+
+        {myInvite && (
+          <View style={styles.invitedBanner}>
+            <Icon name="mail-open-outline" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.invitedBannerTitle}>{myInvite.status === 'accepted' ? 'Invitation accepted' : 'Invitation received'}</Text>
+              <Text style={styles.invitedBannerSub}>
+                {(requesterProfile?.full_name?.split(' ')[0] || 'The requester')} invited you directly. You can make an offer below.
+              </Text>
+            </View>
+            {myInvite.status !== 'accepted' && <TouchableOpacity accessibilityRole="button" onPress={async () => {
+              const { error } = await respondToJobInvitation(myInvite, 'accept')
+              if (error) Alert.alert('Could not accept invitation', error.message)
+              else setMyInvite({ ...myInvite, status: 'accepted' })
+            }}><Text style={styles.declineLink}>Accept</Text></TouchableOpacity>}
+            <TouchableOpacity
+              onPress={handleDeclineInvite}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Decline this invitation">
+              <Text style={styles.declineLink}>Decline</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {requesterOpen ? <>
+          {unansweredQuestions.length > 0 && questionsJSX}
+          {offersJSX}
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.detailsToggle} accessibilityRole="button" accessibilityLabel="Job details"
+              accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(value => !value)}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.detailsTitle}>Job details</Text>
+                <Text style={styles.locationNote}>{job.category}{' \u00b7 '}{jobBudget(job)}</Text>
+              </View>
+              <Icon name={detailsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+            {detailsExpanded && <>
+              {jobDetailsJSX}
+              {answeredQuestions.length > 0 && <View>
+                <Text style={styles.sectionTitle}>Answered questions</Text>
+                {answeredQuestions.map(renderQuestion)}
+              </View>}
+            </>}
+          </View>
+        </> : jobDetailsJSX}
+
+        {/* Owner shortcut to the management screen (edit / share / cancel / delete).
+            Hidden when we arrived from Manage, so Back just returns there. */}
+        {isJobOwner && !fromManage && (
+          <Button
+            icon="settings-outline"
+            title="Manage job"
+            onPress={() => navigation.navigate('ManageTask', { job, bidCount: bids.length })}
+            style={{ marginBottom: 16 }}
+            accessibilityLabel="Manage this job"
+          />
+        )}
+
+        {isJobOwner && acceptedBid && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && (
+          <>
+            <JobArrangementSummary arrival={workSchedule?.arrival_start_at}
+              duration={acceptedBid.estimated_duration}/>
+            <JobPaymentHandoff
+              bidId={acceptedBid.id}
+              method={acceptedBid.payment_method}
+              sortedAt={acceptedBid.payment_sorted_at}
+              sortedBy={acceptedBid.payment_sorted_by}
+              requesterId={job.requester_id}
+              providerId={acceptedBid.provider_id}
+              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner)}
+              onChanged={fetchData}
+            />
+          </>
+        )}
+
+        {/* Requester: completed — leave / edit the provider review */}
+        {isJobOwner && job.status === 'completed' && acceptedBid && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Reviews</Text>
+            {jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview === undefined ? undefined : !!receivedReview, 'Provider').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
+            <ReceivedReview review={receivedReview} fromLabel="provider" />
+            <Button
+              title={providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
+              onPress={() => setProviderReviewVisible(true)}
+              accessibilityLabel={providerReview ? 'Edit provider review' : 'Review provider'}
+            />
+          </View>
+        )}
+
+        {!requesterOpen && questionsJSX}
+
+        {/* Features 3 & 4: Bid section for providers */}
+        {canBid && (
+          <View style={styles.section}>
+            {alreadyBid && !editingBid ? (
+              <>
+                <Text style={styles.sectionTitle}>Your offer</Text>
+                <View style={styles.myBidSummary}>
+                  <Text style={styles.myBidAmount}>{formatOfferAmount(Number(myBid?.amount || 0).toFixed(2), myBid?.pricing_type)}</Text>
+                  {myBid?.line_items?.length > 1 && (
+                    <View style={styles.lineItemsBreakdown}>
+                      {myBid.line_items.map((li, i) => (
+                        <View key={i} style={styles.breakdownRow}>
+                          <Text style={styles.breakdownLabel}>{li.label}</Text>
+                          <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  {myBid?.message ? <Text style={styles.myBidMessage}>{myBid.message}</Text> : null}
+                  {myBid?.available_from && (
+                    <Text style={styles.myBidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available from: {formatOfferAvailability(myBid.available_from)}</Text>
+                  )}
+                  {myBid?.estimated_duration && (
+                    <Text style={styles.myBidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {myBid.estimated_duration}</Text>
+                  )}
+                  {myBid?.materials && (
+                    <Text style={styles.myBidMeta}><Icon name="construct-outline" size={12} color={colors.textMuted} /> {OFFER_MATERIALS_LABELS[myBid.materials] || myBid.materials}</Text>
+                  )}
+                  <Text style={styles.myBidStatus}>{offerStatusLabel(myBid?.status)}</Text>
+                </View>
+                {myBid?.status === 'pending' && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    title="Edit offer"
+                    onPress={() => setEditingBid(true)}
+                    style={{ marginTop: 4 }}
+                    accessibilityLabel="Edit your offer"
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={styles.sectionTitle}>{editingBid ? 'Edit your offer' : 'Make an Offer'}</Text>
+                {bidFormJSX}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Requester-only account: prompt to enable providing before offering */}
+        {needsProviderOptIn && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Make an offer</Text>
+            <Text style={styles.optInBody}>
+              Offering on jobs is a provider feature. Enable providing on your account to make an offer — you can still request help as usual.
+            </Text>
+            <Button
+              title="Enable providing"
+              icon="briefcase-outline"
+              onPress={handleEnableProviding}
+              style={{ marginTop: 12 }}
+              accessibilityLabel="Enable providing to make an offer"
+            />
+          </View>
+        )}
+
+        {!requesterOpen && offersJSX}
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
       </KeyboardAvoidingView>
@@ -1633,6 +1693,11 @@ const styles = StyleSheet.create({
   mapTapHint:        { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.45)', paddingVertical: 6, alignItems: 'center' },
   mapTapHintText:    { fontSize: 12, fontWeight: '600', color: colors.white },
   locationNote:      { color: colors.textMuted, fontSize: 13, marginBottom: 6, lineHeight: 18 },
+
+  detailsToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: touchTarget.minHeight },
+  detailsTitle: { color: colors.textPrimary, fontSize: typography.sizeLg, fontWeight: '700', marginBottom: spacing.sm },
+  requesterAnswerBtn: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md, minHeight: touchTarget.minHeight, justifyContent: 'center', alignItems: 'center' },
+  requesterAnswerBtnText: { color: colors.white, fontSize: typography.sizeSm, fontWeight: '700' },
 
   // Feature 2: Q&A
   questionCard:    { backgroundColor: '#f9f9f9', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#e8e8e8' },
