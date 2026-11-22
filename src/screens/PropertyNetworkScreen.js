@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react'
-import {Alert,BackHandler,Image,Linking,ScrollView,Share,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
+import {Alert,BackHandler,Image,Linking,Modal,ScrollView,Share,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
@@ -15,12 +15,12 @@ import {loadInviteChoices,loadSavedProviders,providerInviteJobs,setProviderSaved
 import {NZ_REGIONS,loadPropertyMatches,matchLocality,propertyNeed,regionForLocality,regionFromText} from '../../shared/propertyMatching'
 import {placesAutocomplete} from '../lib/maps'
 import {
- PROPERTY_AREA_DESCRIPTIONS,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
+ PROPERTY_AREA_DESCRIPTIONS,PROPERTY_HUB_SIZE,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiagramRatio,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,savePropertyService,setPropertyArea,setPropertyProvider,
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
- propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,PROPERTY_STATUS_LABELS,
+ propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,PROPERTY_STATUS_LABELS,PROPERTY_STATUS_ICONS,propertyNodeStatus,propertyToneIcon,propertyBulkLabel,propertyBulkMessage,
 } from '../../shared/propertyNetwork'
 
 const PROPERTY_CHOICES=[['sorted',PROPERTY_STATUS_LABELS.sorted],['help',PROPERTY_STATUS_LABELS.help],['na',PROPERTY_STATUS_LABELS.na]]
@@ -55,15 +55,48 @@ function ContactForm({initial,busy,onSave,onCancel,onDelete}){
  </View>
 }
 
-function AreaButton({area,selected,onPress,style,diagram=false}){
- const badges=propertyAreaStatus(area)
+// Compact region choice: one field showing the current region; tapping it
+// opens the 16 regions as a scrollable list with the selected one ticked.
+function RegionSelect({value,onChange}){
+ const [open,setOpen]=useState(false)
+ return <>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Region: '+(value||'not chosen')} accessibilityHint="Opens the list of regions"
+   style={styles.select} onPress={()=>setOpen(true)}>
+   <Text style={[styles.statusText,!value&&{color:colors.textSecondary}]}>{value||'Choose a region'}</Text>
+   <Icon name="chevron-down" size={18} color={colors.primary}/>
+  </TouchableOpacity>
+  <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
+   <TouchableOpacity accessible={false} activeOpacity={1} onPress={()=>setOpen(false)} style={styles.sheetBackdrop}>
+    <View accessibilityViewIsModal style={styles.sheet} onStartShouldSetResponder={()=>true}>
+     <Text accessibilityRole="header" style={styles.serviceTitle}>Choose a region</Text>
+     <ScrollView style={{marginTop:6}}>
+      {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="button" accessibilityState={{selected:value===item}}
+       style={styles.sheetRow} onPress={()=>{onChange(item);setOpen(false)}}>
+       <Text style={[styles.statusText,value===item&&styles.nodeLabel]}>{item}</Text>
+       {value===item&&<Icon name="checkmark" size={20} color={colors.primary}/>}
+      </TouchableOpacity>)}
+     </ScrollView>
+     <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={()=>setOpen(false)}>
+      <Text style={styles.actionText}>Cancel</Text></TouchableOpacity>
+    </View>
+   </TouchableOpacity>
+  </Modal>
+ </>
+}
+
+const NODE_TONE={help:colors.jobInk,unset:colors.textSecondary,sorted:colors.primaryDark,linked:colors.primaryDark}
+// A diagram node: tapping it opens the area's service checklist.
+function AreaButton({area,selected,onPress,style}){
+ const lines=propertyNodeStatus(area)
  return <TouchableOpacity accessibilityRole="button" accessibilityState={{selected}} onPress={onPress}
-  accessibilityLabel={[area.label,...badges.map(badge=>badge.label)].join(', ')}
-  style={[styles.areaButton,diagram?styles.diagramNode:styles.listNode,selected&&styles.selected,style]}>
-  <Icon name={area.icon} size={22} color={selected?colors.white:colors.primary}/>
-  <Text style={[styles.nodeLabel,diagram&&styles.diagramLabel,selected&&styles.selectedText]}>{area.label}</Text>
-  {badges.map(badge=><Text key={badge.tone} style={[styles.badge,badge.tone==='linked'&&styles.linkedBadge,
-   badge.tone==='gap'&&styles.gap,selected&&styles.selectedText]}>{badge.label}</Text>)}
+  accessibilityLabel={[area.label,...lines.map(line=>line.label)].join(', ')} accessibilityHint="Opens the service checklist"
+  style={[styles.areaButton,styles.diagramNode,lines[0].tone==='help'&&styles.nodeHelp,selected&&styles.selected,style]}>
+  <Icon name={area.icon} size={20} color={selected?colors.white:colors.primary}/>
+  <Text numberOfLines={2} style={[styles.nodeLabel,styles.diagramLabel,selected&&styles.selectedText]}>{area.label}</Text>
+  {lines.map(line=><View key={line.tone} style={styles.nodeLine}>
+   <Icon name={line.icon} size={11} color={selected?colors.white:NODE_TONE[line.tone]}/>
+   <Text numberOfLines={1} style={[styles.badge,{flexShrink:1,color:NODE_TONE[line.tone]},selected&&styles.selectedText]}>{line.label}</Text>
+  </View>)}
  </TouchableOpacity>
 }
 
@@ -86,7 +119,7 @@ function PropertyDiagram({areas,selected,onSelect,onOpenProperty}){
   <TouchableOpacity style={[styles.centre,{width:hub,height:hub,borderRadius:hub/2,left:(size-hub)/2,top:(size*ratio-hub)/2}]} accessibilityRole="button" accessibilityLabel="My Property" onPress={onOpenProperty}><Icon name="home-outline" size={22} color={colors.white}/><Text style={styles.centreText}>My Property</Text></TouchableOpacity>
   {size>0&&areas.map((area,index)=>{
    const pt=spots[index],width=size*PROPERTY_NODE_WIDTH/100
-   return <AreaButton key={area.id} diagram area={area} selected={area.id===selected} onPress={()=>onSelect(area.id)}
+   return <AreaButton key={area.id} area={area} selected={area.id===selected} onPress={()=>onSelect(area.id)}
     style={{width,left:size*pt.x/100-width/2,top:size*ratio*pt.y/100-PROPERTY_NODE_HEIGHT/2}}/>
   })}
  </View>
@@ -166,9 +199,9 @@ function PropertyNetworkScreen({navigation,route}){
  function browse({category,kind}){
   navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category,kind}})
  }
- function post(person,category){
+ function post(person,category,service){
   setTarget(null)
-  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category}}:{}})
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category,service}}:{}})
  }
  // Turning on the wider region fills it in when the locality names exactly one
  // region, directly or in the address suggestions for that place.
@@ -339,14 +372,12 @@ function PropertyNetworkScreen({navigation,route}){
    if(status!==service.status)await savePropertyService(supabase,owner,{...service,status:status??null})
   },message)
  }
+ // Bulk actions only fill unanswered services: answers, Me and linked
+ // providers or contacts are never overwritten, so no confirmation is needed.
  function bulk(item,status){
   const {updates,kept}=propertyBulkServices(item.services,status)
   if(!updates.length)return
-  const label=status==='sorted'?'Sorted':'N/A'
-  const run=()=>void mutate(()=>savePropertyServices(supabase,owner,updates),updates.length+' '+(updates.length===1?'service':'services')+' marked '+label+'.')
-  if(!kept)return run()
-  Alert.alert('Mark the rest as '+label+'?','The '+kept+' you have already answered stay as they are.',[
-   {text:'Cancel',style:'cancel'},{text:'Mark '+updates.length+' as '+label,onPress:run}])
+  void mutate(()=>savePropertyServices(supabase,owner,updates),propertyBulkMessage(updates.length,kept,status))
  }
  function removeArea(item){
   Alert.alert('Remove '+item.label+' from your property?','Your answers are kept if you add it back.',[
@@ -428,7 +459,8 @@ function PropertyNetworkScreen({navigation,route}){
       return <TouchableOpacity key={item.id} accessibilityRole="button" accessibilityLabel={item.label+', '+progress.tag+', '+progress.summary}
        style={styles.card} onPress={()=>selectArea(item.id)}>
        <View style={styles.cardTop}><View style={styles.cardTitle}><Icon name={item.icon} size={20} color={colors.primary}/><Text style={styles.nodeLabel}>{item.label}</Text></View>
-        <Text style={[styles.statusTag,tone]}>{progress.tag}</Text></View>
+        <View style={[styles.statusTag,styles.tagRow,tone]}><Icon name={propertyToneIcon(progress.tone)} size={13} color={progress.tone==='help'?colors.jobInk:progress.tone==='done'?colors.primary:'#555555'}/>
+         <Text style={[styles.tagText,progress.tone==='help'&&{color:colors.jobInk},progress.tone==='done'&&{color:colors.primary}]}>{progress.tag}</Text></View></View>
        <View style={styles.bar}>
         {progress.sorted>0&&<View style={[styles.barPart,{flex:progress.sorted,backgroundColor:colors.primary}]}/>}
         {progress.help>0&&<View style={[styles.barPart,{flex:progress.help,backgroundColor:colors.warning}]}/>}
@@ -453,14 +485,16 @@ function PropertyNetworkScreen({navigation,route}){
      <Text style={styles.muted}>One tap each. Tell us who does it if you like.</Text>
      {!!error&&<Text accessibilityRole="alert">{error}</Text>}
      {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
-     <View style={[styles.row,{marginTop:10}]}>
-      {[['sorted','All sorted'],['irrelevant','None of this applies']].map(([status,label])=>{
-       const off=busy||!area.services.some(service=>!service.status)
-       return <TouchableOpacity key={status} accessibilityRole="button" accessibilityState={{disabled:off}} disabled={off}
-        style={[styles.pill,status==='irrelevant'&&styles.pillQuiet,off&&styles.disabled]} onPress={()=>bulk(area,status)}>
-        <Text style={status==='irrelevant'?styles.nodeLabel:styles.actionText}>{label}</Text></TouchableOpacity>
-      })}
-     </View>
+     {(()=>{
+      const unset=area.services.filter(service=>!service.status).length,answered=area.services.length-unset
+      if(!unset)return null
+      return <><View style={[styles.row,{marginTop:10}]}>
+       {[['sorted'],['irrelevant']].map(([status])=><TouchableOpacity key={status} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy}
+        style={[styles.pill,status==='irrelevant'&&styles.pillQuiet,busy&&styles.disabled]} onPress={()=>bulk(area,status)}>
+        <Text style={status==='irrelevant'?styles.nodeLabel:styles.actionText}>{propertyBulkLabel(status,answered)}</Text></TouchableOpacity>)}
+      </View>
+      {answered>0&&<Text style={[styles.small,{marginTop:4}]}>Only the {unset} still to check change. Your other answers and helpers stay.</Text>}</>
+     })()}
      {area.services.map(service=>{
       const linked=linkedPropertyProviders(data,service)
       const contacts=linkedPropertyContacts(data,service)
@@ -474,12 +508,15 @@ function PropertyNetworkScreen({navigation,route}){
       return <View style={styles.service} key={service.service_key}>
        <View style={styles.cardTop}>
         <Text accessibilityRole="header" style={[styles.serviceTitle,{flexShrink:1}]}>{service.name}</Text>
-        {(!choice||choice==='help')&&<Text style={[styles.statusTag,choice&&styles.tagHelp]}>{choice?PROPERTY_STATUS_LABELS.help:PROPERTY_STATUS_LABELS.unset}</Text>}
+        {(!choice||choice==='help')&&<View style={[styles.statusTag,styles.tagRow,choice&&styles.tagHelp]}>
+         <Icon name={choice?PROPERTY_STATUS_ICONS.help:PROPERTY_STATUS_ICONS.unset} size={13} color={choice?colors.jobInk:'#555555'}/>
+         <Text style={[styles.tagText,choice&&{color:colors.jobInk}]}>{choice?PROPERTY_STATUS_LABELS.help:PROPERTY_STATUS_LABELS.unset}</Text></View>}
        </View>
        <View style={styles.choices} accessibilityLabel={service.name+' status'}>
         {PROPERTY_CHOICES.map(([value,label])=><TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:choice===value,disabled:busy}}
          disabled={busy} style={[styles.choice,choice===value&&styles['choice_'+value]]} onPress={()=>void tapChoice(service,value,covered)}>
-         <Text style={[styles.choiceText,choice===value&&styles['choiceText_'+value]]}>{label}</Text>
+         <View style={styles.choiceInner}>{choice===value&&<Icon name="checkmark" size={16} color={styles['choiceText_'+value].color}/>}
+          <Text style={[styles.choiceText,choice===value&&styles['choiceText_'+value]]}>{label}</Text></View>
         </TouchableOpacity>)}
        </View>
        {choice==='sorted'&&<View style={{marginTop:10,gap:6}}>
@@ -488,7 +525,7 @@ function PropertyNetworkScreen({navigation,route}){
          <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:service.status==='self',disabled:busy}} disabled={busy}
           style={[styles.chip,service.status==='self'&&styles.chipOn]}
           onPress={()=>void mutate(()=>savePropertyService(supabase,owner,{...service,status:propertyWhoMeStatus(service.status)}),'Saved.')}>
-          <Text style={styles.chipText}>Me</Text></TouchableOpacity>
+          <Text style={styles.chipText}>{service.status==='self'?'Me ✓':'Me'}</Text></TouchableOpacity>
          <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:linked.length>0,expanded:providerOpen}}
           style={[styles.chip,linked.length>0&&styles.chipOn]} onPress={()=>togglePicker(service,'provider')}>
           <Text style={styles.chipText}>{linked.length?linked.map(propertyProviderName).join(', ')+' ✓':'A provider…'}</Text></TouchableOpacity>
@@ -523,7 +560,7 @@ function PropertyNetworkScreen({navigation,route}){
         <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:matchKey===service.service_key}} style={styles.smallPrimary}
          onPress={()=>matchKey===service.service_key?closeMatches():findMatches(service,category)}>
          <Text style={styles.primaryText}>{matchKey===service.service_key?'Close search':'Find local help'}</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" style={styles.postJob} onPress={()=>post(null,postCategory)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.postJob} onPress={()=>post(null,postCategory,service.name)}>
          <Text style={styles.gap}>Post a job</Text></TouchableOpacity>
        </View>}
        {matchKey===service.service_key&&<View style={[styles.picker,{marginTop:10}]}>
@@ -536,11 +573,7 @@ function PropertyNetworkScreen({navigation,route}){
         </TouchableOpacity>
         {widen&&<><Text style={styles.nodeLabel}>Region</Text>
          {!!regionHint&&<Text style={styles.small}>{regionHint}</Text>}
-         <View style={[styles.row,{marginTop:6}]} accessibilityLabel="Region">
-          {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="button" accessibilityState={{selected:region===item}}
-           style={[styles.chip,region===item&&styles.chipOn]} onPress={()=>{setRegion(item);setRegionHint('')}}>
-           <Text style={styles.chipText}>{item}</Text></TouchableOpacity>)}
-         </View></>}
+         <RegionSelect value={region} onChange={item=>{setRegion(item);setRegionHint('')}}/></>}
         <Text style={styles.small}>Results don't update as you type. Tap Search providers after changing the town or region.</Text>
         <LocalAction label="Search providers" disabled={matchBusy||!(matchLocality(locality)||(widen&&matchLocality(region)))} onPress={()=>findMatches(service,category)}/>
         {matchBusy&&<Text accessibilityLiveRegion="polite">Finding providers…</Text>}
@@ -563,7 +596,7 @@ function PropertyNetworkScreen({navigation,route}){
           disabled={busy||linked.some(row=>row.id===person.id)} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')}/>
          <LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
         </View>)}
-        <LocalAction label="Post a job" onPress={()=>post(null,postCategory)}/>
+        <LocalAction label="Post a job" onPress={()=>post(null,postCategory,service.name)}/>
        </View>}
        {providerOpen&&<View style={[styles.picker,{marginTop:10}]}>
         <Text style={styles.serviceTitle}>{replacingHere?'Choose the member who replaces '+replacing.name:'Choose a provider'}</Text>
@@ -602,13 +635,13 @@ function PropertyNetworkScreen({navigation,route}){
       </View>
      })}
      {addingOpen?<View style={{marginTop:12}}>
-      <Text style={styles.nodeLabel}>Something else on your property</Text>
-      <TextInput accessibilityLabel="Something else on your property" style={styles.input} placeholder="e.g. Check the spring intake" autoFocus
+      <Text style={styles.nodeLabel}>Another service for {area.label}</Text>
+      <TextInput accessibilityLabel={'Another service for '+area.label} style={styles.input} placeholder="e.g. Check the spring intake" autoFocus
        placeholderTextColor={colors.textSecondary} value={serviceName} onChangeText={setServiceName} maxLength={80}/>
       <View style={styles.row}><LocalAction label="Add" icon="add" disabled={busy||!serviceName.trim()} onPress={addService}/>
        <LocalAction label="Cancel" onPress={()=>{setAddingOpen(false);setServiceName('')}}/></View>
      </View>:<TouchableOpacity accessibilityRole="button" style={styles.dashed} onPress={()=>setAddingOpen(true)}>
-      <Text style={styles.actionText}>+ Add something else</Text></TouchableOpacity>}
+      <Text style={styles.actionText}>+ Add another service</Text></TouchableOpacity>}
      <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.remove} onPress={()=>removeArea(area)}>
       <Text style={styles.removeText}>Remove {area.label} from my property</Text></TouchableOpacity>
   </ScrollView>}
@@ -637,6 +670,8 @@ const styles=StyleSheet.create({
  selectedText:{color:colors.white,fontWeight:'700'},
  service:{backgroundColor:colors.white,borderRadius:14,padding:14,marginTop:12},
  diagramLabel:{fontSize:12,textAlign:'center'},
+ nodeLine:{flexDirection:'row',alignItems:'center',gap:2,maxWidth:'100%'},
+ nodeHelp:{borderWidth:1.5,borderColor:colors.warning},
  badge:{fontSize:11,fontWeight:'600',textAlign:'center',color:colors.textSecondary},
  linkedBadge:{color:colors.primaryDark},
  matchAvatar:{height:38,width:38,borderRadius:19},
@@ -675,6 +710,8 @@ const styles=StyleSheet.create({
  cardTitle:{flexDirection:'row',alignItems:'center',gap:8,flexShrink:1},
  statusTag:{fontSize:12,fontWeight:'700',borderRadius:999,paddingHorizontal:8,paddingVertical:3,backgroundColor:'#eeeeee',color:'#555555',overflow:'hidden'},
  tagHelp:{backgroundColor:colors.jobFill,color:colors.jobInk},
+ tagRow:{flexDirection:'row',alignItems:'center',gap:4},
+ tagText:{fontSize:12,fontWeight:'700',color:'#555555'},
  tagDone:{backgroundColor:colors.primaryLight,color:colors.primary},
  bar:{flexDirection:'row',gap:3,height:6},
  barPart:{borderRadius:3},
@@ -686,6 +723,7 @@ const styles=StyleSheet.create({
  choice_sorted:{borderWidth:2,borderColor:colors.primary,backgroundColor:'#e8f1eb'},
  choice_help:{borderWidth:2,borderColor:colors.warning,backgroundColor:colors.jobFill},
  choice_na:{borderWidth:2,borderColor:'#757575',backgroundColor:'#eeeeee'},
+ choiceInner:{flexDirection:'row',alignItems:'center',gap:4},
  choiceText:{fontSize:14,fontWeight:'600',color:'#333333'},
  choiceText_sorted:{color:'#1f4a37'},
  choiceText_help:{color:colors.jobInk},
@@ -696,6 +734,10 @@ const styles=StyleSheet.create({
  postJob:{minHeight:44,borderRadius:10,borderWidth:1,borderColor:colors.jobLine,backgroundColor:colors.jobFill,paddingHorizontal:14,justifyContent:'center'},
  remove:{minHeight:44,marginTop:20,alignItems:'center',justifyContent:'center'},
  removeText:{color:'#a32d2d',fontWeight:'600'},
+ select:{marginTop:6,minHeight:46,flexDirection:'row',alignItems:'center',gap:8,backgroundColor:colors.white,borderWidth:1,borderColor:colors.border,borderRadius:8,paddingHorizontal:12},
+ sheetBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.35)',justifyContent:'flex-end'},
+ sheet:{maxHeight:'75%',backgroundColor:colors.white,borderTopLeftRadius:16,borderTopRightRadius:16,padding:18,paddingBottom:28},
+ sheetRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:8,borderBottomWidth:1,borderBottomColor:'#eeeeee'},
  input:{marginTop:6,backgroundColor:colors.white,borderWidth:1,borderColor:colors.border,borderRadius:8,padding:12,color:colors.textPrimary},
 })
 

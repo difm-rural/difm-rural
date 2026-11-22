@@ -17,7 +17,7 @@ import {
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  type PropertyContact,type PropertyContactInput,
- propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
+ propertyAreaProgress,propertyAreaWho,propertyBulkLabel,propertyBulkMessage,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
  propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,type PropertyChoice,
 } from '@shared/propertyNetwork'
 import type {ListingKind} from '@shared/listingPricing'
@@ -299,9 +299,8 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  async function bulk(area:AreaView,status:'sorted'|'irrelevant'){
   const {updates,kept}=propertyBulkServices(area.services,status)
   if(!updates.length)return
-  const label=status==='sorted'?'Sorted':'N/A'
-  if(kept&&!window.confirm('Mark the '+updates.length+' unanswered '+(updates.length===1?'service':'services')+' as '+label+'? The '+kept+' you have already answered stay as they are.'))return
-  await mutate(()=>savePropertyServices(client,owner,updates),updates.length+' '+(updates.length===1?'service':'services')+' marked '+label+'.')
+  // Only unanswered services change: answers and helpers are never overwritten.
+  await mutate(()=>savePropertyServices(client,owner,updates),propertyBulkMessage(updates.length,kept,status))
  }
 
  async function removeArea(area:AreaView){
@@ -392,8 +391,10 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
     <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}><PropertyAreaIcon area={current.id} size={26}/> {current.label}</h2>
     <p className="muted">One tap each. Tell us who does it if you like.</p>
     <div className="property-bulk">
-     <button type="button" className="property-pill" disabled={busy||!current.services.some(service=>!service.status)} onClick={()=>void bulk(current,'sorted')}>All sorted</button>
-     <button type="button" className="property-pill quiet" disabled={busy||!current.services.some(service=>!service.status)} onClick={()=>void bulk(current,'irrelevant')}>None of this applies</button>
+     {current.services.some(service=>!service.status)&&<>
+      <button type="button" className="property-pill" disabled={busy} onClick={()=>void bulk(current,'sorted')}>{propertyBulkLabel('sorted',current.services.filter(service=>service.status).length)}</button>
+      <button type="button" className="property-pill quiet" disabled={busy} onClick={()=>void bulk(current,'irrelevant')}>{propertyBulkLabel('irrelevant',current.services.filter(service=>service.status).length)}</button>
+     </>}
     </div>
     {current.services.map(service=>{
      const linked=linkedPropertyProviders(data,service)
@@ -522,10 +523,10 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      </article>
     })}
     {addingOpen?<form className="lform" onSubmit={addService}>
-     <label className="lform-field">Something else on your property<input value={serviceName} onChange={event=>setServiceName(event.target.value)} maxLength={80} required autoFocus/></label>
+     <label className="lform-field">Another service for {current.label}<input value={serviceName} onChange={event=>setServiceName(event.target.value)} maxLength={80} required autoFocus/></label>
      <div className="lform-actions"><button className="lform-save" disabled={busy||!serviceName.trim()}>Add</button>
       <button type="button" className="lform-cancel" onClick={()=>{setAddingOpen(false);setServiceName('')}}>Cancel</button></div>
-    </form>:<button type="button" className="property-add-area" onClick={()=>setAddingOpen(true)}>+ Add something else</button>}
+    </form>:<button type="button" className="property-add-area" onClick={()=>setAddingOpen(true)}>+ Add another service</button>}
     <button type="button" className="property-remove" disabled={busy} onClick={()=>void removeArea(current)}>Remove {current.label} from my property</button>
    </section>}
   </div>}

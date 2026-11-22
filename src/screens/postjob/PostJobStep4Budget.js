@@ -18,9 +18,10 @@ const PRICE_OPTIONS = [
 ]
 
 const MATERIALS_OPTIONS = [
-  { id: 'none',      label: 'Nothing required', icon: 'checkmark-circle-outline' },
-  { id: 'requester', label: "I'll provide", icon: 'home-outline' },
-  { id: 'provider',  label: 'Provider supplies', icon: 'construct-outline' },
+  // Same words as Review, job detail and the web.
+  { id: 'none',      label: 'No materials needed', icon: 'remove-circle-outline' },
+  { id: 'requester', label: 'I supply materials',  icon: 'home-outline' },
+  { id: 'provider',  label: 'Provider to supply',  icon: 'construct-outline' },
 ]
 
 const SCHEDULE_LABELS = {
@@ -77,11 +78,14 @@ export default function PostJobStep4Budget({ navigation, route }) {
   }, [priceType, price, materialsType])
 
   const [attempted,setAttempted]=useState(false)
+  // Fixed price needs an amount above $0; Open to offers needs none.
+  const budgetError = priceType === 'fixed'
+    ? (String(price ?? '').trim() ? moneyInputError(price,'Budget') : 'Enter a budget above $0, or choose Open to offers.')
+    : ''
   function canProceed() {
     if (!materialsType) return false
     if (!priceType) return false
-    if (priceType === 'open') return true
-    return !moneyInputError(price,'Budget')
+    return !budgetError
   }
 
   function handleBack() {
@@ -128,7 +132,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   onPress={() => setPriceType(opt.id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: priceType === opt.id }}>
-                  <Icon name={opt.icon} size={24} color={colors.primary} />
+                  <Icon name={priceType === opt.id ? 'checkmark-circle' : opt.icon} size={24} color={colors.primary} />
                   <Text style={[styles.priceTileLabel, priceType === opt.id && styles.priceTileLabelActive]}>
                     {opt.label}
                   </Text>
@@ -146,7 +150,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   <Text style={styles.currencyText}>$</Text>
                 </View>
                 <TextInput
-                  style={[styles.amountInput, attempted && !!moneyInputError(price,'Budget') && {borderColor:colors.danger,borderWidth:2}]}
+                  style={[styles.amountInput, attempted && !!budgetError && {borderColor:colors.danger,borderWidth:2}]}
                   placeholder="e.g. 250"
                   placeholderTextColor={colors.textMuted}
                   value={price}
@@ -157,7 +161,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   accessibilityLabel="Price in dollars"
                 />
               </View>
-              {(attempted||!!String(price??'').trim()) && !!moneyInputError(price,'Budget') && <Text accessibilityRole="alert" style={{ color: colors.danger, marginTop: 10 }}>{moneyInputError(price,'Budget')}</Text>}
+              {(attempted||!!String(price??'').trim()) && !!budgetError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginTop: 10 }}>{budgetError}</Text>}
             </View>
           )}
 
@@ -172,7 +176,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
                   onPress={() => setMaterialsType(opt.id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: materialsType === opt.id }}>
-                  <Icon name={opt.icon} size={22} color={colors.primary} />
+                  <Icon name={materialsType === opt.id ? 'checkmark-circle' : opt.icon} size={22} color={colors.primary} />
                   <Text style={[styles.tileLabel, materialsType === opt.id && styles.tileLabelActive]}>
                     {opt.label}
                   </Text>

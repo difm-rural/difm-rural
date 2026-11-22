@@ -76,6 +76,13 @@ export async function loadSavedProviders(client:unknown,userId:string){
  return saves.flatMap(row=>people.get(row.provider_id) ?? [])
 }
 
+// A short summary for a card: the first few items, then how many more
+// ("Fencing · Water +2 more"). Duplicates and blanks are dropped.
+export function shortList(items:readonly (string|null|undefined)[]|null|undefined,max=2){
+ const unique=[...new Set((items??[]).map(item=>String(item??'').trim()).filter(Boolean))]
+ return unique.slice(0,max).join(' · ')+(unique.length>max?' +'+(unique.length-max)+' more':'')
+}
+export const providerServiceSummary=(person:SavedProvider)=>shortList(person.services ?? person.skills ?? [])
 export const providerServices=(person:SavedProvider)=>(person.services ?? person.skills ?? []).slice(0,4).join(' · ')
 
 export async function setProviderSaved(client:unknown,requester:string,provider:string,saved:boolean){

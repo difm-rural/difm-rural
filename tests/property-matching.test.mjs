@@ -91,6 +91,9 @@ test('provider search explains manual searching and scope-specific empty results
  assert.match(screen,/Tap Search providers after changing the town or region\./)
  assert.match(screen,/Include a wider region to search further, or post a job\./)
  assert.match(screen,/Try another region, or post a job so local providers can offer\./)
- assert.match(screen,/NZ_REGIONS\.map/);assert.doesNotMatch(screen,/accessibilityLabel="Region" style=\{styles\.input\}/)
+ assert.match(screen,/NZ_REGIONS\.map/)
+ // Compact selector: one field that opens the list, not a grid of 16 chips.
+ assert.match(screen,/<RegionSelect value=\{region\}/);assert.doesNotMatch(screen,/styles\.chip,region===item/)
+ assert.match(screen,/accessibilityState=\{\{selected:value===item\}\}/);assert.doesNotMatch(screen,/accessibilityLabel="Region" style=\{styles\.input\}/)
  assert.match(screen,/label="Post a job"/)
 })
