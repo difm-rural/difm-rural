@@ -325,6 +325,14 @@ export async function replacePropertyContact(client:unknown,contactId:string,pro
 
 export type PropertyChoice='sorted'|'help'|'na'
 // What a stored status shows as. Unset services show no choice.
+// Which "Who does it?" panel is open for a service. Always real booleans: these
+// feed accessibilityState, and Android's renderer rejects null there (the whole
+// React host is torn down and the screen goes white).
+export function propertyPickerState(state:{picker:string;pickerMode:string;replacing:unknown},serviceKey:string){
+ const here=state.picker===serviceKey
+ const replacingHere=here&&!!state.replacing
+ return {replacingHere,providerOpen:here&&(state.pickerMode==='provider'||replacingHere),contactOpen:here&&state.pickerMode==='contact'&&!replacingHere}
+}
 export function propertyServiceChoice(status:ServiceStatus|null|undefined):PropertyChoice|null{
  if(status==='sorted'||status==='self'||status==='has_provider')return 'sorted'
  if(status==='needs_help')return 'help'

@@ -615,3 +615,18 @@ test('removing a provider or contact link asks first on both clients',()=>{
  const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
  assert.match(web,/if\(!window\.confirm\('Remove '\+\(name\|\|'this link'\)/)
 })
+
+test('Who-does-it panel state is always boolean (Android rejects null in accessibilityState)',async()=>{
+ const {propertyPickerState}=await import('../shared/propertyNetwork.ts')
+ // The crash: contact panel open, nothing being replaced → providerOpen was null.
+ assert.deepEqual(propertyPickerState({picker:'firewood',pickerMode:'contact',replacing:null},'firewood'),
+  {replacingHere:false,providerOpen:false,contactOpen:true})
+ assert.deepEqual(propertyPickerState({picker:'firewood',pickerMode:'provider',replacing:null},'firewood'),
+  {replacingHere:false,providerOpen:true,contactOpen:false})
+ assert.deepEqual(propertyPickerState({picker:'firewood',pickerMode:'provider',replacing:{id:'c1',name:'Bob'}},'firewood'),
+  {replacingHere:true,providerOpen:true,contactOpen:false})
+ for(const picker of ['','firewood','other'])for(const pickerMode of ['provider','contact'])for(const replacing of [null,undefined,{id:'c1'}])
+  for(const value of Object.values(propertyPickerState({picker,pickerMode,replacing},'firewood')))assert.equal(typeof value,'boolean')
+ const screen=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.match(screen,/propertyPickerState\(\{picker,pickerMode,replacing\},service\.service_key\)/)
+})

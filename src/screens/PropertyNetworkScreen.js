@@ -20,7 +20,7 @@ import {
  PROPERTY_CONTACT_LIMITS,createPropertyContact,deletePropertyContact,linkedPropertyContacts,propertyContactEmailHref,propertyContactFields,
  propertyContactInviteText,propertyContactPhoneHref,propertyContactServices,replacePropertyContact,setPropertyContact,updatePropertyContact,
  propertyAreaProgress,propertyAreaWho,propertyBulkServices,propertyChoiceStatus,propertyGaps,propertyServiceChoice,propertySetupStarted,
- propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,PROPERTY_STATUS_LABELS,PROPERTY_STATUS_ICONS,propertyNodeStatus,propertyToneIcon,propertyBulkLabel,propertyBulkMessage,
+ propertyStatusAfterUnlink,propertyWhoMeStatus,savePropertyAreas,savePropertyServices,normalizePropertyNetwork,propertyPickerState,PROPERTY_STATUS_LABELS,PROPERTY_STATUS_ICONS,propertyNodeStatus,propertyToneIcon,propertyBulkLabel,propertyBulkMessage,
 } from '../../shared/propertyNetwork'
 
 const PROPERTY_CHOICES=[['sorted',PROPERTY_STATUS_LABELS.sorted],['help',PROPERTY_STATUS_LABELS.help],['na',PROPERTY_STATUS_LABELS.na]]
@@ -500,11 +500,9 @@ function PropertyNetworkScreen({navigation,route}){
       const contacts=linkedPropertyContacts(data,service)
       const covered=linked.length+contacts.length
       const choice=propertyServiceChoice(service.status)
-      const replacingHere=replacing&&picker===service.service_key
+      const {replacingHere,providerOpen,contactOpen}=propertyPickerState({picker,pickerMode,replacing},service.service_key)
       const category=propertyServiceTarget(area,service).category
       const postCategory=propertyJobCategory(area,service)
-      const providerOpen=picker===service.service_key&&(pickerMode==='provider'||replacingHere)
-      const contactOpen=picker===service.service_key&&pickerMode==='contact'&&!replacingHere
       return <View style={styles.service} key={service.service_key}>
        <View style={styles.cardTop}>
         <Text accessibilityRole="header" style={[styles.serviceTitle,{flexShrink:1}]}>{service.name}</Text>
