@@ -24,7 +24,6 @@ import PropertyNetworkSuggestion from '../components/PropertyNetworkSuggestion'
 import CancelModal from '../components/CancelModal'
 import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
-import EmptyState from '../components/EmptyState'
 import Button from '../components/Button'
 import { jobReviewStatus } from '../../shared/jobReviewStatus'
 import JobPaymentHandoff from '../components/JobPaymentHandoff'
@@ -97,7 +96,6 @@ export default function ManageTaskScreen({ navigation, route }) {
   const { job: initialJob, bidCount = 0 } = route.params
   const [job, setJob] = useState(initialJob)
   const [acceptedBid, setAcceptedBid] = useState(null)
-  const [offerAccepted,setOfferAccepted] = useState(false)
   const [invites, setInvites] = useState([])
   const [requesterProfile, setRequesterProfile] = useState(null)
   const [loadingBid, setLoadingBid] = useState(false)
@@ -114,6 +112,8 @@ export default function ManageTaskScreen({ navigation, route }) {
   const [savingReview, setSavingReview] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [moreExpanded, setMoreExpanded] = useState(false)
   const [questionCount, setQuestionCount] = useState(0)
   const [listingPerformance, setListingPerformance] = useState(null)
   const [workSchedule, setWorkSchedule] = useState(null)
@@ -270,7 +270,6 @@ export default function ManageTaskScreen({ navigation, route }) {
                 return
               }
               setJob(prev => ({ ...prev, status: 'accepted' }))
-              setOfferAccepted(true)
             } catch {
               Alert.alert('Could not accept offer', 'Refresh to check whether the offer was accepted before trying again.')
             } finally {
@@ -366,6 +365,27 @@ export default function ManageTaskScreen({ navigation, route }) {
     hasArrival: jobConfirmed,
     arrivalAt: workSchedule?.arrival_start_at,
   })
+
+  if (job.status === 'open' && !questionCount && !bids.length && nextMove) nextMove.label = 'Waiting for offers'
+  const focusedAccepted = isTaskOwner && job.status === 'accepted'
+  const detailsJSX = <View style={styles.card}>
+    <TouchableOpacity style={styles.actionRow} accessibilityRole="button" accessibilityLabel="Job details"
+      accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(value => !value)}>
+      <View style={styles.actionContent}><Text style={styles.actionLabel}>Job details</Text>
+        <Text style={styles.actionSubtitle}>{job.category} � {budgetText}</Text></View>
+      <Icon name={detailsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+    </TouchableOpacity>
+    {detailsExpanded && <>
+      <SummaryRow icon="pricetag-outline" label="Category" value={job.category} />
+      <SummaryRow icon="location-outline" label="Location" value={job.location_name} />
+      <SummaryRow icon="cash-outline" label="Budget" value={budgetText} />
+      {acceptedBid?.bidAmount != null && <SummaryRow icon="checkmark-circle-outline" label="Agreed" value={formatOfferAmount(acceptedBid.bidAmount, acceptedBid.pricingType)} />}
+      <SummaryRow icon="calendar-outline" label="Posted" value={timeAgo(job.created_at)} />
+      {!!job.description && <Text style={styles.waitBody}>{job.description}</Text>}
+      {!!job.location_note && <Text style={styles.waitBody}>{job.location_note}</Text>}
+      {!!(job.scheduled_date || job.date_from) && <SummaryRow icon="calendar-outline" label="Schedule" value={[job.scheduled_date || job.date_from, job.date_to].filter(Boolean).map(value => nzDate(value)).join(' � ')} />}
+    </>}
+  </View>
 
   function ensureTaskOwner() {
     if (isTaskOwner) return true
@@ -532,8 +552,8 @@ export default function ManageTaskScreen({ navigation, route }) {
       </TouchableOpacity>
       <Text style={styles.headerTitle} accessibilityRole="header">Manage job</Text>
       {job.status==='completed'&&<JobStatusNotice>Job completed.</JobStatusNotice>}
-      {offerAccepted&&job.status==='accepted'&&<JobStatusNotice>Offer accepted.</JobStatusNotice>}
-      <Text style={styles.headerSubtitle} numberOfLines={2}>{job.title}</Text>
+
+      <Text style={styles.headerSubtitle} numberOfLines={3} accessibilityLabel={job.title}>{job.title}</Text>
     </View>
     </View>
   )
@@ -602,14 +622,11 @@ export default function ManageTaskScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}>
 
           <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
-          {job.status!=='cancelled'&&<JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={acceptedBid?.duration}/>}
+          {!focusedAccepted&&job.status!=='cancelled'&&<JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={acceptedBid?.duration}/>}
 
           {job.status === 'accepted' ? (
             (isTaskOwner && !jobConfirmed) ? (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Waiting on {otherPartyFirstName}</Text>
-                <Text style={styles.waitBody}>{otherPartyFirstName} will confirm the arrival time.</Text>
-              </View>
+              null
             ) : (
               <WorkScheduleCard
                 schedule={workSchedule}
@@ -626,6 +643,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             )
           ) : null}
 
+          {!focusedAccepted && <>
           {isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && acceptedBid?.bidId ? (
             <JobPaymentHandoff
               bidId={acceptedBid.bidId}
@@ -652,6 +670,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             <SummaryRow icon="pricetag-outline" label="Category" value={job.category} last />
           </View>
 
+          </>}
           {/* Job participant */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{otherPartyRoleLabel}</Text>
@@ -683,6 +702,7 @@ export default function ManageTaskScreen({ navigation, route }) {
                     Awarded · {nzMoney(acceptedBid.bidAmount)} · Use chat with {otherPartyFirstName} to confirm timing and details
                   </Text>
                 </View>
+                {focusedAccepted && <JobArrangementSummary duration={acceptedBid?.duration} />}
               </>
             ) : null}
           </View>
@@ -704,10 +724,24 @@ export default function ManageTaskScreen({ navigation, route }) {
             </TouchableOpacity>
           ) : null}
 
+          {focusedAccepted && isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && acceptedBid?.bidId ? (
+            <JobPaymentHandoff
+              bidId={acceptedBid.bidId}
+              method={acceptedBid.paymentMethod}
+              sortedAt={acceptedBid.paymentSortedAt}
+              sortedBy={acceptedBid.paymentSortedBy}
+              requesterId={job.requester_id}
+              providerId={acceptedBid.providerId}
+              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner)}
+              onChanged={fetchAcceptedBid}
+            />
+          ) : null}
+
+          {focusedAccepted && detailsJSX}
           {/* Actions */}
           {isTaskOwner && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Actions</Text>
+            <Text style={styles.cardTitle}>{focusedAccepted ? 'More actions' : 'Actions'}</Text>
             <View style={styles.actionBtns}>
               <Button
                 variant="destructive"
@@ -719,6 +753,7 @@ export default function ManageTaskScreen({ navigation, route }) {
           </View>
           )}
 
+          {!focusedAccepted && <>
           {/* Job details */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Job details</Text>
@@ -730,6 +765,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             ) : null}
             <SummaryRow icon="calendar-outline" label="Posted" value={timeAgo(job.created_at)} last />
           </View>
+          </>}
 
         </ScrollView>
         <ArrivalWindowModal
@@ -837,88 +873,12 @@ export default function ManageTaskScreen({ navigation, route }) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 112 }]}
         showsVerticalScrollIndicator={false}>
 
-        <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
-
-        {job.status === 'open' && bids.length === 0 ? (
-          <ListingPerformanceCard
-            job={job}
-            performance={listingPerformance}
-            onEdit={handleEdit}
-            onConnections={() => navigation.getParent()?.navigate('Home', {
-              screen: 'Connections',
-              params: { inviteJob: { id: job.id, title: job.title } },
-            })}
-          />
-        ) : null}
-
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Job summary</Text>
-            <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-              <Text style={[styles.statusBadgeText, { color: badge.color }]}>{nextMove?.badge || badge.label}</Text>
-            </View>
-          </View>
-          <SummaryRow icon="pricetag-outline" label="Category" value={job.category} />
-          <SummaryRow icon="location-outline" label="Location"  value={job.location_name} />
-          <SummaryRow icon="cash-outline" label="Budget"    value={budgetText} />
-          <SummaryRow icon="calendar-outline" label="Posted"    value={timeAgo(job.created_at)} last />
-          {showCompletedActions && isTaskOwner && jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview, 'Provider')
-            .filter(Boolean).map(label => <Text key={label} style={styles.waitBody}>{label}</Text>)}
-        </View>
-
-        {/* After the review: offer to add the provider to My Property Network. */}
-        {showCompletedActions && isTaskOwner && !!providerReview && !!acceptedBid?.providerId && (
-          <PropertyNetworkSuggestion
-            providerId={acceptedBid.providerId}
-            providerName={acceptedBid.providerName}
-            work={{ category: job.category, title: job.title }}
-            onOpenNetwork={area => navigation.getParent()?.navigate('Home', { screen: 'PropertyNetwork', params: { area } })}
-          />
-        )}
-
-        {/* Offered to — providers this job was privately offered to */}
-        {invites.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Invited providers</Text>
-            {invites.map((inv, idx) => {
-              const nm = inv.provider?.full_name || 'Provider'
-              return (
-                <View key={inv.id} style={[styles.bidCard, idx < invites.length - 1 && styles.bidCardBorder]}>
-                  <TouchableOpacity
-                    style={styles.bidHeader}
-                    onPress={() => navigation.navigate('ProviderProfile', { providerId: inv.provider_id })}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${nm}, ${inviteStatusLabel(inv)}`}>
-                    {inv.provider?.avatar_url ? (
-                      <Image source={{ uri: inv.provider.avatar_url }} style={styles.bidAvatar} />
-                    ) : (
-                      <View style={styles.bidAvatarFallback}>
-                        <Text style={styles.bidAvatarInitials}>{getInitials(nm)}</Text>
-                      </View>
-                    )}
-                    <View style={styles.bidProviderInfo}>
-                      <Text style={styles.bidProviderName}>{nm}</Text>
-                      <Text style={[styles.inviteStatus, inv.hasOffered && styles.inviteStatusStrong]}>
-                        {inviteStatusLabel(inv)}
-                      </Text>
-                    </View>
-                    <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                  {job.status === 'open' && <TouchableOpacity accessibilityRole="button" onPress={async () => {
-                    const { error } = ACTIVE_JOB_INVITATIONS.includes(inv.status)
-                      ? await respondToJobInvitation(inv, 'withdraw')
-                      : await sendJobInvitation(job.id, inv.provider_id, inv.revision)
-                    if (error) Alert.alert('Could not update invitation', error.message)
-                    else setInvites(await fetchInvitesForJob(job.id))
-                  }}><Text style={{ color: colors.primary }}>{ACTIVE_JOB_INVITATIONS.includes(inv.status) ? 'Withdraw invitation' : 'Invite again'}</Text></TouchableOpacity>}
-                </View>
-              )
-            })}
-          </View>
-        )}
+        {showQuestions ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Waiting on you: answer provider questions" onPress={handleViewQuestions}>
+          <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />
+        </TouchableOpacity> : <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 12 }} />}
 
         {/* Offers received — inline on open jobs */}
-        {job.status === 'open' && (
+        {job.status === 'open' && (loadingBids || bids.length > 0) && (
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitle}>Offers received</Text>
@@ -933,12 +893,7 @@ export default function ManageTaskScreen({ navigation, route }) {
             {loadingBids ? (
               <Text style={styles.loadingText}>Loading offers…</Text>
             ) : bids.length === 0 ? (
-              <EmptyState
-                compact
-                icon="pricetag-outline"
-                title="No offers yet"
-                body="When providers make an offer on your job, it'll appear here."
-              />
+              <Text style={styles.waitBody}>No offers yet. Offers from providers will appear here.</Text>
             ) : (
               bids.map((bid, idx) => {
                 const provName = bid.provider?.full_name || 'Provider'
@@ -1015,9 +970,99 @@ export default function ManageTaskScreen({ navigation, route }) {
           </View>
         )}
 
+        {job.status === 'open' && <View style={styles.card}>
+          <ActionRow emoji="create-outline" iconBg={colors.primaryLight} label="Edit job" subtitle="Update your listing" onPress={handleEdit} />
+          <ActionRow emoji="share-social-outline" iconBg={colors.infoLight} label="Share job" subtitle="Send to someone who might help" onPress={handleShare} last />
+        </View>}
+
+        {job.status === 'open' && !loadingBids && bids.length === 0 && !listingPerformance && <Text style={styles.waitBody}>No offers yet. Offers from providers will appear here.</Text>}
+        {job.status === 'open' && bids.length === 0 ? (
+          <ListingPerformanceCard
+            compact
+            offerCount={bids.length}
+            job={job}
+            performance={listingPerformance}
+            onEdit={handleEdit}
+            onConnections={() => navigation.getParent()?.navigate('Home', {
+              screen: 'Connections',
+              params: { inviteJob: { id: job.id, title: job.title } },
+            })}
+          />
+        ) : null}
+
+        {job.status !== 'open' && <>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Actions</Text>
-          {actionItems.map((item, idx) => (
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>Job summary</Text>
+            <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
+              <Text style={[styles.statusBadgeText, { color: badge.color }]}>{nextMove?.badge || badge.label}</Text>
+            </View>
+          </View>
+          <SummaryRow icon="pricetag-outline" label="Category" value={job.category} />
+          <SummaryRow icon="location-outline" label="Location"  value={job.location_name} />
+          <SummaryRow icon="cash-outline" label="Budget"    value={budgetText} />
+          <SummaryRow icon="calendar-outline" label="Posted"    value={timeAgo(job.created_at)} last />
+          {showCompletedActions && isTaskOwner && jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview, 'Provider')
+            .filter(Boolean).map(label => <Text key={label} style={styles.waitBody}>{label}</Text>)}
+        </View>
+
+        </>}
+        {/* After the review: offer to add the provider to My Property Network. */}
+        {showCompletedActions && isTaskOwner && !!providerReview && !!acceptedBid?.providerId && (
+          <PropertyNetworkSuggestion
+            providerId={acceptedBid.providerId}
+            providerName={acceptedBid.providerName}
+            work={{ category: job.category, title: job.title }}
+            onOpenNetwork={area => navigation.getParent()?.navigate('Home', { screen: 'PropertyNetwork', params: { area } })}
+          />
+        )}
+
+        {/* Offered to — providers this job was privately offered to */}
+        {invites.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Invited providers</Text>
+            {invites.map((inv, idx) => {
+              const nm = inv.provider?.full_name || 'Provider'
+              return (
+                <View key={inv.id} style={[styles.bidCard, idx < invites.length - 1 && styles.bidCardBorder]}>
+                  <TouchableOpacity
+                    style={styles.bidHeader}
+                    onPress={() => navigation.navigate('ProviderProfile', { providerId: inv.provider_id })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${nm}, ${inviteStatusLabel(inv)}`}>
+                    {inv.provider?.avatar_url ? (
+                      <Image source={{ uri: inv.provider.avatar_url }} style={styles.bidAvatar} />
+                    ) : (
+                      <View style={styles.bidAvatarFallback}>
+                        <Text style={styles.bidAvatarInitials}>{getInitials(nm)}</Text>
+                      </View>
+                    )}
+                    <View style={styles.bidProviderInfo}>
+                      <Text style={styles.bidProviderName}>{nm}</Text>
+                      <Text style={[styles.inviteStatus, inv.hasOffered && styles.inviteStatusStrong]}>
+                        {inviteStatusLabel(inv)}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  {job.status === 'open' && <TouchableOpacity accessibilityRole="button" onPress={async () => {
+                    const { error } = ACTIVE_JOB_INVITATIONS.includes(inv.status)
+                      ? await respondToJobInvitation(inv, 'withdraw')
+                      : await sendJobInvitation(job.id, inv.provider_id, inv.revision)
+                    if (error) Alert.alert('Could not update invitation', error.message)
+                    else setInvites(await fetchInvitesForJob(job.id))
+                  }}><Text style={{ color: colors.primary }}>{ACTIVE_JOB_INVITATIONS.includes(inv.status) ? 'Withdraw invitation' : 'Invite again'}</Text></TouchableOpacity>}
+                </View>
+              )
+            })}
+          </View>
+        )}
+
+
+        {job.status === 'open' && detailsJSX}
+        <View style={styles.card}>
+          {job.status === 'open' ? <TouchableOpacity style={styles.actionRow} accessibilityRole="button" accessibilityLabel="More actions" accessibilityState={{ expanded: moreExpanded }} onPress={() => setMoreExpanded(value => !value)}><Text style={styles.actionLabel}>More actions</Text></TouchableOpacity> : <Text style={styles.cardTitle}>Actions</Text>}
+          {actionItems.filter(item => job.status !== 'open' || (moreExpanded && ['cancel', 'delete'].includes(item.key))).map((item, idx) => (
             <ActionRow
               key={item.key}
               emoji={item.emoji}
