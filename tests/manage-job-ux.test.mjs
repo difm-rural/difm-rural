@@ -37,7 +37,7 @@ test('multiple offers retain individual amounts, profile and acceptance confirma
  assert.ok(n.findIndex(v=>v.props?.accessibilityLabel?.startsWith('Accept offer from'))<n.findIndex(v=>v.props?.accessibilityLabel==='Job details'))
 })
 test('unanswered questions are actionable while offer acceptance stays available',()=>{
- const s=screen({questionCount:1,bids:[bid('a')]});s.press('Waiting on you: answer provider questions');assert.equal(s.log.navigate[0][0],'JobDetail');assert.equal(s.log.navigate[0][1].fromManage,true)
+ const s=screen({questionCount:1,bids:[bid('a')]});s.press('Waiting on you: answer provider questions');assert.equal(s.log.navigate[0][0],'JobDetail');assert.equal(s.log.navigate[0][1].fromManage,true);assert.equal(s.log.navigate[0][1].focusQuestions,true)
  assert.ok(s.render().some(v=>v.props?.accessibilityLabel?.startsWith('Accept offer from')))
 })
 for(const sorted of [null,'2026-11-23'])test('accepted provider: single status, chat before payment, payment attribution retained '+sorted,()=>{
@@ -51,3 +51,12 @@ test('later lifecycle retains schedule/review actions and expanded original deta
  const s=screen({job:{status:'completed'}});assert.ok(s.render().some(v=>v.props?.accessibilityLabel==='Review provider'));assert.ok(s.text().includes('Job summary'))
 })
 
+
+test('More actions has a visible changing expand indicator and details summary uses a middle dot',()=>{
+ const s=screen();const more=()=>s.render().find(n=>n.props?.accessibilityLabel==='More actions')
+ assert.equal(more().props.accessibilityState.expanded,false)
+ assert.ok(nodes(more()).some(n=>n.type==='Icon'&&n.props.name==='chevron-down'))
+ s.press('More actions');assert.equal(more().props.accessibilityState.expanded,true)
+ assert.ok(nodes(more()).some(n=>n.type==='Icon'&&n.props.name==='chevron-up'))
+ assert.match(s.text(), /Fencing\s+\u00b7\s+\$250/)
+})

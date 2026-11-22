@@ -372,7 +372,7 @@ export default function ManageTaskScreen({ navigation, route }) {
     <TouchableOpacity style={styles.actionRow} accessibilityRole="button" accessibilityLabel="Job details"
       accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(value => !value)}>
       <View style={styles.actionContent}><Text style={styles.actionLabel}>Job details</Text>
-        <Text style={styles.actionSubtitle}>{job.category} · {budgetText}</Text></View>
+        <Text style={styles.actionSubtitle}>{job.category}{' \u00b7 '}{budgetText}</Text></View>
       <Icon name={detailsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
     </TouchableOpacity>
     {detailsExpanded && <>
@@ -440,7 +440,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
   function handleViewQuestions() {
     if (!ensureTaskOwner()) return
-    navigation.navigate('JobDetail', { job, fromManage: true })
+    navigation.navigate('JobDetail', { job, fromManage: true, focusQuestions: true })
   }
 
   function handleLeaveReview() {
@@ -1061,7 +1061,7 @@ export default function ManageTaskScreen({ navigation, route }) {
 
         {job.status === 'open' && detailsJSX}
         <View style={styles.card}>
-          {job.status === 'open' ? <TouchableOpacity style={styles.actionRow} accessibilityRole="button" accessibilityLabel="More actions" accessibilityState={{ expanded: moreExpanded }} onPress={() => setMoreExpanded(value => !value)}><Text style={styles.actionLabel}>More actions</Text></TouchableOpacity> : <Text style={styles.cardTitle}>Actions</Text>}
+          {job.status === 'open' ? <TouchableOpacity style={styles.actionRow} accessibilityRole="button" accessibilityLabel="More actions" accessibilityState={{ expanded: moreExpanded }} onPress={() => setMoreExpanded(value => !value)}><Text style={[styles.actionLabel, styles.actionContent]}>More actions</Text><Icon name={moreExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} /></TouchableOpacity> : <Text style={styles.cardTitle}>Actions</Text>}
           {actionItems.filter(item => job.status !== 'open' || (moreExpanded && ['cancel', 'delete'].includes(item.key))).map((item, idx) => (
             <ActionRow
               key={item.key}
