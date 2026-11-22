@@ -1,6 +1,6 @@
 import { JobPrivateGallery } from '../../components/JobPrimaryImage'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
-import {addGuidanceToDescription,jobDescriptionGuidance,removeUnusedGuidance} from '../../../shared/jobGuidance'
+import {addGuidanceToDescription,jobDescriptionGuidance,removeUnusedGuidance,JOB_PHOTO_HINT,JOB_PHOTO_LIMIT_LABEL} from '../../../shared/jobGuidance'
 import React, { useEffect, useState } from 'react'
 import {
   Alert, Image, Keyboard, KeyboardAvoidingView, Platform,
@@ -205,14 +205,12 @@ export default function PostJobStep3Details({ navigation, route }) {
           <View style={styles.card}>
             <View style={styles.cardQuestionRow}>
               <Text style={styles.cardQuestion}>Photos</Text>
-              <Text style={styles.optionalTag}>Optional · up to 6</Text>
+              <Text style={styles.optionalTag}>{JOB_PHOTO_LIMIT_LABEL}</Text>
             </View>
             {photos.length === 0 && (
               <View style={styles.photoNudge}>
                 <Icon name="camera-outline" size={16} color={colors.primary} />
-                <Text style={styles.photoNudgeText}>
-                  Providers are far more likely to make an offer when they can see the job — a quick photo or two really helps.
-                </Text>
+                <Text style={styles.photoNudgeText}>{JOB_PHOTO_HINT}</Text>
               </View>
             )}
             {privateEdit&&<JobPrivateGallery jobId={route.params.job.id} style={{width:100,height:100}}/>}

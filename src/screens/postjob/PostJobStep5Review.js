@@ -25,6 +25,7 @@ import { jobPrimaryPhotoRequest } from '../../lib/jobPrimaryPhoto'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { removeThumbnails } from '../../lib/photoThumbs'
 import { removedThumbPaths } from '../../../shared/photos'
+import { JOB_PHOTO_REVIEW_HINT, jobPublicationMessage } from '../../../shared/jobGuidance'
 import { inferJobCategory } from '../../lib/categorize'
 import { CATEGORIES, isHouseSitting } from '../../lib/categories'
 import { colors } from '../../theme/tokens'
@@ -172,11 +173,11 @@ export default function PostJobStep5Review({ navigation, route }) {
   // Providers only ever see the locality before an offer is accepted, so say so
   // here rather than repeating the street address.
   const publicLocality = (locationArea || localityFromAddress(jobAddress) || '').trim()
-  const publicationMessage = publicLocality
-    ? `Your job will be visible to providers near ${publicLocality} immediately. They see the area only; your exact address is shared with the provider you accept.`
-    : latitude || areaPolygon.length > 0
-      ? 'Your job will be visible to providers near your area immediately. Your exact location is shared with the provider you accept.'
-      : 'Your job will be visible to providers across the platform immediately.'
+  const publicationMessage = jobPublicationMessage({
+    locality: publicLocality, hasLocation: !!latitude || areaPolygon.length > 0,
+    isEdit: isEditMode,
+    inviteName: isInvite ? (inviteProviderName || 'the provider you invited') : null, alsoPublic,
+  })
 
   const scheduleLabel   = SCHEDULE_LABELS[scheduleType] || scheduleType
   const scheduleDisplay = scheduleType === 'specific' && scheduledDate
@@ -532,7 +533,7 @@ export default function PostJobStep5Review({ navigation, route }) {
             accessibilityLabel="Add photos to your job">
             <Icon name="camera-outline" size={18} color={colors.warning} />
             <Text style={styles.photoReminderText}>
-              No photos added — jobs with photos get more offers. Tap to add a couple.
+              {JOB_PHOTO_REVIEW_HINT}
             </Text>
             <Icon name="chevron-forward" size={16} color={colors.warning} />
           </TouchableOpacity>
