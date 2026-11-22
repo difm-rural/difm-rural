@@ -1,4 +1,4 @@
-import {completedWorkLabel,providerProfileUrl,loadSavedProviders,loadInviteChoices,mergeMyPeople,providerServiceSummary,providerInviteJobs,setProviderSaved,shortList} from '../../shared/trustedLocals'
+import {completedWorkLabel,providerProfileUrl,loadAdvertisedServices,loadSavedProviders,loadInviteChoices,mergeMyPeople,providerServiceSummary,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
 import {LocalAction,LocalInvitePicker,LocalMoreMenu,copyProviderLink,shareProviderProfile} from '../components/LocalProviderActions'
 import React, { useCallback, useRef, useState } from 'react'
 import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -65,9 +65,18 @@ export default function ConnectionsScreen({ navigation, route }) {
         locals ? loadSavedProviders(supabase,user.id) : [],
         locals ? loadInviteChoices(supabase,user.id) : null,
       ])
+      // People you have only worked with: load what they advertise too, so every
+      // card can say what they offer. If this fails, cards just leave it out.
+      let worked=history.status==='fulfilled'?history.value:[]
+      if(locals&&worked.length){
+        const savedIds=new Set(savedResult.status==='fulfilled'?savedResult.value.map(person=>person.id):[])
+        const ids=[...new Set(worked.filter(row=>row.person&&!savedIds.has(row.personId)).map(row=>row.personId))]
+        const advertised=ids.length?await loadAdvertisedServices(supabase,ids).catch(()=>null):null
+        if(advertised)worked=worked.map(row=>row.person&&advertised.has(row.personId)?{...row,person:{...row.person,services:advertised.get(row.personId)}}:row)
+      }
       if(id===request.current){
         setViewer(user.id)
-        setConnections(history.status==='fulfilled'?history.value:[])
+        setConnections(worked)
         setFailed(history.status==='rejected')
         setSavedFailed(savedResult.status==='rejected')
         setSaved(savedResult.status==='fulfilled'?savedResult.value:[])
@@ -174,8 +183,8 @@ export default function ConnectionsScreen({ navigation, route }) {
     const name=person.full_name||person.display_name||'Provider'
     const services=providerServiceSummary(person)
     const done=completedWorkLabel(work)
-    const recent=shortList(work?.categories)
-    // One short line each: where and how much you've worked together, what they did, what they offer.
+    // Two short lines: where and how much you've worked together, then what they
+    // advertise. Job-by-job history stays under More → Work history.
     const meta=[person.region,done&&(done+(work?.last_engaged_at?', last '+formatLastWorked(work.last_engaged_at):''))].filter(Boolean).join(' · ')
     return <View style={styles.personCard}>
       <TouchableOpacity style={styles.personTop} accessibilityRole="button" onPress={()=>openProfile(person)}
@@ -188,7 +197,6 @@ export default function ConnectionsScreen({ navigation, route }) {
             {!!work&&<View style={styles.badge}><Icon name="checkmark-circle-outline" size={12} color={colors.primary}/><Text style={styles.badgeText}>Worked together</Text></View>}
           </View>
           {!!meta&&<Text style={styles.meta}>{meta}</Text>}
-          {!!recent&&<Text style={styles.categories}>Recent work: {recent}</Text>}
           {!!services&&<Text style={styles.categories}>Offers: {services}</Text>}
         </View>
       </TouchableOpacity>

@@ -49,8 +49,10 @@ test('jobs_public migration masks every job to locality for non-participants',()
  assert.match(sql,/then j\.location_note end as location_note/)
 })
 
-test('Review screen describes publication at locality level, not the street address',()=>{
+test('Review screen describes publication at locality level, not the street address',async()=>{
  const review=readFileSync(new URL('../src/screens/postjob/PostJobStep5Review.js',import.meta.url),'utf8')
  assert.doesNotMatch(review,/near \$\{jobAddress/)
- assert.match(review,/They see the area only; your exact address is shared with the provider you accept\./)
+ const {jobPublicationMessage}=await import('../shared/jobGuidance.ts')
+ assert.match(review,/jobPublicationMessage\(/)
+ assert.match(jobPublicationMessage({locality:'Matakana',hasLocation:true}),/They see the area only; your exact address is shared with the provider you accept\./)
 })

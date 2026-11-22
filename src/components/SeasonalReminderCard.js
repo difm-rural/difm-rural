@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-  visualWrap: { height: 112, position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  visualWrap: { height: 84, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   seasonBadge: {
     position: 'absolute', left: 12, top: 12,
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -98,13 +98,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.white,
   },
-  content: { padding: 15 },
+  content: { padding: 13 },
   category: { color: colors.primary, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   title: { color: colors.textPrimary, fontSize: 16, lineHeight: 21, fontWeight: '700', marginTop: 4 },
   body: { color: colors.textSecondary, fontSize: 13.5, lineHeight: 20, marginTop: 6 },
   action: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    borderRadius: 10, minHeight: 40, paddingHorizontal: 13, marginTop: 13,
+    borderRadius: 10, minHeight: 40, paddingHorizontal: 13, marginTop: 10,
   },
   actionText: { fontSize: 13, fontWeight: '800' },
 })

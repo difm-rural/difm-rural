@@ -395,7 +395,9 @@ test('All sorted and None of this applies only fill unanswered services',async()
  assert.equal(propertyBulkLabel('sorted',2),'Rest are sorted')
  assert.equal(propertyBulkLabel('irrelevant',2),"Rest don't apply")
  assert.equal(propertyBulkMessage(2,0,'sorted'),'2 services marked Sorted.')
- assert.equal(propertyBulkMessage(1,2,'irrelevant'),'1 service marked N/A. Your other 2 stay as they were.')
+ assert.equal(propertyBulkMessage(1,2,'irrelevant'),'1 service marked N/A. Your other 2 answers stay as they were.')
+ assert.equal(propertyBulkMessage(3,1,'sorted'),'3 services marked Sorted. Your other answer stays as it was.')
+ assert.equal(propertyBulkMessage(1,0,'sorted'),'1 service marked Sorted.')
  // Answered services keep their status, including Me and linked helpers.
  assert.ok(updates.every(service=>!services.find(row=>row.service_key===service.service_key).status))
  const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
@@ -629,4 +631,15 @@ test('Who-does-it panel state is always boolean (Android rejects null in accessi
   for(const value of Object.values(propertyPickerState({picker,pickerMode,replacing},'firewood')))assert.equal(typeof value,'boolean')
  const screen=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
  assert.match(screen,/propertyPickerState\(\{picker,pickerMode,replacing\},service\.service_key\)/)
+})
+
+test('Property Network success messages clear themselves; list, diagram and service views keep room at the bottom',()=>{
+ const source=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.match(source,/const PROPERTY_FEEDBACK_MS=5000/)
+ assert.match(source,/setTimeout\(\(\)=>setFeedback\(''\),PROPERTY_FEEDBACK_MS\)/)
+ assert.match(source,/return \(\)=>clearTimeout\(timer\)/)
+ // Errors are not timed out.
+ assert.doesNotMatch(source,/setTimeout\(\(\)=>setError/)
+ // Overview (List and Diagram share it) and the service checklist clear the home indicator.
+ assert.equal((source.match(/contentContainerStyle=\{\{padding:16,paddingBottom:insets\.bottom\+32\}\}/g)||[]).length,2)
 })

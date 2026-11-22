@@ -199,10 +199,10 @@ export default function PostJobStep2Location({ navigation, route }) {
     if (!latitude && areaPolygon.length === 0) {
       Alert.alert(
         'No location set',
-        'Please pin a location on the map, or tap Skip to continue without one.',
+        'Pin the job on the map or trace the work area. You can also continue without a map location.',
         [
           { text: 'Set location', style: 'cancel' },
-          { text: 'Skip', onPress: () => navigation.navigate('PostJobStep3Details', { ...route.params }) },
+          { text: 'Skip map location', onPress: () => navigation.navigate('PostJobStep3Details', { ...route.params }) },
         ]
       )
       return
@@ -233,16 +233,18 @@ export default function PostJobStep2Location({ navigation, route }) {
             style={styles.pill}
             onPress={handleTraceArea}
             accessibilityRole="button"
-            accessibilityLabel="Trace work area">
+            accessibilityLabel={hasArea ? 'Edit traced work area' : 'Trace work area'}>
             <Icon name="map-outline" size={16} color={colors.primary} />
-            <Text style={styles.pillText}>Trace area</Text>
+            <Text style={styles.pillText}>{hasArea ? 'Edit work area' : 'Trace work area'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.pillSkip}
             onPress={handleSkip}
             accessibilityRole="button"
-            accessibilityLabel="Skip location">
-            <Text style={styles.pillSkipText}>Skip location</Text>
+            accessibilityLabel="Skip map location"
+            accessibilityHint="Continues without a map pin. Your town or area is still used."
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.pillSkipText}>Skip map location</Text>
           </TouchableOpacity>
         </View>
 
@@ -251,6 +253,7 @@ export default function PostJobStep2Location({ navigation, route }) {
             <Text style={styles.areaChipText}><Icon name="checkmark" size={12} color={colors.primary} /> {areaHectares} ha traced</Text>
             <TouchableOpacity
               onPress={() => { setAreaPolygon([]); setAreaHectares(null) }}
+              accessibilityRole="button" accessibilityLabel="Remove traced area"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Icon name="close" size={14} color={colors.textMuted} />
             </TouchableOpacity>

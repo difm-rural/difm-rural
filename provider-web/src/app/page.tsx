@@ -145,7 +145,7 @@ export default async function HomePage() {
    {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Finish your profile</h2><p>Add your public name and town or region.</p><Link href="/setup" className="card-link">Finish your profile</Link></section>}
    {hasError&&<div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
    <HomeModes owner={user.id} refresh={<LiveRefresh/>} property={<>
-    <header className="home-heading"><div><h1>Your property, your people</h1><p className="muted">Find local help and manage the people supporting your property.</p></div></header>
+    <header className="home-heading"><div><h1>Your property, your people</h1><p className="muted">Find local help and keep track of who looks after your property.</p></div></header>
     {/* A line only once the network has something in it: no setup prompt. */}
     {networkLines.length>0&&<Link href="/property-network" className="home-network-line">
      <UsersRound size={22} aria-hidden="true"/><span><strong>My Property Network</strong>{networkLines.map(line=><span key={line}>{line}</span>)}</span>
@@ -161,7 +161,7 @@ export default async function HomePage() {
     <header className="home-heading"><div><h1>Your work, your opportunities</h1></div></header>
     {work.indicators.length>0?<section className="home-work-summary" aria-label="My Work overview">
      {work.indicators.map(item=><Link key={item.id} href={item.href} className="home-summary-item"><strong>{item.count}</strong> {item.label}</Link>)}
-    </section>:<p className="home-work-empty">{work.unavailable?'Work summary unavailable. Refresh to try again.':"You're all caught up. Explore available jobs or create a listing."}</p>}
+    </section>:<p className="home-work-empty">{work.unavailable?'Work summary unavailable. Refresh to try again.':"You're all caught up."}</p>}
     {actions(true)}
     <div className="home-work-links">
      <Link href="/connections?view=customers" className="card home-quick"><UsersRound size={22}/><span><strong>My Customers</strong>

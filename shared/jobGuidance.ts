@@ -71,3 +71,25 @@ export function removeUnusedGuidance(description:string,prompts:readonly string[
  const unused=new Set(prompts.map(prompt=>prompt+':'))
  return description.split('\n').filter(line=>!unused.has(line.trim())).join('\n').replace(/\n{3,}/g,'\n\n').trim()
 }
+
+// Photo wording shared by Details (Step 3) and Review (Step 5), so both say the same thing.
+export const JOB_PHOTO_LIMIT_LABEL='Optional · up to 6'
+export const JOB_PHOTO_HINT='A photo or two helps providers see the job and make an offer.'
+export const JOB_PHOTO_REVIEW_HINT='No photos yet. '+JOB_PHOTO_HINT+' Tap to add.'
+
+// The last line on Review: who will see the job and what they see of its location.
+// Since Release 1 every job is shown at locality level to anyone but the owner and
+// the accepted provider (jobs_public / can_see_job_location), whatever the
+// hide-exact-location choice, so the location sentence never depends on it.
+export function jobPublicationMessage({locality,hasLocation,isEdit,inviteName,alsoPublic}:{
+ locality?:string|null;hasLocation:boolean;isEdit?:boolean;inviteName?:string|null;alsoPublic?:boolean}){
+ const place=(locality??'').trim()
+ const where=place||hasLocation?'They see the area only; your exact address is shared with the provider you accept.':''
+ const who=isEdit?'Your changes show on the job as soon as you save.'
+  :inviteName?(alsoPublic?'Your job goes to '+inviteName+' and to providers '+(place?'near '+place:'nearby')+' as soon as you post it.'
+   :'Only '+inviteName+' will see this job.')
+  :place?'Your job will be visible to providers near '+place+' as soon as you post it.'
+  :hasLocation?'Your job will be visible to providers near your area as soon as you post it.'
+  :'Your job will be visible to providers across the platform as soon as you post it.'
+ return [who,where].filter(Boolean).join(' ')
+}

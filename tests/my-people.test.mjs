@@ -32,19 +32,39 @@ test('My People keeps Invite to job visible and moves secondary actions into a m
  assert.doesNotMatch(screen.slice(screen.indexOf('function renderPerson'),screen.indexOf('const localHeader')),/numberOfLines/)
 })
 
-test('My People cards keep each line short: counts, recent work and services as a summary',async()=>{
- const {shortList,providerServiceSummary}=await import('../shared/trustedLocals.ts')
+test('My People cards say what each provider advertises, never their long skills list',async()=>{
+ const {shortList,providerServiceSummary,loadAdvertisedServices}=await import('../shared/trustedLocals.ts')
  assert.equal(shortList(['Fencing','Water','Fencing','',null,'Trees']),'Fencing · Water +1 more')
  assert.equal(shortList(['Fencing']),'Fencing')
  assert.equal(shortList([]),'')
  assert.equal(shortList(null),'')
- assert.equal(providerServiceSummary({id:'a',services:['Fence repairs','Gates','Electric fencing','New fencing']}),'Fence repairs · Gates +2 more')
- assert.equal(providerServiceSummary({id:'a',skills:['Shearing']}),'Shearing')
+ assert.equal(providerServiceSummary({services:['Fencing & Gates','Water & Drainage','Machinery & Repairs','Transport & Delivery']}),'Fencing & Gates · Water & Drainage +2 more')
+ // The profile's skills list (often dozens of capabilities) is never used: that was the "+58 more".
+ const skills=Array.from({length:60},(_,i)=>'Skill '+i)
+ assert.equal(providerServiceSummary({skills}),'')
+ assert.equal(providerServiceSummary({services:[],skills}),'')
+ // Advertised services: active listings only, most-listed category first, at most four.
+ const filters=[]
+ const listings=[
+  {provider_id:'a',category:'Water & Drainage'},{provider_id:'a',category:'Fencing & Gates'},{provider_id:'a',category:'Fencing & Gates'},
+  {provider_id:'a',category:null},{provider_id:'b',category:'Transport & Delivery'},
+  ...['Land & Vegetation','Earthworks & Driveways','Buildings & Maintenance','General Rural Help'].map(category=>({provider_id:'b',category})),
+ ]
+ const query={eq(c,v){filters.push([c,v]);return query},is(c,v){filters.push([c,v]);return query},in(c,v){filters.push([c,v]);return query},
+  order(){return query},range(){return Promise.resolve({data:listings,error:null})}}
+ const client={from:table=>{assert.equal(table,'services');return {select:()=>query}}}
+ const advertised=await loadAdvertisedServices(client,['a','b'])
+ assert.deepEqual(advertised.get('a'),['Fencing & Gates','Water & Drainage'])
+ assert.equal(advertised.get('b').length,4)
+ assert.ok(filters.some(([c,v])=>c==='is_active'&&v===true))
+ assert.ok(filters.some(([c,v])=>c==='closed_at'&&v===null))
+ assert.equal((await loadAdvertisedServices(client,[])).size,0)
  const {readFileSync}=await import('node:fs')
  const screen=readFileSync(new URL('../src/screens/ConnectionsScreen.js',import.meta.url),'utf8')
- // Badges, counts, recent work and services stay; long lists are summarised, not cut off.
- for(const text of ['>Saved<','>Worked together<','Recent work: {recent}','Offers: {services}','completedWorkLabel(work)','shortList(work?.categories)'])
+ // Badges, counts, services, invite and the More menu stay; the per-job "Recent work" line is gone
+ // (Work history in the More menu still has it). People you've only worked with get their services too.
+ for(const text of ['>Saved<','>Worked together<','Offers: {services}','completedWorkLabel(work)','Invite to job',"label:'Work history'",'loadAdvertisedServices(supabase,ids)'])
   assert.ok(screen.includes(text),text)
- assert.doesNotMatch(screen,/work\.categories\.filter\(Boolean\)\.join/)
+ assert.doesNotMatch(screen,/Recent work:/)
  assert.match(screen,/Save provider/)
 })

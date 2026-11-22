@@ -190,7 +190,7 @@ export default function HomeTabScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <View style={[styles.header, { paddingTop: insets.top + 18 }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Text style={styles.kicker}>Rural Connections</Text>
           <Text style={styles.title} accessibilityRole="header">Home</Text>
         </View>
@@ -223,7 +223,7 @@ export default function HomeTabScreen({ navigation }) {
         <Text style={styles.title} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
         {(loadError||!activeMoves||(!propertyMode&&work.unavailable&&work.indicators.length>0))&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
-          <Text style={styles.subtitle}>Find local help and manage the people supporting your property.</Text>
+          <Text style={styles.subtitle}>Find local help and keep track of who looks after your property.</Text>
           {/* A line only once the network has something in it: no setup prompt. */}
           {networkLines.length>0&&<TouchableOpacity style={styles.networkPreview} accessibilityRole="button"
             accessibilityLabel={'My Property Network, '+networkLines.join(', ')} onPress={()=>navigation.navigate('PropertyNetwork')}>
@@ -255,7 +255,7 @@ export default function HomeTabScreen({ navigation }) {
                 <Text style={styles.metricNumber}>{item.count}</Text><Text style={styles.metricLabel}>{item.label}</Text>
               </TouchableOpacity>)}
           </View>:<Text style={styles.workEmpty}>{work.unavailable?'Work summary unavailable. Pull down to try again.':
-            "You're all caught up. Explore available jobs or create a listing."}</Text>}
+            "You're all caught up."}</Text>}
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Find work" subtitle="Browse available jobs."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'JobsBoard'})}/>
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingBottom: 10,
     backgroundColor: colors.background,
   },
   kicker:     { fontSize: 12, letterSpacing: 1.5, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', marginBottom: 6 },
@@ -448,15 +448,15 @@ const styles = StyleSheet.create({
   modeSelected:{backgroundColor:colors.primaryDark},
   modeLabel:{color:colors.primaryDark,fontWeight:'700'},
   modeLabelSelected:{color:colors.white},
-  networkPreview:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:colors.primaryLight,borderRadius:16,marginVertical:16},
+  networkPreview:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:colors.primaryLight,borderRadius:16,marginVertical:12},
   networkArt:{width:96,height:106,position:'relative'},
   networkActions:{flexDirection:'row',flexWrap:'wrap',columnGap:12},
   networkAction:{minHeight:44,justifyContent:'center'},
   miniNode:{position:'absolute',width:23,height:23,marginLeft:-11.5,marginTop:-11.5,borderRadius:12,backgroundColor:colors.white,alignItems:'center',justifyContent:'center'},
   miniGap:{backgroundColor:colors.warningLight},
   miniCentre:{position:'absolute',left:'50%',top:'50%',marginLeft:-15,marginTop:-15,width:30,height:30,borderRadius:15,backgroundColor:colors.primaryDark,alignItems:'center',justifyContent:'center'},
-  workSummary:{flexDirection:'row',flexWrap:'wrap',marginVertical:14,backgroundColor:colors.primaryLight,borderRadius:14},
-  workEmpty:{marginVertical:14,color:colors.textSecondary,lineHeight:20},
+  workSummary:{flexDirection:'row',flexWrap:'wrap',marginVertical:12,backgroundColor:colors.primaryLight,borderRadius:14},
+  workEmpty:{marginVertical:12,color:colors.textSecondary,lineHeight:20},
   workMetric:{width:'50%',padding:12,minHeight:55},
   metricNumber:{fontSize:19,fontWeight:'800',color:colors.primaryDark},
   metricLabel:{fontSize:13,color:colors.textPrimary},
