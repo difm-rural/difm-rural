@@ -1,7 +1,7 @@
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import Icon from './Icon'
-import { colors } from '../theme/tokens'
+import { colors, spacing, touchTarget } from '../theme/tokens'
 import { listingFeedback } from '../lib/listingPerformance'
 
 function Metric({ value, label }) {
@@ -14,6 +14,8 @@ function Metric({ value, label }) {
 }
 
 export default function ListingPerformanceCard({
+  compact = false,
+  offerCount = 0,
   job,
   performance,
   onEdit,
@@ -28,12 +30,13 @@ export default function ListingPerformanceCard({
       <View style={styles.headingRow}>
         <View>
           <Text style={styles.eyebrow}>LISTING PERFORMANCE</Text>
-          <Text style={styles.title}>Help the right provider respond</Text>
+          {!compact && <Text style={styles.title}>Help the right provider respond</Text>}
         </View>
         <Icon name="analytics-outline" size={22} color={colors.primary} />
       </View>
 
       <View style={styles.metrics}>
+        {compact && <><Metric value={offerCount} label="offers received" /><View style={styles.metricDivider} /></>}
         <Metric
           value={performance.providerViews}
           label={`provider view${performance.providerViews === 1 ? '' : 's'}`}
@@ -48,12 +51,13 @@ export default function ListingPerformanceCard({
         Views count providers who opened this job. Matches meet the current capability, travel and availability settings.
       </Text>
 
+      {compact && <Text style={styles.measurementNote}>No offers yet. Offers from providers will appear here.</Text>}
       {feedback.length > 0 ? (
         <View style={styles.feedbackList}>
           {feedback.map((item, index) => (
             <TouchableOpacity
               key={item.key}
-              style={[styles.feedbackRow, index < feedback.length - 1 && styles.feedbackBorder]}
+              style={[styles.feedbackRow, compact && styles.compactFeedback, index < feedback.length - 1 && styles.feedbackBorder]}
               onPress={item.action === 'connections' ? onConnections : onEdit}
               activeOpacity={0.72}
               accessibilityRole="button"
@@ -63,7 +67,7 @@ export default function ListingPerformanceCard({
               </View>
               <View style={styles.feedbackCopy}>
                 <Text style={styles.feedbackTitle}>{item.title}</Text>
-                <Text style={styles.feedbackDetail}>{item.detail}</Text>
+                {!compact && <Text style={styles.feedbackDetail}>{item.detail}</Text>}
               </View>
               <Icon name="chevron-forward" size={17} color={colors.textMuted} />
             </TouchableOpacity>
@@ -80,6 +84,7 @@ export default function ListingPerformanceCard({
 }
 
 const styles = StyleSheet.create({
+  compactFeedback: { minHeight: touchTarget.minHeight, paddingVertical: spacing.sm },
   card: {
     backgroundColor: colors.white,
     borderRadius: 12,
