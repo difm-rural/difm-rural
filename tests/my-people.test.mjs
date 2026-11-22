@@ -31,3 +31,20 @@ test('My People keeps Invite to job visible and moves secondary actions into a m
  assert.match(screen,/onPress=\{\(\)=>openProfile\(person\)\}/)
  assert.doesNotMatch(screen.slice(screen.indexOf('function renderPerson'),screen.indexOf('const localHeader')),/numberOfLines/)
 })
+
+test('My People cards keep each line short: counts, recent work and services as a summary',async()=>{
+ const {shortList,providerServiceSummary}=await import('../shared/trustedLocals.ts')
+ assert.equal(shortList(['Fencing','Water','Fencing','',null,'Trees']),'Fencing · Water +1 more')
+ assert.equal(shortList(['Fencing']),'Fencing')
+ assert.equal(shortList([]),'')
+ assert.equal(shortList(null),'')
+ assert.equal(providerServiceSummary({id:'a',services:['Fence repairs','Gates','Electric fencing','New fencing']}),'Fence repairs · Gates +2 more')
+ assert.equal(providerServiceSummary({id:'a',skills:['Shearing']}),'Shearing')
+ const {readFileSync}=await import('node:fs')
+ const screen=readFileSync(new URL('../src/screens/ConnectionsScreen.js',import.meta.url),'utf8')
+ // Badges, counts, recent work and services stay; long lists are summarised, not cut off.
+ for(const text of ['>Saved<','>Worked together<','Recent work: {recent}','Offers: {services}','completedWorkLabel(work)','shortList(work?.categories)'])
+  assert.ok(screen.includes(text),text)
+ assert.doesNotMatch(screen,/work\.categories\.filter\(Boolean\)\.join/)
+ assert.match(screen,/Save provider/)
+})

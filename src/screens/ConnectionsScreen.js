@@ -1,4 +1,4 @@
-import {completedWorkLabel,providerProfileUrl,loadSavedProviders,loadInviteChoices,mergeMyPeople,providerServices,providerInviteJobs,setProviderSaved} from '../../shared/trustedLocals'
+import {completedWorkLabel,providerProfileUrl,loadSavedProviders,loadInviteChoices,mergeMyPeople,providerServiceSummary,providerInviteJobs,setProviderSaved,shortList} from '../../shared/trustedLocals'
 import {LocalAction,LocalInvitePicker,LocalMoreMenu,copyProviderLink,shareProviderProfile} from '../components/LocalProviderActions'
 import React, { useCallback, useRef, useState } from 'react'
 import { Alert, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -172,8 +172,11 @@ export default function ConnectionsScreen({ navigation, route }) {
   function renderPerson({ item: entry }) {
     const person=entry.person, work=entry.work
     const name=person.full_name||person.display_name||'Provider'
-    const services=providerServices(person)
+    const services=providerServiceSummary(person)
     const done=completedWorkLabel(work)
+    const recent=shortList(work?.categories)
+    // One short line each: where and how much you've worked together, what they did, what they offer.
+    const meta=[person.region,done&&(done+(work?.last_engaged_at?', last '+formatLastWorked(work.last_engaged_at):''))].filter(Boolean).join(' · ')
     return <View style={styles.personCard}>
       <TouchableOpacity style={styles.personTop} accessibilityRole="button" onPress={()=>openProfile(person)}
         accessibilityLabel={[name,entry.saved?'Saved':'',work?'Worked together':'',done].filter(Boolean).join(', ')+'. Opens profile'}>
@@ -184,9 +187,8 @@ export default function ConnectionsScreen({ navigation, route }) {
             {entry.saved&&<View style={styles.badge}><Icon name="bookmark" size={11} color={colors.primary}/><Text style={styles.badgeText}>Saved</Text></View>}
             {!!work&&<View style={styles.badge}><Icon name="checkmark-circle-outline" size={12} color={colors.primary}/><Text style={styles.badgeText}>Worked together</Text></View>}
           </View>
-          {!!person.region&&<Text style={styles.meta}>{person.region}</Text>}
-          {!!done&&<Text style={styles.meta}>{done}{work?.last_engaged_at?' · most recent '+formatLastWorked(work.last_engaged_at):''}</Text>}
-          {work?.categories?.length>0&&<Text style={styles.categories}>Recent work: {work.categories.filter(Boolean).join(' · ')}</Text>}
+          {!!meta&&<Text style={styles.meta}>{meta}</Text>}
+          {!!recent&&<Text style={styles.categories}>Recent work: {recent}</Text>}
           {!!services&&<Text style={styles.categories}>Offers: {services}</Text>}
         </View>
       </TouchableOpacity>
