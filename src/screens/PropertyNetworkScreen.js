@@ -1,5 +1,5 @@
 import React,{useCallback,useRef,useState} from 'react'
-import {Alert,BackHandler,Image,Linking,ScrollView,Share,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
+import {Alert,BackHandler,Image,Linking,Modal,ScrollView,Share,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native'
 import {useFocusEffect} from '@react-navigation/native'
 import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
@@ -53,6 +53,35 @@ function ContactForm({initial,busy,onSave,onCancel,onDelete}){
    {onDelete&&<LocalAction label="Delete contact" icon="trash-outline" disabled={busy} onPress={onDelete}/>}
   </View>
  </View>
+}
+
+// Compact region choice: one field showing the current region; tapping it
+// opens the 16 regions as a scrollable list with the selected one ticked.
+function RegionSelect({value,onChange}){
+ const [open,setOpen]=useState(false)
+ return <>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Region: '+(value||'not chosen')} accessibilityHint="Opens the list of regions"
+   style={styles.select} onPress={()=>setOpen(true)}>
+   <Text style={[styles.statusText,!value&&{color:colors.textSecondary}]}>{value||'Choose a region'}</Text>
+   <Icon name="chevron-down" size={18} color={colors.primary}/>
+  </TouchableOpacity>
+  <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
+   <TouchableOpacity accessible={false} activeOpacity={1} onPress={()=>setOpen(false)} style={styles.sheetBackdrop}>
+    <View accessibilityViewIsModal style={styles.sheet} onStartShouldSetResponder={()=>true}>
+     <Text accessibilityRole="header" style={styles.serviceTitle}>Choose a region</Text>
+     <ScrollView style={{marginTop:6}}>
+      {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="button" accessibilityState={{selected:value===item}}
+       style={styles.sheetRow} onPress={()=>{onChange(item);setOpen(false)}}>
+       <Text style={[styles.statusText,value===item&&styles.nodeLabel]}>{item}</Text>
+       {value===item&&<Icon name="checkmark" size={20} color={colors.primary}/>}
+      </TouchableOpacity>)}
+     </ScrollView>
+     <TouchableOpacity accessibilityRole="button" style={styles.textButton} onPress={()=>setOpen(false)}>
+      <Text style={styles.actionText}>Cancel</Text></TouchableOpacity>
+    </View>
+   </TouchableOpacity>
+  </Modal>
+ </>
 }
 
 const NODE_TONE={help:colors.jobInk,unset:colors.textSecondary,sorted:colors.primaryDark,linked:colors.primaryDark}
@@ -544,11 +573,7 @@ function PropertyNetworkScreen({navigation,route}){
         </TouchableOpacity>
         {widen&&<><Text style={styles.nodeLabel}>Region</Text>
          {!!regionHint&&<Text style={styles.small}>{regionHint}</Text>}
-         <View style={[styles.row,{marginTop:6}]} accessibilityLabel="Region">
-          {NZ_REGIONS.map(item=><TouchableOpacity key={item} accessibilityRole="button" accessibilityState={{selected:region===item}}
-           style={[styles.chip,region===item&&styles.chipOn]} onPress={()=>{setRegion(item);setRegionHint('')}}>
-           <Text style={styles.chipText}>{item}</Text></TouchableOpacity>)}
-         </View></>}
+         <RegionSelect value={region} onChange={item=>{setRegion(item);setRegionHint('')}}/></>}
         <Text style={styles.small}>Results don't update as you type. Tap Search providers after changing the town or region.</Text>
         <LocalAction label="Search providers" disabled={matchBusy||!(matchLocality(locality)||(widen&&matchLocality(region)))} onPress={()=>findMatches(service,category)}/>
         {matchBusy&&<Text accessibilityLiveRegion="polite">Finding providers…</Text>}
@@ -709,6 +734,10 @@ const styles=StyleSheet.create({
  postJob:{minHeight:44,borderRadius:10,borderWidth:1,borderColor:colors.jobLine,backgroundColor:colors.jobFill,paddingHorizontal:14,justifyContent:'center'},
  remove:{minHeight:44,marginTop:20,alignItems:'center',justifyContent:'center'},
  removeText:{color:'#a32d2d',fontWeight:'600'},
+ select:{marginTop:6,minHeight:46,flexDirection:'row',alignItems:'center',gap:8,backgroundColor:colors.white,borderWidth:1,borderColor:colors.border,borderRadius:8,paddingHorizontal:12},
+ sheetBackdrop:{flex:1,backgroundColor:'rgba(0,0,0,.35)',justifyContent:'flex-end'},
+ sheet:{maxHeight:'75%',backgroundColor:colors.white,borderTopLeftRadius:16,borderTopRightRadius:16,padding:18,paddingBottom:28},
+ sheetRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:8,borderBottomWidth:1,borderBottomColor:'#eeeeee'},
  input:{marginTop:6,backgroundColor:colors.white,borderWidth:1,borderColor:colors.border,borderRadius:8,padding:12,color:colors.textPrimary},
 })
 
