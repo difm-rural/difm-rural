@@ -46,7 +46,12 @@ test('prompts are optional and editable: added after what is written, removed if
 test('Step 3 shows the guidance, keeps it optional, and the Property Network passes its service',()=>{
  const step3=readFileSync(new URL('../src/screens/postjob/PostJobStep3Details.js',import.meta.url),'utf8')
  assert.match(step3,/jobDescriptionGuidance\(/)
- assert.match(step3,/Add these as prompts/)
+ assert.match(step3,/Add these to the description/)
+ // Once added, the box says where to answer and that blank lines go; the list isn't repeated.
+ assert.match(step3,/Type your answers after each colon in the box below\. Lines you leave blank are removed when you continue\./)
+ assert.match(step3,/!guidanceAdded \? \(/)
+ assert.match(step3,/>Optional</)
+ assert.match(step3,/if \(finalDescription !== description\) setDescription\(finalDescription\)/)
  assert.match(step3,/finalDescription\.length >= 8/)
  // No second AI implementation on this step.
  assert.doesNotMatch(step3,/functions\.invoke|draftJobFromText/)

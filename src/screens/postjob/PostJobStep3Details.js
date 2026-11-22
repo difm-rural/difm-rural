@@ -158,18 +158,26 @@ export default function PostJobStep3Details({ navigation, route }) {
           {/* 1. Description */}
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Describe the job</Text>
-            <View style={styles.guide} accessibilityLabel={guidance.heading + ': ' + guidance.prompts.join('; ')}>
-              <Text style={styles.guideHeading}>{guidance.heading}</Text>
-              {guidance.prompts.map(prompt => <Text key={prompt} style={styles.guideItem}>• {prompt}</Text>)}
-              {!guidanceAdded && (
-                <TouchableOpacity accessibilityRole="button" accessibilityHint="Adds these as lines you can fill in or delete"
+            {/* Optional prompts. Before they're added: what to mention. After: where to answer. */}
+            {!guidanceAdded ? (
+              <View style={styles.guide} accessibilityLabel={'Optional. ' + guidance.heading + ': ' + guidance.prompts.join('; ')}>
+                <View style={[styles.cardQuestionRow, {marginBottom: 2}]}>
+                  <Text style={styles.guideHeading}>{guidance.heading}</Text>
+                  <Text style={styles.optionalTag}>Optional</Text>
+                </View>
+                {guidance.prompts.map(prompt => <Text key={prompt} style={styles.guideItem}>• {prompt}</Text>)}
+                <TouchableOpacity accessibilityRole="button" accessibilityHint="Adds each one as a line in the description box below, for you to answer or delete"
                   style={styles.guideButton} onPress={() => setDescription(value => addGuidanceToDescription(value, guidance.prompts))}>
                   <Icon name="add" size={15} color={colors.primary} />
-                  <Text style={styles.guideButtonText}>Add these as prompts</Text>
+                  <Text style={styles.guideButtonText}>Add these to the description</Text>
                 </TouchableOpacity>
-              )}
-              {guidanceAdded && <Text style={styles.guideItem}>Fill in what applies. Prompts you leave blank are removed when you continue.</Text>}
-            </View>
+              </View>
+            ) : (
+              <View style={[styles.guide, styles.guideAdded]}>
+                <Icon name="create-outline" size={15} color={colors.primary} />
+                <Text style={[styles.guideItem, {flex: 1}]}>Type your answers after each colon in the box below. Lines you leave blank are removed when you continue.</Text>
+              </View>
+            )}
             <TextInput
               style={[styles.textarea, attempted && !canProceed() && {borderColor:colors.danger,borderWidth:2}]}
               placeholder="What needs doing? Include any special requirements..."
@@ -398,6 +406,7 @@ const styles = StyleSheet.create({
   guideItem:       { fontSize: 12, color: colors.primary, lineHeight: 17 },
   guideButton:     { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 36, marginTop: 4 },
   guideButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  guideAdded:      { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   photoNudge:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10 },
   photoNudgeText:  { flex: 1, fontSize: 12, color: colors.primary, lineHeight: 17 },
   photoGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
