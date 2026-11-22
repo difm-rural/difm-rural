@@ -38,6 +38,7 @@ import { canProvide } from '../lib/roles'
 import { useUser } from '../context/UserContext'
 import { recordJobProviderView } from '../lib/listingPerformance'
 import WorkScheduleCard from '../components/WorkScheduleCard'
+import NextMoveBanner from '../components/NextMoveBanner'
 import ArrivalWindowModal from '../components/ArrivalWindowModal'
 import JobPaymentHandoff from '../components/JobPaymentHandoff'
 import { paymentAcknowledgementAvailable } from '../../shared/paymentAcknowledgement'
@@ -594,6 +595,14 @@ export default function JobDetailScreen({ route, navigation }) {
 
   const isJobOwner        = currentUser?.id === job.requester_id
   const requesterOpen = isJobOwner && job.status === 'open'
+  const requesterAccepted = isJobOwner && job.status === 'accepted'
+  const compactRequesterDetails = requesterOpen || requesterAccepted
+
+  useEffect(() => {
+    if (!requesterAccepted || offerFeedback !== 'Offer accepted.') return
+    const timer = setTimeout(() => setOfferFeedback(''), 4000)
+    return () => clearTimeout(timer)
+  }, [requesterAccepted, offerFeedback])
   const unansweredQuestions = questions.filter(question => !question.answer)
   const answeredQuestions = questions.filter(question => !!question.answer)
   const focusQuestions = route.params?.focusQuestions === true
@@ -643,7 +652,7 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
-      <Text style={styles.headerTitle} accessibilityRole="header">{job.title}</Text>
+      <Text style={[styles.headerTitle, requesterAccepted && styles.acceptedTitle]} numberOfLines={requesterAccepted ? 3 : undefined} accessibilityLabel={requesterAccepted ? job.title : undefined} accessibilityRole="header">{job.title}</Text>
       {job.status==='completed'&&(isAcceptedProvider||isJobOwner)&&<JobStatusNotice>Job completed.</JobStatusNotice>}
       {((offerFeedback==='Offer sent.'&&job.status==='open')||(offerFeedback==='Offer accepted.'&&job.status==='accepted'))&&<JobStatusNotice>{offerFeedback}</JobStatusNotice>}
     </View>
@@ -975,6 +984,11 @@ export default function JobDetailScreen({ route, navigation }) {
   // ─── Normal view (requester + open provider) ──────────────────────────────────
   const bidTotal = getBidTotal()
   const acceptedBid = bids.find(b => b.status === 'accepted')
+  const acceptedNextMove = requesterAccepted ? jobNextMove(job, 'requester', {
+    otherName: acceptedBid?.profiles?.full_name,
+    hasArrival: !!workSchedule?.arrival_start_at,
+    arrivalAt: workSchedule?.arrival_start_at,
+  }) : null
   const acceptedProviderName = acceptedBid?.profiles?.full_name || 'the provider'
 
   const bidFormJSX = (
@@ -1219,18 +1233,43 @@ export default function JobDetailScreen({ route, navigation }) {
 
     </>
   )
+  const offerDetails = bid => (
+    <>
+                {bid.line_items?.length > 1 && (
+                  <View style={styles.lineItemsBreakdown}>
+                    {bid.line_items.map((li, i) => (
+                      <View key={i} style={styles.breakdownRow}>
+                        <Text style={styles.breakdownLabel}>{li.label}</Text>
+                        <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {bid.message ? <Text style={styles.bidMessage}>{bid.message}</Text> : null}
+                {bid.available_from && (
+                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {formatOfferAvailability(bid.available_from)}</Text>
+                )}
+                {!requesterAccepted && bid.estimated_duration && (
+                  <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>
+                )}
+                {bid.materials && (
+                  <Text style={styles.bidMeta}><Icon name="construct-outline" size={12} color={colors.textMuted} /> {OFFER_MATERIALS_LABELS[bid.materials] || bid.materials}</Text>
+                )}
+                {!requesterAccepted && <Text style={styles.bidStatus}>Status: {bid.status.toUpperCase()}</Text>}
+    </>
+  )
   const offersJSX = (
     <>
         {/* Bids list for job owner */}
         {isJobOwner && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {bids.length === 0 ? 'Offers' : `${bids.length} Offer${bids.length > 1 ? 's' : ''} Received`}
+              {requesterAccepted ? 'Your provider' : bids.length === 0 ? 'Offers' : `${bids.length} Offer${bids.length > 1 ? 's' : ''} Received`}
             </Text>
-            {bids.length > 0 && (
+            {!requesterAccepted && bids.length > 0 && (
               <Text style={styles.offersHint}>Private to you. Choose the right fit — reputation, location, availability and price.</Text>
             )}
-            {bids.length === 0 && (
+            {!requesterAccepted && bids.length === 0 && (
               <EmptyState
                 compact
                 icon="pricetag-outline"
@@ -1238,9 +1277,9 @@ export default function JobDetailScreen({ route, navigation }) {
                 body="When providers make an offer on your job, it'll appear here."
               />
             )}
-            {bids.map(bid => (
+            {(requesterAccepted ? bids.filter(bid => bid.status === 'accepted') : bids).map(bid => (
               <PressableCard key={bid.id} style={styles.bidCard}>
-                <View style={styles.bidHeader}>
+                <View style={requesterAccepted ? styles.acceptedProviderHeader : styles.bidHeader}>
                   <TouchableOpacity
                     style={styles.bidProvider}
                     onPress={() => navigation.navigate('ProviderProfile', { providerId: bid.provider_id })}
@@ -1256,38 +1295,18 @@ export default function JobDetailScreen({ route, navigation }) {
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.bidName} numberOfLines={1}>{bid.profiles?.full_name || 'Provider'}</Text>
-                      <Text style={styles.bidProviderMeta} numberOfLines={1}>
+                      <Text style={styles.bidName} numberOfLines={requesterAccepted ? undefined : 1}>{bid.profiles?.full_name || 'Provider'}</Text>
+                      <Text style={styles.bidProviderMeta} numberOfLines={requesterAccepted ? undefined : 1}>
                         {bid.stats?.ratingCount > 0
                           ? `★ ${bid.stats.ratingAvg.toFixed(1)} (${bid.stats.ratingCount})`
                           : 'New provider'}
-                        {bid.stats?.jobsDone > 0 ? ` · ${bid.stats.jobsDone} done` : ''}
+                        {requesterAccepted || bid.stats?.jobsDone > 0 ? ` · ${bid.stats?.jobsDone || 0} done` : ''}
                       </Text>
                     </View>
                   </TouchableOpacity>
-                  <Text style={styles.bidAmount}>{formatOfferAmount(bid.amount, bid.pricing_type)}</Text>
+                  <Text style={styles.bidAmount}>{requesterAccepted ? 'Agreed price: ' : ''}{formatOfferAmount(bid.amount, bid.pricing_type)}</Text>
                 </View>
-                {bid.line_items?.length > 1 && (
-                  <View style={styles.lineItemsBreakdown}>
-                    {bid.line_items.map((li, i) => (
-                      <View key={i} style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>{li.label}</Text>
-                        <Text style={styles.breakdownAmount}>{nzMoney((li.amount || 0).toFixed(2))}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                {bid.message ? <Text style={styles.bidMessage}>{bid.message}</Text> : null}
-                {bid.available_from && (
-                  <Text style={styles.bidMeta}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Available: {formatOfferAvailability(bid.available_from)}</Text>
-                )}
-                {bid.estimated_duration && (
-                  <Text style={styles.bidMeta}><Icon name="time-outline" size={12} color={colors.textMuted} /> Est. duration: {bid.estimated_duration}</Text>
-                )}
-                {bid.materials && (
-                  <Text style={styles.bidMeta}><Icon name="construct-outline" size={12} color={colors.textMuted} /> {OFFER_MATERIALS_LABELS[bid.materials] || bid.materials}</Text>
-                )}
-                <Text style={styles.bidStatus}>Status: {bid.status.toUpperCase()}</Text>
+                {!requesterAccepted && offerDetails(bid)}
                 {bid.status === 'pending' && job.status === 'open' && (
                   <Button
                     icon="checkmark"
@@ -1301,7 +1320,7 @@ export default function JobDetailScreen({ route, navigation }) {
                 {bid.status === 'accepted' && (
                   <>
                     <Button
-                      variant="secondary"
+                      variant={requesterAccepted ? 'primary' : 'secondary'}
                       icon="chatbubble-ellipses-outline"
                       title="Chat with Provider"
                       onPress={() => navigation.navigate('Chat', {
@@ -1331,13 +1350,13 @@ export default function JobDetailScreen({ route, navigation }) {
     <>
         {/* Job card */}
         <View style={styles.card}>
-          {!requesterOpen && <View style={styles.cardHeader}>
+          {!compactRequesterDetails && <View style={styles.cardHeader}>
             <Text style={styles.category}>Category: {job.category}</Text>
             <Text style={styles.price}>
               {jobBudget(job)}
             </Text>
           </View>}
-          {!requesterOpen && <Text style={styles.title} accessibilityRole="header">{job.title}</Text>}
+          {!compactRequesterDetails && <Text style={styles.title} accessibilityRole="header">{job.title}</Text>}
           <Text style={styles.description}>{job.description}</Text>
 
           {/* Feature 1: materials/access */}
@@ -1353,7 +1372,7 @@ export default function JobDetailScreen({ route, navigation }) {
               <Text style={styles.accessText}>{job.access_conditions.map(c => ACCESS_LABELS[c] || c).join(', ')}</Text>
             </View>
           )}
-          {job.location_note ? (
+          {job.location_note && !requesterAccepted ? (
             <View style={styles.accessRow}>
               <Icon name="document-text-outline" size={14} color={colors.textSecondary} />
               <Text style={styles.accessText}>{job.location_note}</Text>
@@ -1392,11 +1411,24 @@ export default function JobDetailScreen({ route, navigation }) {
           ) : null}
           {job.location_note ? <Text style={styles.locationNote}><Icon name="document-text-outline" size={12} color={colors.textMuted} /> {job.location_note}</Text> : null}
           <Text style={styles.locationNote}><Icon name="calendar-outline" size={12} color={colors.textMuted} /> Requested: {jobRequested(job)}</Text>
-          <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>
+          {!requesterAccepted && <Text style={styles.status}>Status: {job.status.toUpperCase()}</Text>}
         </View>
 
     </>
   )
+
+  const paymentJSX = acceptedBid ? (
+            <JobPaymentHandoff
+              bidId={acceptedBid.id}
+              method={acceptedBid.payment_method}
+              sortedAt={acceptedBid.payment_sorted_at}
+              sortedBy={acceptedBid.payment_sorted_by}
+              requesterId={job.requester_id}
+              providerId={acceptedBid.provider_id}
+              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner)}
+              onChanged={fetchData}
+            />
+  ) : null
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -1428,9 +1460,17 @@ export default function JobDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {requesterOpen ? <>
-          {unansweredQuestions.length > 0 && questionsJSX}
+        {compactRequesterDetails ? <>
+          {requesterOpen && unansweredQuestions.length > 0 && questionsJSX}
+          {requesterAccepted && <NextMoveBanner nextMove={{ ...acceptedNextMove,
+            label: acceptedNextMove?.label || 'Provider accepted',
+            detail: `Provider accepted. ${acceptedNextMove?.detail || ''}`.trim(),
+          }} style={{ marginBottom: spacing.md }} />}
           {offersJSX}
+          {requesterAccepted && <>
+            <JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={acceptedBid?.estimated_duration} />
+            {paymentJSX}
+          </>}
           <View style={styles.section}>
             <TouchableOpacity style={styles.detailsToggle} accessibilityRole="button" accessibilityLabel="Job details"
               accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(value => !value)}>
@@ -1442,7 +1482,8 @@ export default function JobDetailScreen({ route, navigation }) {
             </TouchableOpacity>
             {detailsExpanded && <>
               {jobDetailsJSX}
-              {answeredQuestions.length > 0 && <View>
+              {requesterAccepted && acceptedBid && offerDetails(acceptedBid)}
+              {requesterOpen && answeredQuestions.length > 0 && <View>
                 <Text style={styles.sectionTitle}>Answered questions</Text>
                 {answeredQuestions.map(renderQuestion)}
               </View>}
@@ -1462,20 +1503,11 @@ export default function JobDetailScreen({ route, navigation }) {
           />
         )}
 
-        {isJobOwner && acceptedBid && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && (
+        {isJobOwner && acceptedBid && ['in_progress', 'awaiting_completion', 'completed'].includes(job.status) && (
           <>
             <JobArrangementSummary arrival={workSchedule?.arrival_start_at}
               duration={acceptedBid.estimated_duration}/>
-            <JobPaymentHandoff
-              bidId={acceptedBid.id}
-              method={acceptedBid.payment_method}
-              sortedAt={acceptedBid.payment_sorted_at}
-              sortedBy={acceptedBid.payment_sorted_by}
-              requesterId={job.requester_id}
-              providerId={acceptedBid.provider_id}
-              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner)}
-              onChanged={fetchData}
-            />
+            {paymentJSX}
           </>
         )}
 
@@ -1562,7 +1594,7 @@ export default function JobDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {!requesterOpen && offersJSX}
+        {!compactRequesterDetails && offersJSX}
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
       </KeyboardAvoidingView>
@@ -1694,6 +1726,8 @@ const styles = StyleSheet.create({
   mapTapHintText:    { fontSize: 12, fontWeight: '600', color: colors.white },
   locationNote:      { color: colors.textMuted, fontSize: 13, marginBottom: 6, lineHeight: 18 },
 
+  acceptedTitle: { fontSize: typography.sizeXxl, lineHeight: spacing.xxxl },
+  acceptedProviderHeader: { gap: spacing.sm, marginBottom: spacing.sm },
   detailsToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: touchTarget.minHeight },
   detailsTitle: { color: colors.textPrimary, fontSize: typography.sizeLg, fontWeight: '700', marginBottom: spacing.sm },
   requesterAnswerBtn: { backgroundColor: colors.primary, padding: spacing.md, borderRadius: radius.md, minHeight: touchTarget.minHeight, justifyContent: 'center', alignItems: 'center' },
