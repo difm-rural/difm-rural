@@ -85,8 +85,8 @@ test('free text, edited labels and posted jobs are left alone; blanks go; a seco
 
 test('Step 3 converts only on Next, validates what it saves, and adds no AI or web call',()=>{
  const step3=readFileSync(new URL('../src/screens/postjob/PostJobStep3Details.js',import.meta.url),'utf8')
- assert.match(step3,/const finalDescription = finishJobDescription\(description, \{ service, title: jobData\.title,/)
- assert.match(step3,/skip: route\.params\?\.mode === 'edit' \?/)
+ assert.match(step3,/finishJobDescription\(description, \{ service, title: jobData\.title, skip: posted \}\)/)
+ assert.match(step3,/const posted = route\.params\?\.mode === 'edit' \?/)
  assert.match(step3,/postingTextError\(finalDescription,'description'\)/)
  assert.equal((step3.match(/setDescription\(finalDescription\)/g)||[]).length,1)
  assert.match(step3,/onChangeText=\{setDescription\}/)

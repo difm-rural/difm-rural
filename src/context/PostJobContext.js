@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useRef, useState } from 'react'
 import { newJobId } from '../lib/draftId'
+import { jobDraftChanged } from '../../shared/postJobCancel'
 
 const PostJobContext = createContext({})
 
@@ -44,17 +45,31 @@ const freshState = () => ({ ...INITIAL_STATE, draftJobId: newJobId() })
 
 export function PostJobProvider({ children }) {
   const [jobData, setJobData] = useState(freshState)
+  // What the wizard opened with, to tell whether Cancel would lose anything.
+  // Null when no wizard is open, or once its job has been saved.
+  const baseline = useRef(null)
+
+  function startJobBaseline(values = {}) {
+    baseline.current = { ...INITIAL_STATE, ...values }
+  }
+
+  // Values the wizard filled in by itself (e.g. the phone's location) aren't changes.
+  function markAutomatic(values) {
+    if (baseline.current) baseline.current = { ...baseline.current, ...values }
+  }
 
   function updateJobData(updates) {
     setJobData(prev => ({ ...prev, ...updates }))
   }
 
   function resetJobData() {
+    baseline.current = null
     setJobData(freshState())
   }
 
   return (
-    <PostJobContext.Provider value={{ jobData, updateJobData, resetJobData }}>
+    <PostJobContext.Provider value={{ jobData, updateJobData, resetJobData, startJobBaseline, markAutomatic,
+      jobChanged: jobDraftChanged(baseline.current, jobData) }}>
       {children}
     </PostJobContext.Provider>
   )

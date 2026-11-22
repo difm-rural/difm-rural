@@ -17,6 +17,7 @@ for(const first of ['PostJob','GuestPostJob'])test(`mobile completed Basics retu
   if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:0})}
   if(name==='../../theme/tokens')return {colors:{}}
   if(name==='../../components/Icon'||name==='../../components/AiJobAssistant'||name==='../../components/SideHeader')return {default:()=>null,__esModule:true}
+  if(name==='./usePostJobCancel')return {usePostJobCancel:()=>()=>{}}
   throw Error(name)
  }})
  const tree=module.exports.default({currentStep:3,onBack(){}})

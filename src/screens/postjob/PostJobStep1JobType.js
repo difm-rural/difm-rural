@@ -15,6 +15,7 @@ import AiJobAssistant, { JobAiChoice } from '../../components/AiJobAssistant'
 import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
 import { photoToJobEnabled } from '../../lib/jobPrimaryPhoto'
 import { fillJobDraftFields } from '../../../shared/jobSuggestion'
+import { jobEditSeed } from '../../../shared/jobEdit'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
@@ -42,7 +43,7 @@ function formatShort(d) {
 
 export default function PostJobStep1JobType({ navigation, route }) {
   const insets = useSafeAreaInsets()
-  const { jobData, updateJobData, resetJobData } = usePostJob()
+  const { jobData, updateJobData, resetJobData, startJobBaseline } = usePostJob()
 
   const isEditMode = route.params?.mode === 'edit'
   const editJob    = route.params?.job || null
@@ -71,6 +72,8 @@ export default function PostJobStep1JobType({ navigation, route }) {
   // the rest of the app (a dialog on Android, an inline spinner with Done on iOS).
   const [picker, setPicker] = useState(null)
   const [aiExpanded, setAiExpanded] = useState(false)
+  // Words typed to the AI helper but not used yet also count as entered.
+  const [assistantText, setAssistantText] = useState(false)
   const [photoExpanded, setPhotoExpanded] = useState(false)
   const scroll = useRef(null)
   const viewport = useRef(null)
@@ -107,36 +110,19 @@ export default function PostJobStep1JobType({ navigation, route }) {
     openDateTimePicker({ ...pickerOptions(which), onShow: () => setPicker(which) })
   }
 
-  // Seed context from editJob on first entry into this edit session
+  // Seed context from editJob whenever this edit opens. Each branch also records
+  // what it opened with, so Cancel only asks when something has changed.
   useEffect(() => {
-    if (isEditMode && editJob && jobData._editJobId !== editJob.id) {
-      updateJobData({
-        category:     editJob.category        || '',
-        title:        editJob.title           || '',
-        scheduleType: editorScheduleType(editJob),
-        scheduledDate: editJob.scheduled_date || null,
-        dateFrom:     editJob.date_from        || null,
-        dateTo:       editJob.date_to          || null,
-        hideExactLocation: editJob.hide_exact_location || false,
-        locationArea:      editJob.location_area || '',
-        latitude:     editJob.latitude        || null,
-        longitude:    editJob.longitude       || null,
-        jobAddress:   editJob.location_name   || '',
-        locationNote: editJob.location_note   || '',
-        areaPolygon:  editJob.area_polygon    || [],
-        areaHectares: editJob.area_hectares   || null,
-        description:  editJob.description     || '',
-        photos:       editJob.photos          || [],
-        priceType:    editJob.price_type      || 'fixed',
-        price:        editJob.price ? String(editJob.price) : '',
-        _editJobId:   editJob.id,
-        repeatedFromJobId: editJob.repeated_from_job_id || null,
-        recurrenceFrequency: editJob.recurrence_frequency || 'one_time',
-      })
+    if (isEditMode && editJob) {
+      const seeded = jobEditSeed(editJob)
+      resetJobData()
+      updateJobData(seeded)
+      startJobBaseline(seeded)
     } else if (isRepeatMode) {
       resetJobData()
       const mapped = repeatJobToJobData(repeatJob)
       updateJobData(mapped)
+      startJobBaseline(mapped)
       setTitle(mapped.title)
       setScheduleType(mapped.scheduleType)
       setScheduledDate(null)
@@ -146,6 +132,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
       // New job — start clean. Clear both context AND local field state, since a
       // still-mounted Step 1 would otherwise re-sync stale values into context.
       resetJobData()
+      startJobBaseline({ title: prefill?.title || '', category: CATEGORIES.includes(prefill?.category) ? prefill.category : '' })
       setTitle(prefill?.title || '')
       if(CATEGORIES.includes(prefill?.category))updateJobData({category:prefill.category})
       if(prefill?.service)updateJobData({propertyService:String(prefill.service).slice(0,80),propertyServiceCategory:prefill.category||''})
@@ -216,10 +203,6 @@ export default function PostJobStep1JobType({ navigation, route }) {
     return true
   }
 
-  function handleBack() {
-    navigation.goBack()
-  }
-
   function handleNext() {
     Keyboard.dismiss()
     setAttempted(true)
@@ -229,7 +212,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
-      <PostJobHeader currentStep={1} title={isRepeatMode ? 'Repeat a job' : undefined} onBack={handleBack} />
+      <PostJobHeader currentStep={1} title={isRepeatMode ? 'Repeat a job' : undefined} extraChanges={assistantText} />
 
       <KeyboardAvoidingView
         style={styles.flex1}
@@ -293,7 +276,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
                     onSuggestion={applySuggestion}/>
                 </View>
               </>}
-              <AiJobAssistant onUse={draft=>{
+              <AiJobAssistant onDraftChange={setAssistantText} onUse={draft=>{
                 const suggestion=draftToJobData(draft)
                 if (!applySuggestion(suggestion)) return false
                 if (!scheduleType) {

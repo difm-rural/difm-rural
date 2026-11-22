@@ -57,7 +57,10 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
   const [priceType,     setPriceType]     = useState(jobData.priceType || 'fixed')
   const [price,         setPrice]         = useState(jobData.price)
-  const [materialsType, setMaterialsType] = useState(jobData.materialsType || 'none')
+  // A new job starts on "No materials needed". An edit shows only what was saved, so
+  // a job without a choice isn't given one.
+  const isEdit = !!jobData._editJobId
+  const [materialsType, setMaterialsType] = useState(jobData.materialsType || (isEdit ? '' : 'none'))
 
   const locationSummary = jobData.jobAddress
     ? `${String(jobData.jobAddress).split(',').slice(-2).join(',').trim()}`
@@ -83,7 +86,7 @@ export default function PostJobStep4Budget({ navigation, route }) {
     ? (String(price ?? '').trim() ? moneyInputError(price,'Budget') : 'Enter a budget above $0, or choose Open to offers.')
     : ''
   function canProceed() {
-    if (!materialsType) return false
+    if (!materialsType && !isEdit) return false
     if (!priceType) return false
     return !budgetError
   }
@@ -167,8 +170,8 @@ export default function PostJobStep4Budget({ navigation, route }) {
 
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Who supplies the materials?</Text>
-            {attempted && !materialsType && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose who supplies the materials.</Text>}
-            <View style={[styles.tilesRow, attempted && !materialsType && {borderColor:colors.danger,borderWidth:2}]}>
+            {attempted && !materialsType && !isEdit && <Text accessibilityRole="alert" style={{color:colors.danger}}>Choose who supplies the materials.</Text>}
+            <View style={[styles.tilesRow, attempted && !materialsType && !isEdit && {borderColor:colors.danger,borderWidth:2}]}>
               {MATERIALS_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt.id}

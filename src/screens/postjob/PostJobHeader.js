@@ -5,30 +5,43 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import SideHeader from '../../components/SideHeader'
+import { usePostJobCancel } from './usePostJobCancel'
 
 // Step 1 is really title + timing — the category is inferred later, so "Basics"
 // rather than "Job type" (which implies a category picker that isn't there).
 const STEPS = ['Basics', 'Location', 'Details', 'Budget', 'Review']
 
-export default function PostJobHeader({ currentStep, title, onBack }) {
+export default function PostJobHeader({ currentStep, title, onBack, busy = false, extraChanges = false }) {
   const insets = useSafeAreaInsets()
   const navigation=useNavigation()
+  const cancel=usePostJobCancel({currentStep,busy,extraChanges})
   const routes=[navigation.getState().routeNames.includes('GuestPostJob')?'GuestPostJob':'PostJob','PostJobStep2Location','PostJobStep3Details','PostJobStep4Budget','PostJobStep5Review']
   return (
     <View style={styles.header}>
       <SideHeader kind="job" label="POST A JOB · WANTED" tone="dark" topInset={insets.top} bg={colors.primary} pad={16} />
       <View style={styles.body}>
       <View style={styles.titleRow}>
-        <TouchableOpacity
+        {/* Back on the left from Step 2; Cancel always on the right. */}
+        {currentStep === 1 ? <View style={styles.backBtn} /> : <TouchableOpacity
           style={styles.backBtn}
           onPress={onBack}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel={currentStep === 1 ? 'Cancel' : 'Go back'}>
-          <Text style={styles.backText}>{currentStep === 1 ? 'Cancel' : <><Icon name="chevron-back" size={14} color="rgba(255,255,255,0.92)" /> Back</>}</Text>
+          accessibilityLabel="Go back">
+          <Text style={styles.backText}><Icon name="chevron-back" size={14} color="rgba(255,255,255,0.92)" /> Back</Text>
+        </TouchableOpacity>}
+        <Text style={styles.title} numberOfLines={1}>{title || 'Post a job'}</Text>
+        <TouchableOpacity
+          style={[styles.cancelBtn, busy && styles.cancelBusy]}
+          onPress={cancel}
+          disabled={busy}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel"
+          accessibilityState={{ disabled: busy }}
+          accessibilityHint="Leaves without posting or saving. Asks first if you have made changes.">
+          <Text style={styles.backText}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>{title || 'Post a job'}</Text>
-        <View style={styles.spacer} />
       </View>
       {currentStep===1 ? <View style={styles.compact}>
         <Text style={styles.progressText}>Step 1 of {STEPS.length} · Basics</Text>
@@ -42,7 +55,7 @@ export default function PostJobHeader({ currentStep, title, onBack }) {
           const done   = n < currentStep
           const active = n === currentStep
           return (
-            <TouchableOpacity key={n} style={styles.stepItem} disabled={!done} accessibilityRole="button" accessibilityLabel={'Go to '+label} onPress={()=>navigation.popTo(routes[i])}>
+            <TouchableOpacity key={n} style={styles.stepItem} disabled={!done||busy} accessibilityRole="button" accessibilityLabel={'Go to '+label} onPress={()=>navigation.popTo(routes[i])}>
               <View style={[styles.dot, done && styles.dotDone, active && styles.dotActive]}>
                 <Text style={[styles.dotNum, (done || active) && styles.dotNumLight]}>
                   {done ? <Icon name="checkmark" size={13} color={colors.primary} /> : String(n)}
@@ -75,10 +88,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 14,
   },
-  backBtn:  { minWidth: 60 },
+  backBtn:  { minWidth: 72, minHeight: 32, justifyContent: 'center' },
+  cancelBtn: { minWidth: 72, minHeight: 32, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
+  cancelBusy: { opacity: 0.5 },
   backText: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '600' },
-  title:    { fontSize: 17, fontWeight: '700', color: '#fff', textAlign: 'center' },
-  spacer:   { minWidth: 60 },
+  title:    { flexShrink: 1, fontSize: 17, fontWeight: '700', color: '#fff', textAlign: 'center' },
   compact: { gap: 7 },
   progressText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' },

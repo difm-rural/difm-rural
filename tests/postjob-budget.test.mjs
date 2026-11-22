@@ -17,7 +17,7 @@ test('Fixed price needs a positive budget; Open to offers needs none',()=>{
  assert.match(step4,/updateJobData\(\{ priceType, price, materialsType \}\)/)
  const step5=read('src/screens/postjob/PostJobStep5Review.js')
  assert.match(step5,/budgetDisplay += priceType === 'fixed' \? `\$\{nzMoney\(price\)\} \(fixed price\)` : 'Open to offers'/)
- assert.match(step5,/price: +priceType === 'fixed' \? parseFloat\(price\) : null/)
+ assert.match(readFileSync(new URL('../shared/jobEdit.ts',import.meta.url),'utf8'),/price:data\.priceType==='fixed'\?parseFloat\(data\.price\):null/)
  assert.match(step5,/moneyError=priceType==='fixed'\?moneyInputError\(price,'Budget'\):''/)
 })
 

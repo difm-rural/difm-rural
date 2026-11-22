@@ -85,8 +85,9 @@ export default function PostJobStep3Details({ navigation, route }) {
   const guidance = jobDescriptionGuidance({ category: jobData.category, service })
   // What Next saves: answered prompts as sentences, blank ones gone. When editing
   // a posted job, prompt lines already on it stay as they were posted.
-  const finalDescription = finishJobDescription(description, { service, title: jobData.title,
-    skip: route.params?.mode === 'edit' ? route.params?.job?.description || '' : '' })
+  const posted = route.params?.mode === 'edit' ? route.params?.job?.description || '' : ''
+  const finalDescription = posted && description === posted ? posted
+    : finishJobDescription(description, { service, title: jobData.title, skip: posted })
   const guidanceAdded = guidance.prompts.every(prompt => description.includes(prompt + ':'))
   const charsLeft = 8 - finalDescription.length
 

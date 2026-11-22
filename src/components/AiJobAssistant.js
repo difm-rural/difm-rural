@@ -38,7 +38,7 @@ function DraftRow({ label, value, last }) {
   )
 }
 
-export default function AiJobAssistant({ onUse }) {
+export default function AiJobAssistant({ onUse, onDraftChange }) {
   const {height} = useWindowDimensions()
   const [mode, setMode] = useState(null)
   const [text, setText] = useState('')
@@ -58,6 +58,9 @@ export default function AiJobAssistant({ onUse }) {
     const h = Keyboard.addListener(hideEvt, () => setKbHeight(0))
     return () => { s.remove(); h.remove() }
   }, [])
+
+  const hasDraft = !!text.trim() || !!draft
+  useEffect(() => { onDraftChange?.(hasDraft) }, [hasDraft])
 
   function close() {
     request.current++
