@@ -15,6 +15,7 @@ import AiJobAssistant, { JobAiChoice } from '../../components/AiJobAssistant'
 import JobPrimaryPhotoDraft from '../../components/JobPrimaryPhotoDraft'
 import { photoToJobEnabled } from '../../lib/jobPrimaryPhoto'
 import { fillJobDraftFields } from '../../../shared/jobSuggestion'
+import { jobEditSeed } from '../../../shared/jobEdit'
 import PostJobHeader from './PostJobHeader'
 import { usePostJob } from '../../context/PostJobContext'
 import { draftToJobData } from '../../lib/draftJob'
@@ -113,29 +114,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
   // what it opened with, so Cancel only asks when something has changed.
   useEffect(() => {
     if (isEditMode && editJob) {
-      const seeded = {
-        category:     editJob.category        || '',
-        title:        editJob.title           || '',
-        scheduleType: editorScheduleType(editJob),
-        scheduledDate: editJob.scheduled_date || null,
-        dateFrom:     editJob.date_from        || null,
-        dateTo:       editJob.date_to          || null,
-        hideExactLocation: editJob.hide_exact_location || false,
-        locationArea:      editJob.location_area || '',
-        latitude:     editJob.latitude        || null,
-        longitude:    editJob.longitude       || null,
-        jobAddress:   editJob.location_name   || '',
-        locationNote: editJob.location_note   || '',
-        areaPolygon:  editJob.area_polygon    || [],
-        areaHectares: editJob.area_hectares   || null,
-        description:  editJob.description     || '',
-        photos:       editJob.photos          || [],
-        priceType:    editJob.price_type      || 'fixed',
-        price:        editJob.price ? String(editJob.price) : '',
-        _editJobId:   editJob.id,
-        repeatedFromJobId: editJob.repeated_from_job_id || null,
-        recurrenceFrequency: editJob.recurrence_frequency || 'one_time',
-      }
+      const seeded = jobEditSeed(editJob)
       resetJobData()
       updateJobData(seeded)
       startJobBaseline(seeded)

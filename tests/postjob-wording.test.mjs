@@ -28,7 +28,7 @@ test('Details and Review use the same photo wording; Review passes the real priv
  assert.match(review,/isEdit: isEditMode,/)
  assert.match(review,/inviteName: isInvite \?/)
  // The saved privacy flag is unchanged.
- assert.match(review,/hide_exact_location: !!hideExactLocation,/)
+ assert.match(readFileSync(new URL('../shared/jobEdit.ts',import.meta.url),'utf8'),/hide_exact_location:!!data\.hideExactLocation,/)
 })
 
 test('Step 2 labels say what tracing and skipping do; the five steps stay',()=>{

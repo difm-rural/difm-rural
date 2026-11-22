@@ -25,6 +25,7 @@ import { jobPrimaryPhotoRequest } from '../../lib/jobPrimaryPhoto'
 import { uploadJobPhotos, toStorablePhoto } from '../../lib/jobPhotos'
 import { removeThumbnails } from '../../lib/photoThumbs'
 import { removedThumbPaths } from '../../../shared/photos'
+import { editedJobPayload, jobPayload, privateAreaUpdate } from '../../../shared/jobEdit'
 import { JOB_PHOTO_REVIEW_HINT, jobPublicationMessage } from '../../../shared/jobGuidance'
 import { inferJobCategory } from '../../lib/categorize'
 import { CATEGORIES, isHouseSitting } from '../../lib/categories'
@@ -39,10 +40,6 @@ const SCHEDULE_LABELS = {
   specific: 'On a specific date',
   range:    'Over a period',
   flexible: "I'm flexible",
-}
-
-function fmtDay(v) {
-  return nzCalendarDay(v)
 }
 
 const MATERIALS_LABELS = {
@@ -119,7 +116,7 @@ export default function PostJobStep5Review({ navigation, route }) {
 
   const {
     latitude, longitude, jobAddress, locationNote,
-    areaPolygon = [], areaHectares,
+    areaPolygon = [],
     category, title,
     scheduleType, scheduledDate,
     priceType, price,
@@ -132,7 +129,6 @@ export default function PostJobStep5Review({ navigation, route }) {
     dateFrom, dateTo,
     hideExactLocation, locationArea,
     repeatedFromJobId,
-    recurrenceFrequency,
     draftJobId,
   } = jobData
 
@@ -240,6 +236,11 @@ export default function PostJobStep5Review({ navigation, route }) {
   }
 
   async function submitJob() {
+    // An edit must never be posted as another job.
+    if (jobData._editJobId && (!isEditMode || editJob?.id !== jobData._editJobId)) {
+      Alert.alert('Could not save job changes', 'Open the job again to edit it. Nothing has been changed.')
+      return
+    }
     const areaError=publicAreaError(locationArea,false)
     if(areaError){Alert.alert('Check public town or area',areaError);return}
     const textError=postingTextError(title,'title')||postingTextError(description,'description')
@@ -256,31 +257,9 @@ export default function PostJobStep5Review({ navigation, route }) {
     // on edit). Falls back to 'General Rural Help' if the AI call is unavailable.
     const resolvedCategory = shownCategory
 
-    const payload = {
-      title,
-      description,
-      category: resolvedCategory,
-      price_type:        priceType,
-      price:             priceType === 'fixed' ? parseFloat(price) : null,
-      location_name:     jobAddress || null,
-      location_note:     locationNote || null,
-      latitude:          latitude  || null,
-      longitude:         longitude || null,
-      area_polygon:      areaPolygon.length > 0 ? areaPolygon : null,
-      area_hectares:     areaHectares || null,
-      schedule_type:     scheduleType,
-      scheduled_date:    scheduleType === 'specific' && scheduledDate
-        ? nzCalendarDay(scheduledDate)
-        : null,
-      date_from:         scheduleType === 'range' && dateFrom ? fmtDay(dateFrom) : null,
-      date_to:           scheduleType === 'range' && dateTo   ? fmtDay(dateTo)   : null,
-      materials_type:    materialsType || null,
-      access_conditions: accessConditions.length > 0 ? accessConditions : null,
-      hide_exact_location: !!hideExactLocation,
-      location_area:       (locationArea || localityFromAddress(jobAddress)) || null,
-      repeated_from_job_id: repeatedFromJobId || null,
-      recurrence_frequency: recurrenceFrequency || 'one_time',
-    }
+    const payload = isEditMode && editJob
+      ? editedJobPayload(jobData, resolvedCategory, editJob)
+      : jobPayload(jobData, resolvedCategory)
 
     if (primaryPhotoRequired && (!user || !primaryPhoto || photos.length)) {
       Alert.alert('Primary photo required', 'Sign in and choose one primary photo, or continue without a photo.')
@@ -311,9 +290,12 @@ export default function PostJobStep5Review({ navigation, route }) {
         p_job:editJob.id,p_details:{...payload,photos:[]},p_expected:current.map(photo=>photo.id).sort(),p_photos:gallery,
       })
       if (error || saved!==editJob.id) throw new Error('Could not save the job and photos. Your changes are kept.')
+      const area=privateAreaUpdate(payload,editJob)
+      const areaWrite=area&&await supabase.from('jobs').update(area).eq('id',editJob.id).eq('requester_id',user.id).eq('status','open').select('id').maybeSingle()
+      const areaFailed=!!area&&(!!areaWrite.error||!areaWrite.data)
       setUploadStatus('Saved')
       resetJobData()
-      Alert.alert('Job updated','Your job has been updated.',[{text:'OK',onPress:goToStackRoot}])
+      Alert.alert('Job updated',areaFailed?'Your job has been updated, but the work area could not be saved. Edit the job to trace it again.':'Your job has been updated.',[{text:'OK',onPress:goToStackRoot}])
       return true
     }
 
@@ -328,7 +310,8 @@ export default function PostJobStep5Review({ navigation, route }) {
 
       setUploadStatus('Uploading photos...')
       const finalUrls = await uploadJobPhotos(editJob.id, photos)
-      const photoWrite = await supabase.from('jobs').update({ photos: finalUrls }).eq('id', editJob.id).select('id').maybeSingle()
+      const noPhotos = !finalUrls.length && !editJob.photos?.length
+      const photoWrite = await supabase.from('jobs').update({ photos: noPhotos ? editJob.photos ?? null : finalUrls }).eq('id', editJob.id).select('id').maybeSingle()
       if (photoWrite.error || !photoWrite.data || finalUrls.length < photos.length) {
         setUploadStatus('')
         Alert.alert('Some changes need attention', 'Job details were saved, but some photo changes could not be saved. Check your photos and try again.')

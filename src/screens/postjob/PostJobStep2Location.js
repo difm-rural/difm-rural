@@ -8,6 +8,7 @@ import {
 import * as Location from 'expo-location'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PostJobHeader from './PostJobHeader'
+import { tracedLocation } from '../../../shared/jobEdit'
 import JobLocationMap from '../../components/JobLocationMap'
 import AddressAutocomplete from '../../components/AddressAutocomplete'
 import { reverseGeocode, coarseSuburb } from '../../lib/location'
@@ -94,16 +95,20 @@ export default function PostJobStep2Location({ navigation, route }) {
   // AreaTracer result
   useEffect(() => {
     if (!route.params?.areaResult) return
-    const { polygonPoints, areaHectares: ha, centroid } = route.params.areaResult
-    setAreaPolygon(polygonPoints || [])
-    setAreaHectares(ha)
-    if (centroid?.latitude) {
-      setLatitude(centroid.latitude)
-      setLongitude(centroid.longitude)
+    const traced = tracedLocation({ editing: !!jobData._editJobId, points: areaPolygon,
+      pin: { latitude, longitude }, result: route.params.areaResult })
+    if (traced) {
+      setAreaPolygon(traced.areaPolygon)
+      setAreaHectares(traced.areaHectares)
+    }
+    if (traced?.pin) {
+      const { pin } = traced
+      setLatitude(pin.latitude)
+      setLongitude(pin.longitude)
       setTimeout(() => {
         mapRef.current?.animateToRegion({
-          latitude:       centroid.latitude,
-          longitude:      centroid.longitude,
+          latitude:       pin.latitude,
+          longitude:      pin.longitude,
           latitudeDelta:  0.005,
           longitudeDelta: 0.005,
         }, 800)
@@ -119,8 +124,14 @@ export default function PostJobStep2Location({ navigation, route }) {
 
   // The public area is the coarse form of the address (suburb / town). While the
   // exact address is hidden, keep it in sync — this is what shows publicly, and
-  // is the short text the address field displays.
+  // is the short text the address field displays. An edit keeps the saved area until
+  // the address or this choice changes.
+  const savedJob = isEditMode ? route.params?.job : null
   useEffect(() => {
+    if (savedJob && jobAddress === (savedJob.location_name || '') && hideExactLocation === !!savedJob.hide_exact_location) {
+      setLocationArea(savedJob.location_area || '')
+      return
+    }
     if (hideExactLocation) setLocationArea(coarseSuburb(jobAddress) || '')
   }, [jobAddress, hideExactLocation])
 

@@ -78,9 +78,11 @@ export default function AreaTracerScreen({ route, navigation }) {
       (acc, p) => ({ latitude: acc.latitude + p.latitude / polygonPoints.length, longitude: acc.longitude + p.longitude / polygonPoints.length }),
       { latitude: 0, longitude: 0 }
     )
-    navigation.navigate(route.params?.returnTo || 'PostJob', {
+    // Back to the screen that opened this one, keeping its params (an edit's job and
+    // mode). A plain navigate would push a second copy without them.
+    navigation.popTo(route.params?.returnTo || 'PostJob', {
       areaResult: { polygonPoints, areaHectares, centroid },
-    })
+    }, { merge: true })
   }
 
   const areaHa  = polygonPoints.length >= 3 ? calculateArea(polygonPoints) : null
