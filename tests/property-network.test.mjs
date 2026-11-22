@@ -8,7 +8,7 @@ import {
  linkedPropertyContacts,propertyContactFields,propertyContactInviteText,propertyContactPhoneHref,propertyContactEmailHref,propertyContactServices,
  createPropertyContact,updatePropertyContact,deletePropertyContact,setPropertyContact,replacePropertyContact,PROPERTY_SITE_URL,
  propertyServiceChoice,propertyChoiceStatus,propertyWhoMeStatus,propertyStatusAfterUnlink,propertySetupStarted,savePropertyAreas,
- propertyBulkServices,savePropertyServices,propertyAreaProgress,propertyAreaWho,propertyGaps,PROPERTY_AREA_DESCRIPTIONS as HINTS,
+ propertyBulkServices,propertyBulkLabel,propertyBulkMessage,propertyNodeStatus,propertyToneIcon,PROPERTY_STATUS_ICONS,savePropertyServices,propertyAreaProgress,propertyAreaWho,propertyGaps,PROPERTY_AREA_DESCRIPTIONS as HINTS,
  PROPERTY_CATEGORY_AREAS,propertyWorkTarget,propertySuggestion,propertySuggestionText,acceptPropertySuggestion,dismissPropertySuggestion,propertyNetworkHomeLines,
 } from '../shared/propertyNetwork.ts'
 import {CATEGORIES,LISTING_CATEGORIES} from '../shared/categories.ts'
@@ -79,9 +79,10 @@ test('diagram nodes stay inside, clear of each other and of the hub for one thro
   assert.match(source,/List/)
   assert.doesNotMatch(source,/Grow your network|type="radio"|accessibilityRole="radio"|PROPERTY_SERVICE_STATES/)
   for(const text of ["What's on your property?",'Skip for now','Set up my network (','Needs help (','Nothing needs help right now',
-   'Your property','+ Add another part of your property',"Update what's on your property",'All sorted','None of this applies',
-   'Who does it? (optional)','A provider…','Someone not on RC','+ Add something else','from my property','Post a job'])
+   'Your property','+ Add another part of your property',"Update what's on your property",'propertyBulkLabel(',
+   'Who does it? (optional)','A provider…','Someone not on RC','+ Add another service','from my property','Post a job'])
    assert.ok(source.includes(text)||source.includes(text.replaceAll("'",'&apos;')),filename+': '+text)
+  assert.doesNotMatch(source,/Add something else/)
   assert.match(source,/Back to My Property Network/)
   assert.match(source,/Find local help/)
   assert.match(source,/Invite to job|ProviderInviteAction/)
@@ -388,11 +389,45 @@ test('All sorted and None of this applies only fill unanswered services',async()
  assert.deepEqual(writes,[['property_network_services',updates.map(service=>({...service,owner_id:'owner'}))]])
  await savePropertyServices(db,'owner',[])
  assert.equal(writes.length,1)
- // Both clients ask before a bulk change only when some services are already answered.
+ // Nothing is overwritten, so neither client asks first; the words say what changes.
+ assert.equal(propertyBulkLabel('sorted',0),'All sorted')
+ assert.equal(propertyBulkLabel('irrelevant',0),'None of this applies')
+ assert.equal(propertyBulkLabel('sorted',2),'Rest are sorted')
+ assert.equal(propertyBulkLabel('irrelevant',2),"Rest don't apply")
+ assert.equal(propertyBulkMessage(2,0,'sorted'),'2 services marked Sorted.')
+ assert.equal(propertyBulkMessage(1,2,'irrelevant'),'1 service marked N/A. Your other 2 stay as they were.')
+ // Answered services keep their status, including Me and linked helpers.
+ assert.ok(updates.every(service=>!services.find(row=>row.service_key===service.service_key).status))
  const web=readFileSync(new URL('../provider-web/src/app/property-network/property-network.tsx',import.meta.url),'utf8')
  const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
- assert.match(web,/if\(kept&&!window\.confirm\(/)
- assert.match(native,/if\(!kept\)return run\(\)/)
+ for(const source of [web,native]){
+  assert.doesNotMatch(source,/Mark the rest as|unanswered '\+\(updates/)
+  assert.match(source,/propertyBulkMessage\(updates\.length,kept,status\)/)
+ }
+ assert.match(native,/Your other answers and helpers stay\./)
+})
+
+test('diagram nodes summarise each area with the same status words and icons as the list',()=>{
+ const services=(statuses)=>statuses.map((status,i)=>({area:'trees',service_key:'s'+i,name:'S'+i,status}))
+ const labels=area=>propertyNodeStatus(area).map(line=>line.label)
+ assert.deepEqual(labels({services:services(['needs_help','needs_help',null,'sorted']),linkedCount:1}),['2 needs help','1 to check'])
+ assert.deepEqual(labels({services:services([null,null,'sorted']),linkedCount:2}),['2 to check','2 providers'])
+ assert.deepEqual(labels({services:services(['self','has_provider','irrelevant']),linkedCount:1}),['All sorted','1 provider'])
+ assert.deepEqual(labels({services:services(['irrelevant']),linkedCount:0}),['Nothing to check'])
+ assert.ok(propertyNodeStatus({services:services(['needs_help',null,null]),linkedCount:3}).length<=2)
+ assert.equal(propertyNodeStatus({services:services(['needs_help']),linkedCount:0})[0].icon,PROPERTY_STATUS_ICONS.help)
+ assert.equal(propertyToneIcon('help'),PROPERTY_STATUS_ICONS.help)
+ assert.equal(propertyToneIcon('done'),PROPERTY_STATUS_ICONS.sorted)
+ assert.equal(propertyToneIcon('neutral'),PROPERTY_STATUS_ICONS.unset)
+ // Height follows the number of areas: a few areas get a much shorter diagram.
+ assert.ok(propertyDiagramRatio(3)<1&&propertyDiagramRatio(6)<propertyDiagramRatio(7))
+ for(let count=1;count<11;count++)assert.ok(propertyDiagramRatio(count)<=propertyDiagramRatio(count+1)||count===4,count+' areas')
+ const native=readFileSync(new URL('../src/screens/PropertyNetworkScreen.js',import.meta.url),'utf8')
+ assert.match(native,/propertyNodeStatus\(area\)/)
+ assert.match(native,/accessibilityHint="Opens the service checklist"/)
+ // Selected choices show a tick and Me shows ✓, so the state is not colour alone.
+ assert.match(native,/choice===value&&<Icon name="checkmark"/)
+ assert.match(native,/'Me ✓':'Me'/)
 })
 
 test('the gaps list and area cards count what needs help, what is sorted and what is left',()=>{

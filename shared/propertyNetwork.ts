@@ -114,11 +114,12 @@ export function propertyAreas(data:Pick<NetworkData,'preferences'|'services'|'li
  })
 }
 
-// Height:width of the diagram. Up to eight areas sit on one oval; nine or more
-// use a taller oval so every node stays clear of its neighbours and the hub.
-// Each ratio keeps nodes apart from PROPERTY_DIAGRAM_MIN_WIDTH up (tested).
+// Height:width of the diagram, sized to the number of areas so a few areas
+// don't leave a tall empty oval: up to four fit a near-circle, five or six a
+// slightly taller one, seven or eight the offset ring, nine or more a taller
+// oval. Each ratio keeps nodes apart from PROPERTY_DIAGRAM_MIN_WIDTH up (tested).
 export const PROPERTY_DIAGRAM_RATIO=1.65
-export const propertyDiagramRatio=(count:number)=>count>10?2.05:count>8?1.75:PROPERTY_DIAGRAM_RATIO
+export const propertyDiagramRatio=(count:number)=>count>10?2.05:count>8?1.75:count>6?PROPERTY_DIAGRAM_RATIO:count>4?1.1:.95
 export const PROPERTY_NODE_WIDTH=25.5
 export const PROPERTY_NODE_HEIGHT=94
 // A 320px phone screen less a 16px gutter each side (app and web).
@@ -147,13 +148,16 @@ function largeRing(count:number,ratio:number){
   ...column(-1).reverse(),{x:36,y:edge}]
 }
 
+// The ring's vertical radius, as a % of the height: as tall as fits a node at
+// the top and bottom edge, up to the original 39%.
+const ringHeight=(ratio:number)=>Math.min(39,49.5-50*PROPERTY_NODE_HEIGHT/(PROPERTY_DIAGRAM_MIN_WIDTH*ratio))
 // Up to eight areas share one ring; from seven it is offset to leave room for
 // paired nodes above and below the hub.
 export function propertySpokes(count:number,ratio=propertyDiagramRatio(count)){
  const points=count>8?largeRing(count,ratio):Array.from({length:count},(_,index)=>{
   const dense=count>=7
   const radians=(360*index/(dense?8:count)-(dense?67.5:90))*Math.PI/180
-  return {x:50+36*Math.cos(radians),y:50+39*Math.sin(radians)}
+  return {x:50+36*Math.cos(radians),y:50+ringHeight(ratio)*Math.sin(radians)}
  })
  return points.map(({x,y})=>{
   const dx=x-50,dy=y-50
@@ -358,6 +362,14 @@ export function propertyBulkServices(services:readonly PropertyService[],status:
  const unset=services.filter(service=>!service.status)
  return {updates:unset.map(service=>({...service,status})),kept:services.length-unset.length}
 }
+// Bulk button words: "All sorted" while nothing is answered, then "Rest are
+// sorted" so it is clear answered services (and their helpers) don't change.
+export const propertyBulkLabel=(status:ServiceStatus,answered:number)=>
+ status==='sorted'?(answered?'Rest are sorted':'All sorted'):(answered?"Rest don't apply":'None of this applies')
+export function propertyBulkMessage(updated:number,kept:number,status:ServiceStatus){
+ const label=status==='sorted'?PROPERTY_STATUS_LABELS.sorted:PROPERTY_STATUS_LABELS.na
+ return updated+' '+(updated===1?'service':'services')+' marked '+label+'.'+(kept?' Your other '+kept+' stay as they were.':'')
+}
 export async function savePropertyServices(client:unknown,owner:string,services:readonly PropertyService[]){
  if(!services.length)return
  const {error}=await (client as Client).from('property_network_services').upsert(services.map(service=>({...service,owner_id:owner})))
@@ -379,6 +391,22 @@ export function propertyAreaProgress(area:Pick<AreaView,'services'>,who:readonly
  const counts=[sorted?sorted+' sorted':'',help?help+' needs help':'',left?left+' to check':''].filter(Boolean).join(' · ')
  const summary=started?(counts||'Nothing to check')+(names?' · '+names:''):left+' to check · tap to set up, about 30 seconds'
  return {sorted,help,na,left,total,started,tag,tone,summary}
+}
+// One icon per state, used beside the words everywhere a status shows, so the
+// state never depends on colour alone (Ionicons names).
+export const PROPERTY_STATUS_ICONS={sorted:'checkmark-circle',help:'alert-circle',na:'remove-circle-outline',unset:'ellipse-outline'} as const
+export const propertyToneIcon=(tone:'help'|'done'|'neutral')=>
+ tone==='help'?PROPERTY_STATUS_ICONS.help:tone==='done'?PROPERTY_STATUS_ICONS.sorted:PROPERTY_STATUS_ICONS.unset
+// A diagram node's status lines (two at most, to fit the node): needs help and
+// to check counts, or All sorted; then the linked providers when there is room.
+export function propertyNodeStatus(area:Pick<AreaView,'services'|'linkedCount'>){
+ const progress=propertyAreaProgress(area)
+ const lines:{tone:'help'|'unset'|'sorted'|'linked';icon:string;label:string}[]=[]
+ if(progress.help)lines.push({tone:'help',icon:PROPERTY_STATUS_ICONS.help,label:progress.help+' '+PROPERTY_STATUS_LABELS.help.toLowerCase()})
+ if(progress.left)lines.push({tone:'unset',icon:PROPERTY_STATUS_ICONS.unset,label:progress.left+' '+PROPERTY_STATUS_LABELS.unset.toLowerCase()})
+ if(!lines.length)lines.push({tone:'sorted',icon:PROPERTY_STATUS_ICONS.sorted,label:progress.total?'All sorted':'Nothing to check'})
+ if(lines.length<2&&area.linkedCount)lines.push({tone:'linked',icon:'people-outline',label:area.linkedCount+(area.linkedCount===1?' provider':' providers')})
+ return lines
 }
 // Who covers an area: "You" when the owner does something, then members and contacts.
 export function propertyAreaWho(data:NetworkData,area:Pick<AreaView,'id'|'services'>){
