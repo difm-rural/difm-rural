@@ -33,6 +33,9 @@ const INITIAL_STATE = {
   locationArea:       '',
   repeatedFromJobId:  null,
   recurrenceFrequency: 'one_time',
+  // The My Property Network service the job was started from (guidance only; not saved).
+  propertyService:    '',
+  propertyServiceCategory: '',
 }
 
 // Each posting session gets its own job id, so a retried post can't create a

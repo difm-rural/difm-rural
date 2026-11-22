@@ -170,9 +170,9 @@ function PropertyNetworkScreen({navigation,route}){
  function browse({category,kind}){
   navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category,kind}})
  }
- function post(person,category){
+ function post(person,category,service){
   setTarget(null)
-  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category}}:{}})
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category,service}}:{}})
  }
  // Turning on the wider region fills it in when the locality names exactly one
  // region, directly or in the address suggestions for that place.
@@ -531,7 +531,7 @@ function PropertyNetworkScreen({navigation,route}){
         <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:matchKey===service.service_key}} style={styles.smallPrimary}
          onPress={()=>matchKey===service.service_key?closeMatches():findMatches(service,category)}>
          <Text style={styles.primaryText}>{matchKey===service.service_key?'Close search':'Find local help'}</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" style={styles.postJob} onPress={()=>post(null,postCategory)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.postJob} onPress={()=>post(null,postCategory,service.name)}>
          <Text style={styles.gap}>Post a job</Text></TouchableOpacity>
        </View>}
        {matchKey===service.service_key&&<View style={[styles.picker,{marginTop:10}]}>
@@ -571,7 +571,7 @@ function PropertyNetworkScreen({navigation,route}){
           disabled={busy||linked.some(row=>row.id===person.id)} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')}/>
          <LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
         </View>)}
-        <LocalAction label="Post a job" onPress={()=>post(null,postCategory)}/>
+        <LocalAction label="Post a job" onPress={()=>post(null,postCategory,service.name)}/>
        </View>}
        {providerOpen&&<View style={[styles.picker,{marginTop:10}]}>
         <Text style={styles.serviceTitle}>{replacingHere?'Choose the member who replaces '+replacing.name:'Choose a provider'}</Text>

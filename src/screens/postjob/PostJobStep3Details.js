@@ -1,5 +1,6 @@
 import { JobPrivateGallery } from '../../components/JobPrimaryImage'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
+import {addGuidanceToDescription,jobDescriptionGuidance,removeUnusedGuidance} from '../../../shared/jobGuidance'
 import React, { useEffect, useState } from 'react'
 import {
   Alert, Image, Keyboard, KeyboardAvoidingView, Platform,
@@ -78,7 +79,14 @@ export default function PostJobStep3Details({ navigation, route }) {
       ? `${jobData.areaHectares} ha traced`
       : jobData.latitude ? 'Location set' : null
 
-  const charsLeft = 8 - description.trim().length
+  const guidance = jobDescriptionGuidance({
+    category: jobData.category,
+    // Service prompts only while the category is still the one it came with.
+    service: jobData.propertyServiceCategory === jobData.category ? jobData.propertyService : '',
+  })
+  const finalDescription = removeUnusedGuidance(description, guidance.prompts)
+  const guidanceAdded = guidance.prompts.every(prompt => description.includes(prompt + ':'))
+  const charsLeft = 8 - finalDescription.length
 
   useEffect(() => {
     updateJobData({ description, photos, accessConditions, locationNote })
@@ -86,7 +94,7 @@ export default function PostJobStep3Details({ navigation, route }) {
 
   const [attempted,setAttempted]=useState(false)
   function canProceed() {
-    return description.trim().length >= 8 && !postingTextError(description,'description')
+    return finalDescription.length >= 8 && !postingTextError(finalDescription,'description')
   }
 
   function handleBack() { navigation.goBack() }
@@ -95,6 +103,7 @@ export default function PostJobStep3Details({ navigation, route }) {
     Keyboard.dismiss()
     setAttempted(true)
     if (!canProceed()) return
+    if (finalDescription !== description) setDescription(finalDescription)
     navigation.navigate('PostJobStep4Budget', { ...route.params })
   }
 
@@ -149,6 +158,18 @@ export default function PostJobStep3Details({ navigation, route }) {
           {/* 1. Description */}
           <View style={styles.card}>
             <Text style={styles.cardQuestion}>Describe the job</Text>
+            <View style={styles.guide} accessibilityLabel={guidance.heading + ': ' + guidance.prompts.join('; ')}>
+              <Text style={styles.guideHeading}>{guidance.heading}</Text>
+              {guidance.prompts.map(prompt => <Text key={prompt} style={styles.guideItem}>• {prompt}</Text>)}
+              {!guidanceAdded && (
+                <TouchableOpacity accessibilityRole="button" accessibilityHint="Adds these as lines you can fill in or delete"
+                  style={styles.guideButton} onPress={() => setDescription(value => addGuidanceToDescription(value, guidance.prompts))}>
+                  <Icon name="add" size={15} color={colors.primary} />
+                  <Text style={styles.guideButtonText}>Add these as prompts</Text>
+                </TouchableOpacity>
+              )}
+              {guidanceAdded && <Text style={styles.guideItem}>Fill in what applies. Prompts you leave blank are removed when you continue.</Text>}
+            </View>
             <TextInput
               style={[styles.textarea, attempted && !canProceed() && {borderColor:colors.danger,borderWidth:2}]}
               placeholder="What needs doing? Include any special requirements..."
@@ -164,8 +185,8 @@ export default function PostJobStep3Details({ navigation, route }) {
             />
             <Text style={styles.hintText}>{description.length} / {POSTING_DESCRIPTION_MAX} characters</Text>
             {!!postingTextError(description,'description') && <Text accessibilityRole="alert" style={{color:colors.danger}}>{postingTextError(description,'description')}</Text>}
-            {attempted && description.trim().length < 8 && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter a job description with at least 8 characters.</Text>}
-            {description.trim().length > 0 && charsLeft > 0 && (
+            {attempted && finalDescription.length < 8 && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter a job description with at least 8 characters.</Text>}
+            {finalDescription.length > 0 && charsLeft > 0 && (
               <Text style={styles.hintText}>
                 {charsLeft} more character{charsLeft !== 1 ? 's' : ''} needed to continue
               </Text>
@@ -372,6 +393,11 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
+  guide:           { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10, gap: 2 },
+  guideHeading:    { fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 2 },
+  guideItem:       { fontSize: 12, color: colors.primary, lineHeight: 17 },
+  guideButton:     { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 36, marginTop: 4 },
+  guideButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
   photoNudge:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10 },
   photoNudgeText:  { flex: 1, fontSize: 12, color: colors.primary, lineHeight: 17 },
   photoGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

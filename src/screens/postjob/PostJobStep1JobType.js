@@ -148,6 +148,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
       resetJobData()
       setTitle(prefill?.title || '')
       if(CATEGORIES.includes(prefill?.category))updateJobData({category:prefill.category})
+      if(prefill?.service)updateJobData({propertyService:String(prefill.service).slice(0,80),propertyServiceCategory:prefill.category||''})
       setScheduleType('')
       setScheduledDate(null)
       setDateFrom(null)
