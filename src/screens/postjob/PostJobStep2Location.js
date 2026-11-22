@@ -34,7 +34,7 @@ export default function PostJobStep2Location({ navigation, route }) {
   const insets    = useSafeAreaInsets()
   const mapRef    = useRef(null)
   const scrollRef = useRef(null)
-  const { jobData, updateJobData } = usePostJob()
+  const { jobData, updateJobData, markAutomatic } = usePostJob()
 
   const isEditMode = route.params?.mode === 'edit'
 
@@ -74,6 +74,7 @@ export default function PostJobStep2Location({ navigation, route }) {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') return
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      markAutomatic({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
       setLatitude(loc.coords.latitude)
       setLongitude(loc.coords.longitude)
       mapRef.current?.animateToRegion({
@@ -83,6 +84,7 @@ export default function PostJobStep2Location({ navigation, route }) {
         longitudeDelta: 0.005,
       }, 1000)
       const address = await reverseGeocode(loc.coords.latitude, loc.coords.longitude)
+      markAutomatic({ jobAddress: address })
       setJobAddress(address)
     } catch {
       // location unavailable — user stays at NZ default

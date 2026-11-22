@@ -434,6 +434,7 @@ export default function PostJobStep5Review({ navigation, route }) {
         currentStep={5}
         title={isEditMode ? 'Edit job' : route.params?.mode === 'repeat' ? 'Repeat a job' : 'Post a job'}
         onBack={handleBack}
+        busy={!!uploadStatus}
       />
 
       <ScrollView
