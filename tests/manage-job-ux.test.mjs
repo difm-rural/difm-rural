@@ -73,3 +73,14 @@ test('Assigned provider card opens that provider\'s profile, which renders with 
   services:[{id:'t',provider_id:'peter',title:'Large trailer for hire',category:'Machinery',pricing_type:'day_rate',rate:50,travel_range_km:null,availability:['2026-11-18']}]}})
  assert.ok(texts.includes('Peter P.'));assert.ok(texts.includes('Large trailer for hire'))
 })
+
+test('Manage Job makes the full multiline job title the primary heading, with its section label above and status below',()=>{
+ const s=screen();const all=s.render(),title=all.find(n=>n.type==='Text'&&n.props.accessibilityRole==='header')
+ assert.equal(title.props.children[0],s.values.job.title);assert.equal(title.props.numberOfLines,undefined);assert.equal(title.props.accessibilityLabel,s.values.job.title)
+ const label=all.find(n=>n.type==='Text'&&n.props.children[0]==='Manage job')
+ assert.ok(label.props.style.fontSize<title.props.style.fontSize);assert.ok(all.indexOf(label)<all.indexOf(title))
+ assert.ok(all.indexOf(title)<all.findIndex(n=>n.type==='NextMoveBanner'))
+ assert.equal(title.props.style.minWidth,0);assert.equal(title.props.style.flexShrink,1)
+ const completed=screen({job:{status:'completed'}}),rows=completed.render()
+ assert.ok(rows.findIndex(n=>n.props?.accessibilityRole==='header')<rows.findIndex(n=>n.type==='JobStatusNotice'))
+})

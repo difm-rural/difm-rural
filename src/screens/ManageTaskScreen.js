@@ -550,10 +550,10 @@ export default function ManageTaskScreen({ navigation, route }) {
         <Icon name="chevron-back" size={18} color={colors.primary} />
         <Text style={styles.backBtnText}>Back</Text>
       </TouchableOpacity>
-      <Text style={styles.headerTitle} accessibilityRole="header">Manage job</Text>
+      <Text style={styles.kicker}>Manage job</Text>
+      <Text style={styles.headerTitle} accessibilityRole="header" accessibilityLabel={job.title}>{job.title}</Text>
       {job.status==='completed'&&<JobStatusNotice>Job completed.</JobStatusNotice>}
 
-      <Text style={styles.headerSubtitle} numberOfLines={3} accessibilityLabel={job.title}>{job.title}</Text>
     </View>
     </View>
   )
@@ -1110,7 +1110,7 @@ const styles = StyleSheet.create({
   backBtnText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
   backBtnRow:  { flexDirection: 'row', alignItems: 'center' },
   kicker: { fontSize: 13, fontWeight: '700', color: colors.accent, marginBottom: 8 },
-  headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary },
+  headerTitle: { fontSize: 34, lineHeight: 38, fontWeight: '700', color: colors.textPrimary, flexShrink: 1, minWidth: 0 },
   headerSubtitle: { fontSize: 15, lineHeight: 22, color: colors.textSecondary, marginTop: 8 },
 
   // ─── Scroll ────────────────────────────────────────────────────
