@@ -154,3 +154,23 @@ test('accepted provider keeps the existing provider-specific coordination view',
  assert.ok(!app.text().includes('Your provider'));assert.ok(!app.all().some(n=>n.props?.accessibilityLabel==='Job details'))
  assert.ok(app.all().some(n=>n.type==='ConfirmJobSheet'));assert.ok(!app.log.timers.length)
 })
+
+test('provider summary badges wrap within narrow-screen padding without truncating status',async()=>{
+ const app=await openScreen({job:{status:'accepted',category:'Animals & Farm Sitting'},bids:[acceptedOffer],userId:'q'})
+ const all=app.all(),category=all.find(n=>n.type==='Text'&&text(n)==='Category: Animals & Farm Sitting')
+ const header=all.find(n=>n.type==='View'&&nodes(n.props.children).includes(category)&&n.props.style?.flexWrap==='wrap')
+ assert.ok(header,'provider-only badge row wraps')
+ const flatten=value=>Object.assign({},...([value].flat(Infinity).filter(Boolean)))
+ const badge=nodes(header).find(n=>n.type==='View'&&flatten(n.props.style).maxWidth==='100%')
+ const status=nodes(badge).find(n=>n.type==='Text')
+ assert.equal(text(status),'Waiting on you to confirm')
+ assert.equal(status.props.numberOfLines,undefined);assert.equal(status.props.ellipsizeMode,undefined)
+ assert.equal(header.props.style.alignItems,'flex-start')
+ for(const item of [category,badge]){
+  const style=flatten(item.props.style);assert.equal(style.maxWidth,'100%');assert.equal(style.minWidth,0);assert.equal(style.flexShrink,1)
+ }
+ const card=all.find(n=>n.type==='View'&&n.props.style?.borderWidth===1.5&&nodes(n).includes(header))
+ const scroll=all.find(n=>n.type==='ScrollView'&&nodes(n).includes(card))
+ assert.equal(scroll.props.style.padding,16);assert.equal(card.props.style.padding,16)
+
+})

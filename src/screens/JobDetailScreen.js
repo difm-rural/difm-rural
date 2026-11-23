@@ -771,7 +771,7 @@ export default function JobDetailScreen({ route, navigation }) {
           {!isCancelled&&<JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={myBid?.estimated_duration}/>}
           <View style={styles.acceptedCard}>
             <View style={styles.acceptedCardHeader}>
-              <Text style={styles.category}>Category: {job.category}</Text>
+              <Text style={[styles.category, styles.acceptedCategory]}>Category: {job.category}</Text>
               <View style={[styles.acceptedBadge, isCancelled && styles.cancelledBadge]}>
                 <Text style={[styles.acceptedBadgeText, isCancelled && styles.cancelledBadgeText]}>
                   {providerMove?.badge || jobStatusLabel(job.status)}
@@ -1750,9 +1750,10 @@ const styles = StyleSheet.create({
 
   // Provider accepted view
   acceptedCard:       { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary },
-  acceptedCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 },
-  acceptedBadge:      { backgroundColor: colors.primaryLight, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, flexShrink: 0 },
-  acceptedBadgeText:  { fontSize: 12, fontWeight: '700', color: colors.primary },
+  acceptedCategory: { flexShrink: 1, minWidth: 0, maxWidth: '100%' },
+  acceptedCardHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: spacing.sm },
+  acceptedBadge:      { backgroundColor: colors.primaryLight, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
+  acceptedBadgeText:  { fontSize: 12, fontWeight: '700', color: colors.primary, flexShrink: 1 },
   infoBoxGreen:       { backgroundColor: colors.primaryLight, borderRadius: 8, padding: 12, marginTop: 10 },
   infoBoxGreenText:   { fontSize: 14, color: colors.primary, lineHeight: 20 },
 
