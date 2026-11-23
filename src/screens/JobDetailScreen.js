@@ -45,6 +45,7 @@ import { paymentAcknowledgementAvailable } from '../../shared/paymentAcknowledge
 import MarkCompleteSheet from '../components/MarkCompleteSheet'
 import ConfirmJobSheet from '../components/ConfirmJobSheet'
 import {
+  formatArrivalWindow,
   addWorkToPhoneCalendar,
   fetchWorkSchedule,
   saveArrivalWindow,
@@ -652,8 +653,8 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
-      <Text style={[styles.headerTitle, requesterAccepted && styles.acceptedTitle]} numberOfLines={requesterAccepted ? 3 : undefined} accessibilityLabel={requesterAccepted ? job.title : undefined} accessibilityRole="header">{job.title}</Text>
-      {job.status==='completed'&&(isAcceptedProvider||isJobOwner)&&<JobStatusNotice>Job completed.</JobStatusNotice>}
+      <Text style={[styles.headerTitle, (requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status))) && styles.acceptedTitle]} numberOfLines={requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status)) ? 3 : undefined} accessibilityLabel={requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status)) ? job.title : undefined} accessibilityRole="header">{job.title}</Text>
+      {job.status==='completed'&&isJobOwner&&<JobStatusNotice>Job completed.</JobStatusNotice>}
       {((offerFeedback==='Offer sent.'&&job.status==='open')||(offerFeedback==='Offer accepted.'&&job.status==='accepted'))&&<JobStatusNotice>{offerFeedback}</JobStatusNotice>}
     </View>
     </View>
@@ -698,6 +699,7 @@ export default function JobDetailScreen({ route, navigation }) {
         trackEvent('job_marked_complete', { job_id: job.id })
         setCompleteVisible(false)
         setJob(prev => ({ ...prev, status: 'completed' }))
+        setDetailsExpanded(false)
       } catch (e) {
         setCompleteError(e?.message || 'Could not update. Please try again.')
       } finally {
@@ -761,12 +763,98 @@ export default function JobDetailScreen({ route, navigation }) {
       arrivalAt: workSchedule?.arrival_start_at,
     })
 
+    const providerPaymentJSX = (
+      <>
+          {isAcceptedProvider && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && myBid?.id ? (
+            <JobPaymentHandoff
+              bidId={myBid.id}
+              method={myBid.payment_method || null}
+              sortedAt={myBid.payment_sorted_at || null}
+              sortedBy={myBid.payment_sorted_by || null}
+              requesterId={job.requester_id}
+              providerId={currentUser?.id}
+              canUpdate={paymentAcknowledgementAvailable(job.status, myBid.status, isAcceptedProvider)}
+              canEditMethod={jobConfirmed && ['accepted', 'in_progress'].includes(job.status)}
+              onChanged={fetchData}
+            />
+          ) : null}
+      </>
+    )
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {headerJSX}
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} enabled={Platform.OS === 'android'}>
         <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
+          {['accepted', 'completed'].includes(job.status) ? <>
+          <View style={styles.acceptedCard}>
+            <View style={styles.acceptedCardHeader}>
+              <View style={styles.acceptedBadge}>
+                <Text style={styles.acceptedBadgeText}>{isCompleted ? 'Completed' : jobConfirmed ? 'Scheduled' : 'Confirm your arrival time'}</Text>
+              </View>
+            </View>
+            <Text style={styles.detailValue}>Requester: {requesterProfile?.full_name || 'Requester'}</Text>
+            <Text style={styles.detailValue}>Agreed: {formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
+            <Text style={styles.location}>{jobLocation(job)}</Text>
+            {workSchedule?.arrival_start_at && <Text style={styles.detailValue}>Arrival: {formatArrivalWindow(workSchedule)}</Text>}
+          </View>
+
+          {!isCompleted && !jobConfirmed && <View style={styles.section}>
+            <Button title="Confirm job" onPress={() => setConfirmJobVisible(true)} accessibilityLabel="Confirm the job" />
+          </View>}
+          {isCompleted && <View style={styles.section}>
+            <Button title={requesterReview ? `Edit review (${requesterReview.rating}/5)` : 'Review requester'}
+              variant={requesterReview ? 'secondary' : 'primary'} onPress={() => setReviewVisible(true)}
+              accessibilityLabel={requesterReview ? 'Edit requester review' : 'Review requester'} />
+            {jobReviewStatus(requesterReview === undefined ? undefined : !!requesterReview, receivedReview === undefined ? undefined : !!receivedReview, 'Requester').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
+            <ReceivedReview review={receivedReview} fromLabel="requester" />
+          </View>}
+          <View style={styles.section}>
+            {!isCompleted && <Button title="Chat with requester" icon="chatbubble-ellipses-outline"
+              variant={jobConfirmed ? 'primary' : 'secondary'} onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
+            {jobMapTarget(job) && <Button title={jobMapTarget(job)?.kind === 'address' ? 'Navigate to job' : 'View job pin'}
+              variant="secondary" icon="navigate-outline" onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })} />}
+            {!isCompleted && <Button title="Mark as completed" variant="secondary" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
+            {jobConfirmed && !isCompleted && <>
+              <Button title="Update arrival window" variant="secondary" onPress={() => setArrivalModalVisible(true)} />
+              <Button title="I'm running late" variant="secondary" onPress={handleRunningLate} />
+            </>}
+            {jobConfirmed && <Button title="Add to phone calendar" variant="secondary" onPress={() => addWorkToPhoneCalendar({
+              title: job.title, schedule: workSchedule, location: jobLocation(job), otherPartyName: requesterProfile?.full_name,
+            })} />}
+            <Button title="View requester profile" variant="secondary" onPress={() => navigation.navigate('RequesterProfile', { requesterId: job.requester_id })} />
+          </View>
+          {providerPaymentJSX}
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.detailsToggle} accessibilityRole="button" accessibilityLabel="Job details"
+              accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(value => !value)}>
+              <View style={{ flex: 1 }}><Text style={styles.detailsTitle}>Job details</Text>
+                <Text style={styles.locationNote}>{job.category}{' \u00b7 '}{jobRequested(job)}</Text></View>
+              <Icon name={detailsExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+            {detailsExpanded && <>
+              <Text style={styles.description}>{job.description}</Text>
+              <Text style={styles.detailValue}>Budget: {budgetText}</Text>
+              <Text style={styles.detailValue}>Agreed offer: {formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
+              {!!myBid.message && <Text style={styles.detailValue}>{myBid.message}</Text>}
+              {myBid.line_items?.map((item, index) => <Text key={index} style={styles.detailValue}>{item.label}: {nzMoney(item.amount)}</Text>)}
+              {!!myBid.estimated_duration && <Text style={styles.detailValue}>Estimated duration: {myBid.estimated_duration}</Text>}
+              {!!job.materials_type && <Text style={styles.detailValue}>{MATERIALS_LABELS[job.materials_type] || job.materials_type}</Text>}
+              {!!myBid.materials && <Text style={styles.detailValue}>{OFFER_MATERIALS_LABELS[myBid.materials] || myBid.materials}</Text>}
+              {!!job.access_conditions?.length && <Text style={styles.detailValue}>{job.access_conditions.map(value => ACCESS_LABELS[value] || value).join(', ')}</Text>}
+              <Text style={styles.detailValue}>{jobLocation(job)}</Text>
+              {!!job.location_note && <Text style={styles.detailValue}>{job.location_note}</Text>}
+              {jobMapTarget(job) && <TouchableOpacity accessibilityRole="button" accessibilityLabel="View job location pin on map"
+                onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}>
+                <Image source={{ uri: jobStaticMapUrl(job) }} style={styles.mapThumbImg} />
+                {!!job.area_hectares && <Text style={styles.detailValue}>{job.area_hectares} ha</Text>}
+              </TouchableOpacity>}
+              <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{ width: '100%', height: 200 }} />
+              {job.photos?.map((url, index) => <Image key={index} source={{ uri: url }} style={styles.mapThumbImg} />)}
+            </>}
+          </View>
+          </> : <>
           <JobPrivateGallery key={job.id} jobId={job.id} revision={focused} style={{width:'100%',height:200}}/>
           {!isCancelled&&<JobArrangementSummary arrival={workSchedule?.arrival_start_at} duration={myBid?.estimated_duration}/>}
           <View style={styles.acceptedCard}>
@@ -871,19 +959,7 @@ export default function JobDetailScreen({ route, navigation }) {
             ) : null}
           </View>
 
-          {isAcceptedProvider && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && myBid?.id ? (
-            <JobPaymentHandoff
-              bidId={myBid.id}
-              method={myBid.payment_method || null}
-              sortedAt={myBid.payment_sorted_at || null}
-              sortedBy={myBid.payment_sorted_by || null}
-              requesterId={job.requester_id}
-              providerId={currentUser?.id}
-              canUpdate={paymentAcknowledgementAvailable(job.status, myBid.status, isAcceptedProvider)}
-              canEditMethod={jobConfirmed && ['accepted', 'in_progress'].includes(job.status)}
-              onChanged={fetchData}
-            />
-          ) : null}
+          {providerPaymentJSX}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
@@ -928,6 +1004,7 @@ export default function JobDetailScreen({ route, navigation }) {
               </Text>
             </View>
           )}
+          </>}
           <View style={{ height: insets.bottom + 24 }} />
         </ScrollView>
         <ReviewModal
