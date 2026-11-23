@@ -28,14 +28,14 @@ export async function fetchActiveNextMoves(userId, isProvider, {strict=false}={}
       .order('created_at', { ascending: false }),
     supabase
       .from('bookings')
-      .select('*, services(*)')
+      .select('*, services:services_public(*)')
       .eq('requester_id', userId)
       .in('status', BOOKING_ACTIVE_STATUSES)
       .order('created_at', { ascending: false }),
     isProvider
       ? supabase
           .from('bookings')
-          .select('*, services(*)')
+          .select('*, services:services_public(*)')
           .eq('provider_id', userId)
           .in('status', BOOKING_ACTIVE_STATUSES)
           .order('created_at', { ascending: false })

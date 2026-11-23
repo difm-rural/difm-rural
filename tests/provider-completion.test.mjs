@@ -12,7 +12,7 @@ const replacements = source => source
   .replace("import { BOOKING_STATUS, isBookingWithdrawable } from './lifecycle'", 'const { BOOKING_STATUS, isBookingWithdrawable } = globalThis.completionLifecycle')
   .replace("import { saveReview } from './reviews'", 'const saveReview = () => {}')
 const { markJobComplete } = await moduleFromSource(replacements(await read('../src/lib/jobActions.js')))
-const { markBookingReady } = await moduleFromSource(replacements(await read('../src/lib/bookingActions.js')))
+const { markBookingReady, cancelBookingByRequester } = await moduleFromSource(replacements(await read('../src/lib/bookingActions.js')))
 test('accepted grazing directs both parties to ongoing arrangements rather than completion', () => {
   for (const role of ['provider', 'requester']) {
     for (const status of ['confirmed', 'in_progress']) {
@@ -55,4 +55,19 @@ test('racing completion and database rejection do not report false success', asy
   assert.equal((await markJobComplete('job')).error.code, 'stale')
   mutationClient({ data: null, error: { message: 'Permission denied' } })
   assert.equal((await markBookingReady('booking')).error.message, 'Permission denied')
+})
+
+
+test('withdrawal reuses requester and current-state guards, including quote requests',async()=>{
+ for(const status of ['pending','quote_sent','confirmed','in_progress']){
+  const calls=mutationClient({data:[{id:'booking'}],error:null})
+  const result=await cancelBookingByRequester({id:'booking',status},'requester',{reason:'No longer needed',note:'Please confirm'})
+  assert.equal(result.isPending,['pending','quote_sent'].includes(status))
+  assert.ok(calls.some(c=>c[0]==='eq'&&c[1]==='requester_id'&&c[2]==='requester'))
+  assert.ok(calls.some(c=>c[0]==='eq'&&c[1]==='status'&&c[2]===status))
+  assert.equal(calls.find(c=>c[0]==='update')[1].status,result.isPending?'withdrawn':'cancellation_requested')
+ }
+ mutationClient({data:[],error:null});assert.equal((await cancelBookingByRequester({id:'booking',status:'pending'},'other')).error.code,'stale')
+ mutationClient({data:null,error:{message:'Permission denied'}});assert.equal((await cancelBookingByRequester({id:'booking',status:'pending'},'other')).error.message,'Permission denied')
+ for(const status of ['completed','withdrawn','cancelled','declined','cancellation_requested'])assert.equal(globalThis.completionLifecycle.isBookingWithdrawable(status),false)
 })

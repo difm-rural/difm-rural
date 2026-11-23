@@ -33,7 +33,8 @@ import { onBadgeRefresh, requestBadgeRefresh } from '../lib/badgeEvents'
 import { watchNotifications } from '../lib/liveNotifications'
 import { canResumeGuestAction, listingEnquiryNavigationState, parsePendingListingEnquiry, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
 import { ONBOARDING_DESTINATIONS } from '../lib/onboarding'
-import { bookingRequestCopy } from '../lib/bookingRequestCopy'
+import {newJobId} from '../lib/draftId'
+import {fetchBookingDetail} from '../lib/bookingDetail'
 
 // ─── Post job wizard screens ──────────────────────────────────────────────────
 import PostJobStep1JobType  from '../screens/postjob/PostJobStep1JobType'
@@ -444,6 +445,8 @@ export default function AppNavigator() {
   const [servicesBadge,    setServicesBadge]    = useState(0)
 
   const navigationRef = useNavigationContainerRef()
+  const [bookingSuccessResult,setBookingSuccessResult]=useState(null)
+  const pendingBookingPostingRef=useRef(false)
   const sessionRef = useRef(null)
   const profileRef = useRef(null)
   const onboardingDestinationRef = useRef(null)
@@ -560,6 +563,18 @@ export default function AppNavigator() {
   // mounted (after onboarding for new accounts). Enquiries restore a listing
   // beneath Chat so Back returns to the listing instead of the login screen.
   const authedTabsActive = canResumeGuestAction(session, profile, loading, showOnboarding)
+  useEffect(()=>{
+    if(!authedTabsActive||!bookingSuccessResult)return
+    if(bookingSuccessResult.requester_id!==session?.user?.id){setBookingSuccessResult(null);return}
+    let cancelled=false
+    ;(async()=>{
+      for(let attempt=0;attempt<50&&!navigationRef.isReady();attempt++)await new Promise(resolve=>setTimeout(resolve,100))
+      if(cancelled||!navigationRef.isReady())return
+      navigationRef.navigate('Browse',{screen:'BookingConfirm',params:{service:{...bookingSuccessResult.service,profile:bookingSuccessResult.provider},createdBooking:bookingSuccessResult}})
+      setBookingSuccessResult(null)
+    })()
+    return ()=>{cancelled=true}
+  },[authedTabsActive,bookingSuccessResult,session?.user?.id])
   useEffect(() => {
     if (!authedTabsActive) return
     let cancelled = false
@@ -676,30 +691,22 @@ export default function AppNavigator() {
   }
 
   async function postPendingBookingIfAny(userId) {
+    if(pendingBookingPostingRef.current)return
+    pendingBookingPostingRef.current=true
     try {
       const raw = await AsyncStorage.getItem('pendingBooking')
       if (!raw) return
       const pending = JSON.parse(raw)
       const booking = pending.booking || pending
-      const { error } = await supabase
-        .from('bookings')
-        .insert({ ...booking, requester_id: userId, status: booking.status || 'pending' })
-
-      if (error) {
-        // Keep the draft so the user can retry — don't silently lose their booking.
-        Alert.alert('Booking not sent', `${error.message}\n\nYour details are saved — please try booking again.`)
-        return
-      }
-
+      if(!booking.id){booking.id=newJobId();await AsyncStorage.setItem('pendingBooking',JSON.stringify({...pending,booking:{...booking}}))}
+      const {error}=await supabase.from('bookings').upsert({...booking,requester_id:userId,status:booking.status || 'pending'},{onConflict:'id',ignoreDuplicates:true})
+      if(error){Alert.alert('Booking not sent',`${error.message}\n\nYour details are saved — please try booking again.`);return}
+      const created=await fetchBookingDetail(supabase,booking.id)
       await AsyncStorage.removeItem('pendingBooking')
-      const requestCopy = bookingRequestCopy(pending.isQuoteRequired === true)
-      Alert.alert(
-        requestCopy.successTitle,
-        requestCopy.nextStep
-      )
+      setBookingSuccessResult(created)
     } catch (error) {
-      console.log('Error posting pending booking:', error)
-    }
+      Alert.alert('Could not confirm your booking request','Your details are saved. Check Activity before trying again.')
+    } finally { pendingBookingPostingRef.current=false }
   }
 
   function handleOnboardingComplete(destination = 'home') {
@@ -760,7 +767,7 @@ export default function AppNavigator() {
       const [{ count: newJobs }, { count: newServices }] = await Promise.all([
         supabase.from('jobs_public').select('id', { count: 'exact', head: true })
           .eq('status', 'open').gte('created_at', yesterday).neq('requester_id', userId),
-        supabase.from('services').select('id', { count: 'exact', head: true })
+        supabase.from('services_public').select('id', { count: 'exact', head: true })
           .eq('is_active', true).is('closed_at', null).gte('created_at', yesterday).neq('provider_id', userId),
       ])
       setJobsBadge(newJobs || 0)

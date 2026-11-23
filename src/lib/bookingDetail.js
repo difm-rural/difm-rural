@@ -2,7 +2,7 @@
 // only exposes the viewer's own private profile under RLS.
 export async function fetchBookingDetail(client, bookingId) {
   const { data: booking, error } = await client.from('bookings')
-    .select('*, service:service_id(*)').eq('id', bookingId).single()
+    .select('*, service:services_public(*)').eq('id', bookingId).single()
   if (error) throw error
   if (!booking) throw new Error('This booking is unavailable.')
   const ids = [...new Set([booking.requester_id, booking.provider_id].filter(Boolean))]

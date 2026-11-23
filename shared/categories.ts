@@ -13,7 +13,7 @@
 //   - supabase/functions/categorize-job (CATEGORIES — then redeploy)
 //   - add a data migration remapping existing jobs.category / services.category
 
-import type { ListingKind } from './listingPricing'
+import type { ListingKind } from './listingPricing.ts'
 
 // Level 1 — browse categories (kept short so browse isn't overwhelming).
 export const CATEGORIES: string[] = [

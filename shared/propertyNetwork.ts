@@ -264,7 +264,7 @@ export async function loadPropertyNetwork(client:unknown,owner:string):Promise<N
 
 export async function discoverPropertyProviders(client:unknown,owner:string,category:string,kind:ListingKind='service'){
  const db=client as Client
- const listings=await allRows(()=>db.from('services').select<{provider_id:string}>('provider_id')
+ const listings=await allRows(()=>db.from('services_public').select<{provider_id:string}>('provider_id')
   .eq('is_active',true).eq('kind',kind).eq('category',category).is('closed_at',null).order('id'))
  return loadPeople(db,listings.map(row=>row.provider_id).filter(id=>id!==owner))
 }

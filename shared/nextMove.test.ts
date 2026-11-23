@@ -84,7 +84,7 @@ const fixed = { service: { pricing_type: 'fixed' } }
 const bk = (booking: object, role: string, name?: string) => badge(bookingNextMove(booking, role, { otherName: name }))
 check('badge · booking request · provider', bk({ status: 'pending', ...fixed }, 'provider'), ['Waiting on you to respond', 'attention'])
 check('badge · quote request · provider', bk({ status: 'pending', ...quote }, 'provider'), ['Waiting on you to respond', 'attention'])
-check('badge · booking request · requester', bk({ status: 'pending', ...fixed }, 'requester', 'Sam Rata'), ['Waiting on Sam to respond', 'muted'])
+check('badge · booking request · requester', bk({ status: 'pending', ...fixed }, 'requester', 'Sam Rata'), ['Waiting for Sam to accept', 'muted'])
 check('badge · quote sent · requester', bk({ status: 'quote_sent', ...quote }, 'requester'), ['Waiting on you to respond', 'attention'])
 check('badge · quote sent · provider', bk({ status: 'quote_sent', ...quote }, 'provider', 'Ana'), ['Waiting on Ana to respond', 'muted'])
 for (const status of ['confirmed', 'in_progress']) {

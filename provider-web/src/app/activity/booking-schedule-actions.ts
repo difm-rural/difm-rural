@@ -4,7 +4,7 @@ import {requireProvider} from '@/lib/auth'
 import type {ActionState} from '@/components/action-form'
 export async function saveBookingSchedule(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=String(data.get('booking_id') || ''),intent=String(data.get('intent') || '')
- const {data:b,error}=await supabase.from('bookings').select('requester_id,provider_id,status,service:services(kind)').eq('id',id).single()
+ const {data:b,error}=await supabase.from('bookings').select('requester_id,provider_id,status,service:services_public(kind)').eq('id',id).single()
  const service=Array.isArray(b?.service)?b.service[0]:b?.service
  if(error||!b||![b.provider_id,b.requester_id].includes(user.id)||!['confirmed','in_progress'].includes(b.status)||service?.kind==='grazing')return {error:'This booking has changed or scheduling is unavailable. Refresh and try again.'}
  if(intent==='arrival'){

@@ -1,3 +1,4 @@
+import {readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import {formatDateLabel} from '../../shared/formatting.js'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useEffect, useState } from 'react'
@@ -17,8 +18,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../lib/supabase'
 import { fetchBookingDetail } from '../lib/bookingDetail'
 import { bookingPricingType } from '../lib/listingEstimate'
-import { bookingStatusLabel, BOOKING_STATUS, BOOKING_UNDERWAY_STATUSES, isBookingUnderway, isBookingDismissable } from '../lib/lifecycle'
+import { bookingStatusLabel, BOOKING_STATUS, BOOKING_UNDERWAY_STATUSES, isBookingUnderway, isBookingDismissable, isBookingWithdrawable } from '../lib/lifecycle'
 import { colors } from '../theme/tokens'
+import CancelModal from '../components/CancelModal'
 import ReviewModal from '../components/ReviewModal'
 import PropertyNetworkSuggestion from '../components/PropertyNetworkSuggestion'
 import ReceivedReview from '../components/ReceivedReview'
@@ -30,6 +32,7 @@ import NextMoveBanner from '../components/NextMoveBanner'
 import { bookingNextMove } from '../lib/nextMove'
 import { loadReview } from '../lib/reviews'
 import {
+  cancelBookingByRequester,
   updateBookingStatus,
   sendBookingQuote,
   acceptBookingQuote,
@@ -69,10 +72,14 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const initialBooking = route.params?.booking || null
   const viewerRole = route.params?.viewerRole || 'provider'
   const [booking, setBooking] = useState(initialBooking)
+  const [cancelVisible,setCancelVisible]=useState(false)
+  const [cancelling,setCancelling]=useState(false)
   const [savingArrangement, setSavingArrangement] = useState(false)
   const [quoteAmount, setQuoteAmount] = useState('')
   const [quoteNotes, setQuoteNotes] = useState('')
   const [savingQuote, setSavingQuote] = useState(false)
+  const [listingLocation,setListingLocation]=useState(null)
+  useEffect(()=>{setListingLocation(null);if(booking?.service_id&&viewerRole==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(booking.status)){supabase.from('services').select('location_name,latitude,longitude').eq('id',booking.service_id).maybeSingle().then(({data,error})=>{if(!error)setListingLocation(data)})}},[booking?.id,booking?.status,viewerRole])
   const [otherStats, setOtherStats] = useState(null)
   const [otherReviews, setOtherReviews] = useState([])
   const [reviewVisible, setReviewVisible] = useState(false)
@@ -442,6 +449,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets={true}>
+        {listingLocation&&<View style={styles.card}><Text style={styles.cardLabel}>Private listing location · booking participants only</Text><Text>{listingLocation.location_name}</Text>{listingLocation.latitude!=null&&listingLocation.longitude!=null&&<Button variant="secondary" title="Open agreed listing location" onPress={()=>Linking.openURL('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(listingLocation.latitude+','+listingLocation.longitude))}/>}</View>}
         <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 14 }} />
 
         {service.kind !== 'grazing' && ['confirmed', 'in_progress'].includes(booking.status) ? (
@@ -491,7 +499,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Where</Text>
-          <DetailRow label="Address" value={booking.location_name} />
+          <DetailRow label="Private booking location" value={booking.location_name} />
+          <DetailRow label="Public listing area" value={service.location_name} />
           {booking.latitude && booking.longitude ? (
             <TouchableOpacity
               style={styles.detailRow}
@@ -512,8 +521,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <DetailRow label="Service" value={service.title} />
           <DetailRow label="Category" value={service.category} />
           <DetailRow label="Selected rate" value={booking.pricing_snapshot?.option_label} />
+          <DetailRow label="Unit price" value={readableRate(isQuoteRequired?'quote_required':booking.pricing_snapshot?.pricing_type || service.pricing_type,booking.pricing_snapshot?.rate ?? service.rate,booking.pricing_snapshot?.unit_label || service.unit_label,booking.pricing_snapshot?.min_charge ?? service.min_charge)} />
           <DetailRow label="Timing" value={formatDateLabel(booking.scheduled_date)} />
-          <DetailRow label="Quantity" value={String(booking.quantity ?? 1)} />
+          <DetailRow label="Quantity" value={`${booking.quantity ?? 1} ${quantityUnit(booking.pricing_snapshot?.unit_label || service.unit_label || 'unit',booking.quantity ?? 1)}`} />
           <DetailRow label={booking.quote_amount != null ? 'Quote' : 'Base estimate'} value={isQuoteRequired && booking.quote_amount == null ? 'Quote required' : formatMoney(booking.quote_amount ?? booking.total_amount, service)} />
           <DetailRow label="Quote note" value={booking.quote_notes} />
           <DetailRow label="Requester note" value={booking.notes} />
@@ -560,6 +570,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Button variant="secondary" title="Chat" onPress={openChat} style={styles.footerBtn} />
+        {viewerRole==='requester'&&['pending','quote_sent','confirmed','in_progress'].includes(booking.status)&&<Button variant="secondary" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} onPress={()=>setCancelVisible(true)} style={styles.footerBtn}/>}
         {providerCanConfirm && (
           <Button title="Confirm" onPress={confirmBooking} style={styles.footerBtn} />
         )}
@@ -598,6 +609,12 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         )}
       </View>
 
+      <CancelModal visible={cancelVisible} type="booking" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} subtitle={service.title} onClose={()=>setCancelVisible(false)} onConfirm={async(reason,note)=>{
+        if(cancelling)return
+        setCancelling(true)
+        try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw new Error('Sign in to manage your booking.');const {error}=await cancelBookingByRequester(booking,user.id,{reason,note});if(error)throw error;setCancelVisible(false);await fetchBooking()}
+        catch(error){Alert.alert('Could not withdraw request',error.message)}finally{setCancelling(false)}
+      }}/>
       <ReviewModal
         visible={reviewVisible}
         title={myReview ? 'Edit review' : `Review ${otherRoleLabel.toLowerCase()}`}

@@ -1,6 +1,6 @@
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { CommonActions } from '@react-navigation/native'
 import {
   Alert,
@@ -24,6 +24,8 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
+import {newJobId} from '../lib/draftId'
+import {bookingSubmission,bookingSuccess,readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import { bookingRequestCopy } from '../lib/bookingRequestCopy'
 import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
 
@@ -100,21 +102,26 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const [scheduleType,   setScheduleType]   = useState('asap')
   const [date,           setDate]           = useState(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
-  const [location, setLocation] = useState(isGrazing ? service.location_name || '' : '')
-  const [latitude, setLatitude] = useState(isGrazing ? service.latitude ?? null : null)
-  const [longitude, setLongitude] = useState(isGrazing ? service.longitude ?? null : null)
+  const [location, setLocation] = useState('')
+  const [latitude, setLatitude] = useState(null)
+  const [longitude, setLongitude] = useState(null)
   const [locationNote, setLocationNote] = useState('')
   const [notes, setNotes] = useState('')
+  const [duration,setDuration]=useState('')
   const [submitting, setSubmitting] = useState(false)
+  const submission=useRef(bookingSubmission()).current
+  const requestId=useRef(null)
+  if(!requestId.current)requestId.current=newJobId()
+  const [createdBooking,setCreatedBooking]=useState(route.params?.createdBooking || null)
   const [showAuthSheet, setShowAuthSheet] = useState(false)
 
   const basePaymentExplanation = isGrazing
-    ? 'Agree the grazing duration and payment schedule with the provider. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
+    ? 'Agree duration and payment schedule directly with the provider. Rural Connections doesn\'t handle payments.'
     : isQuoteRequired
-    ? 'You arrange payment directly with the provider — Rural Connections doesn\'t handle payments.'
+    ? 'Pay the provider directly. Rural Connections doesn\'t handle payments.'
     : service?.payment_timing === 'upfront'
-    ? 'This provider asks for payment upfront. You arrange payment directly with them — Rural Connections doesn\'t handle payments.'
-    : 'You arrange payment directly with the provider once the work is complete — Rural Connections doesn\'t handle payments.'
+    ? 'The provider requests upfront payment. Pay them directly; Rural Connections doesn\'t handle payments.'
+    : 'Pay the provider directly on completion. Rural Connections doesn\'t handle payments.'
   const paymentExplanation = (service?.kind||'service')==='service' && service?.materials === 'estimate'
     ? `${basePaymentExplanation} Materials are estimated and settled at actual cost on completion.`
     : basePaymentExplanation
@@ -131,6 +138,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
   function buildBookingPayload(requesterId) {
     return {
+      id: requestId.current,
       service_id:     service.id,
       requester_id:   requesterId,
       provider_id:    service.provider_id,
@@ -143,7 +151,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
       latitude,
       longitude,
       location_note: locationNote.trim() || null,
-      notes:          notes.trim() || null,
+      notes:          [duration.trim()?`Expected duration: ${duration.trim()}`:'',notes.trim()].filter(Boolean).join('\n') || null,
     }
   }
 
@@ -229,6 +237,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
   }
 
   async function handleConfirm() {
+    if(submitting||createdBooking)return
+    if(scheduleType==='specific'&&!date){Alert.alert('Choose a date','Select your preferred date.');return}
     const { data: { user } } = await supabase.auth.getUser()
     if (!location.trim()) {
       Alert.alert('Location required', 'Please enter your location or property address.')
@@ -239,22 +249,20 @@ export default function BookingConfirmScreen({ route, navigation }) {
       return
     }
 
+    if(!submission.start())return
     setSubmitting(true)
-    const { error } = await supabase.from('bookings').insert(buildBookingPayload(user.id))
-
-    setSubmitting(false)
-
-    if (error) {
-      Alert.alert('Error', error.message)
-      return
-    }
-
-    Alert.alert(
-      requestCopy.successTitle,
-      requestCopy.nextStep,
-      [{ text: 'OK', onPress: navigateToServices }]
-    )
+    try {
+      const {error}=await supabase.from('bookings').upsert(buildBookingPayload(user.id),{onConflict:'id',ignoreDuplicates:true})
+      if(error)throw error
+      const {data:created,error:readError}=await supabase.from('bookings').select('id,requester_id,provider_id,status').eq('id',requestId.current).eq('requester_id',user.id).single()
+      if(readError)throw readError
+      submission.finish(true)
+      setCreatedBooking({...buildBookingPayload(user.id),...created,service})
+    } catch(error){submission.finish(false);Alert.alert('Could not send request',error.message)}
+    finally{setSubmitting(false)}
   }
+
+  if(createdBooking){const success=bookingSuccess(service.profile?.full_name);return <View style={[styles.screen,{paddingTop:insets.top+20,padding:20}]}><Text style={styles.headerTitle} accessibilityRole="header">{success.title}</Text><Text style={styles.centerBody}>{success.message}</Text><Text style={styles.cardLabel}>{service.title}</Text><Text style={styles.centerBody}>Waiting for provider response</Text><Button title="View booking" onPress={()=>navigation.replace('ServiceBookingDetail',{booking:createdBooking,viewerRole:'requester'})}/><Button variant="secondary" title="Back to listings" onPress={navigateToServices}/></View>}
 
   return (
     <KeyboardAvoidingView
@@ -288,12 +296,13 @@ export default function BookingConfirmScreen({ route, navigation }) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Request summary</Text>
           <SummaryRow label="Listing" value={service.title} />
+          <SummaryRow label="Unit price" value={readableRate(effectivePricingType,option?.rate ?? service.rate,option?.unit_label ?? service.unit_label,option?.min_charge ?? service.min_charge)} />
           <SummaryRow label="Provider" value={service.profile?.full_name || 'Provider'} />
           {option?.label ? <SummaryRow label="Rate option" value={option.label} /> : null}
           {effectivePricingType !== 'fixed' && !isQuoteRequired && (
-            <SummaryRow label="Quantity" value={`${qty} ${unitLabel}${qty !== 1 ? 's' : ''}`} />
+            <SummaryRow label="Quantity" value={`${qty} ${quantityUnit(unitLabel,qty)}`} />
           )}
-          <SummaryRow label={isQuoteRequired ? 'Price' : 'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `${nzMoney(total)}`} />
+          <SummaryRow label={isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `${nzMoney(total)}`} />
           {isGrazing && !isQuoteRequired && /\/(week|month)$/.test(unitLabel) && (
             <SummaryRow label="Estimate period" value={`One ${unitLabel.endsWith('/week') ? 'week' : 'month'}; agree the full duration with the provider`} />
           )}
@@ -328,6 +337,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           </View>
         ) : null}
 
+        {isGrazing&&<View style={styles.card}><Text style={styles.cardLabel}>Expected duration (optional)</Text><TextInput accessibilityLabel="Expected duration" maxLength={120} value={duration} onChangeText={setDuration} placeholder="For example, 6 weeks — agree with the provider" style={styles.input}/></View>}
         {/* Scheduling */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>When do you need this?</Text>
@@ -384,7 +394,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
         {/* Location */}
         <View style={[styles.card, styles.locationCard]}>
-          <Text style={styles.cardLabel}>{isGrazing ? 'Grazing location' : 'Where?'}</Text>
+          <Text style={styles.cardLabel}>{isGrazing ? 'Where the animals will graze' : 'Where?'}</Text>
+          {isGrazing&&<Text style={[styles.paymentInfoText,{paddingHorizontal:16,marginBottom:10}]}>Enter the general area. Agree the exact grazing location with the provider.</Text>}
           <View style={styles.inputWrap}>
             <AddressAutocomplete
               value={location}
@@ -443,7 +454,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
         {/* Total + payment explanation */}
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : 'Base estimate'}</Text>
+            <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Total base estimate'}</Text>
             <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `${nzMoney(total)}`}</Text>
           </View>
           <View style={styles.paymentInfoBox}>

@@ -32,7 +32,7 @@ export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
   const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations, customerCount] = await Promise.all([
     supabase.from('jobs').select('id,title,status,created_at,accepted_at,scheduled_date,date_from').eq('requester_id', user.id).in('status', ACTIVE_JOBS),
-    supabase.from('bookings').select('id,status,provider_id,requester_id,created_at,quote_sent_at,quote_accepted_at,scheduled_date,service:services(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
+    supabase.from('bookings').select('id,status,provider_id,requester_id,created_at,quote_sent_at,quote_accepted_at,scheduled_date,service:services_public(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
     supabase.from('bids').select('id,job_id,status,created_at,payment_method,payment_sorted_at,payment_details_sent_at').eq('provider_id', user.id).in('status', ['pending','accepted']),
     supabase.from('notifications').select('id,type,body,metadata,created_at').eq('user_id', user.id).eq('read',false).order('created_at',{ascending:false}).limit(20),
     supabase.from('services').select('id,is_active,closed_at').eq('provider_id',user.id),

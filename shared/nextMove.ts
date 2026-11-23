@@ -60,7 +60,7 @@ function move(badge: string, label: string, detail: string, opts: Partial<Omit<N
 // 'Waiting on you to confirm' → 'Your turn'; 'Waiting on Sam to complete' →
 // "Sam's turn"; with no name, 'Waiting on the provider to …' → "Provider's turn".
 function shortBadge(badge: string): string {
-  const waiting = /^Waiting on (.+) to \w+$/.exec(badge)
+  const waiting = /^Waiting (?:on|for) (.+) to \w+$/.exec(badge)
   if (!waiting) return badge
   const who = waiting[1]
   if (who === 'you') return 'Your turn'
@@ -74,7 +74,7 @@ function shortBadge(badge: string): string {
 // ("Scheduled for Friday", "Job confirmed") adds something and is kept.
 export function nextMoveHeading(next: Pick<NextMove, 'label'> | null | undefined): string | null {
   const label = next?.label || ''
-  return !label || label.startsWith('Waiting on') ? null : label
+  return !label || /^Waiting (on|for) /.test(label) ? null : label
 }
 
 export function jobNextMove(
@@ -176,7 +176,7 @@ export function bookingNextMove(
             needsAction: true, tone: 'attention', icon: 'calendar-outline', actionLabel: 'Respond',
           })
     }
-    return move(`Waiting on ${other} to respond`, `Waiting on ${other}`, quoteRequired ? 'A quote is needed' : 'Booking confirmation is needed')
+    return move(`Waiting for ${other} to ${quoteRequired?'quote':'accept'}`, `Waiting for ${other}`, quoteRequired?'Your request has been sent. A quote is needed before you confirm.':`Your request has been sent. ${other} will review it before the booking is confirmed.`)
   }
 
   if (booking.status === 'quote_sent') {

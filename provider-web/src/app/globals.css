@@ -864,3 +864,8 @@ a.row:hover { background: var(--sage); }
 /* After completed work: "Add {provider} to your property network for {area}?" */
 .property-suggestion { background: var(--sage); }
 .property-suggestion h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 1.05rem; color: var(--forest-deep); }
+
+/* Compact requester listing summary; action buttons retain existing hit targets. */
+.listing-provider-summary h2 { margin: 0 0 6px; font-size: 1.1rem; overflow-wrap: anywhere; }
+.listing-provider-summary p { margin: 4px 0; }
+.listing-facts > p { margin: 8px 0; overflow-wrap: anywhere; }

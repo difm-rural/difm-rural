@@ -6,14 +6,14 @@ const url=source=>'data:text/javascript;base64,'+Buffer.from(stripTypeScriptType
 const categories=await readFile(new URL('../shared/categories.ts',import.meta.url),'utf8')
 const nearbyUrl=url(await readFile(new URL('../public-web/src/lib/nearby.ts',import.meta.url),'utf8'))
 const {point,distance,readGuestLocation}=await import(nearbyUrl)
-const source=(await readFile(new URL('../public-web/src/lib/marketplace.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(url(categories))).replace("'./nearby'",JSON.stringify(nearbyUrl)).replace("import {resolvePublicJobLocations} from './job-discovery'","const resolvePublicJobLocations=async rows=>globalThis.__publicAreaResolver?globalThis.__publicAreaResolver(rows):rows")
+const source=(await readFile(new URL('../public-web/src/lib/marketplace.ts',import.meta.url),'utf8')).replace("'@shared/findLocalHelp'",JSON.stringify(new URL('../shared/findLocalHelp.ts',import.meta.url).href)).replace("'@shared/categories'",JSON.stringify(url(categories))).replace("'./nearby'",JSON.stringify(nearbyUrl)).replace("import {resolvePublicJobLocations} from './job-discovery'","const resolvePublicJobLocations=async rows=>globalThis.__publicAreaResolver?globalThis.__publicAreaResolver(rows):rows")
 const {publicJobsQuery,publicListingsQuery,publicRows,publicResults,browseFilters,browseHref,JOB_COLUMNS,LISTING_COLUMNS}=await import(url(source))
 const {consoleLink}=await import(url(await readFile(new URL('../public-web/src/lib/console-link.ts',import.meta.url),'utf8')))
 test('public queries exclude private, closed and paused items and avoid private profile and job columns',()=>{
  const calls=[],q={select(v){calls.push(['select',v]);return q},eq(k,v){calls.push(['eq',k,v]);return q},is(k,v){calls.push(['is',k,v]);return q}},client={from(table){calls.push(['from',table]);return q}}
  publicJobsQuery(client);assert.deepEqual(calls[0],['from','jobs_public']);assert.ok(calls.some(c=>c.join('|')==='eq|visibility|public'));assert.ok(calls.some(c=>c.join('|')==='eq|status|open'))
  for(const key of ['location_name','location_note','latitude','longitude','area_polygon','requester_id'])assert.equal(JOB_COLUMNS.split(',').includes(key),false)
- calls.length=0;publicListingsQuery(client);assert.deepEqual(calls[0],['from','services']);assert.ok(calls.some(c=>c.join('|')==='eq|is_active|true'));assert.ok(calls.some(c=>c[0]==='is'&&c[1]==='closed_at'&&c[2]===null))
+ calls.length=0;publicListingsQuery(client);assert.deepEqual(calls[0],['from','services_public']);assert.ok(calls.some(c=>c.join('|')==='eq|is_active|true'));assert.ok(calls.some(c=>c[0]==='is'&&c[1]==='closed_at'&&c[2]===null))
  for(const key of ['phone','address','email'])assert.equal(LISTING_COLUMNS.split(',').includes(key),false)
 })
 test('public search matches literal text, filters categories and paginates after searching',()=>{

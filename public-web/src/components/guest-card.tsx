@@ -1,14 +1,15 @@
+import {readableRate} from '@shared/findLocalHelp'
 import {formatMoney as nzMoney} from '@shared/formatting'
 /* eslint-disable @next/next/no-img-element -- Member photos and local category artwork. */
 import Link from 'next/link'
 import {MapPin, ArrowUpRight} from 'lucide-react'
-import {formatRate, LISTING_KINDS} from '@shared/listingPricing'
+import { LISTING_KINDS} from '@shared/listingPricing'
 import type {PublicRow} from '@/lib/marketplace'
 import {categoryArtwork} from '@shared/categoryArtwork'
 import {ThumbImg} from '@/components/thumb-img'
 export function GuestCard({row,kind}:{row:PublicRow;kind:'jobs'|'listings'}){
   const listing=kind==='listings'
-  const price=listing?(row.pricing_type==='quote_required'?'Quote required':row.rate==null?'Ask for pricing':formatRate(row.pricing_type || '',row.rate,row.unit_label,row.min_charge))
+  const price=listing?(row.pricing_type==='quote_required'?'Quote required':row.rate==null?'Ask for pricing':readableRate(row.pricing_type || '',row.rate,row.unit_label,row.min_charge))
     :row.price_type==='fixed'&&row.price!=null?""+nzMoney(row.price):'Open to offers'
   return <Link href={'/'+kind+'/'+row.id} className="guest-card">
     <div className="guest-card-image">{row.photos?.[0]?<ThumbImg src={row.photos[0]} alt=""/>:<img src={categoryArtwork(row.category)} alt=""/>}<span>{listing?LISTING_KINDS.find(k=>k.id===row.kind)?.label || 'Listing':'Open job'}</span></div>

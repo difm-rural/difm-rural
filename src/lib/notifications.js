@@ -141,7 +141,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
       const otherUserName = sender?.full_name || 'Chat'
       if (meta.booking_id) {
         const { data: booking } = await supabase
-          .from('bookings').select('service:service_id(title)').eq('id', meta.booking_id).maybeSingle()
+          .from('bookings').select('service:services_public(title)').eq('id', meta.booking_id).maybeSingle()
       if (!isCurrent()) return false
         navigation.navigate('Chat', {
           bookingId:     meta.booking_id,
@@ -167,7 +167,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
       }
       if (meta.service_id) {
         const { data: svc } = await supabase
-          .from('services').select('title').eq('id', meta.service_id).maybeSingle()
+          .from('services_public').select('title').eq('id', meta.service_id).maybeSingle()
       if (!isCurrent()) return false
         navigation.navigate('Chat', {
           serviceId:     meta.service_id,
@@ -183,7 +183,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
     if (meta.booking_id) {
       const { data: booking, error } = await supabase
         .from('bookings')
-        .select('*, service:service_id(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
+        .select('*, service:services_public(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
         .eq('id', meta.booking_id)
         .maybeSingle()
       if (!isCurrent()) return false

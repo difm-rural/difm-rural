@@ -1,4 +1,5 @@
 import JobPrimaryImage, {showJobPrimaryMedia} from './JobPrimaryImage'
+import {readableRate} from '../../shared/findLocalHelp'
 import {LISTING_KINDS} from '../../shared/listingPricing'
 import {listingCardCopy} from '../../shared/listingCardCopy'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
@@ -128,6 +129,7 @@ export default function JobServiceCard({
   isGuest = false,
   onGuestAction,
   nextMove = null,
+  fullWidth = false,
 }) {
   const isService = item._type === 'service' || item.itemType === 'service'
   const profile   = isService ? (item.profile || {}) : (item.profiles || {})
@@ -141,7 +143,7 @@ export default function JobServiceCard({
   const catImg    = categoryImage(category)
   const initials  = getInitials(profile.full_name)
   const firstName = getFirstName(profile.full_name)
-  const price     = formatPrice(item)
+  const price     = fullWidth&&isService&&item.pricing_type&&item.rate!=null?readableRate(item.pricing_type,item.rate,item.unit_label,item.min_charge):formatPrice(item)
   const bidCount  = item.bidCount || 0
 
   const ratingCount = isService ? (item.ratingCount || 0) : 0
@@ -154,7 +156,7 @@ export default function JobServiceCard({
   const badge = !showStatusBadge ? null
     : nextMove?.badge
       // This card is narrow (155pt), so it uses the short form: "Your turn" / "Sam's turn".
-      ? { label: nextMove.badgeShort || nextMove.badge, ...(STATUS_TONE_COLORS[nextMove.badgeTone] || STATUS_TONE_COLORS.muted) }
+      ? { label: (fullWidth?nextMove.badge:nextMove.badgeShort) || nextMove.badge, ...(STATUS_TONE_COLORS[nextMove.badgeTone] || STATUS_TONE_COLORS.muted) }
       : statusBadgeProps(status || item.status, bidCount)
   // The badge already says "Waiting on …", so the box below drops that heading
   // and keeps the detail line (plus a schedule / state heading when there is one).
@@ -175,34 +177,34 @@ export default function JobServiceCard({
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card,fullWidth&&{width:'100%',minWidth:0}]}
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel={item.title || 'Listing'}>
 
       {/* ── Image area ──────────────────────────────────────────────────────── */}
-      <View style={styles.imageBox}>
+      <View style={[styles.imageBox,fullWidth&&{width:'100%'}]}>
         {photoUrl ? (
-          <ThumbImage uri={photoUrl} style={styles.photo} resizeMode="cover" />
+          <ThumbImage uri={photoUrl} style={[styles.photo,fullWidth&&{width:'100%'}]} resizeMode="cover" />
         ) : !isService && showJobPrimaryMedia ? (
-          <JobPrimaryImage key={item.id} jobId={item.id} fallback={catImg} style={styles.photo} />
+          <JobPrimaryImage key={item.id} jobId={item.id} fallback={catImg} style={[styles.photo,fullWidth&&{width:'100%'}]} />
         ) : catImg ? (
-          <Image source={catImg} style={styles.photo} resizeMode="cover" />
+          <Image source={catImg} style={[styles.photo,fullWidth&&{width:'100%'}]} resizeMode="cover" />
         ) : (
-          <View style={[styles.placeholder, { backgroundColor: cat.bg }]}>
+          <View style={[styles.placeholder, { backgroundColor: cat.bg },fullWidth&&{width:'100%'}]}>
             <Icon name={cat.icon} size={40} color={cat.fg} />
           </View>
         )}
 
-        {isService && photoUrl && !!copy.headline && (
+        {isService && photoUrl && !!copy.headline && !fullWidth && (
           <View style={[
             styles.cardMessage,
             item.card_style === 'bold' && styles.cardMessageBold,
             item.card_style === 'clean' && styles.cardMessageClean,
           ]}>
             <Text style={[styles.cardMessageText, item.card_style === 'clean' && styles.cardMessageTextClean]} numberOfLines={3}>
-              {copy.headline}
+              {fullWidth?item.title:copy.headline}
             </Text>
           </View>
         )}
@@ -223,8 +225,8 @@ export default function JobServiceCard({
 
         {/* Status badge overlay (top-left) */}
         {badge && (
-          <View style={[styles.overlayBadge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.overlayBadgeText, { color: badge.fg }]} numberOfLines={1} ellipsizeMode="tail">{badge.label}</Text>
+          <View style={[styles.overlayBadge, { backgroundColor: badge.bg },fullWidth&&{maxWidth:'95%',right:7}]}>
+            <Text style={[styles.overlayBadgeText, { color: badge.fg },fullWidth&&{fontSize:12,lineHeight:18}]} numberOfLines={fullWidth?undefined:1} ellipsizeMode="tail">{badge.label}</Text>
           </View>
         )}
 
@@ -234,7 +236,7 @@ export default function JobServiceCard({
       <View style={styles.body}>
 
         {/* Row 1: avatar + first name + price */}
-        <View style={styles.row1}>
+        <View style={[styles.row1,fullWidth&&{flexWrap:'wrap'}]}>
           <View style={styles.miniAvatarWrap}>
             {!isService && item.hide_exact_location ? (
               <View style={styles.miniAvatarFallback} accessibilityLabel="House-sitting">
@@ -248,8 +250,8 @@ export default function JobServiceCard({
               </View>
             )}
           </View>
-          <Text style={styles.providerName} numberOfLines={1}>{firstName}</Text>
-          <Text style={styles.price} numberOfLines={1}>{price}</Text>
+          <Text style={[styles.providerName,fullWidth&&{fontSize:14,minWidth:100}]} numberOfLines={fullWidth?undefined:1}>{fullWidth?profile.full_name:firstName}</Text>
+          <Text style={[styles.price,fullWidth&&{fontSize:14,flexShrink:1}]} numberOfLines={fullWidth?undefined:1}>{price}</Text>
         </View>
 
         {/* Row 2: service badge pill */}
@@ -270,7 +272,7 @@ export default function JobServiceCard({
         )}
 
         {/* Row 3: title */}
-        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
+        <Text style={[styles.title,fullWidth&&{fontSize:18,lineHeight:24}]} numberOfLines={fullWidth?undefined:2} ellipsizeMode="tail">{item.title}</Text>
 
         {/* Row 4: location + distance */}
         <Text style={styles.location} numberOfLines={1}>
@@ -306,7 +308,7 @@ export default function JobServiceCard({
                 </Text>
               </View>
             ) : null}
-            <Text style={[styles.nextMoveDetail, !boxHeading && styles.nextMoveDetailAlone]} numberOfLines={boxHeading ? 2 : 3}>{nextMove.detail}</Text>
+            <Text style={[styles.nextMoveDetail, !boxHeading && styles.nextMoveDetailAlone,fullWidth&&{fontSize:14,lineHeight:20}]} numberOfLines={fullWidth?undefined:boxHeading ? 2 : 3}>{nextMove.detail}</Text>
           </View>
         )}
       </View>
