@@ -9,6 +9,8 @@ import {loadPropertyMatches,matchLocality,propertyNeed,type PropertyMatch} from 
 import {ProviderInviteAction} from '../connections/provider-actions'
 import {Check} from 'lucide-react'
 import {PropertyAreaIcon} from './area-icon'
+import {PropertyAreaJobs} from './property-area-jobs'
+import {propertyNetworkCounts,propertyPostPath,replacePropertyProvider} from '@shared/propertyNetworkJobs'
 import {
  PROPERTY_AREA_DESCRIPTIONS,PROPERTY_NODE_HEIGHT,PROPERTY_NODE_WIDTH,SUPPORT_AREAS,propertyAreaStatus,filterPropertyProviders,discoverPropertyProviders,linkedPropertyProviders,loadPropertyNetwork,
  propertyAreas,propertyDiagramRatio,propertyDiscoveryPath,propertyJobCategory,propertyProviderName,propertyServiceTarget,propertySpokes,
@@ -70,6 +72,8 @@ function ContactForm({initial,busy,onSave,onCancel,onDelete}:{initial?:PropertyC
 
 export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;initialArea?:string;preferredArea?:string|null}){
  const [client]=useState(createClient)
+ const [changing,setChanging]=useState<{service:string;provider:string}|null>(null)
+ const [relationships,setRelationships]=useState<Record<string,string>>({})
  const [data,setData]=useState<NetworkData|null>(null)
  const [selected,setSelected]=useState(initialArea || '')
  const [highlight,setHighlight]=useState(initialArea || '')
@@ -109,7 +113,9 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  const pickerRequest=useRef(0)
  const addingService=useRef<{area:string;name:string;key:string}|null>(null)
  const load=useCallback(async()=>{
-  try{setData(await loadPropertyNetwork(client,owner))}
+  try{setData(await loadPropertyNetwork(client,owner))
+   try{const [saved,worked]=await Promise.all([loadSavedProviders(client,owner),loadConnections(client,owner,'locals')]);setRelationships(Object.fromEntries([...saved.map(person=>[person.id,'Saved in My People']),...worked.map(row=>[row.personId,`Worked together ${row.times} time${row.times===1?'':'s'}`])]))}catch{setRelationships({})}
+  }
   catch{setError('Could not load My Property Network. Try again.')}
  },[client,owner])
  useEffect(()=>{void load()},[load])
@@ -121,7 +127,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  function selectArea(id:AreaId|''){
   closeMatches()
   pickerRequest.current++
-  setSelected(id);if(id)setHighlight(id);setPicker(null);setServiceName('');setAddingOpen(false);setContactForm(null);setReplacing(null);setSetupOpen(false)
+  setChanging(null);setSelected(id);if(id)setHighlight(id);setPicker(null);setServiceName('');setAddingOpen(false);setContactForm(null);setReplacing(null);setSetupOpen(false)
   window.history.replaceState(null,'',id?'?area='+id:window.location.pathname)
   requestAnimationFrame(()=>{
    if(id)areaHeading.current?.focus()
@@ -170,13 +176,18 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
    ])
    if(request!==pickerRequest.current)return
    setProviderGroups([
-    {label:'Saved',people:saved},
-    {label:'Worked together',people:worked.flatMap(row=>row.person?[{...row.person,display_name:null}]:[])},
+    {label:'My People · Saved',people:saved},
+    {label:'My People · Worked together',people:worked.flatMap(row=>row.person?[{...row.person,display_name:null}]:[])},
     {label:'Provider discovery',people:discovered},
    ])
   }catch{if(request===pickerRequest.current)setProviderError('Could not load providers. Try again.')}
  }
 
+ async function chooseProvider(service:PropertyService,person:PropertyProvider){
+  if(changing?.service===service.service_key){
+   if(await mutate(()=>replacePropertyProvider(client,service,changing.provider,person.id),'Provider assignment changed.')){setChanging(null);setPicker(null)}
+  }else await mutate(()=>setPropertyProvider(client,owner,service,person.id,true),'Provider linked.')
+ }
  async function addService(event:React.FormEvent<HTMLFormElement>){
   event.preventDefault()
   const name=serviceName.trim()
@@ -279,6 +290,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
  }
 
  function togglePicker(service:PropertyService,target:{category:string;kind:ListingKind},mode:'provider'|'contact'){
+  setChanging(null)
   setReplacing(null);setContactForm(null)
   if(picker===service.service_key&&pickerMode===mode){pickerRequest.current++;setPicker(null);return}
   setPickerMode(mode)
@@ -338,12 +350,13 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
    </section>}
    {!showSetup&&<section hidden={!!current} ref={overview} className="property-overview">
     {gaps.length>0?<section className="property-gaps" aria-labelledby="property-gaps-heading">
-     <h2 id="property-gaps-heading">Needs help ({gaps.length})</h2>
+     <h2 id="property-gaps-heading">Services needing help ({gaps.length})</h2>
      <ul>{gaps.map(({area,service})=><li key={area.id+service.service_key} className="property-gap-row">
       <span><strong>{service.name}</strong><small>{area.label}</small></span>
       <button type="button" className="lform-save" onClick={()=>findHelp(area,service)}>Find help</button>
+      <Link href={propertyPostPath(area,service)} className="property-post-job">Post a job</Link>
      </li>)}</ul>
-    </section>:active.length>0&&<p className="muted property-quiet">Nothing needs help right now.</p>}
+    </section>:active.length>0&&<p className="muted property-quiet">{propertyNetworkCounts(areas).review?'No services marked Needs help yet. Finish reviewing your areas.':'No services currently marked Needs help.'}</p>}
     <section aria-labelledby="property-parts-heading">
      <div className="property-parts-head">
       <h2 id="property-parts-heading">Your property</h2>
@@ -386,16 +399,18 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      </>}
     </section>
    </section>}
+   {data&&<p className="muted">{propertyNetworkCounts(areas).help} areas marked Needs help · {propertyNetworkCounts(areas).review} areas to review</p>}
    {current&&<section className="property-area-panel" aria-labelledby="property-area-heading">
     <button type="button" className="lform-cancel" onClick={()=>selectArea('')}>Back to My Property Network</button>
     <h2 id="property-area-heading" tabIndex={-1} ref={areaHeading}><PropertyAreaIcon area={current.id} size={26}/> {current.label}</h2>
-    <p className="muted">One tap each. Tell us who does it if you like.</p>
+    <p className="muted">Choose who helps from My People, or leave an area unassigned. Assignments are private and do not notify providers.</p>
     <div className="property-bulk">
      {current.services.some(service=>!service.status)&&<>
       <button type="button" className="property-pill" disabled={busy} onClick={()=>void bulk(current,'sorted')}>{propertyBulkLabel('sorted',current.services.filter(service=>service.status).length)}</button>
       <button type="button" className="property-pill quiet" disabled={busy} onClick={()=>void bulk(current,'irrelevant')}>{propertyBulkLabel('irrelevant',current.services.filter(service=>service.status).length)}</button>
      </>}
     </div>
+    <PropertyAreaJobs key={owner+current.id} owner={owner} area={current.id}/>
     {current.services.map(service=>{
      const linked=linkedPropertyProviders(data,service)
      const contacts=linkedPropertyContacts(data,service)
@@ -403,7 +418,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      const choice=propertyServiceChoice(service.status)
      const replacingHere=replacing&&picker===service.service_key?replacing:null
      const target=propertyServiceTarget(current,service),category=target.category
-     const postPath='/jobs/new?'+new URLSearchParams({category:propertyJobCategory(current,service)})
+     const postPath=propertyPostPath(current,service)
      const providerOpen=picker===service.service_key&&(pickerMode==='provider'||!!replacingHere)
      const contactOpen=picker===service.service_key&&pickerMode==='contact'&&!replacingHere
      return <article className="property-service" key={service.service_key}>
@@ -412,18 +427,20 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        {PROPERTY_CHOICES.map(([value,label])=><button type="button" key={value} className={'property-choice '+value}
         aria-pressed={choice===value} disabled={busy} onClick={()=>void tapChoice(service,value,covered)}>{label}</button>)}
       </div>
-      {choice==='sorted'&&<div className="property-who">
+      {(choice==='sorted'||choice==='help'||covered>0)&&<div className="property-who">
        <span className="muted">Who does it? (optional)</span>
        <div className="property-who-chips">
         <button type="button" className="property-chip" aria-pressed={service.status==='self'} disabled={busy}
          onClick={()=>void mutate(()=>savePropertyService(client,owner,{...service,status:propertyWhoMeStatus(service.status)}),'Saved.')}>Me</button>
         <button type="button" className="property-chip" aria-pressed={linked.length>0} aria-expanded={providerOpen}
-         onClick={()=>togglePicker(service,target,'provider')}>{linked.length?linked.map(propertyProviderName).join(', ')+' ✓':'A provider…'}</button>
+         onClick={()=>togglePicker(service,target,'provider')}>{linked.length?linked.map(propertyProviderName).join(', ')+' ✓':'Choose from My People'}</button>
         <button type="button" className="property-chip" aria-pressed={contacts.length>0} aria-expanded={contactOpen}
          onClick={()=>togglePicker(service,target,'contact')}>{contacts.length?contacts.map(contact=>contact.name).join(', ')+' ✓':'Someone not on RC'}</button>
        </div>
        {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
-        {providerLink(person)}
+        {providerLink(person)}<span className="muted">{relationships[person.id]||'Linked privately to this service'}</span>
+        <button type="button" className="lform-cancel" onClick={()=>{setChanging({service:service.service_key,provider:person.id});setPickerMode('provider');void openPicker(service,target)}}>Change provider</button>
+        <Link href={propertyPostPath(current,service,person.id)}>Post a job for this provider</Link>
         <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void unlink(service,covered-1,
          ()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.',propertyProviderName(person))}>Remove link</button>
         {choices?<ProviderInviteAction provider={person.id} choices={choices} initiallyOpen={inviteTarget===person.id}/>
@@ -485,7 +502,8 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        <Link href={postPath} className="card-link">Post a job</Link>
       </section>}
       {providerOpen&&<section className="property-picker">
-       <h4>{replacingHere?'Choose the member who replaces '+replacingHere.name:'Choose a provider'}</h4>
+       {changing?.service===service.service_key&&<button type="button" onClick={()=>{setChanging(null);setPicker(null)}}>Cancel changing provider</button>}
+       <h4>{replacingHere?'Choose the member who replaces '+replacingHere.name:changing?.service===service.service_key?'Choose replacement provider':'Choose a provider'}</h4>
        {replacingHere&&<p className="muted">They will be linked to every service {replacingHere.name} covers, and {replacingHere.name}&apos;s private contact details will be deleted.</p>}
        {providerGroups&&<label className="lform-field">Find by name or region
         <input value={providerSearch} onChange={event=>{setProviderSearch(event.target.value);setProviderLimit(12)}}/>
@@ -493,13 +511,13 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        {providerError?<p role="alert">{providerError} <button type="button" onClick={()=>void openPicker(service,target)}>Retry</button></p>
         :!providerGroups?<p role="status">Loading providers…</p>:providerGroups.map(group=>{
          const available=filterPropertyProviders(group.people,linked,providerSearch)
-         return <section key={group.label}><h5>{group.label}</h5>{available.length===0?<p className="muted">No providers to link here.</p>
+         return <section key={group.label}><h5>{group.label}</h5>{available.length===0?<p className="muted">No unassigned people match in this group.</p>
           :<ul className="property-linked">{available.slice(0,providerLimit).map(person=><li key={person.id}>
-           {providerLink(person)} {person.region&&<span className="muted">{person.region}</span>}
+           {providerLink(person)} {relationships[person.id]&&<span className="muted">{relationships[person.id]}</span>} {person.region&&<span className="muted">{person.region}</span>}
            {replacingHere?<button type="button" className="lform-cancel" disabled={busy}
             onClick={()=>void replaceContact(person)}>Replace {replacingHere.name}</button>
            :<button type="button" className="lform-cancel" disabled={busy}
-            onClick={()=>void mutate(()=>setPropertyProvider(client,owner,service,person.id,true),'Provider linked.')}>Link to service</button>}
+            onClick={()=>void chooseProvider(service,person)}>{changing?.service===service.service_key?'Replace provider':'Link to service'}</button>}
           </li>)}</ul>}
           {available.length>providerLimit&&<button className="lform-cancel" type="button" onClick={()=>setProviderLimit(value=>value+12)}>Show more providers</button>}
          </section>
