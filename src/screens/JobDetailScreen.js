@@ -653,7 +653,7 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
-      <Text style={[styles.headerTitle, (requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status))) && styles.acceptedTitle]} numberOfLines={requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status)) ? 3 : undefined} accessibilityLabel={requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status)) ? job.title : undefined} accessibilityRole="header">{job.title}</Text>
+      <Text style={[styles.headerTitle, (requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status))) && styles.acceptedTitle]} numberOfLines={requesterAccepted ? 3 : undefined} accessibilityLabel={requesterAccepted || (isAcceptedProvider && ['accepted', 'completed'].includes(job.status)) ? job.title : undefined} accessibilityRole="header">{job.title}</Text>
       {job.status==='completed'&&isJobOwner&&<JobStatusNotice>Job completed.</JobStatusNotice>}
       {((offerFeedback==='Offer sent.'&&job.status==='open')||(offerFeedback==='Offer accepted.'&&job.status==='accepted'))&&<JobStatusNotice>{offerFeedback}</JobStatusNotice>}
     </View>
@@ -866,7 +866,7 @@ export default function JobDetailScreen({ route, navigation }) {
                 </Text>
               </View>
             </View>
-            <Text style={styles.title}>{job.title}</Text>
+
             <Text style={styles.location}><Icon name="location-outline" size={13} color={colors.textMuted} /> Location: {jobLocation(job)}</Text>
             {isCancelled ? (
               <View style={styles.cancelBox}>
@@ -1433,7 +1433,7 @@ export default function JobDetailScreen({ route, navigation }) {
               {jobBudget(job)}
             </Text>
           </View>}
-          {!compactRequesterDetails && <Text style={styles.title} accessibilityRole="header">{job.title}</Text>}
+          {!compactRequesterDetails && isJobOwner && <Text style={styles.title} accessibilityRole="header">{job.title}</Text>}
           <Text style={styles.description}>{job.description}</Text>
 
           {/* Feature 1: materials/access */}

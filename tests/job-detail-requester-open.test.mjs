@@ -226,3 +226,10 @@ test('completion sheet uses the requested wording and full-width stacked buttons
  const row=nodes(tree).find(n=>n.type==='View'&&nodes(n).includes(buttons[0])&&n.props.style?.gap===12&&n.props.style?.backgroundColor===undefined)
  assert.notEqual(row.props.style.flexDirection,'row');buttons[0].props.onPress();assert.equal(cancelled,1);assert.equal(completed,0);buttons[1].props.onPress();assert.equal(completed,1)
 })
+
+for(const status of ['open','accepted','completed','cancelled'])test('provider '+status+' uses one full multiline job heading',async()=>{
+ const title='Repair fencing along the lower paddock and stream boundary '.repeat(3)
+ const app=await openScreen({job:{status,title},bids:status==='open'?[]:[acceptedOffer],userId:'q'})
+ assert.equal(app.text().split(title).length-1,1)
+ const heading=app.all().find(n=>n.type==='Text'&&n.props.accessibilityRole==='header');assert.equal(text(heading),title);assert.equal(heading.props.numberOfLines,undefined)
+})
