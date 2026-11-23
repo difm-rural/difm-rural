@@ -30,9 +30,12 @@ do $$begin if (select status from property_network_services limit 1)<>'needs_hel
 do $$begin if (select count(*) from property_network_providers)<>1 then raise exception 'provider replacement failed';end if;end$$;
 insert into property_network_jobs values(auth.uid(),'water','20000000-0000-4000-8000-000000000001'),(auth.uid(),'water','20000000-0000-4000-8000-000000000002');
 do $$begin
+ begin insert into property_network_jobs values(auth.uid(),'water','20000000-0000-4000-8000-000000000099');raise exception 'linked a job that was never created';exception when insufficient_privilege then null;end;
  begin insert into property_network_jobs values(auth.uid(),'water','20000000-0000-4000-8000-000000000003');raise exception 'linked someone elses job';exception when insufficient_privilege then null;end;
  begin insert into property_network_jobs values(auth.uid(),'water','20000000-0000-4000-8000-000000000004');raise exception 'linked cancelled job';exception when insufficient_privilege then null;end;
 end$$;
+insert into property_network_jobs values(auth.uid(),'water','20000000-0000-4000-8000-000000000001') on conflict do nothing;
+do $$begin if (select count(*) from property_network_jobs)<>2 then raise exception 'duplicate area-job link';end if;end$$;
 -- A fresh session as the owner sees persisted links.
 reset role;
 set role authenticated;

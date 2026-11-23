@@ -1,4 +1,5 @@
 'use client'
+import {linkPostedPropertyJob,type PropertyJobOrigin} from '@shared/propertyNetworkJobs'
 import {JobPhotoDraft,type PhotoSuggestion} from '@/components/job-photo-draft'
 import {JobEditPhotoImage,JobEditPhotos,type JobEditablePhoto,type JobPrivatePhoto} from '@/components/job-edit-photos'
 import {JobAiChoiceCopy,JobTextDraft,revealJobAiContent} from '@/components/job-text-draft'
@@ -29,7 +30,7 @@ import { createClient } from '@/lib/supabase/client'
 import { postJob, editJob } from '../../work-actions'
 
 type Draft={primary_photo_required:boolean;also_public:boolean;category:string;title:string;description:string;price_type:string;price:string;location:string;area:string;location_note:string;hide_exact_location:boolean;latitude:string;longitude:string;schedule_type:string;scheduled_date:string;date_from:string;date_to:string;materials_type:string;access_conditions:string[];photos:string[]}
-export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,privatePhotos,initialCategory,initialTitle}:{userId:string;seed?:JobSeed;mode?:'new'|'edit'|'repeat';offerCount?:number;inviteProvider?:{id:string;name:string};privatePhotos?:JobPrivatePhoto[];initialCategory?:string;initialTitle?:string}){
+export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,privatePhotos,initialCategory,initialTitle,propertyOrigin}:{userId:string;seed?:JobSeed;mode?:'new'|'edit'|'repeat';offerCount?:number;inviteProvider?:{id:string;name:string};privatePhotos?:JobPrivatePhoto[];initialCategory?:string;initialTitle?:string;propertyOrigin?:PropertyJobOrigin|null}){
  const [primaryPhoto,setPrimaryPhoto]=useState<File|null>(null)
  const privateGallery = !!privatePhotos || !!inviteProvider
  const [editPhotos,setEditPhotos]=useState<JobEditablePhoto[]>(privatePhotos??[])
@@ -62,7 +63,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
   try{return await (mode==='edit'?editJob:postJob)(previous,data) ?? previous}
   catch{return {error:'Could not confirm that the job was saved. Your changes are kept. Please try again.'}}
  },{error:''})
- const heading=useRef<HTMLHeadingElement>(null),router=useRouter(),key='rural-job:'+userId+':'+mode+':'+(seed?.id || 'new')+':'+(inviteProvider?.id || 'public')
+ const heading=useRef<HTMLHeadingElement>(null),router=useRouter(),key='rural-job:'+userId+':'+mode+':'+(seed?.id || 'new')+':'+(inviteProvider?.id || 'public')+(propertyOrigin?':property:'+propertyOrigin.ownerId+':'+propertyOrigin.area:'')
  const locationWarning=usePublishingLocationWarning(userId),submissionLock=useRef(false)
  const steps=['The job','Location','Details & photos','Budget','Review']
  useEffect(()=>{
@@ -78,8 +79,10 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
      // already published (e.g. the tab reloaded mid-post) — don't offer to
      // post it again.
      if(mode!=='edit')try{
-      void createClient().from('jobs').select('id').eq('id',value.id).maybeSingle().then(({data,error})=>{
+      void createClient().from('jobs').select('id').eq('id',value.id).maybeSingle().then(async ({data,error})=>{
        if(!active||error||!data)return
+       if(propertyOrigin)try{await linkPostedPropertyJob(createClient(),propertyOrigin,userId,value.id)}catch{if(active)setError('Your job was already posted, but could not be linked to the maintenance area. Link it from My Network; do not post it again.')}
+       if(!active)return
        try{sessionStorage.removeItem(key)}catch{}
        setSaved(null);setPostedDraft(value.id)
       },()=>{})
@@ -213,6 +216,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
  }
  return <form noValidate className="lform" onSubmit={reviewSubmit}>
   {locationWarning.prompt}
+  {propertyOrigin&&postedDraft&&<Link href={'/property-network?area='+propertyOrigin.area}>Back to maintenance area</Link>}
   {postedDraft&&<div className="card"><h2>Draft already posted</h2><p>The draft saved in this tab was already published as a job — you don&apos;t need to post it again.</p><div className="lform-actions"><Link className="lform-save" href={'/jobs/'+postedDraft}>Open the job</Link><button type="button" className="lform-cancel" onClick={()=>setPostedDraft('')}>Start a new job</button></div></div>}
   {saved&&<div className="card"><h2>Resume your draft?</h2><p>A draft is saved in this browser tab. It has not been published.</p><div className="lform-actions"><button type="button" className="lform-save" onClick={()=>{setDraft({...initial,...saved.draft});setJobId(mode==='edit'?seed!.id:saved.id);setSaved(null)}}>Resume draft</button><button type="button" className="lform-cancel" onClick={()=>{setSaved(null);try{sessionStorage.removeItem(key)}catch{}}}>Discard saved draft</button></div></div>}
   {inviteProvider&&<section className="card work-detail"><h2>Invite {inviteProvider.name}</h2><p>This job will be visible only to you and this provider unless you choose the public board.</p><label className="account-setting"><input type="checkbox" disabled={pending||busy||submitting} checked={draft.also_public} onChange={e=>set('also_public',e.target.checked)}/>Also put this job on the public Jobs board</label></section>}
@@ -220,6 +224,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
   {mode==='edit'&&offerCount>0&&<p className="home-load-error">This job has {offerCount} offer{offerCount===1?'':'s'}. Changes may affect those offers; discuss material changes before accepting.</p>}
   {furthest>0&&<nav className="job-steps" aria-label="Job posting steps">{steps.map((label,i)=><button type="button" key={label} aria-current={step===i?'step':undefined} disabled={pending||busy||submitting||i>furthest} onClick={()=>{setError('');setAttempted(false);setStep(i)}}>{i+1}. {label}</button>)}</nav>}
   <div className="job-progress"><p className="eyebrow">Step {step+1} of {steps.length}{step===0&&" · Basics"}</p><progress aria-label="Job posting progress" value={step+1} max={steps.length}/></div><h2 tabIndex={-1} ref={heading}>{step===0?"What do you need done?":steps[step]}</h2>
+  {mode==='new'&&propertyOrigin&&<><input type="hidden" name="property_owner" value={propertyOrigin.ownerId}/><input type="hidden" name="property_area" value={propertyOrigin.area}/></>}
   <input type="hidden" name="job_id" value={jobId}/>{inviteProvider&&<input type="hidden" name="invite_provider_id" value={inviteProvider.id}/>}{mode==='repeat'&&<input type="hidden" name="repeated_from_job_id" value={seed?.id}/>}
   {Object.entries(draft).map(([name,value])=>(name==='category'||step===0&&(name==='schedule_type'||name==='title'))?null:Array.isArray(value)?value.map((v,i)=><input type="hidden" name={name} value={v} key={name+i}/>):typeof value==='boolean'?<input type="hidden" key={name} name={name} value={value?'on':'off'}/>:<input type="hidden" key={name} name={name} value={value}/>)}
   <fieldset disabled={pending||busy||submitting||!ready||!!saved} aria-busy={submitting||pending} className="work-fieldset">

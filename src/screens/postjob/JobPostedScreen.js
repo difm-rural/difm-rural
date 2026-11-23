@@ -20,7 +20,7 @@ const EASE = [1, 2, 3, 4, 5]
 
 export default function JobPostedScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
-  const { jobId, title, body, returnTo } = route.params || {}
+  const { jobId, title, body, returnTo, propertyOrigin } = route.params || {}
 
   const [ease, setEase] = useState(null)
   const [comment, setComment] = useState('')
@@ -34,6 +34,7 @@ export default function JobPostedScreen({ navigation, route }) {
     doneRef.current = true
     const parent = navigation.getParent()
     navigation.reset({ index: 0, routes: [{ name: 'JobsBoard' }] })
+    if(propertyOrigin){parent?.navigate('Home',{screen:'PropertyNetwork',params:{area:propertyOrigin.area}});return}
     const destTab = TAB_ROOTS[returnTo] ? returnTo : 'Home'
     if (destTab !== 'Jobs') parent?.navigate(destTab, { screen: TAB_ROOTS[destTab] })
   }

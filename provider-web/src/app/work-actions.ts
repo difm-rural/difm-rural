@@ -1,4 +1,5 @@
 'use server'
+import {propertyJobOrigin,linkPostedPropertyJob} from '@shared/propertyNetworkJobs'
 import { CATEGORIES } from '@shared/categories'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -30,6 +31,9 @@ export async function editJob(_: ActionState,data:FormData):Promise<ActionState 
 async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {jobId?:string}>{
   const {supabase,user}=await requireProvider(),id=text(data,'job_id'),source=text(data,'repeated_from_job_id'),invite=text(data,'invite_provider_id')
   if(!validId(id) || (source&&!validId(source)) || (invite&&(!validId(invite)||invite===user.id||editing)))return {error:'This draft reference is invalid. Start a new job from Jobs.'}
+  let propertyOrigin=null
+  try{propertyOrigin=!editing?propertyJobOrigin(text(data,'property_owner')||text(data,'property_area')?{ownerId:text(data,'property_owner'),area:text(data,'property_area')}:null,user.id):null}
+  catch{return {error:'Open this maintenance area from your own My Network before posting.'}}
   let current:(JobSeed & {area_polygon:unknown;area_hectares:number|null})|null=null
   if(editing || source){
     const {data:job,error}=await supabase.from('jobs').select(JOB_EDITOR_COLUMNS).eq('id',editing?id:source).eq('requester_id',user.id).single()
@@ -97,10 +101,15 @@ async function saveJob(data:FormData,editing:boolean):Promise<ActionState & {job
       }
     }
   }
+  let propertyLinkFailed=false
+  if(!editing&&propertyOrigin){
+    try{await linkPostedPropertyJob(supabase,propertyOrigin,user.id,id)}catch{propertyLinkFailed=true}
+    revalidatePath('/property-network')
+  }
   for(const path of ['/','/jobs','/jobs/'+id,'/activity','/activity/job/'+id+'/manage'])revalidatePath(path)
   // Navigate from the server so success cannot be lost to a client remount or
   // reload — the browser lands on the job page in the same response.
-  redirect('/jobs/'+id+(editing?'?edited=1':'?posted=1'))
+  redirect('/jobs/'+id+(editing?'?edited=1':'?posted=1')+(propertyLinkFailed?'&propertyLinkFailed=1&propertyArea='+encodeURIComponent(propertyOrigin!.area):''))
 }
 
 // Records the post-job ease rating shown on the "Job posted" screen. Feedback is

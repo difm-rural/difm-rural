@@ -217,11 +217,11 @@ function PropertyNetworkScreen({navigation,route}){
   navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category,kind}})
  }
  function postArea(item,service,person){
-  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:propertyPostParams(item,service,person)})
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:propertyPostParams(item,service,person,owner)})
  }
  function post(person,category,service){
   setTarget(null)
-  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:area?propertyPostParams(area,area.services.find(row=>row.name===service)||{service_key:'',name:service||area.label},person):person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category,service}}:{}})
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:area?propertyPostParams(area,area.services.find(row=>row.name===service)||{service_key:'',name:service||area.label},person,owner):person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category,service}}:{}})
  }
  // Turning on the wider region fills it in when the locality names exactly one
  // region, directly or in the address suggestions for that place.

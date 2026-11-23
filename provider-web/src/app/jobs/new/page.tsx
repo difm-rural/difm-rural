@@ -1,3 +1,4 @@
+import {propertyJobOrigin} from '@shared/propertyNetworkJobs'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { requireProvider } from '@/lib/auth'
@@ -6,17 +7,21 @@ import { JOB_EDITOR_COLUMNS, repeatSeed, jobOwnerActions, validId, type JobSeed 
 import { JobForm } from './job-form'
 import { SideKicker } from '@/components/side-kicker'
 import { CATEGORIES } from '@shared/categories'
-export default async function NewJobPage({searchParams}:{searchParams:Promise<{repeat?:string;invite?:string;category?:string;title?:string}>}){
- const {repeat,invite,category,title}=await searchParams
+export default async function NewJobPage({searchParams}:{searchParams:Promise<{repeat?:string;invite?:string;category?:string;title?:string;property_owner?:string;property_area?:string}>}){
+ const {repeat,invite,category,title,property_owner,property_area}=await searchParams
  const query=new URLSearchParams();if(repeat)query.set('repeat',repeat);if(invite)query.set('invite',invite)
  const initialCategory=category&&CATEGORIES.includes(category)?category:undefined
  if(initialCategory)query.set('category',initialCategory)
  const initialTitle=title?.slice(0,120)
  if(initialTitle)query.set('title',initialTitle)
+ if(property_owner)query.set('property_owner',property_owner)
+ if(property_area)query.set('property_area',property_area)
  const {supabase,user,profile}=await requireProvider('/jobs/new'+(query.size?'?'+query:''))
+ let propertyOrigin=null
+ try{propertyOrigin=propertyJobOrigin(property_owner||property_area?{ownerId:property_owner,area:property_area}:null,user.id)}catch{notFound()}
  let inviteProvider:{id:string;name:string}|undefined
  if(invite){if(!validId(invite)||invite===user.id)notFound();const {data:person,error:personError}=await supabase.from('profiles_public').select('id,full_name').eq('id',invite).maybeSingle();if(personError)throw new Error('Could not load this provider.');if(!person)notFound();inviteProvider={id:person.id,name:person.full_name || 'Provider'}}
  let seed:JobSeed|undefined
  if(repeat){if(!validId(repeat))notFound();const {data,error}=await supabase.from('jobs').select(JOB_EDITOR_COLUMNS).eq('id',repeat).eq('requester_id',user.id).single();if(error)throw new Error('Could not load the original job.');if(!data||!jobOwnerActions(data.status,0).repeat)notFound();seed=repeatSeed(data as JobSeed)}
- return <AppShell refreshOnAlerts={false} providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link className="card-link" href="/jobs">Back to Jobs</Link><header className="work-head job-head"><SideKicker side="job" label="Jobs · wanted"/><h1>{inviteProvider?'Create an invited job':seed?'Repeat a job':'Post a job'}</h1></header><JobForm inviteProvider={inviteProvider} userId={user.id} seed={seed} initialCategory={initialCategory} initialTitle={initialTitle} mode={seed?'repeat':'new'}/></section></AppShell>
+ return <AppShell refreshOnAlerts={false} providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link className="card-link" href="/jobs">Back to Jobs</Link><header className="work-head job-head"><SideKicker side="job" label="Jobs · wanted"/><h1>{inviteProvider?'Create an invited job':seed?'Repeat a job':'Post a job'}</h1></header><JobForm inviteProvider={inviteProvider} userId={user.id} seed={seed} initialCategory={initialCategory} initialTitle={initialTitle} propertyOrigin={propertyOrigin} mode={seed?'repeat':'new'}/></section></AppShell>
 }

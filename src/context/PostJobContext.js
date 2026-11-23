@@ -35,6 +35,7 @@ const INITIAL_STATE = {
   repeatedFromJobId:  null,
   recurrenceFrequency: 'one_time',
   // The My Property Network service the job was started from (guidance only; not saved).
+  propertyOrigin:     null,
   propertyService:    '',
   propertyServiceCategory: '',
 }

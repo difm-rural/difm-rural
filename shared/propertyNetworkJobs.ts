@@ -1,5 +1,5 @@
 import {allRows} from './relationshipHistory'
-import {SUPPORT_AREAS,propertyAreaProgress,propertyJobCategory,type PropertyService} from './propertyNetwork'
+import {SUPPORT_AREAS,propertyAreaProgress,propertyJobCategory,type PropertyService,type AreaId} from './propertyNetwork'
 import {formatDate} from './formatting.js'
 
 type Query<T>=PromiseLike<{data:T[]|null;error:unknown}>&{eq:(key:string,value:string)=>Query<T>;in:(key:string,values:string[])=>Query<T>;order:(key:string,options?:{ascending:boolean})=>Query<T>;range:(start:number,end:number)=>PromiseLike<{data:T[]|null;error:unknown}>}
@@ -24,8 +24,8 @@ export const propertyJobDate=(job:AreaJob)=>formatDate(job.created_at)
 export function propertyJobPrefill(area:{id:string;label:string;category:string},service:Pick<PropertyService,'service_key'|'name'>){
  return {category:propertyJobCategory(area,service),service:area.label+': '+service.name,title:(service.name+' – '+area.label).slice(0,120)}
 }
-export function propertyPostParams(area:{id:string;label:string;category:string},service:Pick<PropertyService,'service_key'|'name'>,person?:{id:string;full_name?:string|null;display_name?:string|null}){
- return {prefill:propertyJobPrefill(area,service),...(person?{inviteProviderId:person.id,inviteProviderName:person.full_name||person.display_name||'Provider'}:{})}
+export function propertyPostParams(area:{id:string;label:string;category:string},service:Pick<PropertyService,'service_key'|'name'>,person?:{id:string;full_name?:string|null;display_name?:string|null},ownerId?:string){
+ return {...(ownerId?{propertyOrigin:{ownerId,area:area.id}}:{}),prefill:propertyJobPrefill(area,service),...(person?{inviteProviderId:person.id,inviteProviderName:person.full_name||person.display_name||'Provider'}:{})}
 }
 export async function loadPropertyJobs(client:unknown,owner:string){
  const db=client as Client
@@ -40,7 +40,7 @@ export async function loadPropertyJobs(client:unknown,owner:string){
  for(let i=0;i<providerIds.length;i+=200)people.push(...await allRows(()=>db.from('profiles_public').select<{id:string;full_name:string|null}>('id,full_name').in('id',providerIds.slice(i,i+200)).order('id')))
  return {jobs:owned.map(job=>({...job,provider:people.find(person=>person.id===bids.find(bid=>bid.job_id===job.id)?.provider_id)?.full_name||undefined})),links}
 }
-export async function setPropertyJob(client:unknown,owner:string,area:string,job:AreaJob,link:boolean){
+export async function setPropertyJob(client:unknown,owner:string,area:string,job:Pick<AreaJob,'id'|'requester_id'|'status'>,link:boolean){
  if(job.requester_id!==owner||!SUPPORT_AREAS.some(row=>row.id===area)||link&&!PROPERTY_JOB_STATUSES.includes(job.status))throw new Error('Choose one of your active or completed jobs.')
  const db=client as Client
  const {error}=link?await db.from('property_network_jobs').upsert({owner_id:owner,area,job_id:job.id},{ignoreDuplicates:true})
@@ -48,9 +48,9 @@ export async function setPropertyJob(client:unknown,owner:string,area:string,job
  if(error)throw error
 }
 
-export function propertyPostPath(area:{id:string;label:string;category:string},service:Pick<PropertyService,'service_key'|'name'>,provider?:string){
+export function propertyPostPath(area:{id:string;label:string;category:string},service:Pick<PropertyService,'service_key'|'name'>,provider?:string,ownerId?:string){
  const prefill=propertyJobPrefill(area,service)
- return '/jobs/new?'+new URLSearchParams({category:prefill.category,title:prefill.title,...(provider?{invite:provider}:{})})
+ return '/jobs/new?'+new URLSearchParams({category:prefill.category,title:prefill.title,...(ownerId?{property_owner:ownerId,property_area:area.id}:{}),...(provider?{invite:provider}:{})})
 }
 
 export async function replacePropertyProvider(client:unknown,service:Pick<PropertyService,'area'|'service_key'>,previous:string,provider:string){
@@ -58,4 +58,20 @@ export async function replacePropertyProvider(client:unknown,service:Pick<Proper
   p_area:service.area,p_service:service.service_key,p_previous:previous,p_provider:provider,
  })
  if(error)throw error
+}
+
+// The existing network is one private property per member; no public job field
+// or new property identity is required to carry the originating area.
+export type PropertyJobOrigin={ownerId:string;area:AreaId}
+export function propertyJobOrigin(value:unknown,ownerId?:string):PropertyJobOrigin|null{
+ if(value==null)return null
+ const origin=value as Partial<PropertyJobOrigin>
+ if(!origin||typeof origin.ownerId!=='string'||!origin.ownerId||!SUPPORT_AREAS.some(area=>area.id===origin.area)||ownerId!==undefined&&origin.ownerId!==ownerId)
+  throw new Error('Open this maintenance area from your own My Network before posting.')
+ return {ownerId:origin.ownerId,area:origin.area as AreaId}
+}
+export async function linkPostedPropertyJob(client:unknown,value:unknown,ownerId:string,jobId:string){
+ const origin=propertyJobOrigin(value,ownerId)
+ if(!origin)return
+ await setPropertyJob(client,ownerId,origin.area,{id:jobId,requester_id:ownerId,status:'open'},true)
 }

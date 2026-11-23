@@ -1,3 +1,4 @@
+import {propertyJobOrigin,linkPostedPropertyJob} from '../../../shared/propertyNetworkJobs'
 import { newJobId } from '../../lib/draftId'
 import {formatMoney as nzMoney,formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {publicAreaError} from '../../../shared/publicArea'
@@ -250,6 +251,12 @@ export default function PostJobStep5Review({ navigation, route }) {
     const dateError=jobScheduleError({schedule_type:scheduleType,scheduled_date:scheduledDate,date_from:dateFrom,date_to:dateTo},isEditMode?editJob:null)
     if(dateError){setUploadStatus('');Alert.alert('Check the job dates',dateError);return}
     const { data: { user } } = await supabase.auth.getUser()
+    if(!isEditMode && jobData.propertyOrigin){
+      if(!user){Alert.alert('Sign in again','Sign in to the account that owns this maintenance area and reopen it from My Network. No job or area link has been created.');setUploadStatus('');return}
+      try{propertyJobOrigin(jobData.propertyOrigin,user.id)}
+      catch(error){Alert.alert('Check originating property',error.message);return}
+    }
+
 
     if (!await confirmPublishingLocation({ latitude, longitude, area: locationArea || jobAddress, kind: 'job' }, user?.id, () => navigation.pop(3))) { setUploadStatus(''); return }
 
@@ -385,6 +392,11 @@ export default function PostJobStep5Review({ navigation, route }) {
       }
     }
 
+    let propertyLinkFailed=false
+    if(!isEditMode && jobData.propertyOrigin){
+      try{await linkPostedPropertyJob(supabase,jobData.propertyOrigin,user.id,newJob.id)}
+      catch{propertyLinkFailed=true}
+    }
     trackEvent('job_posted', { category: resolvedCategory, price_type: priceType, location: jobAddress, invited: isInvite, repeated: isRepeatMode })
     if (isRepeatMode) trackEvent('job_repeated', { source_job_id: repeatedFromJobId, category: resolvedCategory })
     trackCategoryInterest(resolvedCategory)
@@ -402,8 +414,9 @@ export default function PostJobStep5Review({ navigation, route }) {
     // which ends in the same returnAfterPost behaviour via its returnTo param.
     navigation.replace('JobPosted', {
       jobId: newJob.id,
+      propertyOrigin: jobData.propertyOrigin || undefined,
       title: successTitle,
-      body: successBody + (photosFailed ? ' Some photos could not be saved. You can add them by editing the job.' : ''),
+      body: successBody + (propertyLinkFailed ? ' Your job was posted, but could not be linked to the maintenance area. Open My Network to link this existing job; do not post it again.' : '') + (photosFailed ? ' Some photos could not be saved. You can add them by editing the job.' : ''),
       returnTo: route.params?.origin,
     })
     return true

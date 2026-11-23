@@ -354,7 +354,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      <ul>{gaps.map(({area,service})=><li key={area.id+service.service_key} className="property-gap-row">
       <span><strong>{service.name}</strong><small>{area.label}</small></span>
       <button type="button" className="lform-save" onClick={()=>findHelp(area,service)}>Find help</button>
-      <Link href={propertyPostPath(area,service)} className="property-post-job">Post a job</Link>
+      <Link href={propertyPostPath(area,service,undefined,owner)} className="property-post-job">Post a job</Link>
      </li>)}</ul>
     </section>:active.length>0&&<p className="muted property-quiet">{propertyNetworkCounts(areas).review?'No services marked Needs help yet. Finish reviewing your areas.':'No services currently marked Needs help.'}</p>}
     <section aria-labelledby="property-parts-heading">
@@ -418,7 +418,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
      const choice=propertyServiceChoice(service.status)
      const replacingHere=replacing&&picker===service.service_key?replacing:null
      const target=propertyServiceTarget(current,service),category=target.category
-     const postPath=propertyPostPath(current,service)
+     const postPath=propertyPostPath(current,service,undefined,owner)
      const providerOpen=picker===service.service_key&&(pickerMode==='provider'||!!replacingHere)
      const contactOpen=picker===service.service_key&&pickerMode==='contact'&&!replacingHere
      return <article className="property-service" key={service.service_key}>
@@ -440,7 +440,7 @@ export function PropertyNetwork({owner,initialArea,preferredArea}:{owner:string;
        {linked.length>0&&<ul className="property-linked">{linked.map(person=><li key={person.id}>
         {providerLink(person)}<span className="muted">{relationships[person.id]||'Linked privately to this service'}</span>
         <button type="button" className="lform-cancel" onClick={()=>{setChanging({service:service.service_key,provider:person.id});setPickerMode('provider');void openPicker(service,target)}}>Change provider</button>
-        <Link href={propertyPostPath(current,service,person.id)}>Post a job for this provider</Link>
+        <Link href={propertyPostPath(current,service,person.id,owner)}>Post a job for this provider</Link>
         <button className="lform-cancel" type="button" disabled={busy} onClick={()=>void unlink(service,covered-1,
          ()=>setPropertyProvider(client,owner,service,person.id,false),'Provider link removed.',propertyProviderName(person))}>Remove link</button>
         {choices?<ProviderInviteAction provider={person.id} choices={choices} initiallyOpen={inviteTarget===person.id}/>

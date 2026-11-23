@@ -10,7 +10,7 @@ const compile=path=>require('@babel/core').transformSync(readFileSync(new URL(pa
  presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
 
 const real={}
-for(const name of ['categories','dates','formatting.js','jobAnswers','jobEdit','jobGuidance','jobSuggestion','locality','photos','postJobCancel','postingDates','postingMoney','postingText','publicArea','submission'])
+for(const name of ['categories','dates','formatting.js','jobAnswers','jobEdit','jobGuidance','jobSuggestion','locality','photos','postJobCancel','postingDates','postingMoney','postingText','publicArea','submission','propertyNetworkJobs'])
  real['../../../shared/'+name]=real['../../shared/'+name]=await import('../../shared/'+name)
 for(const name of ['categories','quickPickDates','repeatJob','draftId'])
  real['../../lib/'+name]=real['../lib/'+name]=await import('../../src/lib/'+name+'.js')
@@ -25,7 +25,7 @@ const nodes=node=>!node||typeof node!=='object'?[]:Array.isArray(node)?node.flat
 export const flush=async()=>{for(let i=0;i<30;i++)await new Promise(resolve=>setImmediate(resolve))}
 
 export function openWizard({row,params}){
- const log={updates:[],inserts:[],rpc:[],alerts:[],gps:0,areaFails:false}
+ const log={updates:[],inserts:[],rpc:[],alerts:[],gps:0,areaFails:false,links:[],postFails:false,linkFails:false,userId:'me'}
  let current=null,dirty=false
  const hooks={
   useState(init){const me=current,at=me.i++;if(!(at in me.slots))me.slots[at]=typeof init==='function'?init():init
@@ -40,11 +40,12 @@ export function openWizard({row,params}){
  react.default=react
  const stub=name=>({__esModule:true,default:name})
  const answer=result=>{const chain=new Proxy({},{get:(_,key)=>key==='then'?undefined:['maybeSingle','single'].includes(key)?async()=>result():()=>chain});return chain}
- const supabase={auth:{getUser:async()=>({data:{user:{id:'me'}}})},
-  from:()=>({
+ const supabase={auth:{getUser:async()=>({data:{user:log.userId?{id:log.userId}:null}})},
+  from:table=>({
+   upsert(value,options){log.links.push({table,value,options});return Promise.resolve({error:log.linkFails?{message:'link failed'}:null})},
    update(value){const fails=log.areaFails&&'area_polygon' in value&&!('title' in value);log.updates.push(value);return answer(()=>fails?{data:null,error:{message:'x'}}:{data:{id:row?.id},error:null})},
-   insert(value){log.inserts.push(value);return answer(()=>({data:{id:'new'},error:null}))}}),
-  rpc:async(name,args)=>{log.rpc.push([name,args]);return {data:name==='list_job_private_photos'?[]:args.p_job??'new',error:null}},
+   insert(value){log.inserts.push(value);return answer(()=>log.postFails?{data:null,error:{message:'post failed'}}:{data:{id:'new'},error:null})}}),
+  rpc:async(name,args)=>{log.rpc.push([name,args]);if(log.postFails&&name==='create_invited_job')return {data:null,error:{message:'post failed'}};return {data:name==='list_job_private_photos'?[]:args.p_job??'new',error:null}},
   functions:{invoke:async()=>({data:null,error:null})}}
  const modules={
   react,'react/jsx-runtime':{jsx:element,jsxs:element,Fragment:'Fragment'},
