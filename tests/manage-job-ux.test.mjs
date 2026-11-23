@@ -60,3 +60,16 @@ test('More actions has a visible changing expand indicator and details summary u
  assert.ok(nodes(more()).some(n=>n.type==='Icon'&&n.props.name==='chevron-up'))
  assert.match(s.text(), /Fencing\s+\u00b7\s+\$250/)
 })
+
+test('Assigned provider card opens that provider\'s profile, which renders with their listings',async()=>{
+ const {openProviderProfile}=await import('./support/provider-profile-screen.mjs')
+ const s=screen({job:{status:'accepted',title:'Help clean barn'},acceptedBid:{bidId:'b',providerId:'peter',providerName:'Peter Provider',bidAmount:80}})
+ s.press("View Peter Provider's profile")
+ assert.deepEqual(s.log.navigate,[['ProviderProfile',{providerId:'peter'}]])
+ const [route,params]=s.log.navigate[0]
+ assert.equal(route,'ProviderProfile')
+ // The listing that crashed it: an available-from date and no travel range.
+ const {texts}=await openProviderProfile({params,rows:{profiles_public:{id:'peter',full_name:'Peter Provider',primary_role:'provider'},
+  services:[{id:'t',provider_id:'peter',title:'Large trailer for hire',category:'Machinery',pricing_type:'day_rate',rate:50,travel_range_km:null,availability:['2026-11-18']}]}})
+ assert.ok(texts.includes('Peter P.'));assert.ok(texts.includes('Large trailer for hire'))
+})
