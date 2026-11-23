@@ -137,7 +137,7 @@ export function rankPropertyListings(listings:Listing[],rule:Need,owner:string,l
 export async function loadPropertyMatches(client:unknown,owner:string,rule:Need,locality:string,region:string,saved:string[],worked:string[]){
  const db=client as Client
  if(!rule.categories.length||(!matchLocality(locality)&&!matchLocality(region)))return []
- const listings=await allRows(()=>db.from('services').select<Listing>('provider_id,category,title,description,location_name')
+ const listings=await allRows(()=>db.from('services_public').select<Listing>('provider_id,category,title,description,location_name')
   .in('category',[...rule.categories]).eq('kind',rule.kind??'service').eq('is_active',true).is('closed_at',null).order('id'))
  const shortlist=rankPropertyListings(listings,rule,owner,locality,region,saved,worked).slice(0,24)
  const ids=shortlist.map(result=>result.id)

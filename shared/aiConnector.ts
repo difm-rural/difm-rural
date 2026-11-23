@@ -383,7 +383,7 @@ export async function searchListings(client: SupabaseLike, input: SearchArgs = {
   const category = categoryFilter(args.category)
   const area = searchTerm(args.area)
   const base = () => {
-    let q = client.from('services').select(LISTING_COLUMNS + ',card_headline,latitude,longitude,service_latitude,service_longitude').eq('is_active', true).is('closed_at', null)
+    let q = client.from('services_public').select(LISTING_COLUMNS + ',card_headline,latitude,longitude,service_latitude,service_longitude,discovery_latitude,discovery_longitude').eq('is_active', true).is('closed_at', null)
     const filter = textFilter(groups, ['title', 'description', 'category', 'card_headline'])
     if (filter) q = q.or(filter)
     if (category) q = q.eq('category', category)
@@ -415,7 +415,7 @@ export async function searchListings(client: SupabaseLike, input: SearchArgs = {
   const rows = check<ListingRow[]>(await base().order('created_at', { ascending: false }).limit(CANDIDATES)) || []
   const located: (Located<ListingRow> & { range: number })[] = []
   for (const row of rows) {
-    const point = pointOf(row.latitude, row.longitude) || pointOf(row.service_latitude, row.service_longitude)
+    const point = pointOf(row.latitude, row.longitude) || pointOf(row.service_latitude, row.service_longitude) || pointOf('discovery_latitude' in row?row.discovery_latitude:null, 'discovery_longitude' in row?row.discovery_longitude:null)
     if (!point) continue
     const range = money(row.travel_range_km) ?? DEFAULT_LISTING_RANGE_KM
     located.push({ row, km: distanceKm(centre, point), range, score: wordScore(row, groups) })
@@ -477,7 +477,7 @@ export async function getJob(client: SupabaseLike, userId: string, args: { job_i
 
 export async function getListing(client: SupabaseLike, args: { listing_id?: string }) {
   const id = requireUuid(args.listing_id, 'listing_id')
-  const row = check<ListingRow | null>(await client.from('services').select(LISTING_COLUMNS).eq('id', id).maybeSingle())
+  const row = check<ListingRow | null>(await client.from('services_public').select(LISTING_COLUMNS).eq('id', id).maybeSingle())
   if (!row) return { found: false as const, listing_id: id }
   const names = await publicNames(client, [row.provider_id])
   return {
@@ -539,7 +539,7 @@ export async function myActivity(client: SupabaseLike, userId: string, args: { l
     jobIds.length ? client.from('bids').select('job_id').in('job_id', jobIds).eq('status', 'pending').limit(1000) : empty,
     jobIds.length ? client.from('job_questions').select('job_id').in('job_id', jobIds).is('answer', null).limit(1000) : empty,
     bidJobIds.length ? client.from('jobs_public').select(JOB_COLUMNS).in('id', bidJobIds) : empty,
-    serviceIds.length ? client.from('services').select('id,title,kind,pricing_type').in('id', serviceIds) : empty,
+    serviceIds.length ? client.from('services_public').select('id,title,kind,pricing_type').in('id', serviceIds) : empty,
     awardedIds.length ? client.from('bids').select('job_id,provider_id,payment_method').in('job_id', awardedIds).eq('status', 'accepted') : empty,
   ])
   const count = (rows: { job_id: string }[]) => rows.reduce((m, r) => m.set(r.job_id, (m.get(r.job_id) || 0) + 1), new Map<string, number>())
@@ -627,7 +627,7 @@ export async function readConversation(client: SupabaseLike, userId: string, arg
         .or(`requester_id.eq.${userId},provider_id.eq.${userId}`).maybeSingle(),
     )
     if (!booking) return { found: false as const, kind, id }
-    const service = check<{ title: string } | null>(await client.from('services').select('title').eq('id', booking.service_id).maybeSingle())
+    const service = check<{ title: string } | null>(await client.from('services_public').select('title').eq('id', booking.service_id).maybeSingle())
     title = service?.title ?? null
     rows = check<MessageRow[]>(await client.from('service_booking_messages').select('id,sender_id,receiver_id,content,created_at')
       .eq('booking_id', id).or(participant).order('created_at', { ascending: false }).limit(limit)) || []
@@ -646,7 +646,7 @@ export async function readConversation(client: SupabaseLike, userId: string, arg
       ) || []
       for (const b of paid) if (b.payment_message_id) paymentMessages.set(b.payment_message_id, b.payment_method)
     } else {
-      const listing = check<{ title: string } | null>(await client.from('services').select('title').eq('id', id).maybeSingle())
+      const listing = check<{ title: string } | null>(await client.from('services_public').select('title').eq('id', id).maybeSingle())
       title = listing?.title ?? null
     }
   }

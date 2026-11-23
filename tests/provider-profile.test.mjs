@@ -9,7 +9,7 @@ const PETER_SERVICES=[
  {id:'trailer',provider_id:'peter',title:'Large trailer for hire',category:'Machinery',pricing_type:'day_rate',rate:50,travel_range_km:null,availability:['2026-11-18'],includes_equipment:false},
  {id:'grazing',provider_id:'peter',title:'2 paddocks with water available for grazing',category:'Grazing',pricing_type:'per_unit',rate:50,unit_label:'head/week',travel_range_km:null,availability:null},
 ]
-const peter=services=>openProviderProfile({params:{providerId:'peter'},rows:{profiles_public:PETER,services,bids:[{job_id:'j',status:'accepted'}],reviews:[]}})
+const peter=services=>openProviderProfile({params:{providerId:'peter'},rows:{profiles_public:PETER,services_public:services,bids:[{job_id:'j',status:'accepted'}],reviews:[]}})
 
 test('a provider whose listing has an available-from date and no travel range opens',async()=>{
  const {texts}=await peter(PETER_SERVICES)

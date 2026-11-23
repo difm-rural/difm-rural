@@ -70,7 +70,7 @@ test('Assigned provider card opens that provider\'s profile, which renders with 
  assert.equal(route,'ProviderProfile')
  // The listing that crashed it: an available-from date and no travel range.
  const {texts}=await openProviderProfile({params,rows:{profiles_public:{id:'peter',full_name:'Peter Provider',primary_role:'provider'},
-  services:[{id:'t',provider_id:'peter',title:'Large trailer for hire',category:'Machinery',pricing_type:'day_rate',rate:50,travel_range_km:null,availability:['2026-11-18']}]}})
+  services_public:[{id:'t',provider_id:'peter',title:'Large trailer for hire',category:'Machinery',pricing_type:'day_rate',rate:50,travel_range_km:null,availability:['2026-11-18']}]}})
  assert.ok(texts.includes('Peter P.'));assert.ok(texts.includes('Large trailer for hire'))
 })
 

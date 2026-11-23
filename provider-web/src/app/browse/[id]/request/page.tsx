@@ -10,7 +10,7 @@ export default async function RequestPage({params,searchParams}:{params:Promise<
  const {id}=await params,{quantity,variant=''}=await searchParams
  const query=new URLSearchParams({variant});if(quantity)query.set('quantity',quantity)
  const {supabase,user,profile}=await requireProvider('/browse/'+id+'/request?'+query)
- const {data:s,error}=await supabase.from('services').select('*').eq('id',id).eq('is_active',true).is('closed_at',null).maybeSingle()
+ const {data:s,error}=await supabase.from('services_public').select('*').eq('id',id).eq('is_active',true).is('closed_at',null).maybeSingle()
  if(error)throw new Error('Could not load listing pricing.');if(!s||s.provider_id===user.id||['for_sale','lease'].includes(s.kind))notFound()
  const {data:active,error:activeError}=await supabase.from('bookings').select('id,status').eq('service_id',id).eq('requester_id',user.id).in('status',['pending','quote_sent','confirmed','in_progress','cancellation_requested'])
  let index=variant,invalid=false

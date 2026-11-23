@@ -29,7 +29,7 @@ export async function loadInbox(client:SupabaseClient,userId:string,notices:Noti
     subjects(client,'jobs_public','id,title',threads.filter(t=>t.ref.kind==='job').map(t=>t.ref.id)),
     subjects(client,'bookings','id,service_id',threads.filter(t=>t.ref.kind==='booking').map(t=>t.ref.id)),
   ])
-  const listings=await subjects(client,'services','id,title',[...threads.filter(t=>t.ref.kind==='listing').map(t=>t.ref.id),...[...bookings.values()].map(b=>String(b.service_id))])
+  const listings=await subjects(client,'services_public','id,title',[...threads.filter(t=>t.ref.kind==='listing').map(t=>t.ref.id),...[...bookings.values()].map(b=>String(b.service_id))])
   return threads.map(({ref,message})=>({ ...ref,key:conversationKey(ref),
     name:String(people.get(ref.person)?.full_name || people.get(ref.person)?.display_name || 'Community member'),
     title:String((ref.kind==='job'?jobs.get(ref.id)?.title:listings.get(ref.kind==='booking'?String(bookings.get(ref.id)?.service_id):ref.id)?.title) || (ref.kind==='listing'?'Listing enquiry':ref.kind==='job'?'Job':'Booking')),
@@ -43,14 +43,14 @@ export async function loadConversation(client:SupabaseClient,userId:string,ref:C
   const messages=await readMessages(client,ref.kind==='booking'?'service_booking_messages':'messages',userId,ref)
   let title='',closed=false,privateJob=false
   if(ref.kind==='listing'){
-    const {data:s,error}=await client.from('services').select('id,title,provider_id,is_active,closed_at').eq('id',ref.id).maybeSingle()
+    const {data:s,error}=await client.from('services_public').select('id,title,provider_id,is_active,closed_at').eq('id',ref.id).maybeSingle()
     if(error)throw error
     if(!messages.length && (!s || !s.is_active || s.closed_at || ![userId,ref.person].includes(s.provider_id)))return null
     // Only the owner and an enquirer may start a fresh thread.
     if(!messages.length && s?.provider_id!==ref.person)return null
     title=s?.title || 'Listing enquiry'
   }else if(ref.kind==='booking'){
-    const {data:b,error}=await client.from('bookings').select('requester_id,provider_id,status,service:services(title)').eq('id',ref.id).maybeSingle()
+    const {data:b,error}=await client.from('bookings').select('requester_id,provider_id,status,service:services_public(title)').eq('id',ref.id).maybeSingle()
     if(error)throw error
     if(!b || ![b.requester_id,b.provider_id].includes(userId) || (userId===b.requester_id?b.provider_id:b.requester_id)!==ref.person)return null
     title=(b.service as unknown as {title?:string})?.title || 'Booking'

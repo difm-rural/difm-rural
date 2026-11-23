@@ -29,7 +29,7 @@ export default function ConnectionDetailScreen({ navigation, route }) {
     let active = true
     ;(async () => {
       const { data } = await supabase
-        .from('services')
+        .from('services_public')
         .select('*')
         .eq('provider_id', providerId)
         .eq('is_active', true)

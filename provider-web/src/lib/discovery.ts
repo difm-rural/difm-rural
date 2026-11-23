@@ -1,3 +1,4 @@
+import {matchesHelpFilter} from '@shared/findLocalHelp'
 import {CATEGORIES,LISTING_CATEGORIES} from '@shared/categories'
 import type {ListingKind} from '@shared/listingPricing'
 export type Coordinates={latitude:number;longitude:number}
@@ -23,7 +24,7 @@ export function distanceKm(a:Coordinates,b:Coordinates){const r=Math.PI/180,dlat
 export type Discoverable={id:string;title:string;description?:string|null;category?:string|null;kind?:string|null;location_name?:string|null;location_area?:string|null;latitude?:number|null;longitude?:number|null;created_at:string;discovery_latitude?:number;discovery_longitude?:number;discovery_location_approximate?:boolean}
 export function discover<T extends Discoverable>(rows:T[],f:DiscoveryFilters,origin:Coordinates|null){
  const query=f.q.toLocaleLowerCase('en-NZ')
- const matching=rows.filter(row=>(!f.category||row.category===f.category)&&(!f.kind||row.kind===f.kind)&&(!query||[row.title,row.description,row.category,row.location_name,row.location_area].some(v=>String(v || '').toLocaleLowerCase('en-NZ').includes(query)))).map(row=>{const pin=coordinates(row.latitude,row.longitude)||coordinates(row.discovery_latitude,row.discovery_longitude);return {...row,distance:origin&&pin?distanceKm(origin,pin):null}}).filter(row=>!f.radius||(row.distance!==null&&row.distance<=f.radius))
+ const matching=rows.filter(row=>(!f.category||row.category===f.category)&&matchesHelpFilter(row,f.kind)&&(!query||[row.title,row.description,row.category,row.location_name,row.location_area].some(v=>String(v || '').toLocaleLowerCase('en-NZ').includes(query)))).map(row=>{const pin=coordinates(row.latitude,row.longitude)||coordinates(row.discovery_latitude,row.discovery_longitude);return {...row,distance:origin&&pin?distanceKm(origin,pin):null}}).filter(row=>!f.radius||(row.distance!==null&&row.distance<=f.radius))
  matching.sort((a,b)=>f.sort==='nearest'&&origin?(a.distance ?? Infinity)-(b.distance ?? Infinity)||b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id):b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id))
  const pages=Math.max(1,Math.ceil(matching.length/20)),page=Math.min(f.page,pages)
  return {rows:matching.slice((page-1)*20,page*20),count:matching.length,pages,page}

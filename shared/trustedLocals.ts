@@ -61,7 +61,7 @@ export async function loadAdvertisedServices(client:unknown,ids:readonly string[
  for(let i=0;i<ids.length;i+=200){
   const batch=ids.slice(i,i+200)
   if(!batch.length)continue
-  const listings=await allRows(()=>db.from('services').select<Service>('provider_id,category').in('provider_id',batch).eq('is_active',true).is('closed_at',null).order('id'))
+  const listings=await allRows(()=>db.from('services_public').select<Service>('provider_id,category').in('provider_id',batch).eq('is_active',true).is('closed_at',null).order('id'))
   const counts=new Map<string,Map<string,number>>()
   for(const listing of listings){
    if(!listing.category)continue

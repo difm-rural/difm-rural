@@ -39,7 +39,7 @@ export default async function PublicProfilePage({params}:{params:Promise<{id:str
    .eq('requester_id',user.id).eq('provider_id',id).maybeSingle():null
   let reviews:PublicReview[]=[],reviewError=false
   try{reviews=await allPublicReviews(supabase,id)}catch{reviewError=true}
-  const {data:listings,error:listingError}=await supabase.from('services').select('id,title,kind,rate,pricing_type,unit_label,min_charge,photos,category,card_headline,card_supporting_text,card_style').eq('provider_id',id).eq('is_active',true).is('closed_at',null).order('created_at',{ascending:false})
+  const {data:listings,error:listingError}=await supabase.from('services_public').select('id,title,kind,rate,pricing_type,unit_label,min_charge,photos,category,card_headline,card_supporting_text,card_style').eq('provider_id',id).eq('is_active',true).is('closed_at',null).order('created_at',{ascending:false})
   const avg=reviews.length?reviews.reduce((s,r)=>s+r.rating,0)/reviews.length:0
   const availability=availabilityDisplay(p.availability_status,p.availability_until,p.availability_updated_at)
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href={user.id===id?'/account':'/browse'} className="card-link">{user.id===id?'Back to Account':'Browse listings'}</Link>

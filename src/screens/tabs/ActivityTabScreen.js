@@ -44,6 +44,7 @@ function bookingNeedsQuote(booking) {
 function BookingWorkCard({
   booking,
   viewerRole,
+  fullWidth=false,
   onPress,
   onConfirm,
   onDecline,
@@ -75,8 +76,9 @@ function BookingWorkCard({
   const nextMove = bookingNextMove(booking, viewerRole, { otherName })
 
   return (
-    <View style={styles.bookingWorkWrap}>
+    <View style={[styles.bookingWorkWrap,(fullWidth||viewerRole==='requester')&&{width:'100%'}]}>
       <JobServiceCard
+        fullWidth={fullWidth||viewerRole==='requester'}
         item={serviceItem}
         showStatusBadge
         status={booking.status}
@@ -152,17 +154,6 @@ function BookingWorkCard({
         </TouchableOpacity>
       )}
 
-      {canRequesterCancel && (
-        <TouchableOpacity
-          style={styles.miniDangerBtn}
-          onPress={onCancelRequest}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel service booking">
-          <Text style={styles.miniDangerText}>
-            {isBookingWithdrawable(booking.status) ? 'Withdraw' : 'Request cancel'}
-          </Text>
-        </TouchableOpacity>
-      )}
 
       {viewerRole === 'requester' && booking.status === 'cancellation_requested' && (
         <Text style={styles.bookingHint}>Waiting for provider</Text>
@@ -306,7 +297,7 @@ export default function ActivityTabScreen({ navigation,route }) {
     // Booked services as requester
     const { data: bookingsData } = await supabase
       .from('bookings')
-      .select('*, services(*)')
+      .select('*, services:services_public(*)')
       .eq('requester_id', uid)
       .in('status', BOOKING_ACTIVE_STATUSES)
       .order('created_at', { ascending: false })
@@ -369,7 +360,7 @@ export default function ActivityTabScreen({ navigation,route }) {
     // Bookings as provider
     const { data: bookingsData } = await supabase
       .from('bookings')
-      .select('*, services(*)')
+      .select('*, services:services_public(*)')
       .eq('provider_id', uid)
       .in('status', [...BOOKING_ACTIVE_STATUSES, 'withdrawn', 'cancelled'])
       .order('created_at', { ascending: false })
@@ -408,7 +399,7 @@ export default function ActivityTabScreen({ navigation,route }) {
           .then(({ data }) => { jobs.push(...((data || []).map(j => ({ ...j, _viewerRole: 'requester', bidCount: 0 })))) })
       )
       promises.push(
-        supabase.from('bookings').select('*, services(*)')
+        supabase.from('bookings').select('*, services:services_public(*)')
           .eq('requester_id', uid).eq('status', 'completed')
           .order('created_at', { ascending: false })
           .then(async ({ data }) => {
@@ -441,7 +432,7 @@ export default function ActivityTabScreen({ navigation,route }) {
           })
       )
       promises.push(
-        supabase.from('bookings').select('*, services(*)')
+        supabase.from('bookings').select('*, services:services_public(*)')
           .eq('provider_id', uid).eq('status', 'completed')
           .order('created_at', { ascending: false })
           .then(async ({ data }) => {
@@ -715,12 +706,8 @@ export default function ActivityTabScreen({ navigation,route }) {
         {!focus&&isRequester && activeJobs.length > 0 && (
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Posted jobs</Text>
-            <FlatList
-              horizontal
-              data={activeJobs}
-              keyExtractor={job => `job-${job.id}`}
-              renderItem={({ item: job }) => (
-                <JobServiceCard
+            <View style={{paddingHorizontal:16,gap:12}}>{activeJobs.map(job=><View key={job.id} style={{width:'100%'}}>
+                <JobServiceCard fullWidth
                   item={job}
                   showStatusBadge
                   status={job.status}
@@ -732,15 +719,7 @@ export default function ActivityTabScreen({ navigation,route }) {
                     paymentSortedAt: job._paymentSortedAt,
                   })}
                   onPress={() => navigation.navigate('ManageTask', { job, bidCount: job.bidCount || 0 })}
-                />
-              )}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-            />
+                /></View>)}</View>
           </View>
         )}
 
@@ -748,25 +727,13 @@ export default function ActivityTabScreen({ navigation,route }) {
         {!focus&&isRequester && myBookings.length > 0 && (
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Your requests and bookings</Text>
-            <FlatList
-              horizontal
-              data={myBookings}
-              keyExtractor={b => `booking-${b.id}`}
-              renderItem={({ item: b }) => (
+            <View style={{paddingHorizontal:16,gap:12}}>{myBookings.map(b=><View key={b.id} style={{width:'100%'}}>
                 <BookingWorkCard
                   booking={b}
                   viewerRole="requester"
                   onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: 'requester' })}
                   onCancelRequest={() => cancelRequesterBooking(b)}
-                />
-              )}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-            />
+                /></View>)}</View>
           </View>
         )}
 
@@ -850,12 +817,8 @@ export default function ActivityTabScreen({ navigation,route }) {
               {completedJobs.length > 0 && (
                 <View style={styles.cardSection}>
                   <Text style={styles.sectionLabel}>Completed jobs</Text>
-                  <FlatList
-                    horizontal
-                    data={completedJobs}
-                    keyExtractor={job => `comp-job-${job._viewerRole}-${job.id}`}
-                    renderItem={({ item: job }) => (
-                      <JobServiceCard
+                  <View style={{paddingHorizontal:16,gap:12}}>{completedJobs.map(job=><View key={job.id+'-'+job._viewerRole} style={{width:'100%'}}>
+                      <JobServiceCard fullWidth
                         item={job}
                         showStatusBadge
                         status="completed"
@@ -863,40 +826,20 @@ export default function ActivityTabScreen({ navigation,route }) {
                           if (job._viewerRole === 'requester') navigation.navigate('ManageTask', { job, bidCount: 0 })
                           else navigation.navigate('JobDetail', { job })
                         }}
-                      />
-                    )}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.hListContent}
-                    ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-                    ListFooterComponent={<View style={{ width: 40 }} />}
-                    snapToInterval={SNAP_INTERVAL}
-                    decelerationRate="fast"
-                  />
+                      /></View>)}</View>
                 </View>
               )}
 
               {completedBookings.length > 0 && (
                 <View style={styles.cardSection}>
                   <Text style={styles.sectionLabel}>Completed bookings</Text>
-                  <FlatList
-                    horizontal
-                    data={completedBookings}
-                    keyExtractor={b => `comp-booking-${b._viewerRole}-${b.id}`}
-                    renderItem={({ item: b }) => (
-                      <BookingWorkCard
+                  <View style={{paddingHorizontal:16,gap:12}}>{completedBookings.map(b=><View key={b.id+'-'+b._viewerRole} style={{width:'100%'}}>
+                      <BookingWorkCard fullWidth
                         booking={{ ...b, status: 'completed' }}
                         viewerRole={b._viewerRole}
                         onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: b._viewerRole })}
                         onReview={() => openBookingReview(b)}
-                      />
-                    )}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.hListContent}
-                    ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-                    ListFooterComponent={<View style={{ width: 40 }} />}
-                    snapToInterval={SNAP_INTERVAL}
-                    decelerationRate="fast"
-                  />
+                      /></View>)}</View>
                 </View>
               )}
             </>

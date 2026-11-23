@@ -1,0 +1,20 @@
+import {readFileSync} from 'node:fs'
+import {createRequire} from 'node:module'
+const require=createRequire(import.meta.url)
+const compiled=require('@babel/core').transformSync(readFileSync(new URL('../../src/screens/BookingConfirmScreen.js',import.meta.url),'utf8'),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
+const real={'../../shared/formatting.js':await import('../../shared/formatting.js'),'../../shared/dates':await import('../../shared/dates.ts'),'../../shared/findLocalHelp':await import('../../shared/findLocalHelp.ts'),'../lib/listingEstimate':await import('../../shared/listingEstimate.ts'),'../lib/bookingRequestCopy':await import('../../src/lib/bookingRequestCopy.js'),'../lib/draftId':await import('../../src/lib/draftId.js')}
+const nodes=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)]
+export function openBooking({service,quantity=1,fail=false,user='requester'}={}){
+ const state=[],log={writes:[],navigation:[],alerts:[],reads:[]};let index=0,tree,row
+ const hooks={useState(init){const at=index++;if(!(at in state))state[at]=typeof init==='function'?init():init;return [state[at],v=>{state[at]=typeof v==='function'?v(state[at]):v}]},useRef(init){const at=index++;state[at]??={current:init};return state[at]},useEffect(){}}
+ const react={...hooks,__esModule:true};react.default=react
+ const el=(type,props)=>({type,props})
+ const supabase={auth:{getUser:async()=>({data:{user:user?{id:user}:null}})},from(table){log.reads.push(table);return {async upsert(payload,options){log.writes.push({payload,options});if(fail){fail=false;return {error:new Error('Connection lost')}}row??=payload;return {error:null}},select(){const q={eq(){return q},single:async()=>({data:row,error:null})};return q}}}}
+ const modules={react,'react/jsx-runtime':{jsx:el,jsxs:el,Fragment:'Fragment'},'react-native':{Platform:{OS:'android'},Alert:{alert:(...a)=>log.alerts.push(a)},StyleSheet:{create:v=>v,absoluteFill:{},absoluteFillObject:{}},Dimensions:{get:()=>({height:800})},...Object.fromEntries(['KeyboardAvoidingView','Modal','ScrollView','Text','TextInput','TouchableOpacity','View'].map(n=>[n,n]))},'@react-navigation/native':{CommonActions:{reset:v=>v}},'@react-native-async-storage/async-storage':{__esModule:true,default:{setItem:async()=>{}}},'@react-native-community/datetimepicker':{__esModule:true,default:'DateTimePicker'},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../lib/supabase':{supabase},'../theme/tokens':{colors:{}},...Object.fromEntries(['Icon','Button','AddressAutocomplete'].map(n=>['../components/'+n,{__esModule:true,default:n}]))}
+ const exp={};new Function('exports','require',compiled)(exp,name=>{const m=modules[name]??real[name];if(!m)throw Error('Missing '+name);return m})
+ const nav={getState:()=>({routeNames:['BrowseMain']}),dispatch:v=>log.navigation.push(v),replace:(...a)=>log.navigation.push(a),navigate:(...a)=>log.navigation.push(a),goBack:()=>log.navigation.push('back')}
+ const render=()=>{index=0;tree=exp.default({route:{params:{service,quantity}},navigation:nav});return tree}
+ render()
+ const all=()=>nodes(render())
+ return {log,all,render,find:(type,predicate=()=>true)=>all().find(n=>n.type===type&&predicate(n.props)),texts:()=>all().filter(n=>n.type==='Text').flatMap(n=>[n.props.children].flat()).join(' '),async press(title){const node=all().find(n=>n.type==='Button'&&n.props.title===title);if(!node)throw Error('No action '+title);await node.props.onPress();render()}}
+}

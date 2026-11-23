@@ -14,7 +14,7 @@ export default function EnquiryPersonCard({ serviceId, personId }) {
     async function load() {
       const [profileResult, listingResult] = await Promise.all([
         supabase.from('profiles_public').select('id, full_name, display_name, created_at').eq('id', personId).single(),
-        supabase.from('services').select('provider_id').eq('id', serviceId).single(),
+        supabase.from('services_public').select('provider_id').eq('id', serviceId).single(),
       ])
       if (profileResult.error || listingResult.error || !profileResult.data || !listingResult.data) return
       const role = listingResult.data.provider_id === personId ? 'provider' : 'requester'
