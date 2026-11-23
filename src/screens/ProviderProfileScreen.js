@@ -232,8 +232,9 @@ export default function ProviderProfileScreen({ route, navigation }) {
   const maxTravel    = travelRanges.length > 0 ? Math.max(...travelRanges) : 0
   const region       = getDisplayLocation(profile?.address) || profile?.region || services[0]?.location_name || null
 
-  // Availability union across all services
-  const availDays = new Set(services.flatMap(s => Array.isArray(s.availability) ? s.availability : []))
+  // Weekdays a listing is available. Listings now store an available-from date
+  // (e.g. "2026-11-18") here instead, which is not a weekday, so it's left out.
+  const availDays = new Set(services.flatMap(s => Array.isArray(s.availability) ? s.availability : []).filter(day => ALL_DAYS.includes(day)))
 
   // Job category map for reviews
   const jobCatMap = {}
@@ -476,7 +477,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
               </View>
             )}
 
-            {maxTravel === 0 && !hasEquipment && availDays.size === 0 && (
+            {maxTravel === 0 && availDays.size === 0 && (
               <EmptyState
                 compact
                 icon="navigate-outline"
