@@ -17,9 +17,9 @@ const text=node=>typeof node==='string'||typeof node==='number'?String(node):!no
 const baseJob={id:'job',requester_id:'owner',status:'open',title:'Repair the fence',description:'Repair the boundary fence.',category:'Fencing',price_type:'fixed',price:250,location_name:'10 Farm Road, Waitoki',location_area:'Waitoki',latitude:-36.5,longitude:174.5,hide_exact_location:true,materials_type:'provider',access_conditions:['dogs_on_property'],location_note:'Use the second gate',schedule_type:'flexible'}
 const question=(id,answer=null)=>({id,asker_id:'p',question:'Question '+id,answer,created_at:'2026-11-22T01:00:00Z'})
 const bid=id=>({id,provider_id:id,amount:200,status:'pending',pricing_type:'fixed'})
-async function openScreen({schedule=null,stats={},providerName=null,job={},questions=[question('answered','Yes'),question('first'),question('second')],bids=[bid('p'),bid('q')],userId='owner',params={fromManage:true,focusQuestions:true}}={}) {
+async function openScreen({review=null,schedule=null,stats={},providerName=null,job={},questions=[question('answered','Yes'),question('first'),question('second')],bids=[bid('p'),bid('q')],userId='owner',params={fromManage:true,focusQuestions:true}}={}) {
  const db={job:{...baseJob,...job},questions:structuredClone(questions),bids:structuredClone(bids)}
- const log={scroll:[],updates:[],accept:[],alerts:[],navigate:[],reads:[],timers:[]}
+ const log={scroll:[],updates:[],accept:[],alerts:[],navigate:[],reads:[],timers:[],calendar:[],late:[],arrival:[],completed:[]}
  let focused=true,dirty=false,tree,slots=[],at=0,effects=[]
  const react={createElement:(type,props,...children)=>{if(type==='ScrollView'&&props?.ref)props.ref.current={scrollTo:value=>log.scroll.push(value)};return {type,props:{...props,children}}},
   useState:init=>{const i=at++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return [slots[i],next=>{const value=typeof next==='function'?next(slots[i]):next;if(!Object.is(value,slots[i])){slots[i]=value;dirty=true}}]},
@@ -37,7 +37,7 @@ async function openScreen({schedule=null,stats={},providerName=null,job={},quest
   return query
  }}
  const component=name=>({__esModule:true,default:name})
- const mocks={react,'react-native':{StyleSheet:{create:v=>v},Platform:{OS:'android'},Alert:{alert:(...v)=>log.alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','Image','KeyboardAvoidingView'].map(v=>[v,v]))},'@react-navigation/native':{useIsFocused:()=>focused},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../context/UserContext':{useUser:()=>({refreshProfile(){}})},'../theme/tokens':tokens,'../lib/supabase':{supabase},'../lib/roles':{canProvide:()=>true},'../lib/offers':offers,'../../shared/offers':offers,'../../shared/formatting.js':formatting,'../../shared/dates':dates,'../../shared/requestedDate':requested,'../../shared/jobMapTarget':mapTarget,'../lib/quickPickDates':{localDate:()=>null},'../lib/analytics':{trackEvent(){}},'../lib/listingPerformance':{recordJobProviderView(){}},'../lib/providerStats':{fetchProviderStats:async()=>stats},'../lib/workSchedule':{fetchWorkSchedule:async()=>schedule},'../lib/location':{stripPlusCode:v=>v,coarseSuburb:v=>v},'../lib/maps':{staticMapUrl:()=>'/map.png',staticMapPolygonUrl:()=>'/polygon.png'},'../lib/jobActions':{acceptBid:async(job,offer)=>{log.accept.push({job,offer});db.job={...db.job,status:'accepted'};db.bids=db.bids.map(b=>({...b,status:b.id===offer.id?'accepted':'rejected'}));return {error:null}}},'../lib/watchlist':{},'../lib/reviews':{loadReview:async()=>null},'../../shared/jobReviewStatus':{jobReviewStatus:()=>[]},'../../shared/paymentAcknowledgement':{paymentAcknowledgementAvailable:()=>true},'../lib/lifecycle':{jobStatusLabel:status=>status},'../lib/nextMove':{jobNextMove},'../../shared/jobInvitations':{ACTIVE_JOB_INVITATIONS:[]},'../lib/invites':{respondToJobInvitation:async()=>({})},'../components/JobPrimaryImage':{JobPrivateGallery:'JobPrivateGallery'},'../components/JobArrangementSummary':{JobArrangementSummary:'JobArrangementSummary',JobStatusNotice:'JobStatusNotice'}}
+ const mocks={react,'react-native':{StyleSheet:{create:v=>v},Platform:{OS:'android'},Alert:{alert:(...v)=>log.alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','Image','KeyboardAvoidingView'].map(v=>[v,v]))},'@react-navigation/native':{useIsFocused:()=>focused},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../context/UserContext':{useUser:()=>({refreshProfile(){}})},'../theme/tokens':tokens,'../lib/supabase':{supabase},'../lib/roles':{canProvide:()=>true},'../lib/offers':offers,'../../shared/offers':offers,'../../shared/formatting.js':formatting,'../../shared/dates':dates,'../../shared/requestedDate':requested,'../../shared/jobMapTarget':mapTarget,'../lib/quickPickDates':{localDate:()=>null},'../lib/analytics':{trackEvent(){}},'../lib/listingPerformance':{recordJobProviderView(){}},'../lib/providerStats':{fetchProviderStats:async()=>stats},'../lib/workSchedule':{fetchWorkSchedule:async()=>schedule,saveArrivalWindow:async args=>{log.arrival.push(args);schedule={arrival_start_at:args.start,arrival_end_at:args.end};return {data:schedule,error:null}},sendRunningLate:async args=>{log.late.push(args);return {error:null}},addWorkToPhoneCalendar:async args=>{log.calendar.push(args)},formatArrivalWindow:schedule=>schedule.arrival_start_at},'../lib/location':{stripPlusCode:v=>v,coarseSuburb:v=>v},'../lib/maps':{staticMapUrl:()=>'/map.png',staticMapPolygonUrl:()=>'/polygon.png'},'../lib/jobActions':{markJobComplete:async id=>{log.completed.push(id);db.job={...db.job,status:'completed'};return {error:null}},acceptBid:async(job,offer)=>{log.accept.push({job,offer});db.job={...db.job,status:'accepted'};db.bids=db.bids.map(b=>({...b,status:b.id===offer.id?'accepted':'rejected'}));return {error:null}}},'../lib/watchlist':{},'../lib/reviews':{loadReview:async()=>review},'../../shared/jobReviewStatus':{jobReviewStatus:()=>[]},'../../shared/paymentAcknowledgement':{paymentAcknowledgementAvailable:()=>true},'../lib/lifecycle':{jobStatusLabel:status=>status},'../lib/nextMove':{jobNextMove},'../../shared/jobInvitations':{ACTIVE_JOB_INVITATIONS:[]},'../lib/invites':{respondToJobInvitation:async()=>({})},'../components/JobPrimaryImage':{JobPrivateGallery:'JobPrivateGallery'},'../components/JobArrangementSummary':{JobArrangementSummary:'JobArrangementSummary',JobStatusNotice:'JobStatusNotice'}}
  const module={exports:{}}
  new Function('setTimeout','clearTimeout','require','module','exports',code)((fn,ms)=>{const timer={fn,ms};log.timers.push(timer);return timer},()=>{},name=>{if(name in mocks)return mocks[name];if(name.includes('/components/'))return component(name.split('/').at(-1));throw new Error('Unexpected import '+name)},module,module.exports)
  const render=()=>{at=0;dirty=false;tree=module.exports.default({route:{params:{job:db.job,...params}},navigation:{navigate:(...args)=>log.navigate.push(args),goBack(){}}});const queue=effects;effects=[];queue.forEach(fn=>fn());return nodes(tree)}
@@ -151,19 +151,19 @@ test('accepted requester long names and prices can wrap vertically without a fix
 
 test('accepted provider keeps the existing provider-specific coordination view',async()=>{
  const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q'})
- assert.ok(!app.text().includes('Your provider'));assert.ok(!app.all().some(n=>n.props?.accessibilityLabel==='Job details'))
+ assert.ok(!app.text().includes('Your provider'));assert.ok(app.all().some(n=>n.props?.accessibilityLabel==='Job details'))
  assert.ok(app.all().some(n=>n.type==='ConfirmJobSheet'));assert.ok(!app.log.timers.length)
 })
 
 test('provider summary badges wrap within narrow-screen padding without truncating status',async()=>{
- const app=await openScreen({job:{status:'accepted',category:'Animals & Farm Sitting'},bids:[acceptedOffer],userId:'q'})
+ const app=await openScreen({job:{status:'cancelled',category:'Animals & Farm Sitting'},bids:[acceptedOffer],userId:'q'})
  const all=app.all(),category=all.find(n=>n.type==='Text'&&text(n)==='Category: Animals & Farm Sitting')
  const header=all.find(n=>n.type==='View'&&nodes(n.props.children).includes(category)&&n.props.style?.flexWrap==='wrap')
  assert.ok(header,'provider-only badge row wraps')
  const flatten=value=>Object.assign({},...([value].flat(Infinity).filter(Boolean)))
  const badge=nodes(header).find(n=>n.type==='View'&&flatten(n.props.style).maxWidth==='100%')
  const status=nodes(badge).find(n=>n.type==='Text')
- assert.equal(text(status),'Waiting on you to confirm')
+ assert.equal(text(status),'cancelled')
  assert.equal(status.props.numberOfLines,undefined);assert.equal(status.props.ellipsizeMode,undefined)
  assert.equal(header.props.style.alignItems,'flex-start')
  for(const item of [category,badge]){
@@ -173,4 +173,56 @@ test('provider summary badges wrap within narrow-screen padding without truncati
  const scroll=all.find(n=>n.type==='ScrollView'&&nodes(n).includes(card))
  assert.equal(scroll.props.style.padding,16);assert.equal(card.props.style.padding,16)
 
+})
+
+test('provider Release 2 unconfirmed: primary confirmation, compact summary, details and existing confirm sheet',async()=>{
+ const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q'})
+ assert.ok(app.text().includes('Confirm your arrival time'));assert.ok(!app.text().includes('Your offer was accepted'))
+ assert.equal(app.text().split(baseJob.title).length-1,1);assert.ok(!app.text().includes(baseJob.description))
+ const confirm=app.all().find(n=>n.props?.title==='Confirm job');assert.equal(confirm.props.variant,undefined)
+ await app.press('Confirm the job');const sheet=app.all().find(n=>n.type==='ConfirmJobSheet');assert.equal(sheet.props.visible,true);assert.equal(sheet.props.bidId,'q');assert.equal(sheet.props.amount,375)
+ await sheet.props.onClose();await app.settle();assert.equal(app.all().find(n=>n.type==='ConfirmJobSheet').props.visible,false)
+ await app.press('Job details');assert.ok(app.text().includes(baseJob.description));assert.ok(app.text().includes(baseJob.location_name));assert.ok(app.text().includes('Provider to supply materials'))
+ await app.press('View job location pin on map');assert.equal(app.log.navigate.at(-1)[0],'JobMap');await app.press('Job details');assert.ok(!app.text().includes(baseJob.description))
+})
+test('provider scheduled: one arrival summary, ordered actions and scheduling controls',async()=>{
+ const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2099-01-01T03:00:00Z',arrival_end_at:'2099-01-01T04:00:00Z'}})
+ assert.ok(app.text().includes('Scheduled'));assert.equal(app.text().split('2099-01-01T03:00:00Z').length-1,1)
+ const buttons=app.all().filter(n=>n.type==='Button').map(n=>n.props.title)
+ assert.deepEqual(buttons.slice(0,4),['Chat with requester','Navigate to job','Mark as completed','Update arrival window'])
+ await app.press('Chat with Requester');assert.equal(app.log.navigate.at(-1)[0],'Chat')
+ await app.press('Navigate to job');assert.equal(app.log.navigate.at(-1)[0],'JobMap')
+ await app.press('Add to phone calendar');assert.equal(app.log.calendar.length,1)
+ await app.press('Update arrival window');const sheet=app.all().find(n=>n.type==='ArrivalWindowModal');assert.equal(sheet.props.visible,true)
+ await sheet.props.onSave('2099-01-02T03:00:00Z','2099-01-02T04:00:00Z');await app.settle();assert.equal(app.log.arrival[0].jobId,'job');assert.ok(app.text().includes('2099-01-02T03:00:00Z'))
+ await app.press("I'm running late");await app.log.alerts.at(-1)[2].find(b=>b.text==='15 minutes').onPress();await app.settle();assert.deepEqual(app.log.late[0],{jobId:'job',minutes:15})
+})
+test('completion cancellation writes nothing; completion remains available before future arrival, then prioritises review and payment',async()=>{
+ const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2099-01-01T03:00:00Z'}})
+ await app.press('Mark job as completed');let sheet=app.all().find(n=>n.type==='MarkCompleteSheet');assert.equal(sheet.props.visible,true)
+ await sheet.props.onClose();await app.settle();assert.deepEqual(app.log.completed,[])
+ await app.press('Job details');await app.press('Mark job as completed');sheet=app.all().find(n=>n.type==='MarkCompleteSheet');await sheet.props.onConfirm();await app.settle()
+ assert.deepEqual(app.log.completed,['job']);assert.ok(app.text().includes('Completed'));assert.ok(!app.text().includes('Your offer was accepted'));assert.ok(!app.text().includes(baseJob.description))
+ assert.equal(app.all().find(n=>n.type==='Button').props.title,'Review requester');await app.press('Review requester');assert.equal(app.all().find(n=>n.type==='ReviewModal').props.visible,true)
+ const payment=app.all().find(n=>n.type==='JobPaymentHandoff');assert.equal(payment.props.bidId,'q');assert.equal(payment.props.canUpdate,true);assert.equal(payment.props.canEditMethod,false)
+})
+test('completed provider preserves reviewed state, payment attribution and secondary navigation',async()=>{
+ const app=await openScreen({job:{status:'completed'},bids:[{...acceptedOffer,payment_sorted_at:'2026-11-23',payment_sorted_by:'q'}],userId:'q',review:{rating:5,comment:'Great'}})
+ const review=app.all().find(n=>n.props?.accessibilityLabel==='Edit requester review');assert.equal(review.props.variant,'secondary')
+ const payment=app.all().find(n=>n.type==='JobPaymentHandoff');assert.equal(payment.props.sortedBy,'q');assert.equal(payment.props.sortedAt,'2026-11-23')
+ assert.equal(app.all().find(n=>n.props?.title==='Navigate to job').props.variant,'secondary')
+})
+
+test('completion sheet uses the requested wording and full-width stacked buttons',()=>{
+ const src=readFileSync(new URL('../src/components/MarkCompleteSheet.js',import.meta.url),'utf8')
+ const compiled=require('@babel/core').transformSync(src,{configFile:false,babelrc:false,plugins:['@babel/plugin-transform-react-jsx','@babel/plugin-transform-modules-commonjs']}).code
+ const module={exports:{}};let cancelled=0,completed=0
+ const mocks={react:{createElement:(type,props,...children)=>({type,props:{...props,children}})},'react-native':{Modal:'Modal',View:'View',Text:'Text',StyleSheet:{create:v=>v}},'./Button':{__esModule:true,default:'Button'},'../theme/tokens':tokens}
+ new Function('require','module','exports',compiled)(name=>mocks[name],module,module.exports)
+ const tree=module.exports.default({visible:true,busy:false,onClose:()=>cancelled++,onConfirm:()=>completed++})
+ assert.ok(text(tree).includes('Mark job as complete?'));assert.ok(text(tree).includes("Confirm that you've finished the work. The requester will be notified and can leave a review."))
+ const buttons=nodes(tree).filter(n=>n.type==='Button');assert.deepEqual(buttons.map(n=>n.props.title),['Not yet','Complete job'])
+ assert.ok(buttons.every(n=>n.props.style.alignSelf==='stretch'))
+ const row=nodes(tree).find(n=>n.type==='View'&&nodes(n).includes(buttons[0])&&n.props.style?.gap===12&&n.props.style?.backgroundColor===undefined)
+ assert.notEqual(row.props.style.flexDirection,'row');buttons[0].props.onPress();assert.equal(cancelled,1);assert.equal(completed,0);buttons[1].props.onPress();assert.equal(completed,1)
 })
