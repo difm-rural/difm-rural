@@ -45,7 +45,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
   const chatFirst=conversation&&conversation.name&&conversation.name!=='Community member'?conversation.name.trim().split(/\s+/)[0]:''
   const chatHeading=chatFirst?'Messages with '+chatFirst:'Messages'
 
-  const {data:listingLocation}=role==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(work.status)?await supabase.from('services').select('location_name,latitude,longitude').eq('id',work.booking!.service_id).maybeSingle():{data:null}
+  const {data:listingLocation}=role==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(work.status)?await supabase.from('service_private_locations').select('location_name,latitude,longitude').eq('service_id',work.booking!.service_id).maybeSingle():{data:null}
   const b=work.booking!
   const timeline:string[]=['Requested '+nzDate(b.created_at)]
   if(b.quote_amount!=null)timeline.push('Quote sent')

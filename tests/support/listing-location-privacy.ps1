@@ -11,6 +11,8 @@ alter table public.services enable row level security;
 create policy "Anyone can view active services" on public.services for select using(is_active);
 create policy owner_services on public.services for all using(provider_id=auth.uid()) with check(provider_id=auth.uid());
 grant select on public.services to anon,authenticated;
+grant insert,update,delete on public.services to authenticated;
+grant select on public.bookings to authenticated;
 insert into public.services values('10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000001','Grazing',true,null,'123 Private Road, Testtown, New Zealand',-41.12345,174.12345,-41.12345,174.12345,'Private gate note');
 insert into public.bookings values('20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','pending');
 '@

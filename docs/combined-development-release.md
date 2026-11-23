@@ -2,6 +2,8 @@
 
 Prepared 24 November 2026. **Local preparation only; no deployment approval is implied.**
 
+**Subsequent authorised compatibility/deployment work:** see `listing-location-legacy-compatibility.md`. It supersedes this report's earlier raw-table-denial migration/old-client gate with protected private storage and coarse legacy reads. The original integration results below remain historical evidence for `1d5976d`.
+
 ## Integration tree
 
 - Branch: `codex/development-property-help-integration`.

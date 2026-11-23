@@ -79,7 +79,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const [quoteNotes, setQuoteNotes] = useState('')
   const [savingQuote, setSavingQuote] = useState(false)
   const [listingLocation,setListingLocation]=useState(null)
-  useEffect(()=>{setListingLocation(null);if(booking?.service_id&&viewerRole==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(booking.status)){supabase.from('services').select('location_name,latitude,longitude').eq('id',booking.service_id).maybeSingle().then(({data,error})=>{if(!error)setListingLocation(data)})}},[booking?.id,booking?.status,viewerRole])
+  useEffect(()=>{setListingLocation(null);if(booking?.service_id&&viewerRole==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(booking.status)){supabase.from('service_private_locations').select('location_name,latitude,longitude').eq('service_id',booking.service_id).maybeSingle().then(({data,error})=>{if(!error)setListingLocation(data)})}},[booking?.id,booking?.status,viewerRole])
   const [otherStats, setOtherStats] = useState(null)
   const [otherReviews, setOtherReviews] = useState([])
   const [reviewVisible, setReviewVisible] = useState(false)
