@@ -1,3 +1,4 @@
+import {arrangementTime} from '@shared/notificationArrangement'
 import {formatDateTime as nzDateTime} from '@shared/formatting'
 import {notificationBody} from '@shared/notificationBody'
 import {notificationIconKey} from '@shared/notificationIcons'
@@ -30,7 +31,7 @@ export default async function NotificationsPage({searchParams}:{searchParams:Pro
   const now=new Date()
   const rows:NotificationRowData[]=(data || []).map(n=>{
     const side=notificationSide(n)
-    return {id:n.id,type:n.type,href:notificationHref(n),read:!!n.read,body:notificationBody(n),
+    return {id:n.id,type:n.type,href:notificationHref(n),read:!!n.read,body:notificationBody(n),arrangement:arrangementTime(n),
       iconKey:notificationIconKey(n.type),side,tag:sideTag(side,n),
       created_at:n.created_at,relative:relativeTime(n.created_at,now),fullDate:nzDateTime(n.created_at)}
   })

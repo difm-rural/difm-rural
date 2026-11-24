@@ -1,4 +1,5 @@
 'use client'
+import {notificationHint} from '@shared/notificationHints'
 import {useActionState, useState, useTransition} from 'react'
 import {
   Bell, Briefcase, CalendarDays, Car, Check, CheckCheck, CircleAlert, CircleCheck, CircleHelp, CircleX,
@@ -17,7 +18,7 @@ const ICONS:Record<NotificationIconKey,LucideIcon>={
 }
 
 export type NotificationRowData={
-  id:string; type:string; href:string; read:boolean; body:string
+  id:string; type:string; href:string; read:boolean; body:string; arrangement?:string|null
   iconKey:NotificationIconKey; side:MarketSide|null; tag:string|null
   created_at:string; relative:string; fullDate:string
 }
@@ -68,6 +69,8 @@ export function NotificationRow({n,markRead,answerAvailability}:{n:NotificationR
       <span className="notification-text">
         {n.tag && <span className={'notification-tag '+n.side}>{n.tag}</span>}
         <span className="notification-body">{unread && <span className="sr-only">Unread: </span>}{n.body}</span>
+        {n.arrangement&&<span className="notification-arrangement">{n.arrangement}</span>}
+        {notificationHint(n.type)&&<span className="notification-hint">{notificationHint(n.type)}</span>}
         <time dateTime={n.created_at} title={n.fullDate}>{n.relative}</time>
       </span>
       {unread && <span className="notification-dot" aria-hidden="true"/>}

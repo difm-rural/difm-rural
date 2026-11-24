@@ -91,7 +91,7 @@ test('search_jobs reads jobs_public only, open + public, and drops address field
 
 test('search_listings filters active, open listings and shows the provider first name only', async () => {
   const client = fakeClient({
-    services: [{ id: LISTING, provider_id: OTHER, title: 'Drone spraying', location_name: '12 Kahikatea Drive, Te Awamutu', latitude: -38, longitude: 175 }],
+    services_public: [{ id: LISTING, provider_id: OTHER, title: 'Drone spraying', location_name: '12 Kahikatea Drive, Te Awamutu', latitude: -38, longitude: 175 }],
     profiles_public: [{ id: OTHER, full_name: 'Sam Provider' }],
   })
   const out = await searchListings(client, { category: 'spraying & pest control' })
@@ -118,7 +118,7 @@ test('get_job reports the viewer relationship and a next move from shared/nextMo
 })
 
 test('get_listing returns found:false when RLS hides it', async () => {
-  const out = await getListing(fakeClient({ services: null }), { listing_id: LISTING })
+  const out = await getListing(fakeClient({ services_public: null }), { listing_id: LISTING })
   assert.deepEqual(out, { found: false, listing_id: LISTING })
 })
 
@@ -132,7 +132,7 @@ test('my_activity uses explicit participant filters and nextMove badges', async 
       : [],
     bids: call => op(call, 'in').some(o => o[1] === 'job_id') ? [{ job_id: JOB }] : [],
     job_questions: [],
-    services: [{ id: LISTING, title: 'Fencing', pricing_type: 'hourly' }],
+    services_public: [{ id: LISTING, title: 'Fencing', pricing_type: 'hourly' }],
     profiles_public: [{ id: OTHER, full_name: 'Robin Requester' }],
   })
   const out = await myActivity(client, ME, {})
@@ -301,7 +301,7 @@ test('simple word forms share a stem, and filler words are ignored', () => {
 })
 
 test('"fencer near Waitoki" finds the Rodney District fencer whose 50 km range covers it', async () => {
-  const client = fakeClient({ services: [GARDENER, FENCER], profiles_public: [{ id: OTHER, full_name: 'Sam Fencer' }] })
+  const client = fakeClient({ services_public: [GARDENER, FENCER], profiles_public: [{ id: OTHER, full_name: 'Sam Fencer' }] })
   const out = await searchListings(client, { query: 'fencer', area: 'Waitoki' }, { geocode })
   assert.equal(out.area_match, 'distance')
   assert.deepEqual(out.results.map(r => r.id), ['l-fencer'])
@@ -312,12 +312,12 @@ test('"fencer near Waitoki" finds the Rodney District fencer whose 50 km range c
   const json = JSON.stringify(out)
   assert.doesNotMatch(json, /Matakana Valley|Hill Road|-36\.38|174\.70|latitude|longitude/)
   // the query matched title, description and category forms
-  const or = op(client.calls.find(c => c.table === 'services'), 'or')[0][1]
+  const or = op(client.calls.find(c => c.table === 'services_public'), 'or')[0][1]
   for (const piece of ['title.ilike.*fenc*', 'description.ilike.*fenc*', 'category.ilike.*fenc*', 'title.ilike.*gate*']) assert.ok(or.includes(piece), piece)
 })
 
 test('a listing whose range does not reach the area is left out, with a useful hint', async () => {
-  const client = fakeClient({ services: [{ ...FENCER, travel_range_km: 10 }], profiles_public: [] })
+  const client = fakeClient({ services_public: [{ ...FENCER, travel_range_km: 10 }], profiles_public: [] })
   const out = await searchListings(client, { query: 'fencing', area: 'Waitoki' }, { geocode })
   assert.equal(out.results.length, 0)
   assert.match(out.hint, /No listings cover Waitoki/)
@@ -327,7 +327,7 @@ test('a listing whose range does not reach the area is left out, with a useful h
 })
 
 test('an unknown place falls back to text matching and says so', async () => {
-  const client = fakeClient({ services: [], profiles_public: [] })
+  const client = fakeClient({ services_public: [], profiles_public: [] })
   const out = await searchListings(client, { query: 'fencing', area: 'Nowhereville' }, { geocode })
   assert.equal(out.area_match, 'text')
   assert.match(out.area_note, /Couldn't find "Nowhereville"/)
@@ -351,7 +351,7 @@ test('jobs within 30 km are sorted by distance, hidden jobs use their public are
 })
 
 test('a place written into the query is used as the area', async () => {
-  const client = fakeClient({ services: [GARDENER, FENCER], profiles_public: [] })
+  const client = fakeClient({ services_public: [GARDENER, FENCER], profiles_public: [] })
   const out = await searchListings(client, { query: 'fencer near Waitoki' }, { geocode })
   assert.equal(out.area, 'Waitoki')
   assert.deepEqual(out.results.map(r => r.id), ['l-fencer'])
@@ -419,7 +419,7 @@ test('read_conversation returns only the payment summary for payment messages', 
 })
 
 test('descriptions are redacted too', async () => {
-  const client = fakeClient({ services: [{ id: LISTING, provider_id: OTHER, title: 'Fencing', description: 'Text 021 123 4567 or email fence@example.nz. From $1,250.', location_name: 'Waitoki' }], profiles_public: [] })
+  const client = fakeClient({ services_public: [{ id: LISTING, provider_id: OTHER, title: 'Fencing', description: 'Text 021 123 4567 or email fence@example.nz. From $1,250.', location_name: 'Waitoki' }], profiles_public: [] })
   const out = await getListing(client, { listing_id: LISTING })
   assert.equal(out.listing.description, 'Text [phone removed] or email [email removed]. From $1,250.')
 })

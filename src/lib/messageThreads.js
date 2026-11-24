@@ -63,7 +63,7 @@ export async function fetchMessageThreads() {
     readSubjects('jobs_public', 'id,title', threads.filter(thread => thread.type === 'job').map(thread => thread.subjectId)),
     readSubjects('bookings', 'id,service_id', threads.filter(thread => thread.type === 'booking').map(thread => thread.subjectId)),
   ])
-  const listings = await readSubjects('services', 'id,title', [
+  const listings = await readSubjects('services_public', 'id,title', [
     ...threads.filter(thread => thread.type === 'listing').map(thread => thread.subjectId),
     ...[...bookings.values()].map(booking => booking.service_id).filter(Boolean),
   ])

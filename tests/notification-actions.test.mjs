@@ -1,3 +1,4 @@
+import {notificationHint} from '../shared/notificationHints.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
@@ -11,6 +12,7 @@ function render(n){
  const jsx=(type,props)=>({type,props})
  const module={exports:{}}
  vm.runInNewContext(code,{exports:module.exports,require(name){
+  if(name==='@shared/notificationHints')return {notificationHint}
   if(name==='react')return {useState:value=>[value,()=>{}],useTransition:()=>[false,fn=>fn()],useActionState:(_,s)=>[s,()=>{},false]}
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'}
   if(name==='lucide-react')return new Proxy({},{get:()=>'svg'})
@@ -82,4 +84,12 @@ for(const leave of [false,true])test(`mobile slow lookup ${leave?'does not reope
  await pending
  assert.equal(navigations.length,leave?0:1)
  assert.equal(reads,leave?0:1)
+})
+
+test('web keeps arrangement time separate from the primary notification body',()=>{
+ const {tree}=render({type:'job_confirmed',body:'Peter confirmed arrangements.',arrangement:'Tue 24 Nov 2026, 4:00 pm (NZ time)',tag:'CONFIRMED'})
+ const walk=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(walk):[n,...walk(n.props?.children)]
+ const all=walk(tree)
+ assert.equal(all.find(n=>n.props?.className==='notification-arrangement').props.children,'Tue 24 Nov 2026, 4:00 pm (NZ time)')
+ assert.ok(all.some(n=>n.props?.children==='CONFIRMED'))
 })

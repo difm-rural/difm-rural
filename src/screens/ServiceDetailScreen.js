@@ -18,7 +18,8 @@ import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
 import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle'
 import { cancelBookingByRequester } from '../lib/bookingActions'
-import ReviewList from '../components/ReviewList'
+import {bookingLocationPolicy} from '../../shared/bookingLocation'
+import {readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
@@ -150,7 +151,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
   async function fetchService() {
     if (!initialService?.id) return
     const { data } = await supabase
-      .from('services')
+      .from('services_public')
       .select('*')
       .eq('id', initialService.id)
       .single()
@@ -307,10 +308,8 @@ export default function ServiceDetailScreen({ route, navigation }) {
           accessibilityLabel="Go back">
           <Icon name="chevron-back" size={18} color={colors.primary} /><Text style={styles.backBtnText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={2} accessibilityRole="header">{service.title}</Text>
-        {profile?.full_name ? (
-          <Text style={styles.headerSub}>by {profile.full_name}</Text>
-        ) : null}
+
+
       </View>
 
       <ScrollView
@@ -318,6 +317,8 @@ export default function ServiceDetailScreen({ route, navigation }) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}>
 
+        <Text style={styles.headerTitle} accessibilityRole="header">{service.title}</Text>
+        <Text style={[styles.headerSub,{color:colors.primary,fontWeight:'700',marginBottom:14}]}>{readableRate(service.pricing_type,service.rate,service.unit_label,service.min_charge)}</Text>
         {isOwnService && (
           <View style={styles.previewNote}>
             <Text style={styles.previewNoteText}>
@@ -396,10 +397,11 @@ export default function ServiceDetailScreen({ route, navigation }) {
         {recentReviews.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Recent reviews</Text>
-            <ReviewList reviews={recentReviews} />
+            <TouchableOpacity onPress={()=>navigation.navigate('ReviewsList',{revieweeId:service.provider_id,revieweeRole:'provider',revieweeName:profile?.full_name})} accessibilityRole="button"><Text style={styles.providerMeta}>★ {providerStats?.ratingAvg?.toFixed(1) || '—'} · {providerStats?.ratingCount || 0} reviews · Read all reviews →</Text></TouchableOpacity>
           </View>
         )}
 
+        {['for_sale','lease'].includes(service.kind)&&<View style={styles.card}><Text style={styles.cardLabel}>Location arrangements</Text><Text style={[styles.providerMeta,{paddingHorizontal:16,paddingBottom:14}]}>{bookingLocationPolicy(service.kind).help}</Text></View>}
         {/* Service details */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Listing details</Text>
@@ -528,7 +530,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
               </TouchableOpacity>
               <View style={styles.qtyDisplay}>
                 <Text style={styles.qtyNum}>{estimate.quantity}</Text>
-                <Text style={styles.qtyUnit}>{effectiveUnitLabel}{estimate.quantity !== 1 ? 's' : ''}</Text>
+                <Text style={styles.qtyUnit}>{quantityUnit(effectiveUnitLabel,estimate.quantity)}</Text>
               </View>
               <TouchableOpacity
                 style={styles.qtyBtn}

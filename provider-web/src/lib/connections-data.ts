@@ -31,7 +31,7 @@ export async function connectionHistory(client:SupabaseClient,userId:string,othe
   const [jobs,bookings]=await Promise.all([
    completedRelationshipJobs(client,requester,provider),
    allRows<{id:string;created_at:string;service:{title:string}|{title:string}[]|null}>(()=>client.from('bookings')
-    .select('id,created_at,service:services(title)').eq('requester_id',requester).eq('provider_id',provider).eq('status','completed').order('id')),
+    .select('id,created_at,service:services_public(title)').eq('requester_id',requester).eq('provider_id',provider).eq('status','completed').order('id')),
   ])
   return [
    ...jobs.map(job=>({...job,kind:'job' as const})),

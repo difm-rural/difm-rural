@@ -23,6 +23,7 @@ const navigation: { href: string; label: string; icon: typeof House; color?: str
   { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness, color: 'var(--job-icon)', colorDark: 'var(--job-icon-on-dark)' },
   { href: '/browse', label: 'Listings', icon: Search, color: 'var(--listing-icon)', colorDark: 'var(--listing-icon-on-dark)' },
   { href: '/activity', label: 'Activity', icon: Activity },
+  { href: '/property-network', label: 'My Network', icon: House },
   { href: '/listings', label: 'My listings', icon: ListChecks },
   { href: '/account', label: 'Account', icon: UserRound },
 ]

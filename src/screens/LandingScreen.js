@@ -105,7 +105,7 @@ export default function LandingScreen({ navigation }) {
 
   async function fetchServices() {
     const { data: servicesData, error } = await supabase
-      .from('services')
+      .from('services_public')
       .select('*')
       .eq('is_active', true)
       .is('closed_at', null)

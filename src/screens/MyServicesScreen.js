@@ -1,3 +1,4 @@
+import {withPrivateListingLocations} from '../../shared/privateListingLocation'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import ThumbImage from '../components/ThumbImage'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -166,7 +167,9 @@ export default function MyServicesScreen({ navigation, route }) {
       return
     }
 
-    const raw = servicesData || []
+    let raw
+    try{raw=await withPrivateListingLocations(supabase,servicesData || [])}
+    catch{Alert.alert('Could not load listing locations','Please refresh before editing a listing.');setLoading(false);setRefreshing(false);return}
     if (raw.length === 0) {
       setServices([])
       setLoading(false)

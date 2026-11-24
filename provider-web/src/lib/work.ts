@@ -29,8 +29,14 @@ export function notificationHref(notification: {type:string;metadata?:Record<str
   if(notification.type==='new_message' && m.booking_id)return '/bookings/'+encodeURIComponent(String(m.booking_id))+'#conversation'
   if(notification.type==='new_message' && m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))+'#conversation'
   if(notification.type==='new_message' && m.service_id && m.sender_id)return '/enquiries?s='+encodeURIComponent(String(m.service_id))+'&c='+encodeURIComponent(String(m.sender_id))
-  if(m.booking_id)return '/bookings/'+encodeURIComponent(String(m.booking_id))+'#manage'
-  if(m.job_id)return '/jobs/'+encodeURIComponent(String(m.job_id))
+  if(m.booking_id)return '/bookings/'+encodeURIComponent(String(m.booking_id))+(['booking_completed','review_received'].includes(notification.type)?'#reviews':'#manage')
+  if(m.job_id){
+    const job='/jobs/'+encodeURIComponent(String(m.job_id))
+    if(['new_question','question_answered'].includes(notification.type))return job+'#questions'
+    if(notification.type==='new_bid')return job+'#offer'
+    if(['job_completed','review_received'].includes(notification.type))return job+'#reviews'
+    return job
+  }
   if(m.saved_interest_id)return '/jobs?interest='+encodeURIComponent(String(m.saved_interest_id))
   if(m.service_id)return '/browse/'+encodeURIComponent(String(m.service_id))
   return '/activity'

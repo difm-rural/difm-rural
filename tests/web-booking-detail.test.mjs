@@ -42,20 +42,22 @@ test('booking responses follow participant roles, saved pricing and current stat
 })
 let jobSource=(await readFile(new URL('../provider-web/src/lib/job-input.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(new URL('../shared/categories.ts',import.meta.url).href))
 let offerSource=(await readFile(new URL('../provider-web/src/lib/offer-input.ts',import.meta.url),'utf8')).replace("'@shared/offers'",JSON.stringify(new URL('../shared/offers.ts',import.meta.url).href))
-const moduleUrl=s=>'data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(s)).toString('base64')
+const resolveShared=s=>s.replace(/(['"])@shared\/([^'"]+)\1/g,(_,q,name)=>JSON.stringify(new URL('../shared/'+name+(/\.[jt]s$/.test(name)?'':'.ts'),import.meta.url).href))
+const moduleUrl=s=>'data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(resolveShared(s))).toString('base64')
 let source=await readFile(new URL('../provider-web/src/app/work-actions.ts',import.meta.url),'utf8')
+source=source.replace("'@shared/propertyNetworkJobs'",JSON.stringify(new URL('../shared/propertyNetworkJobs.ts',import.meta.url).href))
 source=source.replace("import { redirect } from 'next/navigation'","const redirect=path=>{throw new Error('REDIRECT:'+path)}").replace("import { revalidatePath } from 'next/cache'","const revalidatePath=()=>{}").replace("import { requireProvider } from '@/lib/auth'","const requireProvider=async()=>globalThis.__bookingTestAuth").replace("'@/lib/job-input'",JSON.stringify(moduleUrl(jobSource))).replace("'@/lib/offer-input'",JSON.stringify(moduleUrl(offerSource))).replace("'@/lib/booking-detail'",JSON.stringify(bookingDetailUrl))
 const {requestBooking,respondBooking}=await import(moduleUrl(source))
-function client(tables,{beforeUpdate}={}){const calls=[];return {calls,from(table){let rows=[...(tables[table] || [])],patch=null;const q={select(){return q},eq(key,value){calls.push(['eq',table,key,value]);rows=rows.filter(row=>row[key]===value);return q},is(key,value){rows=rows.filter(row=>row[key]===value);return q},in(key,values){rows=rows.filter(row=>values.includes(row[key]));return q},single(){return {data:rows[0]?structuredClone(rows[0]):null,error:null}},maybeSingle(){return q.single()},insert(value){calls.push(['insert',table,value]);return {error:null}},update(value){beforeUpdate?.(tables,table);rows=[...(tables[table] || [])];patch=value;calls.push(['update',table,value]);return q},then(resolve){const result=rows.map(row=>({...row,...(patch || {})}));return Promise.resolve({data:result,error:null}).then(resolve)}};return q}}}
+function client(tables,{beforeUpdate,insertError=null}={}){const calls=[];return {calls,from(table){let rows=[...(tables[table] || [])],patch=null;const q={select(){return q},eq(key,value){calls.push(['eq',table,key,value]);rows=rows.filter(row=>row[key]===value);return q},is(key,value){rows=rows.filter(row=>row[key]===value);return q},in(key,values){rows=rows.filter(row=>values.includes(row[key]));return q},single(){return {data:rows[0]?structuredClone(rows[0]):null,error:null}},maybeSingle(){return q.single()},insert(value){calls.push(['insert',table,value]);return {error:insertError}},update(value){beforeUpdate?.(tables,table);rows=[...(tables[table] || [])];patch=value;calls.push(['update',table,value]);return q},then(resolve){const result=rows.map(row=>({...row,...(patch || {})}));return Promise.resolve({data:result,error:null}).then(resolve)}};return q}}}
 const requestValues={service_id:listing.id,request_id:id,quantity:1,location:'Cambridge property',schedule_type:'flexible',pricing_revision:pricingRevision(listing),variant_index:'0'}
 test('request submission stores minimum-adjusted variant pricing and opens that exact request',async()=>{
- const supabase=client({services:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
- await assert.rejects(requestBooking({error:''},form(requestValues)),new RegExp('REDIRECT:/activity/booking/'+id+'/manage'))
+ const supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ await assert.rejects(requestBooking({error:''},form(requestValues)),{message:'REDIRECT:/bookings/'+id+'?sent=1'})
  const payload=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(payload.requester_id,requester);assert.equal(payload.provider_id,provider);assert.equal(payload.quantity,2);assert.equal(payload.total_amount,300);assert.equal(payload.pricing_snapshot.option_label,'Specialist work');assert.equal(payload.status,'pending')
 })
 test('request submission rejects changed pricing and malformed locations/dates without inserting',async()=>{
  for(const patch of [{pricing_revision:'old-price'},{schedule_type:'specific',date:'2026-02-30'},{latitude:'91',longitude:'1'}]){
-  const supabase=client({services:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+  const supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
   assert.ok((await requestBooking({error:''},form({...requestValues,...patch}))).error);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
  }
 })
@@ -102,4 +104,41 @@ test('app and web requests use the saved pricing type rather than a later live r
 test('materials payment wording applies to services rather than goods, hire or grazing',()=>{
  assert.match(paymentCopy({kind:'service',materials:'estimate'}),/Materials are estimated/)
  for(const kind of ['for_sale','hire','lease','grazing'])assert.doesNotMatch(paymentCopy({kind,materials:'estimate'}),/Materials/)
+})
+
+
+test('failed web request stays on the form rather than showing confirmation',async()=>{
+ const supabase=client({services_public:[listing],bookings:[]},{insertError:{message:'Connection lost'}});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ const result=await requestBooking({error:''},form(requestValues));assert.ok(result.error)
+ assert.equal(supabase.calls.filter(c=>c[0]==='insert').length,1)
+})
+test('optional grazing duration is carried as editable notes without changing price or lifecycle',async()=>{
+ const supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ await assert.rejects(requestBooking({error:''},form({...requestValues,expected_duration:'6 weeks',notes:'Two quiet cattle'})),{message:'REDIRECT:/bookings/'+id+'?sent=1'})
+ const payload=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(payload.notes,'Expected duration: 6 weeks\nTwo quiet cattle');assert.equal(payload.status,'pending');assert.ok(!('duration' in payload))
+})
+
+test('web derives location ownership from listing and ignores forged grazing coordinates',async()=>{
+ for(const patch of [{kind:'grazing'},{kind:'hire'}]){
+  const item={...listing,...patch};const supabase=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+  const values={...requestValues,location:'',pricing_revision:pricingRevision(item)}
+  if(item.kind==='grazing')Object.assign(values,{location:'Forged address',latitude:'invalid',longitude:'999',location_note:'Private'})
+  await assert.rejects(requestBooking({error:''},form(values)),/REDIRECT:/)
+  const row=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(row.location_name,null);assert.equal(row.latitude,null);assert.equal(row.longitude,null);assert.equal(row.location_note,null);assert.equal(row.status,'pending')
+ }
+})
+test('web on-site request still requires requester address and preserves valid coordinates',async()=>{
+ let supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ assert.ok((await requestBooking({error:''},form({...requestValues,location:''}))).error);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ await assert.rejects(requestBooking({error:''},form({...requestValues,latitude:0,longitude:0,location_note:'Gate'})),/REDIRECT:/)
+ const row=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(row.latitude,0);assert.equal(row.longitude,0);assert.equal(row.location_note,'Gate')
+})
+
+test('web location changes preserve listing ownership and enquiry-only restrictions',async()=>{
+ for(const [kind,userId] of [['grazing',provider],['hire',provider],['for_sale',requester],['lease',requester]]){
+  const item={...listing,kind};const supabase=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:userId}}
+  assert.ok((await requestBooking({error:''},form({...requestValues,location:'',pricing_revision:pricingRevision(item)}))).error)
+  assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ }
 })

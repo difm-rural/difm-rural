@@ -78,9 +78,9 @@ test('diagram nodes stay inside, clear of each other and of the hub for one thro
   assert.match(source,/Diagram/)
   assert.match(source,/List/)
   assert.doesNotMatch(source,/Grow your network|type="radio"|accessibilityRole="radio"|PROPERTY_SERVICE_STATES/)
-  for(const text of ["What's on your property?",'Skip for now','Set up my network (','Needs help (','Nothing needs help right now',
+  for(const text of ["What's on your property?",'Skip for now','Set up my network (','Services needing help (','No services currently marked Needs help.',
    'Your property','+ Add another part of your property',"Update what's on your property",'propertyBulkLabel(',
-   'Who does it? (optional)','A provider…','Someone not on RC','+ Add another service','from my property','Post a job'])
+   'Who does it? (optional)','Choose from My People','Someone not on RC','+ Add another service','from my property','Post a job'])
    assert.ok(source.includes(text)||source.includes(text.replaceAll("'",'&apos;')),filename+': '+text)
   assert.doesNotMatch(source,/Add something else/)
   assert.match(source,/Back to My Property Network/)

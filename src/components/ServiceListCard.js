@@ -1,3 +1,4 @@
+import {readableRate} from '../../shared/findLocalHelp'
 import {listingCardCopy} from '../../shared/listingCardCopy'
 import {LISTING_KINDS} from '../../shared/listingPricing'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
@@ -33,7 +34,7 @@ export default function ServiceListCard({ item, onPress }) {
   const photoUrl  = Array.isArray(item.photos) && item.photos.length > 0 ? item.photos[0] : null
   const cat       = categoryVisual(item.category)
   const catImg    = categoryImage(item.category)
-  const price     = servicePrice(item)
+  const price     = item.kind==='grazing'?readableRate(item.pricing_type,item.rate,item.unit_label,item.min_charge):servicePrice(item)
   const ratingCount  = item.ratingCount || 0
   const ratingText   = ratingCount > 0 ? `★ ${Number(item.ratingAverage || 0).toFixed(1)} (${ratingCount})` : '★ New'
   const providerName = profile.full_name || 'Provider'

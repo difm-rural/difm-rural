@@ -42,6 +42,21 @@ export async function fetchNotifications(limit = 50) {
   return data || []
 }
 
+// Inbox filtering happens before limiting, and the count covers all unread events.
+export async function fetchNotificationInbox({unreadOnly=false,limit=100}={}) {
+  const {data:{session},error:authError}=await supabase.auth.getSession()
+  if(authError)throw authError
+  if(!session?.user)return {items:[],unreadCount:0}
+  let rows=supabase.from('notifications').select('*').eq('user_id',session.user.id)
+  if(unreadOnly)rows=rows.eq('read',false)
+  const [list,count]=await Promise.all([
+    rows.order('created_at',{ascending:false}).order('id',{ascending:false}).limit(limit),
+    supabase.from('notifications').select('id',{count:'exact',head:true}).eq('user_id',session.user.id).eq('read',false),
+  ])
+  if(list.error||count.error)throw list.error||count.error
+  return {items:list.data||[],unreadCount:count.count||0}
+}
+
 // Marks the current user's unread notifications for a given job or booking as
 // read — call when the user resolves the underlying item (e.g. confirms a
 // booking) so stale "please confirm" prompts leave the Needs-attention feed.
@@ -67,18 +82,15 @@ export async function markNotificationsReadFor({ bookingId, jobId, serviceId, ty
   }
 }
 
-export async function markAllNotificationsRead() {
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) return
-    await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('user_id', session.user.id)
-      .eq('read', false)
-  } catch {
-    // Badge will catch up on the next refresh
-  }
+export async function markAllNotificationsRead(cutoff = new Date().toISOString()) {
+  const {data:{session},error:authError}=await supabase.auth.getSession()
+  if(authError)throw authError
+  if(!session?.user)return false
+  const {error}=await supabase.from('notifications').update({read:true})
+    .eq('user_id',session.user.id).eq('read',false).lte('created_at',cutoff)
+  if(error)throw error
+  requestBadgeRefresh()
+  return true
 }
 
 // Navigates to whatever a notification is about, then marks it read — works
@@ -99,7 +111,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
 
   const markRead = () => {
     if (notification?.id && !notification.read) {
-      supabase.from('notifications').update({ read: true }).eq('id', notification.id)
+      supabase.from('notifications').update({ read: true }).eq('id', notification.id).eq('user_id',userId)
         .then(() => requestBadgeRefresh())
     }
   }
@@ -108,8 +120,8 @@ export async function openNotificationTarget(navigation, userId, notification) {
   // than leaving an un-openable item stuck in the command center.
   const targetGone = (what) => {
     markRead()
-    Alert.alert('No longer available', `This ${what} has been removed.`)
-    return false
+    Alert.alert('No longer available', `This ${what} has been removed or is no longer shared with you.`)
+    return true
   }
 
   try {
@@ -119,7 +131,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
         screen: 'AccountMain',
         params: { openAvailability: Date.now() },
       })
-      markRead()
+      if(notification.type!=='new_message')markRead()
       return true
     }
 
@@ -130,42 +142,45 @@ export async function openNotificationTarget(navigation, userId, notification) {
       if (!isCurrent()) return false
       const otherUserName = sender?.full_name || 'Chat'
       if (meta.booking_id) {
-        const { data: booking } = await supabase
-          .from('bookings').select('service:service_id(title)').eq('id', meta.booking_id).maybeSingle()
-      if (!isCurrent()) return false
+        const { data: booking, error: targetError } = await supabase
+          .from('bookings').select('service:services_public(title)').eq('id', meta.booking_id).maybeSingle()
+      if (!isCurrent() || targetError) return false
+        if(!booking)return targetGone('conversation')
         navigation.navigate('Chat', {
           bookingId:     meta.booking_id,
           jobTitle:      booking?.service?.title || 'Service booking',
           otherUserId:   meta.sender_id,
           otherUserName,
         })
-        markRead()
+        if(notification.type!=='new_message')markRead()
         return true
       }
       if (meta.job_id) {
-        const { data: job } = await supabase
+        const { data: job, error: targetError } = await supabase
           .from('jobs_public').select('title').eq('id', meta.job_id).maybeSingle()
-      if (!isCurrent()) return false
+      if (!isCurrent() || targetError) return false
+        if(!job)return targetGone('conversation')
         navigation.navigate('Chat', {
           jobId:         meta.job_id,
           jobTitle:      job?.title || 'Job',
           otherUserId:   meta.sender_id,
           otherUserName,
         })
-        markRead()
+        if(notification.type!=='new_message')markRead()
         return true
       }
       if (meta.service_id) {
-        const { data: svc } = await supabase
-          .from('services').select('title').eq('id', meta.service_id).maybeSingle()
-      if (!isCurrent()) return false
+        const { data: svc, error: targetError } = await supabase
+          .from('services_public').select('title').eq('id', meta.service_id).maybeSingle()
+      if (!isCurrent() || targetError) return false
+        if(!svc)return targetGone('conversation')
         navigation.navigate('Chat', {
           serviceId:     meta.service_id,
           jobTitle:      svc?.title || 'Listing',
           otherUserId:   meta.sender_id,
           otherUserName,
         })
-        markRead()
+        if(notification.type!=='new_message')markRead()
         return true
       }
     }
@@ -173,7 +188,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
     if (meta.booking_id) {
       const { data: booking, error } = await supabase
         .from('bookings')
-        .select('*, service:service_id(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
+        .select('*, service:services_public(*), requester:requester_id(id, full_name, avatar_url), provider:provider_id(id, full_name, avatar_url)')
         .eq('id', meta.booking_id)
         .maybeSingle()
       if (!isCurrent()) return false
@@ -181,7 +196,7 @@ export async function openNotificationTarget(navigation, userId, notification) {
       if (!booking) return targetGone('booking')
       const viewerRole = booking.provider_id === userId ? 'provider' : 'requester'
       navigation.navigate('ServiceBookingDetail', { booking, viewerRole })
-      markRead()
+      if(notification.type!=='new_message')markRead()
       return true
     }
 
@@ -198,8 +213,8 @@ export async function openNotificationTarget(navigation, userId, notification) {
       // notifications there rather than to the owner's ManageTask screen.
       const isQuestion = notification.type === 'new_question' || notification.type === 'question_answered'
       if (job.requester_id === userId && !isQuestion) navigation.navigate('ManageTask', { job, bidCount: 0 })
-      else navigation.navigate('JobDetail', { job })
-      markRead()
+      else navigation.navigate('JobDetail', { job, ...(isQuestion?{focusQuestions:true}: {}) })
+      if(notification.type!=='new_message')markRead()
       return true
     }
 

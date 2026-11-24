@@ -57,7 +57,7 @@ test('matching rejects exact addresses and coordinates and normalizes locality s
 
 test('queries use active public offerings, projected profiles and existing review ratings only',async()=>{
  const reads=[]
- const data={services:[listing('a','Water delivery','Te Awamutu')],profiles_public:[{id:'a',full_name:'A'}],reviews:[{reviewee_id:'a',rating:4}]}
+ const data={services_public:[listing('a','Water delivery','Te Awamutu')],profiles_public:[{id:'a',full_name:'A'}],reviews:[{reviewee_id:'a',rating:4}]}
  const db={from:table=>({select:fields=>{
   reads.push([table,fields])
   const query={order:()=>query,in:(...args)=>{reads.push(args);return query},eq:(...args)=>{reads.push(args);return query},

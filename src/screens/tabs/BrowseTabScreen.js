@@ -21,15 +21,8 @@ import { SkeletonList } from '../../components/SkeletonCard'
 import useNearbyBrowsing from '../../hooks/useNearbyBrowsing'
 import NearbyControls from '../../components/NearbyControls'
 import { filterNearby } from '../../lib/nearbyBrowsing'
+import {HELP_FILTERS,matchesHelpFilter,matchesListingSearch} from '../../../shared/findLocalHelp'
 import { availabilityDisplay } from '../../lib/providerAvailability'
-
-function itemMatchesSearch(item, query) {
-  if (!query.trim()) return true
-  const q = query.trim().toLowerCase()
-  return [item.title, item.description, item.category, item.location_name].some(
-    v => String(v || '').toLowerCase().includes(q)
-  )
-}
 
 function ServiceSection({ title, items, onPressItem }) {
   if (!items.length) return null
@@ -59,6 +52,7 @@ export default function BrowseTabScreen({ navigation, route }) {
   const [loading,     setLoading]     = useState(true)
   const [refreshing,  setRefreshing]  = useState(false)
   const [search,      setSearch]      = useState('')
+  const [kind,setKind]=useState('')
   const [loadError, setLoadError] = useState(false)
   const loadingRef = useRef(false)
 
@@ -91,7 +85,7 @@ export default function BrowseTabScreen({ navigation, route }) {
 
   async function fetchServices() {
     const { data: servicesData, error } = await supabase
-      .from('services')
+      .from('services_public')
       .select('*')
       .eq('is_active', true)
       .is('closed_at', null)
@@ -150,7 +144,7 @@ export default function BrowseTabScreen({ navigation, route }) {
     navigation.navigate('ServiceDetail', { service: item })
   }
 
-  const result = filterNearby(services.filter(item => itemMatchesSearch(item, search)), nearby)
+  const result = filterNearby(services.filter(item => matchesHelpFilter(item,kind) && matchesListingSearch(item, search)), nearby)
   const filtered = result.items
   const isEmpty = filtered.length === 0
 
@@ -172,11 +166,11 @@ export default function BrowseTabScreen({ navigation, route }) {
         }
       />
       <View style={[styles.header, { paddingTop: 0 }]}>
-        <Text style={styles.title}>Listings</Text>
-        <Text style={styles.subtitle}>Services, grazing, hire and local goods</Text>
+        <Text style={styles.title}>Find local help</Text>
+        <Text style={styles.subtitle}>Services, grazing, equipment and rural goods</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search fencing, water, machinery..."
+          placeholder="What are you looking for?"
           placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -187,14 +181,17 @@ export default function BrowseTabScreen({ navigation, route }) {
         />
       </View>
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:20,gap:8,paddingBottom:8}} style={{flexGrow:0}}>
+        {HELP_FILTERS.map(([value,label])=><TouchableOpacity key={value} onPress={()=>setKind(value)} accessibilityRole="button" accessibilityState={{selected:kind===value}} style={{padding:10,borderRadius:18,backgroundColor:kind===value?colors.primaryLight:colors.white}}><Text style={{color:colors.primary,fontWeight:kind===value?'700':'400'}}>{label}</Text></TouchableOpacity>)}
+      </ScrollView>
       {currentUserId && (
         <TouchableOpacity
-          style={styles.manageBanner}
+          style={{paddingHorizontal:20,paddingVertical:8,alignSelf:'flex-start'}}
           onPress={() => navigation.navigate('MyServices')}
           accessibilityRole="button"
           accessibilityLabel="My listings">
-          <Text style={styles.manageBannerTitle}>My listings</Text>
-          <Text style={styles.manageBannerText}>Manage live, paused and closed listings</Text>
+          <Text style={{color:colors.primary,fontWeight:'600'}}>My listings</Text>
+
         </TouchableOpacity>
       )}
 
@@ -224,7 +221,7 @@ export default function BrowseTabScreen({ navigation, route }) {
       ) : isEmpty ? (
           <EmptyState
             icon="pricetags-outline"
-            title="No listings available yet"
+            title={kind?'No listings match this filter':'No listings available yet'}
             body="Check back soon, or post a job to get offers from locals."
             actionLabel="Post a job"
             actionIcon="arrow-forward"
@@ -238,6 +235,7 @@ export default function BrowseTabScreen({ navigation, route }) {
           <ServiceSection title={result.active ? 'Near you' : 'All listings'} items={filtered} onPressItem={handlePress} />
         </>
       )}
+      {!loading&&!loadError&&isEmpty&&(search.trim()||result.active||kind)&&<TouchableOpacity onPress={()=>{if(!currentUserId)navigation.navigate('GuestPostJob');else navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Browse'}})}} accessibilityRole="button" style={{padding:20}}><Text style={{color:colors.primary,fontWeight:'700'}}>Can’t find suitable help? Post a job →</Text></TouchableOpacity>}
       </ScrollView>
     </View>
   )

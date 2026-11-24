@@ -888,6 +888,15 @@ a.row:hover { background: var(--sage); }
 /* After completed work: "Add {provider} to your property network for {area}?" */
 .property-suggestion { background: var(--sage); }
 .property-suggestion h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 1.05rem; color: var(--forest-deep); }
+
+/* Compact requester listing summary; action buttons retain existing hit targets. */
+.listing-provider-summary h2 { margin: 0 0 6px; font-size: 1.1rem; overflow-wrap: anywhere; }
+.listing-provider-summary p { margin: 4px 0; }
+.listing-facts > p { margin: 8px 0; overflow-wrap: anywhere; }
 .missing-item { max-width: 520px; margin: 40px auto; }
 .missing-item h1 { margin: 12px 0 8px; font-size: 22px; color: var(--ink); }
 .missing-item-actions { justify-content: center; flex-wrap: wrap; }
+
+.notification-hint { display:block; font-size:0.8rem; color:var(--forest); margin-top:4px; }
+
+.notification-arrangement { display:block; font-size:0.8rem; color:var(--muted); margin-top:4px; }

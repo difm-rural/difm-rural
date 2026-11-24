@@ -132,6 +132,7 @@ export default function PostJobStep1JobType({ navigation, route }) {
       // New job — start clean. Clear both context AND local field state, since a
       // still-mounted Step 1 would otherwise re-sync stale values into context.
       resetJobData()
+      updateJobData({propertyOrigin:route.params?.propertyOrigin || null})
       startJobBaseline({ title: prefill?.title || '', category: CATEGORIES.includes(prefill?.category) ? prefill.category : '' })
       setTitle(prefill?.title || '')
       if(CATEGORIES.includes(prefill?.category))updateJobData({category:prefill.category})

@@ -21,9 +21,9 @@ import { PropertyNetworkSuggestion } from '@/components/work/property-network-su
 // The booking workspace — the single home for a service booking: details,
 // schedule, management, reviews and the conversation (sticky side panel). Mirrors
 // the job workspace; bookings always have both participants so it's two-column.
-export default async function BookingWorkspace({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{reviewed?:string}>}){
+export default async function BookingWorkspace({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{reviewed?:string;sent?:string}>}){
   const {id}=await params
-  const {reviewed}=await searchParams
+  const {reviewed,sent}=await searchParams
   const {supabase,user,profile}=await requireProvider('/bookings/'+id)
   const [work]=await Promise.all([loadActivityWork(supabase,'booking',id),markNotificationsReadFor(supabase,user.id,{bookingId:id})])
   if(!work)notFound()
@@ -46,6 +46,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
   const chatFirst=conversation&&conversation.name&&conversation.name!=='Community member'?conversation.name.trim().split(/\s+/)[0]:''
   const chatHeading=chatFirst?'Messages with '+chatFirst:'Messages'
 
+  const {data:listingLocation}=role==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(work.status)?await supabase.from('service_private_locations').select('location_name,latitude,longitude').eq('service_id',work.booking!.service_id).maybeSingle():{data:null}
   const b=work.booking!
   const timeline:string[]=['Requested '+nzDate(b.created_at)]
   if(b.quote_amount!=null)timeline.push('Quote sent')
@@ -63,10 +64,12 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
   </article>
 
   const mainColumn=<>
+    {sent==='1'&&role==='requester'&&work.status==='pending'&&<section className="card" role="status"><h2>Booking request sent!</h2><p>Your request has been sent to {person?.full_name || 'the provider'}. They’ll review it and respond.</p><p>{work.title} · Waiting for response</p><Link className="lform-save" href={'/bookings/'+id}>View booking</Link> <Link className="card-link" href="/browse">Back to listings</Link></section>}
     {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
     {headerCard}
     {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
     {actions.filter(a=>a!=='review').length>0&&<div className="lform-actions"><a className="lform-cancel" href="#manage">Manage this booking</a></div>}
+    {listingLocation&&<section className="card"><h2>Private listing location</h2><p>Shared with authorised booking participants only.</p><p>{listingLocation.location_name}</p>{listingLocation.latitude!=null&&listingLocation.longitude!=null&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(listingLocation.latitude+','+listingLocation.longitude)} target="_blank" rel="noopener noreferrer">Open agreed listing location</a>}</section>}
     <BookingDetails booking={work.booking!} userId={user.id}/>
     {work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
     <ManageActions kind="booking" id={id} actions={actions} otherFirst={otherFirst}/>

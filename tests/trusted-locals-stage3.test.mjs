@@ -35,7 +35,7 @@ test('independent saves use public projections and summarise active services',as
  const sources={
   saved_providers:[{requester_id:'me',provider_id:'provider'},{requester_id:'someone',provider_id:'other'}],
   profiles_public:[{id:'provider',full_name:'Provider',skills:['Fencing']}],
-  services:[{provider_id:'provider',category:'Stock work',is_active:true,closed_at:null},{provider_id:'provider',category:'Retired service',is_active:true,closed_at:'yesterday'}],
+  services_public:[{provider_id:'provider',category:'Stock work',is_active:true,closed_at:null},{provider_id:'provider',category:'Retired service',is_active:true,closed_at:'yesterday'}],
  }
  const columns=[]
  const db={from:table=>({select:projection=>{

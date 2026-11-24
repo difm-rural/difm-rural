@@ -1,3 +1,5 @@
+import * as bookingLocation from '../shared/bookingLocation.ts'
+import * as propertyNetworkJobs from '../shared/propertyNetworkJobs.ts'
 import {fillJobDraftFields} from '../shared/jobSuggestion.ts'
 import * as formatting from '../shared/formatting.js'
 import * as publicArea from '../shared/publicArea.ts'
@@ -17,7 +19,7 @@ const source=await readFile(new URL('../provider-web/src/app/jobs/new/job-form.t
 const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
 function harness(storage,seed,{
  check=async()=>true,suggest=async()=>({data:{category:'Water & Drainage'}}),jobExists=false,
- photoEnabled=false,uploadPhoto=async()=>({checksum:'a'.repeat(64)}),privatePhotos,
+ photoEnabled=false,uploadPhoto=async()=>({checksum:'a'.repeat(64)}),privatePhotos,propertyOrigin,
 }={}){
  const state=[],refs=[],effects=[],dependencies=[],cleanups=[],submissions=[],destinations=[]
  let index=0,refIndex=0,effectIndex=0,tree,actionState={error:''}
@@ -38,7 +40,9 @@ function harness(storage,seed,{
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx}
-  if(name==='@shared/jobSuggestion')return {fillJobDraftFields}
+  if(name==='@shared/bookingLocation')return bookingLocation
+  if(name==='@shared/propertyNetworkJobs')return propertyNetworkJobs
+ if(name==='@shared/jobSuggestion')return {fillJobDraftFields}
   if(name==='@shared/jobDraft')return jobDraft
   if(name==='@shared/postingDates')return dates
   if(name==='@shared/postingMoney')return money
@@ -60,7 +64,7 @@ function harness(storage,seed,{
  },Date,console,process:{env:{NEXT_PUBLIC_PHOTO_TO_JOB:photoEnabled?'true':'false'}},AbortController,
  FormData:class {constructor(fields){Object.assign(this,fields)}set(key,value){this[key]=value}},
  sessionStorage:storage,crypto:{randomUUID:()=> 'test-job-id'},document:{querySelector:()=>null}})
- const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new',privatePhotos});effects.splice(0).forEach(fn=>fn())}
+ const render=()=>{index=0;refIndex=0;effectIndex=0;tree=module.exports.JobForm({userId:'test',seed,mode:seed?'edit':'new',privatePhotos,propertyOrigin});effects.splice(0).forEach(fn=>fn())}
  const nodes=(node=tree)=>!node||typeof node!=='object'?[]:[node,...[node.props?.children].flat(Infinity).filter(c=>c!==undefined).flatMap(c=>nodes(c))]
  const text=node=>typeof node==='string'?node:[node?.props?.children].flat(Infinity).map(c=>typeof c==='object'?text(c):String(c??'')).join('')
  const click=label=>{nodes().find(n=>n.type==='button'&&(text(n)===label||label==='Next'&&text(n)==='Next — Location')).props.onClick();render()}
@@ -363,4 +367,16 @@ test('Describe fills the visible named title and draft details, then preserves e
  assert.deepEqual(fillJobDraftFields({title:'',description:'',category:''},{title:'Gate',description:'Fix a hinge',category:'Fencing'}).fields,
   {title:'Gate',description:'Fix a hinge',category:'Fencing & Gates'})
  assert.equal(apply()({title:' ',description:'',category:'Unknown'}),false)
+})
+
+test('property origin stays in hidden form context and has a separate draft namespace from ordinary posting',async()=>{
+ assert.match(source,/^'use client'/)
+ const keys=[],storage={getItem:key=>{keys.push(key);return null},setItem(){},removeItem(){}}
+ const ordinary=harness(storage);await ordinary.flush()
+ const area=harness(storage,undefined,{propertyOrigin:{ownerId:'test',area:'water'}});await area.flush()
+ assert.ok(keys.includes('rural-job:test:new:new:public'));assert.ok(keys.includes('rural-job:test:new:new:public:property:test:water'))
+ const hidden=Object.fromEntries(area.nodes().filter(n=>n.type==='input'&&n.props.type==='hidden').map(n=>[n.props.name,n.props.value]))
+ assert.equal(hidden.property_owner,'test');assert.equal(hidden.property_area,'water')
+ assert.equal(ordinary.nodes().some(n=>n.props?.name==='property_area'),false)
+ const cancel=area.nodes().find(n=>n.type==='a'&&area.text(n)==='Cancel');assert.ok(cancel);assert.equal(area.submissions.length,0)
 })

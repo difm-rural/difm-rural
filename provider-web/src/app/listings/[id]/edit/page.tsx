@@ -1,3 +1,4 @@
+import {withPrivateListingLocations} from '@shared/privateListingLocation'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -21,13 +22,14 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
     .maybeSingle()
 
   if (!listing) notFound()
+  const [privateListing]=await withPrivateListingLocations(supabase,[listing])
 
   return (
     <AppShell refreshOnAlerts={false} providerName={(profile?.full_name as string) ?? 'Provider'}>
       <section className="page">
         <Link href="/listings" className="card-link"><ArrowLeft size={14} /> Back to listings</Link>
         <header className="work-head listing-head"><SideKicker side="listing" label="Listings · offered"/><h1>Edit listing</h1></header>
-        <ListingForm mode="edit" userId={user.id} listing={listing as EditListing} />
+        <ListingForm mode="edit" userId={user.id} listing={privateListing as EditListing} />
       </section>
     </AppShell>
   )

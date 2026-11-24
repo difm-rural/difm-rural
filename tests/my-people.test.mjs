@@ -52,7 +52,7 @@ test('My People cards say what each provider advertises, never their long skills
  ]
  const query={eq(c,v){filters.push([c,v]);return query},is(c,v){filters.push([c,v]);return query},in(c,v){filters.push([c,v]);return query},
   order(){return query},range(){return Promise.resolve({data:listings,error:null})}}
- const client={from:table=>{assert.equal(table,'services');return {select:()=>query}}}
+ const client={from:table=>{assert.equal(table,'services_public');return {select:()=>query}}}
  const advertised=await loadAdvertisedServices(client,['a','b'])
  assert.deepEqual(advertised.get('a'),['Fencing & Gates','Water & Drainage'])
  assert.equal(advertised.get('b').length,4)

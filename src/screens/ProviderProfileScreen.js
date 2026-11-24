@@ -157,7 +157,7 @@ export default function ProviderProfileScreen({ route, navigation }) {
         // Safe public columns only — never fetch another user's phone/address/GPS.
         supabase.from('profiles_public').select('id, full_name, avatar_url, display_name, bio, skills, qualifications, region, primary_role, role, created_at, availability_status, availability_until, availability_updated_at').eq('id', providerId).single(),
         supabase.from('bids').select('job_id, status, created_at').eq('provider_id', providerId),
-        supabase.from('services')
+        supabase.from('services_public')
           .select('*')
           .eq('provider_id', providerId)
           .eq('is_active', true)

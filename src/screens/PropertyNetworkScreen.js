@@ -5,6 +5,8 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context'
 import {LocalAction,LocalInvitePicker} from '../components/LocalProviderActions'
 import Icon from '../components/Icon'
 import Loading from '../components/Loading'
+import PropertyAreaJobs from '../components/PropertyAreaJobs'
+import {propertyNetworkCounts,propertyPostParams,replacePropertyProvider} from '../../shared/propertyNetworkJobs'
 import {withScreenBoundary} from '../components/ErrorBoundary'
 import {supabase} from '../lib/supabase'
 import {fetchConnections} from '../lib/connections'
@@ -130,6 +132,8 @@ const PROPERTY_FEEDBACK_MS=5000
 function PropertyNetworkScreen({navigation,route}){
  const insets=useSafeAreaInsets()
  const [owner,setOwner]=useState(null)
+ const [changing,setChanging]=useState(null)
+ const [relationships,setRelationships]=useState({})
  const [data,setData]=useState(null)
  const [error,setError]=useState('')
  const [feedback,setFeedback]=useState('')
@@ -182,6 +186,10 @@ function PropertyNetworkScreen({navigation,route}){
    const id=auth.user.id
    const network=await loadPropertyNetwork(supabase,id)
    setOwner(id);setData(normalizePropertyNetwork(network))
+   try{
+    const [saved,worked]=await Promise.all([loadSavedProviders(supabase,id),fetchConnections(id,'locals')])
+    setRelationships(Object.fromEntries([...saved.map(person=>[person.id,'Saved in My People']),...worked.map(row=>[row.personId,`Worked together ${row.times_worked} time${row.times_worked===1?'':'s'}`])]))
+   }catch{setRelationships({})}
    if(!preferredLoaded.current){
     preferredLoaded.current=true
     const {data:profile}=await supabase.from('profiles').select('region').eq('id',id).maybeSingle()
@@ -197,7 +205,7 @@ function PropertyNetworkScreen({navigation,route}){
  function selectArea(id){
   closeMatches()
   pickerRequest.current++
-  setSelected(id);if(id)setHighlight(id);setPicker('');setServiceName('');setAddingOpen(false);setContactForm(null);setReplacing(null);setSetupOpen(false)
+  setChanging(null);setSelected(id);if(id)setHighlight(id);setPicker('');setServiceName('');setAddingOpen(false);setContactForm(null);setReplacing(null);setSetupOpen(false)
   navigation.setParams({area:id})
  }
  useFocusEffect(useCallback(()=>{
@@ -208,9 +216,12 @@ function PropertyNetworkScreen({navigation,route}){
  function browse({category,kind}){
   navigation.getParent()?.navigate('Browse',{screen:'BrowseMain',params:{category,kind}})
  }
+ function postArea(item,service,person){
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:propertyPostParams(item,service,person,owner)})
+ }
  function post(person,category,service){
   setTarget(null)
-  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category,service}}:{}})
+  navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:area?propertyPostParams(area,area.services.find(row=>row.name===service)||{service_key:'',name:service||area.label},person,owner):person?{inviteProviderId:person.id,inviteProviderName:propertyProviderName(person)}:category?{prefill:{category,service}}:{}})
  }
  // Turning on the wider region fills it in when the locality names exactly one
  // region, directly or in the address suggestions for that place.
@@ -260,9 +271,14 @@ function PropertyNetworkScreen({navigation,route}){
     discoverPropertyProviders(supabase,owner,propertyServiceTarget(area,service).category,propertyServiceTarget(area,service).kind),
    ])
    if(request!==pickerRequest.current)return
-   setGroups([{label:'Saved',people:saved},{label:'Worked together',people:worked.flatMap(row=>row.person?[row.person]:[])},
+   setGroups([{label:'My People · Saved',people:saved},{label:'My People · Worked together',people:worked.flatMap(row=>row.person?[row.person]:[])},
     {label:'Provider discovery',people:discovered}])
   }catch{if(request===pickerRequest.current)setProviderError('Could not load providers. Try again.')}
+ }
+ async function chooseProvider(service,person){
+  if(changing?.service===service.service_key){
+   if(await mutate(()=>replacePropertyProvider(supabase,service,changing.provider,person.id),'Provider assignment changed.')){setChanging(null);setPicker('')}
+  }else await mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')
  }
  async function openInvite(person){
   if(lock.current)return
@@ -359,6 +375,7 @@ function PropertyNetworkScreen({navigation,route}){
    status?service.name+': '+PROPERTY_CHOICES.find(([value])=>value===choice)[1]+'.':service.name+' cleared.')
  }
  function togglePicker(service,mode){
+  setChanging(null)
   setReplacing(null);setContactForm(null)
   if(picker===service.service_key&&pickerMode===mode){pickerRequest.current++;setPicker('');return}
   setPickerMode(mode)
@@ -431,7 +448,7 @@ function PropertyNetworkScreen({navigation,route}){
   {!showSetup&&<ScrollView style={area?{display:'none'}:undefined} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:16,paddingBottom:insets.bottom+32}}>
    <LocalAction label="Back" icon="chevron-back" onPress={()=>navigation.goBack()}/>
    <Text accessibilityRole="header" style={styles.title}>My Property Network</Text>
-   <Text style={styles.muted}>Who helps with your property, and what still needs someone.</Text>
+   <Text style={styles.muted}>Your private maintenance areas, providers and linked jobs.</Text>
    <View style={styles.row} accessibilityLabel="My Property">
     <Text style={[styles.nodeLabel,styles.viewButton]}>My Network</Text>
     <LocalAction label="My People" onPress={()=>navigation.navigate('Connections',{side:'locals',fromPropertyNetwork:true})}/>
@@ -440,14 +457,16 @@ function PropertyNetworkScreen({navigation,route}){
    {!area&&!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
    {!data&&!error&&<Loading label="Loading My Property Network…"/>}
    {data&&<>
+    <Text style={styles.muted}>{propertyNetworkCounts(areas).help} areas marked Needs help · {propertyNetworkCounts(areas).review} areas to review</Text>
     {gaps.length>0?<View style={styles.gaps}>
-     <Text accessibilityRole="header" style={[styles.sectionTitle,{color:colors.jobInk}]}>Needs help ({gaps.length})</Text>
+     <Text accessibilityRole="header" style={[styles.sectionTitle,{color:colors.jobInk}]}>Services needing help ({gaps.length})</Text>
      {gaps.map(({area:item,service})=><View key={item.id+service.service_key} style={styles.gapRow}>
-      <View style={{flex:1}}><Text style={styles.nodeLabel}>{service.name}</Text><Text style={styles.small}>{item.label}</Text></View>
+      <View style={{flex:1,minWidth:'50%'}}><Text style={styles.nodeLabel}>{service.name}</Text><Text style={styles.small}>{item.label}</Text></View>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Find help with '+service.name} style={styles.smallPrimary} onPress={()=>findHelp(item,service)}>
        <Text style={styles.primaryText}>Find help</Text></TouchableOpacity>
+      <LocalAction label="Post a job" onPress={()=>postArea(item,service)}/>
      </View>)}
-    </View>:active.length>0&&<Text style={[styles.muted,{marginTop:12}]}>Nothing needs help right now.</Text>}
+    </View>:active.length>0&&<Text style={[styles.muted,{marginTop:12}]}>{propertyNetworkCounts(areas).review?'No services marked Needs help yet. Finish reviewing your areas.':'No services currently marked Needs help.'}</Text>}
     <View style={styles.partsHead}>
      <Text accessibilityRole="header" style={styles.sectionTitle}>Your property</Text>
      {active.length>0&&<View style={styles.switch} accessibilityLabel="Network view">
@@ -491,7 +510,7 @@ function PropertyNetworkScreen({navigation,route}){
      <LocalAction label="Back to My Property Network" icon="chevron-back" onPress={()=>selectArea('')}/>
      <View style={styles.areaHeading}><Icon name={area.icon} size={32} color={colors.primary}/>
       <Text accessibilityRole="header" style={styles.title}>{area.label}</Text></View>
-     <Text style={styles.muted}>One tap each. Tell us who does it if you like.</Text>
+     <Text style={styles.muted}>Choose who helps from My People, or leave an area unassigned. Assignments are private and do not notify providers.</Text>
      {!!error&&<Text accessibilityRole="alert">{error}</Text>}
      {!!feedback&&<Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text>}
      {(()=>{
@@ -504,6 +523,7 @@ function PropertyNetworkScreen({navigation,route}){
       </View>
       {answered>0&&<Text style={[styles.small,{marginTop:4}]}>Only the {unset} still to check change. Your other answers and helpers stay.</Text>}</>
      })()}
+     <PropertyAreaJobs key={owner+area.id} owner={owner} area={area.id} navigation={navigation}/>
      {area.services.map(service=>{
       const linked=linkedPropertyProviders(data,service)
       const contacts=linkedPropertyContacts(data,service)
@@ -526,7 +546,7 @@ function PropertyNetworkScreen({navigation,route}){
           <Text style={[styles.choiceText,choice===value&&styles['choiceText_'+value]]}>{label}</Text></View>
         </TouchableOpacity>)}
        </View>
-       {choice==='sorted'&&<View style={{marginTop:10,gap:6}}>
+       {(choice==='sorted'||choice==='help'||covered>0)&&<View style={{marginTop:10,gap:6}}>
         <Text style={styles.small}>Who does it? (optional)</Text>
         <View style={styles.row}>
          <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:service.status==='self',disabled:busy}} disabled={busy}
@@ -535,13 +555,16 @@ function PropertyNetworkScreen({navigation,route}){
           <Text style={styles.chipText}>{service.status==='self'?'Me ✓':'Me'}</Text></TouchableOpacity>
          <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:linked.length>0,expanded:providerOpen}}
           style={[styles.chip,linked.length>0&&styles.chipOn]} onPress={()=>togglePicker(service,'provider')}>
-          <Text style={styles.chipText}>{linked.length?linked.map(propertyProviderName).join(', ')+' ✓':'A provider…'}</Text></TouchableOpacity>
+          <Text style={styles.chipText}>{linked.length?linked.map(propertyProviderName).join(', ')+' ✓':'Choose from My People'}</Text></TouchableOpacity>
          <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:contacts.length>0,expanded:contactOpen}}
           style={[styles.chip,contacts.length>0&&styles.chipOn]} onPress={()=>togglePicker(service,'contact')}>
           <Text style={styles.chipText}>{contacts.length?contacts.map(contact=>contact.name).join(', ')+' ✓':'Someone not on RC'}</Text></TouchableOpacity>
         </View>
         {linked.map(person=><View key={person.id} style={styles.linked}>
          <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
+         <Text style={styles.small}>{relationships[person.id]||'Linked privately to this service'}</Text>
+         <LocalAction label="Change provider" onPress={()=>{setChanging({service:service.service_key,provider:person.id});setPickerMode('provider');openPicker(service)}}/>
+         <LocalAction label="Post a job for this provider" onPress={()=>post(person,postCategory,service.name)}/>
          <View style={styles.row}><LocalAction label="Invite to job" disabled={busy} onPress={()=>openInvite(person)}/>
           <LocalAction label="Remove link" disabled={busy} onPress={()=>confirmUnlink(propertyProviderName(person),service,covered-1,()=>setPropertyProvider(supabase,owner,service,person.id,false),'Provider link removed.')}/></View>
         </View>)}
@@ -567,8 +590,8 @@ function PropertyNetworkScreen({navigation,route}){
         <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:matchKey===service.service_key}} style={styles.smallPrimary}
          onPress={()=>matchKey===service.service_key?closeMatches():findMatches(service,category)}>
          <Text style={styles.primaryText}>{matchKey===service.service_key?'Close search':'Find local help'}</Text></TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" style={styles.postJob} onPress={()=>post(null,postCategory,service.name)}>
-         <Text style={styles.gap}>Post a job</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" style={styles.smallPrimary} onPress={()=>post(null,postCategory,service.name)}>
+         <Text style={styles.primaryText}>Post a job</Text></TouchableOpacity>
        </View>}
        {matchKey===service.service_key&&<View style={[styles.picker,{marginTop:10}]}>
         <Text accessibilityRole="header" style={styles.serviceTitle}>Find providers for {service.name}</Text>
@@ -605,8 +628,9 @@ function PropertyNetworkScreen({navigation,route}){
         </View>)}
         <LocalAction label="Post a job" onPress={()=>post(null,postCategory,service.name)}/>
        </View>}
-       {providerOpen&&<View style={[styles.picker,{marginTop:10}]}>
-        <Text style={styles.serviceTitle}>{replacingHere?'Choose the member who replaces '+replacing.name:'Choose a provider'}</Text>
+       {providerOpen&&<View style={[styles.picker,{marginTop:10}]} >
+        {changing?.service===service.service_key&&<LocalAction label="Cancel changing provider" onPress={()=>{setChanging(null);setPicker('')}}/>}
+        <Text style={styles.serviceTitle}>{replacingHere?'Choose the member who replaces '+replacing.name:changing?.service===service.service_key?'Choose replacement provider':'Choose a provider'}</Text>
         {replacingHere&&<Text style={styles.muted}>They will be linked to every service {replacing.name} covers, and {replacing.name}'s private contact details will be deleted.</Text>}
         {groups&&<TextInput accessibilityLabel="Find by name or region" placeholder="Find by name or region"
          placeholderTextColor={colors.textSecondary} value={providerSearch} style={styles.input}
@@ -617,11 +641,12 @@ function PropertyNetworkScreen({navigation,route}){
           const available=filterPropertyProviders(group.people,linked,providerSearch)
           return <View key={group.label} style={{marginTop:10}}>
            <Text accessibilityRole="header" style={styles.nodeLabel}>{group.label}</Text>
-           {!available.length&&<Text style={styles.muted}>No providers to link here.</Text>}
+           {!available.length&&<Text style={styles.muted}>No unassigned people match in this group.</Text>}
            {available.slice(0,providerLimit).map(person=><View key={person.id} style={styles.row}>
             <LocalAction label={propertyProviderName(person)} onPress={()=>profile(person)}/>
+            {!!relationships[person.id]&&<Text style={styles.small}>{relationships[person.id]}</Text>}
             {replacingHere?<LocalAction label={'Replace '+replacing.name} disabled={busy} onPress={()=>void replaceContact(person)}/>
-             :<LocalAction label="Link to service" disabled={busy} onPress={()=>void mutate(()=>setPropertyProvider(supabase,owner,service,person.id,true),'Provider linked.')}/>}
+             :<LocalAction label={changing?.service===service.service_key?'Replace provider':'Link to service'} disabled={busy} onPress={()=>void chooseProvider(service,person)}/>}
            </View>)}
            {available.length>providerLimit&&<LocalAction label="Show more providers" onPress={()=>setProviderLimit(value=>value+12)}/>}
           </View>
@@ -706,7 +731,7 @@ const styles=StyleSheet.create({
  textButton:{minHeight:44,alignItems:'center',justifyContent:'center'},
  disabled:{opacity:.5},
  gaps:{marginTop:14,padding:14,borderRadius:16,backgroundColor:colors.jobFill,gap:8},
- gapRow:{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:12,backgroundColor:colors.white},
+ gapRow:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:10,padding:12,borderRadius:12,backgroundColor:colors.white},
  small:{fontSize:12,color:colors.textSecondary},
  partsHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:18,marginBottom:4},
  switch:{flexDirection:'row',backgroundColor:'#e7e7e7',borderRadius:8,padding:2},

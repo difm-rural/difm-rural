@@ -32,9 +32,9 @@ import { PaymentSorted } from './payment-requester'
 import { agreedPaymentMethodLabels, paymentAcknowledgementActor, paymentAcknowledgementAvailable } from '@shared/paymentAcknowledgement'
 import { workActions, workRole, type ActivityWork } from '@/lib/activity-policy'
 
-export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string;accepted?:string;offered?:string}>}){
+export default async function JobPage({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{thread?:string|string[];reviewed?:string;posted?:string;edited?:string;accepted?:string;offered?:string;propertyLinkFailed?:string;propertyArea?:string}>}){
  const {id}=await params
- const {thread,reviewed,posted,edited,accepted,offered}=await searchParams
+ const {thread,reviewed,posted,edited,accepted,offered,propertyLinkFailed,propertyArea}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const [{data:job,error}]=await Promise.all([supabase.from('jobs_public').select('*').eq('id',id).maybeSingle(),markNotificationsReadFor(supabase,user.id,{jobId:id})])
@@ -183,6 +183,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  </div>):<p className="muted">No providers invited yet.</p>}{job.status==='open'&&<Link href="/connections" className="card-link">Invite a previous provider</Link>}</section>:null
 
  const mainColumn=<>
+  {propertyLinkFailed==='1'&&own&&<p role="alert">Your job was posted, but could not be linked to the maintenance area. <Link href={'/property-network?area='+encodeURIComponent(propertyArea||'')}>Open My Network to link this existing job</Link>; do not post it again.</p>}
   {posted==='1'&&own&&<><p className="status-banner" role="status">Job posted.</p><PostFeedback jobId={id}/></>}
   {accepted==='1'&&own&&job.status==='accepted'&&acceptedOffer&&<p className="status-banner job-success" role="status">Offer accepted.</p>}
   {edited==='1'&&own&&<p className="status-banner" role="status">Job changes saved.</p>}

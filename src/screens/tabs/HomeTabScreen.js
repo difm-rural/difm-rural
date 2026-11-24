@@ -295,7 +295,7 @@ export default function HomeTabScreen({ navigation }) {
             {attention.map((item, i) => {
               const isNextMove = item._kind === 'nextMove'
               const side = isNextMove ? null : notificationSide(item)
-              const tag  = side ? sideTag(side, item) : null
+              const tag = sideTag(side,item)
               const iconName = isNextMove
                 ? item.nextMove.icon
                 : NOTIFICATION_ICONS[item.type] || 'notifications-outline'

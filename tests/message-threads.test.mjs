@@ -39,7 +39,7 @@ test('inbox uses participant filters and privacy-safe job reads; sent messages o
   const queries = []
   const tables = { messages: [sent, { ...sent, id: 'job-message', service_id: null, job_id: 'job1' }],
     service_booking_messages: [], jobs_public: [{ id: 'job1', title: 'Fencing' }],
-    profiles_public: [{ id: 'owner', full_name: 'Sam' }], services: [{ id: 'listing1', title: 'Grazing' }] }
+    profiles_public: [{ id: 'owner', full_name: 'Sam' }], services_public: [{ id: 'listing1', title: 'Grazing' }] }
   Object.assign(globalThis.threadTestClient, {
     auth: { async getUser() { return { data: { user: { id: 'me' } }, error: null } } },
     from(table) {
