@@ -23,7 +23,7 @@ assert.equal(relativeTime(null, now), '')
 
 assert.equal(dayGroupLabel(ago(30), now), 'Today')
 assert.equal(dayGroupLabel(ago(601), now), 'Yesterday')
-assert.equal(dayGroupLabel(ago(3 * 1440), now), 'This week')
+assert.equal(dayGroupLabel(ago(3 * 1440), now), 'Earlier')
 assert.equal(dayGroupLabel(ago(8 * 1440), now), 'Earlier')
 assert.equal(dayGroupLabel(undefined, now), 'Earlier')
 
@@ -38,8 +38,7 @@ const list = [
 assert.deepEqual(groupByDay(list, now).map(g => [g.label, g.items.map(i => i.id)]), [
   ['Today', ['a', 'b']],
   ['Yesterday', ['c']],
-  ['This week', ['d']],
-  ['Earlier', ['e', 'f']],
+  ['Earlier', ['d', 'e', 'f']],
 ])
 assert.deepEqual(groupByDay([], now), [])
 assert.deepEqual(groupByDay([{ id: 'x', created_at: ago(8 * 1440) }], now).map(g => g.label), ['Earlier'])

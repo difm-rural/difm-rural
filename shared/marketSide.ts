@@ -29,9 +29,9 @@ export function notificationSide(n: Notice): MarketSide | null {
 // payment_sorted / payment_unsorted carry job_id (side = job) and can go to
 // either party → stay neutral too.
 const OWNER_TYPES = new Set([
-  'new_bid', 'new_question', 'job_ready', 'job_completed', 'payment_details_sent', 'job_confirmed',
+  'new_bid', 'new_question', 'job_ready', 'payment_details_sent', 'job_confirmed',
   'new_booking', 'service_quote_accepted', 'booking_ready',
-  'booking_completed', 'work_completion_due', 'booking_cancellation_requested',
+  'work_completion_due', 'booking_cancellation_requested',
 ])
 
 // Small-caps tag shown above a notification body. Null side → no tag.

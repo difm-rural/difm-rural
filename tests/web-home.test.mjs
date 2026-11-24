@@ -15,7 +15,7 @@ test('Home notifications reopen their specific job, booking or enquiry conversat
   assert.equal(notificationHref({type:'new_message',metadata:{job_id:'j'}}),'/jobs/j#conversation')
   assert.equal(notificationHref({type:'new_message',metadata:{service_id:'s',sender_id:'p'}}),'/listings/s?thread=p#enquiries')
   assert.equal(notificationHref({type:'new_booking',metadata:{booking_id:'b'}}),'/bookings/b#manage')
-  assert.equal(notificationHref({type:'new_bid',metadata:{job_id:'j'}}),'/jobs/j')
+  assert.equal(notificationHref({type:'new_bid',metadata:{job_id:'j'}}),'/jobs/j#offer')
 })
 test('pending requests and attachment messages use truthful readable text',()=>{
   assert.equal(statusLabel('pending'),'Booking request')

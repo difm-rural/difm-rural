@@ -1,3 +1,4 @@
+import {notificationHint} from '../shared/notificationHints.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
@@ -11,6 +12,7 @@ function render(n){
  const jsx=(type,props)=>({type,props})
  const module={exports:{}}
  vm.runInNewContext(code,{exports:module.exports,require(name){
+  if(name==='@shared/notificationHints')return {notificationHint}
   if(name==='react')return {useState:value=>[value,()=>{}],useTransition:()=>[false,fn=>fn()],useActionState:(_,s)=>[s,()=>{},false]}
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'}
   if(name==='lucide-react')return new Proxy({},{get:()=>'svg'})

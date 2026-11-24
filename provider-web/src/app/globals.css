@@ -896,3 +896,5 @@ a.row:hover { background: var(--sage); }
 .missing-item { max-width: 520px; margin: 40px auto; }
 .missing-item h1 { margin: 12px 0 8px; font-size: 22px; color: var(--ink); }
 .missing-item-actions { justify-content: center; flex-wrap: wrap; }
+
+.notification-hint { display:block; font-size:0.8rem; color:var(--forest); margin-top:4px; }
