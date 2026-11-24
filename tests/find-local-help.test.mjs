@@ -53,16 +53,7 @@ test('kind and search filtering compose with unchanged distance filtering and Al
 })
 import {readFileSync} from 'node:fs'
 const navigatorSource=readFileSync(new URL('../src/navigation/AppNavigator.js',import.meta.url),'utf8')
-const pendingSource=navigatorSource.slice(navigatorSource.indexOf('  async function postPendingBookingIfAny('),navigatorSource.indexOf('  function handleOnboardingComplete'))
-test('guest booking resumption supports legacy drafts, guards concurrent sign-in events and confirms the saved record',async()=>{
- let saved=JSON.stringify({service_id:'listing',provider_id:'provider',quantity:7,total_amount:350}),created,posts=[],success=[],alerts=[]
- const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}
- const resume=new Function('AsyncStorage','newJobId','supabase','fetchBookingDetail','setBookingSuccessResult','Alert','pendingBookingPostingRef','return ('+pendingSource+')')(storage,()=> 'known-uuid',{from:()=>({upsert:async row=>{posts.push(row);created=row;return {error:null}}})},async(c,id)=>({...created,id}),row=>success.push(row),{alert:(...a)=>alerts.push(a)},{current:false})
- await Promise.all([resume('requester'),resume('requester')]);assert.equal(posts.length,1);assert.equal(success[0].id,'known-uuid');assert.equal(saved,null);assert.equal(alerts.length,0)
-})
-test('failed guest submission retains a stable draft ID and never reports success',async()=>{
- let saved=JSON.stringify({booking:{service_id:'listing'}}),success=false
- const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}
- const resume=new Function('AsyncStorage','newJobId','supabase','fetchBookingDetail','setBookingSuccessResult','Alert','pendingBookingPostingRef','return ('+pendingSource+')')(storage,()=> 'retry-uuid',{from:()=>({upsert:async()=>({error:{message:'offline'}})})},async()=>{throw Error('Should not load success')},()=>{success=true},{alert(){}},{current:false})
- await resume('requester');await resume('requester');assert.equal(JSON.parse(saved).booking.id,'retry-uuid');assert.equal(success,false)
+test('guest authentication never automatically posts jobs or bookings',()=>{
+ assert.doesNotMatch(navigatorSource,/postPending(Job|Booking)IfAny|from\('bookings'\)\.upsert/)
+ assert.match(navigatorSource,/guestIntentDestination\(supabase, intent\)/)
 })

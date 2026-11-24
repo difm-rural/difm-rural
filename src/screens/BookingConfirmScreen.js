@@ -1,3 +1,4 @@
+import {saveGuestIntent} from '../lib/guestIntent'
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
 import React, { useEffect, useState, useRef } from 'react'
@@ -193,19 +194,10 @@ export default function BookingConfirmScreen({ route, navigation }) {
     )
   }
 
-  async function savePendingBooking() {
-    await AsyncStorage.setItem('pendingBooking', JSON.stringify({
-      serviceTitle: service.title,
-      providerName: service.profile?.full_name || 'The provider',
-      isQuoteRequired,
-      booking: buildBookingPayload(null),
-    }))
-  }
-
   async function requireAuth(intent) {
     try{bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote})}
     catch(error){Alert.alert('Check location',error.message);return}
-    await savePendingBooking()
+    await saveGuestIntent(AsyncStorage, 'booking', service.id)
     setShowAuthSheet(false)
     // Passwordless email-code login auto-creates the account, so both
     // "Create account" and "Sign in" go to the Login screen.

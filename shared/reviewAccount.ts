@@ -12,7 +12,7 @@ export const EMAIL_STEP_ACTION='Continue'
 export function isPasswordAccount(email:string){return PASSWORD_LOGIN_EMAILS.includes(email.trim().toLowerCase())}
 export function isReviewAccount(email:string){return isPasswordAccount(email)}
 export function signInMethodHint(email:string){
- if (!email.trim()) return 'Enter your email to see how to sign in.'
+ if (!email.trim()) return ''
  return isPasswordAccount(email)?'Continue to enter your password.':'Continue and we’ll email you a sign-in code.'
 }
 export function reviewSignInFailure(error:{code?:string;status?:number}|null){

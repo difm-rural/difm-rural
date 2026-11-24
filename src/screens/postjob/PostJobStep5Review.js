@@ -1,3 +1,4 @@
+import {saveGuestIntent} from '../../lib/guestIntent'
 import {propertyJobOrigin,linkPostedPropertyJob} from '../../../shared/propertyNetworkJobs'
 import { newJobId } from '../../lib/draftId'
 import {formatMoney as nzMoney,formatWorkDate as nzDate} from '../../../shared/formatting.js'
@@ -92,7 +93,7 @@ function AuthSheet({ onDismiss, onLogin }) {
       <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
         <Text style={styles.sheetTitle}>Almost there!</Text>
         <Text style={styles.sheetMessage}>
-          Sign in to post your job. Your details have been saved.{'\n'}
+          Sign in to continue. Your draft is saved on this device; review it before posting.{'\n'}
           New? Just enter your email — we'll create your account automatically.
         </Text>
         <TouchableOpacity
@@ -275,7 +276,8 @@ export default function PostJobStep5Review({ navigation, route }) {
     if (!user) {
       // Save photos with the draft so they survive the login round-trip.
       const pendingPhotos = (photos || []).map(toStorablePhoto)
-      await AsyncStorage.setItem('pendingJob', JSON.stringify({ ...payload, ...(draftJobId ? { id: draftJobId } : {}), _photos: pendingPhotos }))
+      await AsyncStorage.setItem('pendingJob', JSON.stringify({ ...payload, ...(draftJobId ? { id: draftJobId } : {}), _photos: pendingPhotos, _draft: jobData, _savedAt: Date.now() }))
+      await saveGuestIntent(AsyncStorage, 'post-job')
       setUploadStatus('')          // sign-in interrupts the post; drop the busy state
       setShowAuthSheet(true)
       return
