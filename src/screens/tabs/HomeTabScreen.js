@@ -1,5 +1,3 @@
-import {notificationBody} from '../../../shared/notificationBody'
-import {notificationSide, sideTag} from '../../../shared/marketSide'
 import {rankOnTheGo} from '../../../shared/onTheGo'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
 import React, { useCallback, useRef, useState } from 'react'
@@ -16,17 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import Icon from '../../components/Icon'
-import {
-  NOTIFICATION_ICONS,
-  fetchNotifications,
-  notificationTimeAgo,
-  openNotificationTarget,
-} from '../../lib/notifications'
+import {fetchNotificationInbox} from '../../lib/notifications'
 import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../../../shared/homeMode'
-import {homeCustomerCount,homeUpcoming,homeWorkSummary} from '../../../shared/homeSummary'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '../../../shared/homeSummary'
 import {loadPropertyNetwork,propertyNetworkHomeLines} from '../../../shared/propertyNetwork'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
@@ -60,12 +53,13 @@ export default function HomeTabScreen({ navigation }) {
   const [network,setNetwork]=useState(null)
   const preferenceOwner=useRef(null)
   const preferenceRevision=useRef(0)
+  const loadRevision=useRef(0)
   function chooseMode(value){
     preferenceRevision.current++
     setMode(value)
     if(userId)void AsyncStorage.setItem(homeModeKey(userId),value).catch(()=>{})
   }
-  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(null)
   const [invitedJobs, setInvitedJobs]   = useState(null)
   const [customerCount,setCustomerCount]=useState(null)
   const [seasonalReminders, setSeasonalReminders] = useState([])
@@ -81,16 +75,18 @@ export default function HomeTabScreen({ navigation }) {
   useFocusEffect(useCallback(() => {
     let active = true
     const unsubscribe = onBadgeRefresh(() => {
-      fetchNotifications(8).then(rows => { if (active) setNotifications(rows) }).catch(() => {})
+      if (active) load()
     })
     return () => { active = false; unsubscribe() }
   }, []))
 
   async function load() {
+    const revision=++loadRevision.current
     setLoadError(false)
     try{
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user)return
+    if (revision!==loadRevision.current)return
+    if (!user){setActiveMoves(null);setUnreadCount(null);return}
     setUserId(user.id)
     if(preferenceOwner.current!==user.id){
       preferenceOwner.current=user.id
@@ -102,22 +98,23 @@ export default function HomeTabScreen({ navigation }) {
     }
 
     const [notifs, invited, reminders, active, propertyNetwork, customers] = await Promise.all([
-      fetchNotifications(8),
+      fetchNotificationInbox({limit:0}).catch(()=>null),
       fetchInvitedJobsForProvider(user.id,{strict:true}).catch(()=>null),
       fetchSeasonalReminders(),
       fetchActiveNextMoves(user.id,true,{strict:true}).catch(()=>null),
       loadPropertyNetwork(supabase,user.id).catch(()=>null),
       homeCustomerCount(supabase,user.id),
     ])
-    setNotifications(notifs)
+    if (revision!==loadRevision.current)return
+    setUnreadCount(notifs?.unreadCount??null)
     setInvitedJobs(invited)
     setSeasonalReminders(reminders)
     setActiveMoves(active)
     setNetwork(propertyNetwork)
     setCustomerCount(customers)
     reminders.forEach(reminder => recordSeasonalEvent(reminder.id, 'impression'))
-    }catch{setLoadError(true)}
-    finally{setLoading(false);setRefreshing(false)}
+    }catch{if(revision===loadRevision.current)setLoadError(true)}
+    finally{if(revision===loadRevision.current){setLoading(false);setRefreshing(false)}}
   }
 
   function onRefresh() {
@@ -152,30 +149,12 @@ export default function HomeTabScreen({ navigation }) {
   })
   const modeItems=(activeMoves||[]).filter(item=>item.viewerRole===homeRole(mode))
   const networkLines=network?propertyNetworkHomeLines(network):[]
-  const unread=notifications.filter(n=>!n.read)
-  const nextMoves=modeItems.filter(item=>item.nextMove.needsAction)
+  const actionSummary=homeAttentionSummary(loadError||activeMoves===null?null:modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})),
+    propertyMode?0:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null)
+  const nextMoves=actionSummary.items
   const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
-  const nextMoveKeys = new Set(nextMoves.map(item => `${item.entityType}:${item.entityId}`))
-  const remainingNotifications = unread.filter(notification => {
-    // An outstanding booking/job action does not replace a new chat message.
-    if (notification.type === 'new_message') return true
-    const metadata = notification.metadata || {}
-    const key = metadata.booking_id
-      ? `booking:${metadata.booking_id}`
-      : metadata.job_id
-        ? `job:${metadata.job_id}`
-        : null
-    return !key || !nextMoveKeys.has(key)
-  })
-  const attention = [
-    ...nextMoves.map(item => ({ ...item, _kind: 'nextMove' })),
-    ...remainingNotifications.map(item => ({ ...item, _kind: 'notification' })),
-  ].slice(0, 5)
+  const attention=nextMoves.slice(0,5)
   function openAttentionItem(item) {
-    if (item._kind === 'notification') {
-      openNotificationTarget(navigation, userId, item)
-      return
-    }
     if (item.entityType === 'job') {
       if (item.viewerRole === 'provider') navigation.navigate('JobDetail', { job: item.item })
       else navigation.navigate('ManageTask', { job: item.item, bidCount: item.item.bidCount || 0 })
@@ -247,6 +226,7 @@ export default function HomeTabScreen({ navigation }) {
               onPress={()=>navigation.getParent()?.navigate('Browse',{screen:'BrowseMain'})}/>
           </View>
         </> : <>
+          <Text style={styles.workEmpty}>{actionSummary.text}</Text>
           {work.indicators.length>0?<View style={styles.workSummary}>
             {work.indicators.map(item=>
               <TouchableOpacity key={item.id} style={styles.workMetric} accessibilityRole="button" accessibilityLabel={item.count+' '+item.label}
@@ -254,8 +234,7 @@ export default function HomeTabScreen({ navigation }) {
                   navigation.getParent()?.navigate('Activity',{screen:'ActivityMain',params:{homeFocus:item.id}})}>
                 <Text style={styles.metricNumber}>{item.count}</Text><Text style={styles.metricLabel}>{item.label}</Text>
               </TouchableOpacity>)}
-          </View>:<Text style={styles.workEmpty}>{work.unavailable?'Work summary unavailable. Pull down to try again.':
-            "You're all caught up."}</Text>}
+          </View>:null}
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Find work" subtitle="Browse available jobs."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'JobsBoard'})}/>
@@ -271,62 +250,35 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         </>}
 
+        <TouchableOpacity accessibilityRole="button" onPress={()=>navigation.navigate('Notifications')} style={{minHeight:44,justifyContent:'center'}}>
+          <Text style={styles.sectionLink}>{unreadCount===null?'All notifications':`All notifications (${unreadCount} unread)`}</Text>
+        </TouchableOpacity>
         {attention.length > 0 && (
           <>
-          {/* Needs attention — unread notifications */}
+          {/* Current lifecycle actions; unread history is independent. */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Needs attention</Text>
-              <TouchableOpacity
-                onPress={() => nextMoves.length > 0
-                  ? navigation.getParent()?.navigate('Activity')
-                  : navigation.navigate('Notifications')}
-                accessibilityRole="button"
-                accessibilityLabel={nextMoves.length > 0 ? 'View all activity' : 'All notifications'}>
-                <Text style={styles.sectionLink}>
-                  {nextMoves.length > 0
-                    ? `View activity (${nextMoves.length})`
-                    : unread.length > 0
-                      ? `All notifications (${unread.length})`
-                      : 'All notifications'}
-                </Text>
+              <Text style={styles.sectionTitle}>Needs attention ({nextMoves.length})</Text>
+              <TouchableOpacity onPress={()=>navigation.getParent()?.navigate('Activity')} accessibilityRole="button" accessibilityLabel="View all activity">
+                <Text style={styles.sectionLink}>View activity</Text>
               </TouchableOpacity>
             </View>
             {attention.map((item, i) => {
-              const isNextMove = item._kind === 'nextMove'
-              const side = isNextMove ? null : notificationSide(item)
-              const tag = sideTag(side,item)
-              const iconName = isNextMove
-                ? item.nextMove.icon
-                : NOTIFICATION_ICONS[item.type] || 'notifications-outline'
               return (
                 <TouchableOpacity
-                  key={item.id}
+                  key={`${item.entityType}:${item.entityId}`}
                   style={[styles.notifRow, i < attention.length - 1 && styles.notifRowBorder]}
                   onPress={() => openAttentionItem(item)}
                   activeOpacity={0.75}
                   accessibilityRole="button"
-                  accessibilityLabel={isNextMove ? `${item.nextMove.label}. ${item.nextMove.detail}` : notificationBody(item)}>
-                  {side ? (
-                    <View style={[styles.notifIconCircle, { backgroundColor: side === 'job' ? colors.jobFill : colors.listingFill }]}>
-                      <Icon name={iconName} size={17} color={side === 'job' ? colors.jobIcon : colors.listingIcon} />
-                    </View>
-                  ) : (
-                    <Icon name={iconName} size={20} color={isNextMove ? '#9a6700' : colors.primary} />
-                  )}
-                  {isNextMove ? (
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.nextMoveTitle} numberOfLines={1}>{item.title}</Text>
-                      <Text style={styles.nextMoveLabel}>{item.nextMove.label}</Text>
-                      <Text style={styles.notifBody} numberOfLines={2}>{item.nextMove.detail}</Text>
-                    </View>
-                  ) : (
-                    <View style={{ flex: 1 }}>
-                      {tag && <Text style={[styles.sideTag, { color: side === 'job' ? colors.jobInk : colors.listingInk }]}>{tag}</Text>}
-                      <Text style={styles.notifBody} numberOfLines={2}>{notificationBody(item)}</Text>
-                      <Text style={styles.notifTime}>{notificationTimeAgo(item.created_at)}</Text>
-                    </View>
-                  )}
+                  accessibilityLabel={`${item.title}. ${item.nextMove.label}. ${item.nextMove.detail}`}>
+                  <Icon name={item.nextMove.icon} size={20} color="#9a6700" />
+                  <View style={{flex:1,minWidth:0}}>
+                    <Text style={styles.nextMoveTitle}>{item.title}</Text>
+                    <Text style={styles.nextMoveLabel}>{item.nextMove.label}</Text>
+                    <Text style={styles.notifBody}>{item.nextMove.detail}</Text>
+                    <Text style={styles.sectionLink}>{item.nextMove.actionLabel || 'View details'} →</Text>
+                  </View>
                   <View style={styles.notifDot} />
                 </TouchableOpacity>
               )
@@ -353,7 +305,7 @@ export default function HomeTabScreen({ navigation }) {
               const urgent = item.nextMove.badgeTone === 'attention'
               return (
                 <TouchableOpacity
-                  key={item.id}
+                  key={`${item.entityType}:${item.entityId}`}
                   style={[styles.notifRow, i < onTheGo.shown.length - 1 && styles.notifRowBorder]}
                   onPress={() => openAttentionItem({ ...item, _kind: 'nextMove' })}
                   activeOpacity={0.75}

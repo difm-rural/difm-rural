@@ -257,7 +257,7 @@ a.row:hover { background: var(--sage); }
 .home-columns { display: grid; grid-template-columns: minmax(0,2fr) minmax(250px,1fr); gap: 24px; }
 .home-attention { background: white; }
 .home-attention .row { display: flex; align-items: center; gap: 12px; }
-.home-attention .row-main { flex: 1; }
+.home-attention .row-main { flex: 1; overflow-wrap: anywhere; }
 .home-attention .row-snippet { white-space: normal; }
 .home-onthego { margin-top: 16px; }
 .home-onthego .work-badge { margin-top: 3px; }

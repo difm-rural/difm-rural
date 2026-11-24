@@ -23,6 +23,15 @@ export function homeWorkSummary(counts:Record<Indicator['id'],number|null>){
  }
 }
 
+// Attention comes from the existing lifecycle's needsAction flag, never from
+// notification read state. Informational history stays in Notifications.
+export function homeAttentionSummary<T extends {needsAction:boolean}>(moves:readonly T[]|null, additional:number|null=0){
+ const items=(moves||[]).filter(item=>item.needsAction)
+ const count=moves===null||additional===null?null:items.length+additional
+ return {items,count,text:count===null?'Activity summary unavailable. Refresh to try again.':
+  count===0?"You're all caught up.":`${count} ${count===1?'item needs':'items need'} your attention.`}
+}
+
 type CountQuery={eq:(key:string,value:string)=>CountQuery;neq:(key:string,value:string)=>PromiseLike<{count:number|null;error:unknown}>}
 export async function homeCustomerCount(client:unknown,owner:string){
  const db=client as {from:(table:string)=>{select:(field:string,options:{head:true;count:'exact'})=>CountQuery}}
