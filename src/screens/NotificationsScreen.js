@@ -153,7 +153,7 @@ export default function NotificationsScreen({ navigation, route }) {
           {tag && <Text style={[styles.sideTag, { color: side === 'job' ? colors.jobInk : colors.listingInk }]}>{tag}</Text>}
           <Text style={styles.rowBody}>{notificationBody(item)}</Text>
           {openingId === item.id && <Text accessibilityRole="text" style={styles.rowTime}>Opening…</Text>}
-          {item.type === 'availability_check' && !item._availabilityAnswered && (
+          {item.type === 'availability_check' && item._wasUnread && !item._availabilityAnswered && (
             <View style={styles.quickActions}>
               <TouchableOpacity
                 style={styles.quickAction}

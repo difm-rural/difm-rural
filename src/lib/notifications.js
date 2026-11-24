@@ -1,44 +1,34 @@
 import {formatDate} from '../../shared/formatting.js'
+import { NOTIFICATION_ICON_KEYS } from '../../shared/notificationIcons'
 import { Alert } from 'react-native'
 import { supabase } from './supabase'
 import { requestBadgeRefresh } from './badgeEvents'
 
-export const NOTIFICATION_ICONS = {
-  new_booking:                     'briefcase-outline',
-  new_bid:                         'cash-outline',
-  new_job_invite:                  'mail-open-outline',
-  bid_accepted:                    'trophy-outline',
-  bid_rejected:                    'close-circle-outline',
-  job_cancelled:                   'alert-circle-outline',
-  job_ready:                       'notifications-outline',
-  job_completed:                   'checkmark-circle-outline',
-  review_received:                 'star-outline',
-  new_question:                    'help-circle-outline',
-  question_answered:               'chatbubble-ellipses-outline',
-  new_message:                     'chatbubble-ellipses-outline',
-  service_quote_sent:              'document-text-outline',
-  service_quote_accepted:          'trophy-outline',
-  booking_confirmed:               'checkmark-circle-outline',
-  booking_declined:                'close-circle-outline',
-  booking_cancelled:               'alert-circle-outline',
-  service_booking_withdrawn:       'alert-circle-outline',
-  booking_ready:                   'notifications-outline',
-  opportunity_match:               'briefcase-outline',
-  opportunity_digest:              'briefcase-outline',
-  saved_interest_match:            'bookmark-outline',
-  saved_interest_digest:           'bookmark-outline',
-  availability_check:              'calendar-outline',
-  arrival_window_confirmed:        'calendar-outline',
-  running_late:                    'car-outline',
-  work_completion_due:             'checkmark-done-outline',
-  booking_completed:               'checkmark-circle-outline',
-  booking_cancellation_requested:  'alert-circle-outline',
-  payment_details_sent:            'card-outline',
-  payment_marked_sent:             'checkmark-done-outline',
-  payment_sorted:                  'checkmark-done-outline',
-  payment_unsorted:                'card-outline',
-  job_confirmed:                   'checkmark-circle-outline',
+// Semantic icon keys are shared with provider-web (shared/notificationIcons.ts);
+// this maps them onto Ionicons for the app.
+const IONICON_FOR_KEY = {
+  briefcase: 'briefcase-outline',
+  cash:      'cash-outline',
+  invite:    'mail-open-outline',
+  trophy:    'trophy-outline',
+  declined:  'close-circle-outline',
+  alert:     'alert-circle-outline',
+  bell:      'notifications-outline',
+  done:      'checkmark-circle-outline',
+  'done-all': 'checkmark-done-outline',
+  star:      'star-outline',
+  question:  'help-circle-outline',
+  chat:      'chatbubble-ellipses-outline',
+  document:  'document-text-outline',
+  bookmark:  'bookmark-outline',
+  calendar:  'calendar-outline',
+  car:       'car-outline',
+  card:      'card-outline',
 }
+
+export const NOTIFICATION_ICONS = Object.fromEntries(
+  Object.entries(NOTIFICATION_ICON_KEYS).map(([type, key]) => [type, IONICON_FOR_KEY[key]]),
+)
 
 export async function fetchNotifications(limit = 50) {
   const { data: { session } } = await supabase.auth.getSession()
