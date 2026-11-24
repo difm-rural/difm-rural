@@ -15,10 +15,10 @@ test('grazing unit price and calculator quantity/capacity retain existing estima
  assert.equal(readableRate('per_unit',50,'head/week'),'$50 per head per week');assert.equal(quantityUnit('head/week',7),'head');assert.equal(quantityUnit('head/month',1),'head')
  assert.equal(listingEstimate(service,null,7).baseAmount,350);assert.equal(listingEstimate(service,null,100).quantity,10)
 })
-const located=options=>{const screen=openBooking({service,quantity:7,...options});screen.find('AddressAutocomplete').props.onChangeText('Agreed grazing area');screen.render();return screen}
+const located=options=>{const screen=openBooking({service,quantity:7,...options});screen.find('AddressAutocomplete')?.props.onChangeText('Agreed grazing area');screen.render();return screen}
 test('request preserves quantity and never copies a private provider address or pin',async()=>{
  const s=located();assert.ok(!s.texts().includes('PRIVATE STREET ADDRESS'));await s.press('Send booking request')
- const row=s.log.writes[0].payload;assert.equal(row.quantity,7);assert.equal(row.total_amount,350);assert.equal(row.location_name,'Agreed grazing area');assert.equal(row.latitude,null);assert.equal(row.longitude,null)
+ const row=s.log.writes[0].payload;assert.equal(row.quantity,7);assert.equal(row.total_amount,350);assert.equal(row.location_name,null);assert.equal(row.latitude,null);assert.equal(row.longitude,null)
  assert.ok(s.texts().includes('Booking request sent!'));assert.ok(s.texts().includes('Peter'))
  await s.press('View booking');assert.equal(s.log.navigation[0][0],'ServiceBookingDetail');assert.equal(s.log.navigation[0][1].booking.id,row.id);assert.equal(s.log.navigation[0][1].viewerRole,'requester')
 })

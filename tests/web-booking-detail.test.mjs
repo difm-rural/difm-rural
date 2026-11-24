@@ -117,3 +117,28 @@ test('optional grazing duration is carried as editable notes without changing pr
  await assert.rejects(requestBooking({error:''},form({...requestValues,expected_duration:'6 weeks',notes:'Two quiet cattle'})),{message:'REDIRECT:/bookings/'+id+'?sent=1'})
  const payload=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(payload.notes,'Expected duration: 6 weeks\nTwo quiet cattle');assert.equal(payload.status,'pending');assert.ok(!('duration' in payload))
 })
+
+test('web derives location ownership from listing and ignores forged grazing coordinates',async()=>{
+ for(const patch of [{kind:'grazing'},{kind:'hire'}]){
+  const item={...listing,...patch};const supabase=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+  const values={...requestValues,location:'',pricing_revision:pricingRevision(item)}
+  if(item.kind==='grazing')Object.assign(values,{location:'Forged address',latitude:'invalid',longitude:'999',location_note:'Private'})
+  await assert.rejects(requestBooking({error:''},form(values)),/REDIRECT:/)
+  const row=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(row.location_name,null);assert.equal(row.latitude,null);assert.equal(row.longitude,null);assert.equal(row.location_note,null);assert.equal(row.status,'pending')
+ }
+})
+test('web on-site request still requires requester address and preserves valid coordinates',async()=>{
+ let supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ assert.ok((await requestBooking({error:''},form({...requestValues,location:''}))).error);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ await assert.rejects(requestBooking({error:''},form({...requestValues,latitude:0,longitude:0,location_note:'Gate'})),/REDIRECT:/)
+ const row=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(row.latitude,0);assert.equal(row.longitude,0);assert.equal(row.location_note,'Gate')
+})
+
+test('web location changes preserve listing ownership and enquiry-only restrictions',async()=>{
+ for(const [kind,userId] of [['grazing',provider],['hire',provider],['for_sale',requester],['lease',requester]]){
+  const item={...listing,kind};const supabase=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:userId}}
+  assert.ok((await requestBooking({error:''},form({...requestValues,location:'',pricing_revision:pricingRevision(item)}))).error)
+  assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ }
+})

@@ -1,3 +1,4 @@
+import * as bookingLocation from '../shared/bookingLocation.ts'
 import * as propertyNetworkJobs from '../shared/propertyNetworkJobs.ts'
 import {fillJobDraftFields} from '../shared/jobSuggestion.ts'
 import * as formatting from '../shared/formatting.js'
@@ -39,6 +40,7 @@ function harness(storage,seed,{
  if(name==='@/components/job-location-map')return {JobLocationMap:'job-map'}
  if(name==='react')return react
   if(name==='react/jsx-runtime')return {jsx,jsxs:jsx}
+  if(name==='@shared/bookingLocation')return bookingLocation
   if(name==='@shared/propertyNetworkJobs')return propertyNetworkJobs
  if(name==='@shared/jobSuggestion')return {fillJobDraftFields}
   if(name==='@shared/jobDraft')return jobDraft

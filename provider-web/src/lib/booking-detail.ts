@@ -44,4 +44,4 @@ export function bookingNextStep(status:string,role:'requester'|'provider',quote:
  return 'This request is closed. You can find it again in Activity History.'
 }
 
-export type BookingRecord=BookingResponse & {service_id:string;quantity:number;total_amount:number;payment_timing:string|null;scheduled_date:string|null;location_name:string|null;latitude:number|null;longitude:number|null;location_note:string|null;notes:string|null;created_at:string;quote_accepted_at:string|null;service:(PricingListing & {id:string;title:string;closed_at:string|null;is_active:boolean;kind?:string|null})|null}
+export type BookingRecord=BookingResponse & {service_id:string;quantity:number;total_amount:number;payment_timing:string|null;scheduled_date:string|null;location_name:string|null;latitude:number|null;longitude:number|null;location_note:string|null;notes:string|null;created_at:string;quote_accepted_at:string|null;service:(PricingListing & {id:string;title:string;closed_at:string|null;is_active:boolean;kind?:string|null;location_name?:string|null})|null}

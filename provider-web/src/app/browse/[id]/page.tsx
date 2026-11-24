@@ -1,3 +1,4 @@
+import {bookingLocationPolicy} from '@shared/bookingLocation'
 import {readableRate} from '@shared/findLocalHelp'
 import {formatDateLabel} from '@shared/formatting'
 import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
@@ -40,7 +41,7 @@ export default async function ListingPage({params,searchParams}:{params:Promise<
  {s.photos?.length?<PhotoGallery photos={s.photos} title={s.title}/>:<div className="card"><p className="muted">No photos provided.</p></div>}
  {own&&<p className="account-current">{s.closed_at?'Closed listing — visible only to you here':s.is_active?'Live listing':'Paused listing — visible only to you here'} · Manage your listing from My listings.</p>}
  <article className="card listing-provider-summary"><h2>{ownerError?'Provider profile unavailable':<Link href={'/people/'+s.provider_id}>{owner?.full_name || 'Listing provider'}</Link>}</h2>{owner?.created_at&&<p className="muted">Member since {new Date(owner.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}<Link href={'/people/'+s.provider_id+'/reviews?role=provider'} className="card-link">{reviewError?'Read reviews and comments':reviews.length?'★ '+average.toFixed(1)+' · '+reviews.length+' completed-work reviews — read comments':'No reviews yet — view profile'}</Link></article>
- <article className="card work-detail listing-facts"><h2>Listing details</h2><p>{s.category} · {s.location_name || 'Location to be arranged'}</p><strong>{readableRate(s.pricing_type,s.rate,s.unit_label,s.min_charge)}</strong><p className="work-description">{s.description}</p>
+ <article className="card work-detail listing-facts"><h2>Listing details</h2>{['for_sale','lease'].includes(s.kind)&&<p>{bookingLocationPolicy(s.kind).help}</p>}<p>{s.category} · {s.location_name || 'Location to be arranged'}</p><strong>{readableRate(s.pricing_type,s.rate,s.unit_label,s.min_charge)}</strong><p className="work-description">{s.description}</p>
  {s.latitude!=null&&s.longitude!=null&&<a className="card-link" href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(s.latitude+','+s.longitude)} target="_blank" rel="noopener noreferrer">Open listing location in Maps</a>}
  {(s.kind||'service')==='service'&&s.materials&&<p>Materials: {materialsLabel(s.materials)}</p>}{s.travel_range_km>0&&<p>Travel range: {s.travel_range_km} km</p>}<p>Availability: {s.availability?.length?s.availability.map(formatDateLabel).join(', '):'Arrange with the provider'}</p>
  {s.min_charge!=null&&<p>Minimum charge: {nzMoney(s.min_charge)}</p>}{s.minimum_units>1&&<p>Minimum quantity: {s.minimum_units}</p>}{s.kind==='grazing'&&s.max_units&&<p>Grazing capacity: {s.max_units} head</p>}

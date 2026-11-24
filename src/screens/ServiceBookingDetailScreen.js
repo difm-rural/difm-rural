@@ -1,3 +1,4 @@
+import {bookingLocationPolicy} from '../../shared/bookingLocation'
 import {readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import {formatDateLabel} from '../../shared/formatting.js'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
@@ -498,7 +499,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         )}
 
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Where</Text>
+          <Text style={styles.cardLabel}>{service.kind==='grazing'?'Grazing area':service.kind==='hire'?'Collection / delivery':'Where'}</Text>
+          {['grazing','hire'].includes(service.kind)&&<Text style={styles.detailValue}>{bookingLocationPolicy(service.kind).help}</Text>}
           <DetailRow label="Private booking location" value={booking.location_name} />
           <DetailRow label="Public listing area" value={service.location_name} />
           {booking.latitude && booking.longitude ? (
