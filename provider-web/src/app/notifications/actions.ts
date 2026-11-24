@@ -2,7 +2,9 @@
 import { revalidatePath } from 'next/cache'
 import { requireProvider } from '@/lib/auth'
 import type { ActionState } from '@/components/action-form'
-import { notificationHref } from '@/lib/work'
+import { availabilityInput } from '@/lib/profile-input'
+
+function refreshed(){revalidatePath('/notifications');revalidatePath('/');revalidatePath('/activity')}
 
 export async function updateNotification(_:ActionState,data:FormData):Promise<ActionState>{
   const {supabase,user}=await requireProvider()
@@ -17,26 +19,37 @@ export async function updateNotification(_:ActionState,data:FormData):Promise<Ac
   q=all?q.lte('created_at',cutoff):q.eq('id',id)
   const {error}=await q
   if(error)return {error:'Could not update notifications. Check your connection and try again.'}
-  revalidatePath('/notifications');revalidatePath('/');revalidatePath('/activity')
+  refreshed()
   return {error:'',success:all?'Notifications marked read.':'Marked read.'}
 }
-export async function visitNotification(_:ActionState,data:FormData):Promise<ActionState & {href?:string}>{
-  const {supabase,user}=await requireProvider(),id=String(data.get('id') || '')
-  const {data:n,error}=await supabase.from('notifications').select('id,type,body,metadata').eq('id',id).eq('user_id',user.id).maybeSingle()
-  if(error)return {error:'Could not open this notification. Try again.'}
-  if(!n)return {error:'This notification is no longer available.'}
-  const meta=n.metadata || {}
-  const target=meta.booking_id?{table:'bookings',id:meta.booking_id}:meta.job_id?{table:'jobs_public',id:meta.job_id}:meta.service_id?{table:'services',id:meta.service_id}:meta.saved_interest_id?{table:'saved_interests',id:meta.saved_interest_id}:null
-  if(target){
-    const {data:record,error:targetError}=await supabase.from(target.table).select('id').eq('id',target.id).maybeSingle()
-    if(targetError)return {error:'Could not load the related item. Check your connection and try again.'}
-    if(!record)return {error:'The related item has been removed or is no longer available. You can mark this notification read.'}
-  }
-  // Message notices are read by the focused conversation after messages load.
-  if(n.type!=='new_message'){
-    const {error:readError}=await supabase.from('notifications').update({read:true}).eq('id',id).eq('user_id',user.id)
-    if(readError)return {error:'Could not update the read status. Please try again.'}
-    revalidatePath('/')
-  }
-  return {error:'',href:notificationHref(n)}
+
+// Fired in the background when a row is opened, and by the row's "Mark read"
+// button. Message notices are excluded here too: the conversation marks them
+// read once its messages have loaded.
+export async function markNotificationRead(id:string,options:{includeMessages?:boolean}={}):Promise<{ok:boolean}>{
+  const {supabase,user}=await requireProvider()
+  if(!id)return {ok:false}
+  let q=supabase.from('notifications').update({read:true}).eq('id',id).eq('user_id',user.id).eq('read',false)
+  if(!options.includeMessages)q=q.neq('type','new_message')
+  const {error}=await q
+  if(error)return {ok:false}
+  refreshed()
+  return {ok:true}
+}
+
+const QUICK_AVAILABILITY=new Set(['available_this_week','limited'])
+
+// The inline answers on an availability_check notice (mirrors the app's
+// NotificationsScreen quick actions): save the status, then mark the notice read.
+export async function answerAvailabilityCheck(id:string,status:string):Promise<ActionState>{
+  if(!QUICK_AVAILABILITY.has(status))return {error:'Choose an availability option.'}
+  const {supabase,user}=await requireProvider()
+  const form=new FormData();form.set('availability_status',status)
+  const input=availabilityInput(form)
+  if(!input.ok)return {error:input.error}
+  const {data:rows,error}=await supabase.from('profiles').update(input.value).eq('id',user.id).select('id')
+  if(error || !rows?.length)return {error:'Could not save availability. Check your connection and try again.'}
+  await supabase.from('notifications').update({read:true}).eq('id',id).eq('user_id',user.id)
+  refreshed();revalidatePath('/account');revalidatePath('/account/availability')
+  return {error:''}
 }

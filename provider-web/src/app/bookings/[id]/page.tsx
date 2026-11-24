@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { SideKicker } from '@/components/side-kicker'
 import { requireProvider } from '@/lib/auth'
+import { markNotificationsReadFor } from '@/lib/notification-read'
 import { LiveRefresh } from '@/components/live-refresh'
 import { statusLabel } from '@/lib/work'
 import { loadActivityWork } from '@/lib/activity-data'
@@ -24,7 +25,7 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
   const {id}=await params
   const {reviewed,sent}=await searchParams
   const {supabase,user,profile}=await requireProvider('/bookings/'+id)
-  const work=await loadActivityWork(supabase,'booking',id)
+  const [work]=await Promise.all([loadActivityWork(supabase,'booking',id),markNotificationsReadFor(supabase,user.id,{bookingId:id})])
   if(!work)notFound()
   const role=workRole(work,user.id)
   if(!role)notFound()

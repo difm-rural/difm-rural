@@ -11,6 +11,7 @@ import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { SideKicker } from '@/components/side-kicker'
 import { requireProvider } from '@/lib/auth'
+import { markNotificationsReadFor } from '@/lib/notification-read'
 import { ActionForm } from '@/components/action-form'
 import { LiveRefresh } from '@/components/live-refresh'
 import { acceptOffer, changeOffer, jobQuestion, removeJob } from '../../work-actions'
@@ -36,7 +37,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const {thread,reviewed,posted,edited,accepted,offered,propertyLinkFailed,propertyArea}=await searchParams
  const threadParam=Array.isArray(thread)?thread[0]:thread
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
- const {data:job,error}=await supabase.from('jobs_public').select('*').eq('id',id).maybeSingle()
+ const [{data:job,error}]=await Promise.all([supabase.from('jobs_public').select('*').eq('id',id).maybeSingle(),markNotificationsReadFor(supabase,user.id,{jobId:id})])
  if(error)throw new Error('Could not load this job. Refresh to try again.');if(!job)notFound()
  const {data:gallery}=process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'
   ? await supabase.rpc('list_job_private_photos',{p_job:id})

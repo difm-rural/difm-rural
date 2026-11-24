@@ -332,6 +332,7 @@ test('posted job displays separate category and location labels and verified acc
   '@/lib/job-input':{SCHEDULES:{},jobOwnerActions:()=>({})},
   '@/lib/activity-policy':{workRole:()=> 'requester',workActions:()=>[]},
   '@/lib/messaging-data':{loadConversation:async()=>null},
+  '@/lib/notification-read':{markNotificationsReadFor:async()=>{}},
   '@/lib/auth':{requireProvider:async()=>({user:{id:userId},supabase:{
    from(table){
     return {select(){return this},eq(){return this},order(){return this},in(){return this},
