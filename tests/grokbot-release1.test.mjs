@@ -1,6 +1,7 @@
 import * as propertyNetworkJobs from '../shared/propertyNetworkJobs.ts'
 import {agreedJobDetails} from '../shared/agreedJobDetails.ts'
 import assert from 'node:assert/strict'
+import * as bookingLocation from '../shared/bookingLocation.ts'
 import test from 'node:test'
 import {readFile} from 'node:fs/promises'
 import {createRequire} from 'node:module'
@@ -236,7 +237,7 @@ test('posting keeps a validated explicit category and only suggests when it is a
    functions:{invoke:async()=>{classified++;return {data:{category:'Fencing & Gates'}}}},
   }})},
   '@/lib/job-input':{validId:value=>value==='job',jobInput:()=>({ok:true,value:{title:'Repair a gate',description:'Replace two hinges'}})},
-  '@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+  '@shared/bookingLocation':bookingLocation,'@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
  })
  const data=new FormData()
  data.set('job_id','job')
@@ -270,7 +271,7 @@ test('confirmation only returns the saved arrival and success after the RPC succ
    return {error:fail?{}:null}
   }}})},
   '@/lib/job-input':{validId:()=>true},
-  '@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+  '@shared/bookingLocation':bookingLocation,'@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
  })
  const data=new FormData()
  const arrival='2099-11-18T21:00:00.000Z'
@@ -300,7 +301,7 @@ test('accepting an offer keeps the existing RPC and navigates to feedback only o
    from:table=>({select:()=>({eq:()=>({single:async()=>({data:table==='bids'?{id:'offer',job_id:'job'}:{requester_id:owner,status:'open'}})})})}),
    rpc:async(name,payload)=>{calls.push([name,payload.p_offer_id]);return {error:rpcError}},
   }})},
-  '@/lib/job-input':{},'@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
+  '@/lib/job-input':{},'@shared/bookingLocation':bookingLocation,'@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/dates':dates,'@/lib/offer-input':{},'@/lib/booking-detail':{},
  })
  const data=new FormData()
  data.set('offer_id','offer')
@@ -390,7 +391,7 @@ test('offer submission navigates to a persistent job banner only after database 
  let writeError=true,existing=false,destination
  let writes=0
  const {sendOffer}=compile(await source('../provider-web/src/app/work-actions.ts'),{
-  '@shared/categories':{},'@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,
+  '@shared/categories':{},'@shared/bookingLocation':bookingLocation,'@shared/propertyNetworkJobs':propertyNetworkJobs,'@shared/flowFeedback':{},'@shared/photos':{},'@shared/dates':dates,
   'next/navigation':{redirect(path){destination=path;throw Error('redirect')}},'next/cache':{revalidatePath(){}},
   '@/lib/job-input':{},'@/lib/booking-detail':{},'@/lib/offer-input':{offerInput:()=>({ok:true,value:{amount:50}})},
   '@/lib/auth':{requireProvider:async()=>({user:{id:'provider'},supabase:{

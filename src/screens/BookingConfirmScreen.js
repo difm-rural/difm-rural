@@ -24,6 +24,7 @@ import { colors } from '../theme/tokens'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
 import AddressAutocomplete from '../components/AddressAutocomplete'
+import {bookingLocationPolicy,bookingPublicArea,bookingLocationFields} from '../../shared/bookingLocation'
 import {newJobId} from '../lib/draftId'
 import {bookingSubmission,bookingSuccess,readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import { bookingRequestCopy } from '../lib/bookingRequestCopy'
@@ -88,6 +89,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const { service, quantity: initialQty, selectedOption } = route.params || {}
   const option = selectedOption || null
   const isGrazing = service?.kind === 'grazing'
+  const locationPolicy=bookingLocationPolicy(service?.kind)
   const estimate = listingEstimate(service, option, initialQty)
   const qty = estimate.quantity
   const effectivePricingType = estimate.pricingType
@@ -129,6 +131,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
   useEffect(() => {
     const result = route.params?.locationResult
     if (!result) return
+    if(!locationPolicy.collectRequesterLocation){navigation.setParams({locationResult:null});return}
     if (result.address) setLocation(result.address)
     if (result.latitude != null) setLatitude(result.latitude)
     if (result.longitude != null) setLongitude(result.longitude)
@@ -147,10 +150,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
       payment_timing: service.payment_timing,
       status:         'pending',
       scheduled_date: scheduleType === 'specific' ? toLocalIsoDate(date) : scheduleType,
-      location_name:  location.trim(),
-      latitude,
-      longitude,
-      location_note: locationNote.trim() || null,
+      ...bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote}),
       notes:          [duration.trim()?`Expected duration: ${duration.trim()}`:'',notes.trim()].filter(Boolean).join('\n') || null,
     }
   }
@@ -203,10 +203,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
   }
 
   async function requireAuth(intent) {
-    if (!location.trim()) {
-      Alert.alert('Location required', 'Please enter your location or property address.')
-      return
-    }
+    try{bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote})}
+    catch(error){Alert.alert('Check location',error.message);return}
     await savePendingBooking()
     setShowAuthSheet(false)
     // Passwordless email-code login auto-creates the account, so both
@@ -240,10 +238,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
     if(submitting||createdBooking)return
     if(scheduleType==='specific'&&!date){Alert.alert('Choose a date','Select your preferred date.');return}
     const { data: { user } } = await supabase.auth.getUser()
-    if (!location.trim()) {
-      Alert.alert('Location required', 'Please enter your location or property address.')
-      return
-    }
+    try{bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote})}
+    catch(error){Alert.alert('Check location',error.message);return}
     if (!user) {
       setShowAuthSheet(true)
       return
@@ -392,14 +388,19 @@ export default function BookingConfirmScreen({ route, navigation }) {
           )}
         </View>
 
+        {locationPolicy.source!=='requester'&&<View style={styles.card}>
+          <Text style={styles.cardLabel}>{locationPolicy.label}</Text>
+          <Text style={[styles.paymentInfoText,{paddingHorizontal:16,paddingBottom:14}]}>{bookingPublicArea(service.location_name)}</Text>
+          {isGrazing&&<Text style={[styles.paymentInfoText,{paddingHorizontal:16,paddingBottom:14}]}>{locationPolicy.help}</Text>}
+        </View>}
         {/* Location */}
-        <View style={[styles.card, styles.locationCard]}>
-          <Text style={styles.cardLabel}>{isGrazing ? 'Where the animals will graze' : 'Where?'}</Text>
-          {isGrazing&&<Text style={[styles.paymentInfoText,{paddingHorizontal:16,marginBottom:10}]}>Enter the general area. Agree the exact grazing location with the provider.</Text>}
+        {locationPolicy.collectRequesterLocation&&<View style={[styles.card, styles.locationCard]}>
+          <Text style={styles.cardLabel}>{locationPolicy.required?'Where?':locationPolicy.inputLabel}</Text>
+          {service.kind==='hire'&&<Text style={[styles.paymentInfoText,{paddingHorizontal:16,marginBottom:10}]}>{locationPolicy.help}</Text>}
           <View style={styles.inputWrap}>
             <AddressAutocomplete
               value={location}
-              placeholder={isGrazing ? 'Grazing property location' : 'Your address or property location'}
+              placeholder={locationPolicy.inputLabel}
               onChangeText={(text) => {
                 setLocation(text)
                 setLatitude(null)
@@ -407,8 +408,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
               }}
               onSelect={({ address, latitude: lat, longitude: lng }) => {
                 setLocation(address || '')
-                setLatitude(lat || null)
-                setLongitude(lng || null)
+                setLatitude(lat ?? null)
+                setLongitude(lng ?? null)
               }}
             />
           </View>
@@ -430,7 +431,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
               <Text style={styles.pinBtnText}>{latitude && longitude ? 'Edit pin' : 'Drop pin'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </View>}
 
         {/* Notes */}
         <View style={styles.card}>

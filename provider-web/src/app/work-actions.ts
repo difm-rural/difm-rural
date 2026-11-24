@@ -1,4 +1,5 @@
 'use server'
+import {bookingLocationFields} from '@shared/bookingLocation'
 import {propertyJobOrigin,linkPostedPropertyJob} from '@shared/propertyNetworkJobs'
 import { CATEGORIES } from '@shared/categories'
 import { redirect } from 'next/navigation'
@@ -266,25 +267,26 @@ export async function acceptOffer(_: ActionState, data: FormData): Promise<Actio
 
 export async function requestBooking(_:ActionState,data:FormData):Promise<ActionState>{
   const {supabase,user}=await requireProvider(),id=text(data,'service_id'),requestId=text(data,'request_id'),location=text(data,'location'),quantity=Number(text(data,'quantity'))
-  if(!validId(id)||!validId(requestId)||!location||location.length>300||!Number.isFinite(quantity)||quantity<=0||quantity>10000000)return {error:'Add a location (up to 300 characters) and a positive quantity.'}
+  if(!validId(id)||!validId(requestId)||!Number.isFinite(quantity)||quantity<=0||quantity>10000000)return {error:'Choose a valid listing and a positive quantity.'}
   const notes=[text(data,'expected_duration')?'Expected duration: '+text(data,'expected_duration').slice(0,120):'',text(data,'notes')].filter(Boolean).join('\n'),locationNote=text(data,'location_note'),schedule=text(data,'schedule_type'),date=text(data,'date'),lat=text(data,'latitude'),lng=text(data,'longitude')
-  if(notes.length>5000||locationNote.length>2000)return {error:'Keep notes to 5,000 characters and arrival directions to 2,000.'}
+  if(notes.length>5000)return {error:'Keep notes to 5,000 characters and arrival directions to 2,000.'}
   const isoDate=schedule==='specific'?parseNzDate(date):null
   if(!['asap','flexible','specific'].includes(schedule)||(schedule==='specific'&&!isoDate))return {error:'Choose a valid preferred date or flexible timing.'}
-  if(!!lat!==!!lng||(lat&&(!Number.isFinite(Number(lat))||Math.abs(Number(lat))>90||!Number.isFinite(Number(lng))||Math.abs(Number(lng))>180)))return {error:'Clear the invalid GPS location or choose it again.'}
   const {data:existing,error:existingError}=await supabase.from('bookings').select('id').eq('id',requestId).eq('requester_id',user.id).maybeSingle()
   if(existingError)return failed()
   if(existing)redirect('/activity/booking/'+existing.id+'/manage')
   const {data:s,error}=await supabase.from('services_public').select('*').eq('id',id).single()
   if(error)return failed()
   if(!s||!s.is_active||s.closed_at||s.provider_id===user.id||['for_sale','lease'].includes(s.kind))return {error:'This listing is unavailable for booking requests. Go back to the listing to check its status.'}
+  let locationFields
+  try{locationFields=bookingLocationFields(s.kind,{location,latitude:lat,longitude:lng,note:locationNote})}catch(error){return {error:error instanceof Error?error.message:'Check the booking location.'}}
   if(text(data,'pricing_revision')!==pricingRevision(s))return {error:'The listing pricing or terms changed. Go back to the listing and review the latest details before sending your request.'}
   const active=await supabase.from('bookings').select('id').eq('service_id',id).eq('requester_id',user.id).in('status',['pending','quote_sent','confirmed','in_progress','cancellation_requested'])
   if(active.error)return failed()
   if(active.data?.length)return {error:'You already have an active request for this listing. Open Activity to view it.'}
   let snapshot
   try{snapshot=pricingSnapshot(s,text(data,'variant_index'),quantity)}catch{return {error:'This rate option has changed. Go back to the listing and choose a rate again.'}}
-  const {error:saveError}=await supabase.from('bookings').insert({id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,location_name:location,latitude:lat?Number(lat):null,longitude:lng?Number(lng):null,location_note:locationNote||null,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
+  const {error:saveError}=await supabase.from('bookings').insert({id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,...locationFields,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
   if(saveError)return failed()
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/browse/'+id)
   redirect('/bookings/'+requestId+'?sent=1')

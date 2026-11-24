@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs'
 import {createRequire} from 'node:module'
 const require=createRequire(import.meta.url)
 const compiled=require('@babel/core').transformSync(readFileSync(new URL('../../src/screens/BookingConfirmScreen.js',import.meta.url),'utf8'),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
-const real={'../../shared/formatting.js':await import('../../shared/formatting.js'),'../../shared/dates':await import('../../shared/dates.ts'),'../../shared/findLocalHelp':await import('../../shared/findLocalHelp.ts'),'../lib/listingEstimate':await import('../../shared/listingEstimate.ts'),'../lib/bookingRequestCopy':await import('../../src/lib/bookingRequestCopy.js'),'../lib/draftId':await import('../../src/lib/draftId.js')}
+const real={'../../shared/bookingLocation':await import('../../shared/bookingLocation.ts'),'../../shared/formatting.js':await import('../../shared/formatting.js'),'../../shared/dates':await import('../../shared/dates.ts'),'../../shared/findLocalHelp':await import('../../shared/findLocalHelp.ts'),'../lib/listingEstimate':await import('../../shared/listingEstimate.ts'),'../lib/bookingRequestCopy':await import('../../src/lib/bookingRequestCopy.js'),'../lib/draftId':await import('../../src/lib/draftId.js')}
 const nodes=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)]
 export function openBooking({service,quantity=1,fail=false,user='requester'}={}){
  const state=[],log={writes:[],navigation:[],alerts:[],reads:[]};let index=0,tree,row

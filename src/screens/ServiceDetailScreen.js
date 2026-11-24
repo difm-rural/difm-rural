@@ -18,6 +18,7 @@ import { colors } from '../theme/tokens'
 import { fetchProviderStats } from '../lib/providerStats'
 import { BOOKING_ACTIVE_STATUSES, isBookingWithdrawable } from '../lib/lifecycle'
 import { cancelBookingByRequester } from '../lib/bookingActions'
+import {bookingLocationPolicy} from '../../shared/bookingLocation'
 import {readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import Icon from '../components/Icon'
 import SideHeader from '../components/SideHeader'
@@ -400,6 +401,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
           </View>
         )}
 
+        {['for_sale','lease'].includes(service.kind)&&<View style={styles.card}><Text style={styles.cardLabel}>Location arrangements</Text><Text style={[styles.providerMeta,{paddingHorizontal:16,paddingBottom:14}]}>{bookingLocationPolicy(service.kind).help}</Text></View>}
         {/* Service details */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Listing details</Text>
