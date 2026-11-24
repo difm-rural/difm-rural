@@ -259,8 +259,8 @@ export default function HomeTabScreen({ navigation }) {
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Find work" subtitle="Browse available jobs."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'JobsBoard'})}/>
-            <PrimaryAction title="Create a listing" subtitle="Advertise a service." variant="secondary"
-              onPress={()=>navigation.navigate('CreateService',{newListing:Date.now()})}/>
+            <PrimaryAction title="My listings" subtitle="Manage or create listings" variant="secondary"
+              onPress={()=>navigation.navigate('MyServices')}/>
           </View>
           <TouchableOpacity style={styles.connCard} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'customers'})}>
             <Icon name="people-outline" size={22} color={colors.primary}/>

@@ -38,9 +38,11 @@ export default async function ListingsPage({ searchParams }: { searchParams: Pro
         {saved === '1' && <p className="status-banner" role="status">Listing changes saved.</p>}
 
         {rows.length === 0 ? (
-          <p className="empty">
-            No listings yet. <Link href="/listings/new" className="text-link">Create one</Link> or use the Rural Connections app.
-          </p>
+          <div className="home-empty">
+            <h2>No listings yet</h2>
+            <p>Create a listing to start reaching locals nearby.</p>
+            <Link href="/listings/new" className="lform-save as-link">Create your first listing</Link>
+          </div>
         ) : (
           <div className="manage-grid">
             {rows.map(s => <ManageCard key={s.id} s={s} />)}

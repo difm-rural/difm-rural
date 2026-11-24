@@ -112,7 +112,7 @@ export default async function HomePage() {
   function actions(work:boolean){
    const items=work?[
     {title:'Find work',text:'Browse available jobs.',href:'/jobs',icon:Search},
-    {title:'Create a listing',text:'Advertise a service.',href:'/listings/new',icon:Plus},
+    {title:'My listings',text:'Manage or create listings',href:'/listings',icon:ListChecks},
    ]:[
     {title:'Post a job',text:'Get help with something that needs doing.',href:'/jobs/new',icon:Plus},
     {title:'Find local help',text:'Browse local providers and services.',href:'/browse',icon:Search},

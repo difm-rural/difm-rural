@@ -101,3 +101,11 @@ test('dashboard keeps available activity and signals an actual lookup error',asy
  assert.doesNotMatch(hidden.html,/Some activity could not be loaded/)
  assert.match(hidden.html,/Pending fence.*Awarded fence/)
 })
+
+test('Work Home keeps two action cards and opens listing management rather than creation',async()=>{
+ const {html}=await dashboard();const actions=html.match(/<div class="home-actions">([\s\S]*?)<\/div>/)?.[1]
+ assert.ok(actions);assert.equal((actions.match(/<a /g)||[]).length,2)
+ assert.match(actions,/href="\/jobs"[^>]*>[\s\S]*Find work/)
+ assert.match(actions,/href="\/listings"[^>]*>[\s\S]*My listings[\s\S]*Manage or create listings/)
+ assert.doesNotMatch(actions,/\/listings\/new/)
+})

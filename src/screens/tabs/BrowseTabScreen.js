@@ -186,11 +186,13 @@ export default function BrowseTabScreen({ navigation, route }) {
       </ScrollView>
       {currentUserId && (
         <TouchableOpacity
-          style={{paddingHorizontal:20,paddingVertical:8,alignSelf:'flex-start'}}
+          style={styles.manageListings}
           onPress={() => navigation.navigate('MyServices')}
           accessibilityRole="button"
-          accessibilityLabel="My listings">
-          <Text style={{color:colors.primary,fontWeight:'600'}}>My listings</Text>
+          accessibilityLabel="Manage my listings">
+          <Icon name="list-outline" size={20} color={colors.primary}/>
+          <Text style={styles.manageListingsText}>Manage my listings</Text>
+          <Icon name="chevron-forward" size={16} color={colors.textMuted}/>
 
         </TouchableOpacity>
       )}
@@ -242,6 +244,8 @@ export default function BrowseTabScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  manageListings: {marginHorizontal:20,paddingVertical:10,minHeight:44,flexDirection:'row',alignItems:'center',gap:10},
+  manageListingsText: {flex:1,minWidth:0,fontSize:14,fontWeight:'600',color:colors.primary},
   screen: { flex: 1, backgroundColor: colors.background },
 
   header: {
