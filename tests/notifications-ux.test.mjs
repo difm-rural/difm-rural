@@ -1,3 +1,4 @@
+import {arrangementTime} from '../shared/notificationArrangement.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
@@ -6,14 +7,14 @@ import * as groups from '../shared/notificationGroups.ts'
 import {notificationHint} from '../shared/notificationHints.ts'
 import {notificationBody} from '../shared/notificationBody.ts'
 import {notificationHref} from '../provider-web/src/lib/work.ts'
-import {sideTag} from '../shared/marketSide.ts'
+import {sideTag,notificationSide} from '../shared/marketSide.ts'
 const require=createRequire(import.meta.url)
 const code=require('@babel/core').transformSync(readFileSync(new URL('../src/screens/NotificationsScreen.js',import.meta.url),'utf8'),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
 function screen({events=[],count=events.filter(n=>!n.read).length,failMark=false,failLoad=false}={}){
  const state=[],calls=[],effects=[];let index=0,lastFilter,tree
  const jsx=(type,props)=>({type,props})
  const react={useState(init){const at=index++;if(!(at in state))state[at]=typeof init==='function'?init():init;return [state[at],v=>state[at]=typeof v==='function'?v(state[at]):v]},useRef(init){const at=index++;state[at]??={current:init};return state[at]},useCallback:fn=>fn}
- const modules={react:{...react,default:react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},'../../shared/notificationGroups':groups,'../../shared/notificationHints':{notificationHint},'../../shared/notificationBody':{notificationBody},'../../shared/marketSide':{notificationSide:()=>null,sideTag:()=>null},'../../shared/stackNavigation':{stackRootAction:()=>null},'../lib/supabase':{supabase:{auth:{getUser:async()=>({data:{user:{id:'viewer'}}})}}},'../theme/tokens':{colors:{}},'@react-navigation/native':{useFocusEffect(fn){const filter=state[0];if(lastFilter!==filter){lastFilter=filter;effects.push(fn)}}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'react-native':{...Object.fromEntries(['SectionList','RefreshControl','Text','TouchableOpacity','View'].map(x=>[x,x])),StyleSheet:{create:x=>x},AppState:{addEventListener:()=>({remove(){}})}},'../lib/badgeEvents':{onBadgeRefresh:()=>()=>{},requestBadgeRefresh(){}},'../lib/notifications':{NOTIFICATION_ICONS:{},async fetchNotificationInbox(options){calls.push(options);if(failLoad)throw Error('offline');return {items:events.filter(n=>!options.unreadOnly||!n.read),unreadCount:count}},async markAllNotificationsRead(){if(failMark)throw Error('offline');events=events.map(n=>({...n,read:true}));count=0;return true},openNotificationTarget:async()=>true},...Object.fromEntries(['Icon','EmptyState','Loading'].map(x=>['../components/'+x,{__esModule:true,default:x}]))}
+ const modules={react:{...react,default:react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},'../../shared/notificationArrangement':{arrangementTime},'../../shared/notificationGroups':groups,'../../shared/notificationHints':{notificationHint},'../../shared/notificationBody':{notificationBody},'../../shared/marketSide':{notificationSide,sideTag},'../../shared/stackNavigation':{stackRootAction:()=>null},'../lib/supabase':{supabase:{auth:{getUser:async()=>({data:{user:{id:'viewer'}}})}}},'../theme/tokens':{colors:{}},'@react-navigation/native':{useFocusEffect(fn){const filter=state[0];if(lastFilter!==filter){lastFilter=filter;effects.push(fn)}}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'react-native':{...Object.fromEntries(['SectionList','RefreshControl','Text','TouchableOpacity','View'].map(x=>[x,x])),StyleSheet:{create:x=>x},AppState:{addEventListener:()=>({remove(){}})}},'../lib/badgeEvents':{onBadgeRefresh:()=>()=>{},requestBadgeRefresh(){}},'../lib/notifications':{NOTIFICATION_ICONS:{},async fetchNotificationInbox(options){calls.push(options);if(failLoad)throw Error('offline');return {items:events.filter(n=>!options.unreadOnly||!n.read),unreadCount:count}},async markAllNotificationsRead(){if(failMark)throw Error('offline');events=events.map(n=>({...n,read:true}));count=0;return true},openNotificationTarget:async()=>true},...Object.fromEntries(['Icon','EmptyState','Loading'].map(x=>['../components/'+x,{__esModule:true,default:x}]))}
  const exp={};new Function('exports','require','setInterval','clearInterval',code)(exp,name=>{if(!(name in modules))throw Error(name);return modules[name]},()=>1,()=>{})
  const nodes=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)]
  const render=()=>{index=0;tree=exp.default({navigation:{},route:{}});return tree}
@@ -47,7 +48,7 @@ test('known body templates are concise, NZD-formatted and preserve arbitrary det
  assert.equal(notificationBody({type:'job_completed',body:'Peter marked "Fix trough" complete. Leave a review of your experience.'}),"Peter completed 'Fix trough'. Leave a review.")
  assert.equal(notificationBody({type:'new_bid',body:'New offer of $3500.00 NZD on "Clean barn"'}),"New $3,500 offer for 'Clean barn'.")
  assert.equal(notificationBody({type:'new_message',body:'New message from Peter about "Fix trough"'}),"New message from Peter about 'Fix trough'.")
- const body='Peter confirmed "Fix trough": around 10am, bank transfer. Bring a ladder.';assert.equal(notificationBody({type:'job_confirmed',body}),body)
+ const body='Peter confirmed "Fix trough": around 10am, bank transfer. Bring a ladder.';assert.equal(notificationBody({type:'job_confirmed',body}),"Peter confirmed arrangements for 'Fix trough'.")
 })
 test('event routes and hints distinguish response opportunities from information',()=>{
  for(const type of ['new_question','question_answered'])assert.equal(notificationHref({type,metadata:{job_id:'j'}}),'/jobs/j#questions')
@@ -55,7 +56,7 @@ test('event routes and hints distinguish response opportunities from information
  assert.equal(notificationHref({type:'job_completed',metadata:{job_id:'j'}}),'/jobs/j#reviews')
  assert.equal(notificationHref({type:'review_received',metadata:{booking_id:'b'}}),'/bookings/b#reviews')
  assert.equal(notificationHint('new_message'),'Reply in chat');assert.equal(notificationHint('review_received'),null)
- for(const type of ['job_completed','booking_completed'])assert.equal(sideTag(type==='job_completed'?'job':'listing',{type}),type==='job_completed'?'JOB':'LISTING')
+ for(const type of ['job_completed','booking_completed'])assert.equal(sideTag(type==='job_completed'?'job':'listing',{type}),'COMPLETED')
 })
 
 const native=readFileSync(new URL('../src/lib/notifications.js',import.meta.url),'utf8')
@@ -101,4 +102,15 @@ test('compact mobile rows retain complete long text and accessibility scaling',a
  const children=row.props.children[1].props.children
  const body=children.find(n=>n?.type==='Text'&&n.props.children===text)
  assert.ok(body);assert.equal(body.props.numberOfLines,undefined);assert.equal(body.props.allowFontScaling,undefined)
+})
+
+test('mobile segmented filter has a visible selected surface and separate arrangement time',async()=>{
+ const s=screen({events:[{...events[0],type:'job_confirmed',body:'Peter Provider confirmed "Fix trough": around Tue 24 Nov 2026, 4:00 pm, already agreed.'}],count:7});await s.settle()
+ const selected=s.find('TouchableOpacity',p=>p.accessibilityRole==='tab'&&p.accessibilityState.selected)
+ assert.equal(selected.props.style.length,2);assert.ok(selected.props.style[1]);assert.match(s.text(),/Unread \(7\)/)
+ const row=s.find('SectionList').props.renderItem({item:{...events[0],type:'job_confirmed',body:'Peter Provider confirmed "Fix trough": around Tue 24 Nov 2026, 4:00 pm, already agreed.'}})
+ const children=row.props.children[1].props.children
+ assert.ok(children.some(n=>n?.props?.children==="Peter confirmed arrangements for 'Fix trough'."))
+ assert.ok(children.some(n=>n?.props?.children==='Tue 24 Nov 2026, 4:00 pm (NZ time)'))
+ assert.ok(children.some(n=>n?.props?.children==='CONFIRMED'))
 })

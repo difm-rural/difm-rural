@@ -17,27 +17,21 @@ export function notificationSide(n: Notice): MarketSide | null {
   return null
 }
 
-// Notification types where the recipient owns the subject (their posted job, or
-// a listing/booking they host) → the tag reads "YOUR JOB" / "YOUR LISTING".
-// Everything else keeps the neutral "JOB" / "LISTING" so we never claim
-// ownership we aren't sure of.
-// Upgrades to YOUR: new_bid, new_question, job_ready, job_completed,
-// payment_details_sent (their job); new_booking, service_quote_accepted,
-// booking_ready, booking_completed, work_completion_due,
-// booking_cancellation_requested (a listing/booking they host).
-// payment_marked_sent goes to the provider (not the job owner) → stays neutral.
-// payment_sorted / payment_unsorted carry job_id (side = job) and can go to
-// either party → stay neutral too.
-const OWNER_TYPES = new Set([
-  'new_bid', 'new_question', 'job_ready', 'payment_details_sent', 'job_confirmed',
-  'new_booking', 'service_quote_accepted', 'booking_ready',
-  'work_completion_due', 'booking_cancellation_requested',
-])
-
-// Small-caps tag shown above a notification body. Null side → no tag.
-export function sideTag(side: MarketSide | null, n?: Notice): string | null {
-  if (!side) return null
-  const noun = side === 'job' ? 'JOB' : 'LISTING'
-  const type = n && typeof n.type === 'string' ? n.type : ''
-  return OWNER_TYPES.has(type) ? `YOUR ${noun}` : noun
+// Event labels are shared by mobile, web and Home; marketplace colour stays
+// based on the existing job/listing side rather than implying ownership.
+const EVENT_LABELS:Record<string,string>={
+ review_received:'REVIEW',job_completed:'COMPLETED',booking_completed:'COMPLETED',
+ new_message:'MESSAGE',job_confirmed:'CONFIRMED',arrival_window_confirmed:'CONFIRMED',
+ new_bid:'OFFER',new_question:'QUESTION',question_answered:'ANSWER',bid_accepted:'ACCEPTED',
+ new_booking:'BOOKING',booking_confirmed:'BOOKING',booking_declined:'BOOKING',booking_cancelled:'BOOKING',
+ service_booking_withdrawn:'BOOKING',booking_ready:'BOOKING',booking_cancellation_requested:'BOOKING',
+ service_quote_sent:'QUOTE',service_quote_accepted:'ACCEPTED',bid_rejected:'OFFER',
+ new_job_invite:'INVITATION',job_cancelled:'CANCELLED',job_ready:'READY',running_late:'ARRIVAL UPDATE',
+ work_completion_due:'COMPLETION',opportunity_match:'OPPORTUNITY',opportunity_digest:'OPPORTUNITIES',
+ saved_interest_match:'SAVED SEARCH',saved_interest_digest:'SAVED SEARCH',availability_check:'AVAILABILITY',
+ payment_details_sent:'PAYMENT',payment_marked_sent:'PAYMENT',payment_sorted:'PAYMENT',payment_unsorted:'PAYMENT',
+}
+export function sideTag(_side:MarketSide|null,n?:Notice):string|null {
+ const type=n&&typeof n.type==='string'?n.type:''
+ return type?(EVENT_LABELS[type]||'UPDATE'):null
 }

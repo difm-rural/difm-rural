@@ -85,3 +85,11 @@ for(const leave of [false,true])test(`mobile slow lookup ${leave?'does not reope
  assert.equal(navigations.length,leave?0:1)
  assert.equal(reads,leave?0:1)
 })
+
+test('web keeps arrangement time separate from the primary notification body',()=>{
+ const {tree}=render({type:'job_confirmed',body:'Peter confirmed arrangements.',arrangement:'Tue 24 Nov 2026, 4:00 pm (NZ time)',tag:'CONFIRMED'})
+ const walk=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(walk):[n,...walk(n.props?.children)]
+ const all=walk(tree)
+ assert.equal(all.find(n=>n.props?.className==='notification-arrangement').props.children,'Tue 24 Nov 2026, 4:00 pm (NZ time)')
+ assert.ok(all.some(n=>n.props?.children==='CONFIRMED'))
+})

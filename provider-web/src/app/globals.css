@@ -898,3 +898,5 @@ a.row:hover { background: var(--sage); }
 .missing-item-actions { justify-content: center; flex-wrap: wrap; }
 
 .notification-hint { display:block; font-size:0.8rem; color:var(--forest); margin-top:4px; }
+
+.notification-arrangement { display:block; font-size:0.8rem; color:var(--muted); margin-top:4px; }

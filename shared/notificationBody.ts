@@ -1,8 +1,11 @@
+import {arrangementSummary} from './notificationArrangement'
 import {formatMoney} from './formatting.js'
-// Format only known event templates. Unknown/older bodies and arrangement
-// details are retained verbatim rather than guessing missing names or roles.
+// Format only known event templates. Unknown bodies are retained, and display
+// formatting never mutates the stored record or its full arrangement details.
 export function notificationBody(notification:{type?:string;body?:string|null}):string{
  const body=notification.body||''
+ const arrangement=arrangementSummary(notification)
+ if(arrangement)return arrangement
  let match:RegExpMatchArray|null
  if(notification.type==='opportunity_match')return body.replace(/ · \d+(?:\.\d+)? km away\. /,' · ')
  if(notification.type==='review_received'&&(match=body.match(/^(.+) left you a ([1-5])★ review for "(.+)"\.$/)))

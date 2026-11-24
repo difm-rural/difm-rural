@@ -1,3 +1,4 @@
+import {arrangementTime} from '../../shared/notificationArrangement'
 import {notificationHint} from '../../shared/notificationHints'
 import {groupByDay,relativeTime} from '../../shared/notificationGroups'
 import {notificationBody} from '../../shared/notificationBody'
@@ -146,7 +147,8 @@ export default function NotificationsScreen({ navigation, route }) {
 
   function renderItem({ item }) {
     const side = notificationSide(item)
-    const tag  = side ? sideTag(side, item) : null
+    const tag = sideTag(side,item)
+    const time = arrangementTime(item,timezone)
     const iconName = NOTIFICATION_ICONS[item.type] || 'notifications-outline'
     return (
       <TouchableOpacity
@@ -155,7 +157,7 @@ export default function NotificationsScreen({ navigation, route }) {
         onPress={() => handleOpen(item)}
         activeOpacity={0.75}
         accessibilityRole="button"
-        accessibilityLabel={notificationBody(item)}>
+        accessibilityLabel={[notificationBody(item),time].filter(Boolean).join(' ')}>
         {side ? (
           <View style={[styles.rowIconCircle, { backgroundColor: side === 'job' ? colors.jobFill : colors.listingFill }]}>
             <Icon name={iconName} size={18} color={side === 'job' ? colors.jobIcon : colors.listingIcon} />
@@ -166,6 +168,7 @@ export default function NotificationsScreen({ navigation, route }) {
         <View style={styles.rowContent}>
           {tag && <Text style={[styles.sideTag, { color: side === 'job' ? colors.jobInk : colors.listingInk }]}>{tag}</Text>}
           <Text style={styles.rowBody}>{notificationBody(item)}</Text>
+          {time&&<Text style={styles.rowTime}>{time}</Text>}
           {notificationHint(item.type)&&<Text style={styles.rowHint}>{notificationHint(item.type)}</Text>}
           {openingId === item.id && <Text accessibilityRole="text" style={styles.rowTime}>Opening…</Text>}
           {item.type === 'availability_check' && !item.read && !item._availabilityAnswered && (
@@ -231,8 +234,8 @@ export default function NotificationsScreen({ navigation, route }) {
 
       <View style={styles.filters} accessibilityRole="tablist">
         {['all','unread'].map(value=><TouchableOpacity key={value} accessibilityRole="tab" accessibilityState={{selected:filter===value}}
-          onPress={()=>{if(value!==filter){setItems([]);setLoading(true);setFilter(value)}}} style={styles.filter}>
-          <Text style={filter===value?styles.filterSelected:styles.rowBody}>{value==='all'?'All':`Unread (${unreadCount})`}</Text>
+          onPress={()=>{if(value!==filter){setItems([]);setLoading(true);setFilter(value)}}} style={[styles.filter,filter===value&&styles.filterActive]}>
+          <Text style={filter===value?styles.filterSelected:styles.filterText}>{value==='all'?'All':`Unread (${unreadCount})`}</Text>
         </TouchableOpacity>)}
       </View>
       {!!error&&<Text style={styles.error} accessibilityRole="alert">{error}</Text>}
@@ -291,9 +294,11 @@ const styles = StyleSheet.create({
   rowIconCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   sideTag:    { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginBottom: 2 },
   rowContent: { flex: 1, minWidth: 0 },
-  filters: {flexDirection:"row",paddingHorizontal:20,gap:20},
-  filter: {minHeight:44,justifyContent:"center"},
-  filterSelected: {fontSize:15,fontWeight:"700",color:colors.primary},
+  filters: {flexDirection:"row",marginHorizontal:20,marginVertical:6,padding:3,borderRadius:10,backgroundColor:colors.border},
+  filter: {flex:1,minHeight:44,justifyContent:"center",alignItems:"center",borderRadius:8,paddingHorizontal:8,paddingVertical:6},
+  filterActive: {backgroundColor:colors.primary},
+  filterText: {fontSize:14,fontWeight:"600",color:colors.textPrimary},
+  filterSelected: {fontSize:14,fontWeight:"700",color:colors.white},
   groupHeading: {paddingHorizontal:20,paddingVertical:10,fontSize:14,fontWeight:"700",color:colors.textMuted},
   rowHint: {fontSize:13,color:colors.primary,marginTop:4},
   error: {padding:16,color:colors.textPrimary},
