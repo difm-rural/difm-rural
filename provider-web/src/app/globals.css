@@ -867,7 +867,7 @@ a.row:hover { background: var(--sage); }
 .home-summary-item { display: grid; gap: 3px; padding: 12px; min-height: 60px; color: var(--forest-deep); text-decoration: none; font-size: 13px; }
 .home-summary-item strong { font-size: 20px; }
 .home-work-links { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
-.home-v2 .home-actions { margin-bottom: 16px; }
+.home-v2 .home-actions { gap: 14px; margin-bottom: 16px; }
 @media(max-width:580px) {
  .home-mode-row { flex-wrap: wrap; }
  .home-mode-toggle { flex: 1; }

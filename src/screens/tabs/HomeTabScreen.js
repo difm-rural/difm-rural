@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
   title:      { fontSize: 28, lineHeight: 32, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 6 },
 
-  actionsGrid: { flexDirection: 'row', gap: 10, marginBottom: 15 },
+  actionsGrid: { flexDirection: 'row', gap: 14, marginBottom: 15 },
   actionCard:  { flex: 1, borderRadius: 12, padding: 16, minHeight: 84 },
 
   modeSwitch:{flexDirection:'row',backgroundColor:colors.primaryLight,padding:4,borderRadius:14,gap:4},
