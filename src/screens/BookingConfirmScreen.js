@@ -28,7 +28,7 @@ import {bookingLocationPolicy,bookingPublicArea,bookingLocationFields} from '../
 import {newJobId} from '../lib/draftId'
 import {bookingSubmission,bookingSuccess,readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import { bookingRequestCopy } from '../lib/bookingRequestCopy'
-import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
+import { listingEstimate, reviewBookingQuantity, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION, bookingQuantityLimits } from '../lib/listingEstimate'
 
 function formatDisplayDate(d) {
   return nzDate(d)
@@ -90,12 +90,19 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const option = selectedOption || null
   const isGrazing = service?.kind === 'grazing'
   const locationPolicy=bookingLocationPolicy(service?.kind)
-  const estimate = listingEstimate(service, option, initialQty)
-  const qty = estimate.quantity
+  const quantityLimits = bookingQuantityLimits(service, option)
+  const review = reviewBookingQuantity(service, option, initialQty ?? '')
+  const estimate = listingEstimate(service, option, review.ok ? review.quantity : quantityLimits.minimum)
+  const qty = review.ok ? review.quantity : initialQty
+  const showPrice = review.ok && estimate.quantity === review.quantity
   const effectivePricingType = estimate.pricingType
   const isQuoteRequired = effectivePricingType === 'quote_required'
   const requestCopy = bookingRequestCopy(isQuoteRequired)
-  const total = estimate.baseAmount?.toFixed(2)
+  const total = showPrice ? review.amount?.toFixed(2) : null
+  function quantityProblem() {
+    if (showPrice) return ''
+    return review.message || 'Enter a quantity within this listing\'s capacity.'
+  }
 
   const unitLabel = effectivePricingType === 'hourly' ? 'hour'
     : effectivePricingType === 'day_rate' ? 'day'
@@ -140,12 +147,14 @@ export default function BookingConfirmScreen({ route, navigation }) {
   }, [route.params?.locationResult])
 
   function buildBookingPayload(requesterId) {
+    const problem = quantityProblem()
+    if (problem) throw new Error(problem)
     return {
       id: requestId.current,
       service_id:     service.id,
       requester_id:   requesterId,
       provider_id:    service.provider_id,
-      quantity:       qty,
+      quantity:       estimate.quantity,
       total_amount:   estimate.baseAmount ?? 0,
       payment_timing: service.payment_timing,
       status:         'pending',
@@ -199,10 +208,13 @@ export default function BookingConfirmScreen({ route, navigation }) {
       providerName: service.profile?.full_name || 'The provider',
       isQuoteRequired,
       booking: buildBookingPayload(null),
+      quantityLimits: { kind: service.kind, pricing_type: estimate.pricingType, unit_label: option?.unit_label ?? service.unit_label, minimum_units: estimate.minimumUnits, max_units: service.max_units },
     }))
   }
 
   async function requireAuth(intent) {
+    const problem = quantityProblem()
+    if (problem) { Alert.alert('Check quantity', problem); return }
     try{bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote})}
     catch(error){Alert.alert('Check location',error.message);return}
     await savePendingBooking()
@@ -236,6 +248,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
   async function handleConfirm() {
     if(submitting||createdBooking)return
+    const problem = quantityProblem()
+    if (problem) { Alert.alert('Check quantity', problem); return }
     if(scheduleType==='specific'&&!date){Alert.alert('Choose a date','Select your preferred date.');return}
     const { data: { user } } = await supabase.auth.getUser()
     try{bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote})}
@@ -296,9 +310,10 @@ export default function BookingConfirmScreen({ route, navigation }) {
           <SummaryRow label="Provider" value={service.profile?.full_name || 'Provider'} />
           {option?.label ? <SummaryRow label="Rate option" value={option.label} /> : null}
           {effectivePricingType !== 'fixed' && !isQuoteRequired && (
-            <SummaryRow label="Quantity" value={`${qty} ${quantityUnit(unitLabel,qty)}`} />
+            <SummaryRow label="Quantity" value={showPrice ? `${qty} ${quantityUnit(unitLabel,qty)}` : `${Number.isFinite(Number(qty)) ? qty : '—'} ${quantityUnit(unitLabel, Number(qty) || 0)}`} />
           )}
-          <SummaryRow label={isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `${nzMoney(total)}`} />
+          {!showPrice && !isQuoteRequired && <Text accessibilityRole="alert">{quantityProblem()}</Text>}
+          <SummaryRow label={isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : showPrice ? `${nzMoney(total)}` : 'Unavailable until the quantity is valid'} />
           {isGrazing && !isQuoteRequired && /\/(week|month)$/.test(unitLabel) && (
             <SummaryRow label="Estimate period" value={`One ${unitLabel.endsWith('/week') ? 'week' : 'month'}; agree the full duration with the provider`} />
           )}
@@ -456,7 +471,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Total base estimate'}</Text>
-            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `${nzMoney(total)}`}</Text>
+            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : showPrice ? `${nzMoney(total)}` : '—'}</Text>
           </View>
           <View style={styles.paymentInfoBox}>
             <Text style={[styles.paymentInfoText, { marginBottom: 8 }]}>{requestCopy.nextStep}</Text>
@@ -473,6 +488,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           title={requestCopy.action}
           onPress={handleConfirm}
           loading={submitting}
+          disabled={!showPrice}
           accessibilityLabel={requestCopy.action}
         />
       </View>

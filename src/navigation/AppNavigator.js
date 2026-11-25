@@ -35,6 +35,7 @@ import { canResumeGuestAction, listingEnquiryNavigationState, parsePendingListin
 import { ONBOARDING_DESTINATIONS } from '../lib/onboarding'
 import {newJobId} from '../lib/draftId'
 import {fetchBookingDetail} from '../lib/bookingDetail'
+import { bookingQuantityLimits, validateBookingQuantity } from '../lib/listingEstimate'
 
 // ─── Post job wizard screens ──────────────────────────────────────────────────
 import PostJobStep1JobType  from '../screens/postjob/PostJobStep1JobType'
@@ -699,6 +700,15 @@ export default function AppNavigator() {
       const pending = JSON.parse(raw)
       const booking = pending.booking || pending
       if(!booking.id){booking.id=newJobId();await AsyncStorage.setItem('pendingBooking',JSON.stringify({...pending,booking:{...booking}}))}
+      const {data:listing,error:listingError}=await supabase.from('services_public').select('kind,pricing_type,unit_label,minimum_units,max_units').eq('id',booking.service_id).maybeSingle()
+      const quantitySource=pending.quantityLimits || (!listingError && listing ? listing : null)
+      if(quantitySource){
+        const check=validateBookingQuantity(booking.quantity,bookingQuantityLimits(quantitySource))
+        if(!check.ok || check.quantity!==Number(booking.quantity)){
+          Alert.alert('Booking not sent',`${check.message || 'Enter a quantity within this listing\'s capacity.'}\n\nYour details are saved — please try booking again.`)
+          return
+        }
+      }
       const {error}=await supabase.from('bookings').upsert({...booking,requester_id:userId,status:booking.status || 'pending'},{onConflict:'id',ignoreDuplicates:true})
       if(error){Alert.alert('Booking not sent',`${error.message}\n\nYour details are saved — please try booking again.`);return}
       const created=await fetchBookingDetail(supabase,booking.id)
