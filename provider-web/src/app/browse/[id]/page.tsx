@@ -1,6 +1,8 @@
 import {bookingLocationPolicy} from '@shared/bookingLocation'
 import {readableRate} from '@shared/findLocalHelp'
-import {listingAvailability, ESTIMATED_TIMING_NOTE, PAUSED_REQUEST_MESSAGE} from '@shared/listingAvailability'
+import {CircleCheck, CirclePause, Clock} from 'lucide-react'
+import {ListingAvailabilityPanel} from '@shared/ListingAvailabilityPanel'
+import {listingAvailability, PAUSED_REQUEST_MESSAGE} from '@shared/listingAvailability'
 import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
 import Link from '@/components/navigation-link'
 import {notFound} from 'next/navigation'
@@ -42,9 +44,10 @@ export default async function ListingPage({params,searchParams}:{params:Promise<
  {s.photos?.length?<PhotoGallery photos={s.photos} title={s.title}/>:<div className="card"><p className="muted">No photos provided.</p></div>}
  {own&&<p className="account-current">{s.closed_at?'Closed listing — visible only to you here':s.is_active?'Live listing':'Paused listing — visible only to you here'} · Manage your listing from My listings.</p>}
  <article className="card listing-provider-summary"><h2>{ownerError?'Provider profile unavailable':<Link href={'/people/'+s.provider_id}>{owner?.full_name || 'Listing provider'}</Link>}</h2>{owner?.created_at&&<p className="muted">Member since {new Date(owner.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}<Link href={'/people/'+s.provider_id+'/reviews?role=provider'} className="card-link">{reviewError?'Read reviews and comments':reviews.length?'★ '+average.toFixed(1)+' · '+reviews.length+' completed-work reviews — read comments':'No reviews yet — view profile'}</Link></article>
+ <ListingAvailabilityPanel listing={s} icons={{accepting:<CircleCheck size={18} aria-hidden="true"/>,limited:<Clock size={18} aria-hidden="true"/>,paused:<CirclePause size={18} aria-hidden="true"/>}} />
  <article className="card work-detail listing-facts"><h2>Listing details</h2>{['for_sale','lease'].includes(s.kind)&&<p>{bookingLocationPolicy(s.kind).help}</p>}<p>{s.category} · {s.location_name || 'Location to be arranged'}</p><strong>{readableRate(s.pricing_type,s.rate,s.unit_label,s.min_charge)}</strong><p className="work-description">{s.description}</p>
  {s.latitude!=null&&s.longitude!=null&&<a className="card-link" href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(s.latitude+','+s.longitude)} target="_blank" rel="noopener noreferrer">Open listing location in Maps</a>}
- {(s.kind||'service')==='service'&&s.materials&&<p>Materials: {materialsLabel(s.materials)}</p>}{s.travel_range_km>0&&<p>Travel range: {s.travel_range_km} km</p>}{availability.visibleStatus&&<p><strong>{availability.visibleStatus}</strong></p>}{availability.lead&&<p><strong>{availability.lead}</strong>{availability.estimate&&<>. {ESTIMATED_TIMING_NOTE}</>}</p>}{availability.message&&<p className="work-description">{availability.message}</p>}{availability.updated&&<p className="muted">{availability.updated}</p>}
+ {(s.kind||'service')==='service'&&s.materials&&<p>Materials: {materialsLabel(s.materials)}</p>}{s.travel_range_km>0&&<p>Travel range: {s.travel_range_km} km</p>}
  {s.min_charge!=null&&<p>Minimum charge: {nzMoney(s.min_charge)}</p>}{s.minimum_units>1&&<p>Minimum quantity: {s.minimum_units}</p>}{s.kind==='grazing'&&s.max_units&&<p>Grazing capacity: {s.max_units} head</p>}
  {!!s.pricing_variants?.length&&<section><h3>Rate options</h3>{s.pricing_variants.map((v:Parameters<typeof variantDisplay>[0],i:number)=><p key={i}>{variantDisplay(v)}{Number(v.min_charge)>0?" · Minimum charge: "+nzMoney(v.min_charge)+'':''}</p>)}</section>}
  {!!s.pricing_add_ons?.length&&<section><h3>Extra charges</h3>{s.pricing_add_ons.map((a:Parameters<typeof addOnDisplay>[0],i:number)=><p key={i}>{addOnDisplay(a)}</p>)}<p className="muted">These charges are not included in the base estimate. Agree which apply with the provider.</p></section>}

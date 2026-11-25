@@ -1,6 +1,7 @@
 import {NavigationFeedback} from '@/components/navigation-feedback'
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "../../../shared/listingAvailabilityDetail.css";
 
 export const metadata: Metadata = {
   title: {

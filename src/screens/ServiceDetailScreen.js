@@ -1,5 +1,6 @@
 import {saveGuestIntent, GUEST_INTENT_KEY} from '../lib/guestIntent'
-import {listingAvailability, ESTIMATED_TIMING_NOTE, PAUSED_REQUEST_MESSAGE} from '../../shared/listingAvailability'
+import {listingAvailability, PAUSED_REQUEST_MESSAGE} from '../../shared/listingAvailability'
+import ListingAvailabilityCard from '../components/ListingAvailabilityCard'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
@@ -418,6 +419,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
         )}
 
         {['for_sale','lease'].includes(service.kind)&&<View style={styles.card}><Text style={styles.cardLabel}>Location arrangements</Text><Text style={[styles.providerMeta,{paddingHorizontal:16,paddingBottom:14}]}>{bookingLocationPolicy(service.kind).help}</Text></View>}
+        <ListingAvailabilityCard listing={service} />
         {/* Service details */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Listing details</Text>
@@ -455,9 +457,6 @@ export default function ServiceDetailScreen({ route, navigation }) {
           {service.travel_range_km ? (
             <DetailRow label="Travel range" value={`${service.travel_range_km} km`} />
           ) : null}
-          {(availability.visibleStatus || availability.lead || availability.message || availability.updated) && (
-            <DetailRow label="Availability" value={[availability.visibleStatus, availability.lead, availability.estimate && ESTIMATED_TIMING_NOTE, availability.message, availability.updated].filter(Boolean).join('\n')} last={!paymentValue} />
-          )}
           {paymentValue && (
             <DetailRow label="Payment" value={paymentValue} last />
           )}

@@ -1,0 +1,32 @@
+.listing-availability {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.listing-availability h2 { margin: 0; font-size: 16px; }
+.listing-availability p { margin: 0; }
+.listing-availability-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.listing-availability-status svg { flex: none; }
+.listing-availability-status[data-tone="accepting"] { color: var(--forest-deep); background: #e8f5e9; }
+.listing-availability-status[data-tone="limited"] { color: #854d0e; background: #fff3e0; }
+.listing-availability-status[data-tone="paused"] { color: #a62b28; background: #fdecea; }
+.listing-availability-estimate { font-size: 22px; line-height: 1.3; font-weight: 700; }
+.listing-availability-message { font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+.listing-availability-secondary { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.listing-availability-meta { display: grid; gap: 3px; }
