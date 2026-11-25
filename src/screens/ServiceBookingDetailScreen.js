@@ -302,7 +302,11 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }
 
   function confirmBooking() {
-    updateStatus('confirmed', [BOOKING_STATUS.PENDING], 'The requester can now see this booking is confirmed.')
+    Alert.alert('Accept booking request?',
+      `Accepting "${service.title || 'this request'}" confirms the booking with the requester. Use Chat to agree timing, access and payment.`, [
+        {text:'Not now',style:'cancel'},
+        {text:'Accept booking request',onPress:()=>updateStatus('confirmed', [BOOKING_STATUS.PENDING], 'The requester can now see this booking is confirmed.')},
+      ])
   }
 
   function markReady() {
@@ -571,12 +575,10 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.footer, providerCanConfirm&&{flexWrap:'wrap'}, { paddingBottom: insets.bottom + 12 }]}>
+        {providerCanConfirm&&<Button title="Accept booking request" onPress={confirmBooking} style={styles.acceptBookingBtn}/>}
         <Button variant="secondary" title="Chat" onPress={openChat} style={styles.footerBtn} />
         {viewerRole==='requester'&&['pending','quote_sent','confirmed','in_progress'].includes(booking.status)&&<Button variant="secondary" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} onPress={()=>setCancelVisible(true)} style={styles.footerBtn}/>}
-        {providerCanConfirm && (
-          <Button title="Confirm" onPress={confirmBooking} style={styles.footerBtn} />
-        )}
         {providerCanQuote && (
           <Button title={booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}
             onPress={sendQuote} loading={savingQuote} style={styles.footerBtn} />
@@ -677,4 +679,5 @@ const styles = StyleSheet.create({
   noticeText: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
   footer: { flexDirection: 'row', gap: 10, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 16, paddingTop: 14 },
   footerBtn: { flex: 1 },
+  acceptBookingBtn:{flexBasis:'100%',flexGrow:0,flexShrink:0},
 })
