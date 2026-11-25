@@ -1,10 +1,11 @@
+import {LISTING_AVAILABILITY_COLUMNS, type ListingAvailability} from '@shared/listingAvailability'
 import {resolvePublicJobLocations} from './job-discovery'
 import {matchesHelpFilter} from '@shared/findLocalHelp'
 import {CATEGORIES} from '@shared/categories'
 import type {SupabaseClient} from '@supabase/supabase-js'
 import {point,distance,type Point} from './nearby'
 export const JOB_COLUMNS='id,title,description,category,price_type,price,location_area,photos,created_at,schedule_type,scheduled_date,date_from,date_to,materials_type,access_conditions,hide_exact_location'
-export const LISTING_COLUMNS='id,provider_id,title,description,category,kind,pricing_type,rate,unit_label,location_name,photos,created_at,card_headline,card_supporting_text,card_style,min_charge,minimum_units,max_units,pricing_variants,pricing_add_ons,pricing_terms,materials,payment_timing,travel_range_km,availability'
+export const LISTING_COLUMNS=`id,provider_id,title,description,category,kind,pricing_type,rate,unit_label,location_name,photos,created_at,card_headline,card_supporting_text,card_style,min_charge,minimum_units,max_units,pricing_variants,pricing_add_ons,pricing_terms,materials,payment_timing,travel_range_km,availability,${LISTING_AVAILABILITY_COLUMNS}`
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function browseFilters(values:Record<string,unknown>){
  const page=Number(values.page)
@@ -14,7 +15,7 @@ export function browseHref(path:string,f:ReturnType<typeof browseFilters>){const
 export function publicJobsQuery(client:SupabaseClient){return client.from('jobs_public').select(JOB_COLUMNS).eq('status','open').eq('visibility','public')}
 export function publicListingsQuery(client:SupabaseClient){return client.from('services_public').select(LISTING_COLUMNS).eq('is_active',true).is('closed_at',null)}
 export function publicQuery(client:SupabaseClient,kind:'jobs'|'listings'){return kind==='jobs'?publicJobsQuery(client):publicListingsQuery(client)}
-export type PublicRow={id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;min_charge?:number|null;distance?:number|null;distanceApproximate?:boolean}
+export type PublicRow=ListingAvailability & {id:string;title:string;description:string|null;category:string|null;kind?:string;photos:string[]|null;location_area?:string|null;location_name?:string|null;price_type?:string;price?:number|null;pricing_type?:string;rate?:number|null;unit_label?:string|null;min_charge?:number|null;distance?:number|null;distanceApproximate?:boolean}
 export async function publicRows(client:SupabaseClient,kind:'jobs'|'listings',origin:Point|null=null){
  const rows:PublicRow[]=[]
  for(let offset=0;;offset+=500){const {data,error}=await publicQuery(client,kind).order('created_at',{ascending:false}).order('id').range(offset,offset+499);if(error)throw error;rows.push(...(data as unknown as PublicRow[] || []));if(!data || data.length<500)break}

@@ -4,6 +4,7 @@ import {LISTING_KINDS} from '../../shared/listingPricing'
 import {listingCardCopy} from '../../shared/listingCardCopy'
 import {formatMoney as nzMoney,formatDistance} from '../../shared/formatting.js'
 import {nextMoveHeading} from '../../shared/nextMove'
+import {listingAvailability} from '../../shared/listingAvailability'
 import React from 'react'
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { colors } from '../theme/tokens'
@@ -132,6 +133,7 @@ export default function JobServiceCard({
   fullWidth = false,
 }) {
   const isService = item._type === 'service' || item.itemType === 'service'
+  const listingTiming = isService && !showStatusBadge ? listingAvailability(item).card : []
   const profile   = isService ? (item.profile || {}) : (item.profiles || {})
   const availability = isService
     ? availabilityDisplay(profile.availability_status, profile.availability_until, profile.availability_updated_at)
@@ -181,7 +183,7 @@ export default function JobServiceCard({
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={item.title || 'Listing'}>
+      accessibilityLabel={[item.title || 'Listing', ...listingTiming].join(', ')}>
 
       {/* ── Image area ──────────────────────────────────────────────────────── */}
       <View style={[styles.imageBox,fullWidth&&{width:'100%'}]}>
@@ -273,6 +275,7 @@ export default function JobServiceCard({
 
         {/* Row 3: title */}
         <Text style={[styles.title,fullWidth&&{fontSize:18,lineHeight:24}]} numberOfLines={fullWidth?undefined:2} ellipsizeMode="tail">{item.title}</Text>
+        {listingTiming.map(line => <Text key={line} style={{color: colors.listingInk, fontWeight: '700', fontSize: 12, marginBottom: 4}}>{line}</Text>)}
 
         {/* Row 4: location + distance */}
         <Text style={styles.location} numberOfLines={1}>

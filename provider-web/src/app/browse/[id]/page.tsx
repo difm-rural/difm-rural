@@ -1,6 +1,6 @@
 import {bookingLocationPolicy} from '@shared/bookingLocation'
 import {readableRate} from '@shared/findLocalHelp'
-import {formatDateLabel} from '@shared/formatting'
+import {listingAvailability, ESTIMATED_TIMING_NOTE, PAUSED_REQUEST_MESSAGE} from '@shared/listingAvailability'
 import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
 import Link from '@/components/navigation-link'
 import {notFound} from 'next/navigation'
@@ -21,6 +21,7 @@ export default async function ListingPage({params,searchParams}:{params:Promise<
  const {data:s,error}=await supabase.from('services_public').select('*').eq('id',id).maybeSingle()
  if(error)throw new Error('Could not load this listing.');if(!s||((!s.is_active||s.closed_at)&&s.provider_id!==user.id))notFound()
  const own=s.provider_id===user.id
+ const availability=listingAvailability(s)
  const [{data:owner,error:ownerError},bookings]=await Promise.all([supabase.from('profiles_public').select('full_name,created_at').eq('id',s.provider_id).maybeSingle(),supabase.from('bookings').select('id,status,created_at').eq('service_id',id).eq(own?'provider_id':'requester_id',user.id).order('created_at',{ascending:false})])
  const ownerFirst=owner?.full_name?.trim().split(/\s+/)[0]
  let reviews:{rating:number;reviewee_role:string}[]=[],reviewError=false
@@ -43,14 +44,14 @@ export default async function ListingPage({params,searchParams}:{params:Promise<
  <article className="card listing-provider-summary"><h2>{ownerError?'Provider profile unavailable':<Link href={'/people/'+s.provider_id}>{owner?.full_name || 'Listing provider'}</Link>}</h2>{owner?.created_at&&<p className="muted">Member since {new Date(owner.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}<Link href={'/people/'+s.provider_id+'/reviews?role=provider'} className="card-link">{reviewError?'Read reviews and comments':reviews.length?'★ '+average.toFixed(1)+' · '+reviews.length+' completed-work reviews — read comments':'No reviews yet — view profile'}</Link></article>
  <article className="card work-detail listing-facts"><h2>Listing details</h2>{['for_sale','lease'].includes(s.kind)&&<p>{bookingLocationPolicy(s.kind).help}</p>}<p>{s.category} · {s.location_name || 'Location to be arranged'}</p><strong>{readableRate(s.pricing_type,s.rate,s.unit_label,s.min_charge)}</strong><p className="work-description">{s.description}</p>
  {s.latitude!=null&&s.longitude!=null&&<a className="card-link" href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(s.latitude+','+s.longitude)} target="_blank" rel="noopener noreferrer">Open listing location in Maps</a>}
- {(s.kind||'service')==='service'&&s.materials&&<p>Materials: {materialsLabel(s.materials)}</p>}{s.travel_range_km>0&&<p>Travel range: {s.travel_range_km} km</p>}<p>Availability: {s.availability?.length?s.availability.map(formatDateLabel).join(', '):'Arrange with the provider'}</p>
+ {(s.kind||'service')==='service'&&s.materials&&<p>Materials: {materialsLabel(s.materials)}</p>}{s.travel_range_km>0&&<p>Travel range: {s.travel_range_km} km</p>}{availability.visibleStatus&&<p><strong>{availability.visibleStatus}</strong></p>}{availability.lead&&<p><strong>{availability.lead}</strong>{availability.estimate&&<>. {ESTIMATED_TIMING_NOTE}</>}</p>}{availability.message&&<p className="work-description">{availability.message}</p>}{availability.updated&&<p className="muted">{availability.updated}</p>}
  {s.min_charge!=null&&<p>Minimum charge: {nzMoney(s.min_charge)}</p>}{s.minimum_units>1&&<p>Minimum quantity: {s.minimum_units}</p>}{s.kind==='grazing'&&s.max_units&&<p>Grazing capacity: {s.max_units} head</p>}
  {!!s.pricing_variants?.length&&<section><h3>Rate options</h3>{s.pricing_variants.map((v:Parameters<typeof variantDisplay>[0],i:number)=><p key={i}>{variantDisplay(v)}{Number(v.min_charge)>0?" · Minimum charge: "+nzMoney(v.min_charge)+'':''}</p>)}</section>}
  {!!s.pricing_add_ons?.length&&<section><h3>Extra charges</h3>{s.pricing_add_ons.map((a:Parameters<typeof addOnDisplay>[0],i:number)=><p key={i}>{addOnDisplay(a)}</p>)}<p className="muted">These charges are not included in the base estimate. Agree which apply with the provider.</p></section>}
  {s.pricing_terms&&<section><h3>Pricing terms</h3><p className="work-description">{s.pricing_terms}</p></section>}<p>{paymentCopy(s)}</p></article>
 
  {bookings.error?<p role="alert" className="card">Could not check your existing requests. Refresh before sending another request.</p>:bookings.data?.length? <section className="card"><h2>{own?'Bookings for this listing':'Your requests for this listing'}</h2>{bookings.data.map(b=><p key={b.id}><Link href={'/bookings/'+b.id} className="card-link">{statusLabel(b.status)} · {nzDate(new Date(b.created_at))} — View details</Link></p>)}</section>:null}
- {own?<div className="lform-actions"><Link className="lform-save" href={'/listings/'+id+'/edit'}>Edit listing</Link><Link className="lform-cancel" href="/listings">Manage My listings</Link></div>:!['for_sale','lease'].includes(s.kind)&&!active.length&&!bookings.error?<ListingRequestPanel listing={s}/>:null}
+ {own?<div className="lform-actions"><Link className="lform-save" href={'/listings/'+id+'/edit'}>Edit listing</Link><Link className="lform-cancel" href="/listings">Manage My listings</Link></div>:!['for_sale','lease'].includes(s.kind)&&!active.length&&!bookings.error?(availability.paused?<p role="status">{PAUSED_REQUEST_MESSAGE}</p>:<ListingRequestPanel listing={s}/>):null}
  {own
    ? <section className="card" id="enquiries"><h2>Enquiries</h2>{!listingThreads.length?<p className="muted">No enquiries yet.</p>:listingThreads.map(t=><div key={t.person} id={'enquiry-'+t.person} style={{scrollMarginTop:96,marginBottom:12}}><Link className="card-link" href={'?thread='+t.person+'#enquiry-'+t.person}><strong>{t.name}</strong> · {t.preview} · {nzDate(new Date(t.updatedAt))}{t.unread>0&&<span className="web-badge" aria-label={t.unread+' unread'}> {t.unread}</span>}</Link>{threadParam===t.person&&enquiry&&<div className="work-inline-chat"><Conversation compact context={enquiry} heading={t.name&&t.name!=='Community member'?'Messages with '+t.name.trim().split(/\s+/)[0]:'Messages'}/></div>}</div>)}</section>
    : <section id="enquiry" style={{scrollMarginTop:96}}>{enquiry?<Conversation compact context={enquiry} heading={ownerFirst?'Ask '+ownerFirst+' about this listing':'Messages'}/>:<p className="card muted">Messaging isn’t available for this listing right now.</p>}</section>}

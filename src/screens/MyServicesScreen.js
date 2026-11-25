@@ -20,6 +20,8 @@ import Icon from '../components/Icon'
 import EmptyState from '../components/EmptyState'
 import Loading from '../components/Loading'
 import Button from '../components/Button'
+import ManageListingAvailability from '../components/ManageListingAvailability'
+import {listingAvailability} from '../../shared/listingAvailability'
 
 function formatRate(service) {
   const { pricing_type, rate, unit_label } = service
@@ -45,7 +47,8 @@ function listedAgo(createdAt) {
   return months === 1 ? 'Listed 1 month ago' : `Listed ${months} months ago`
 }
 
-function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView }) {
+function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView, onAvailability }) {
+  const availability = listingAvailability(service)
   const photoUrl = Array.isArray(service.photos) && service.photos.length > 0 ? service.photos[0] : null
 
   return (
@@ -85,7 +88,7 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView }) {
           style={[styles.toggleSwitch, service.is_active && styles.toggleSwitchOn]}
           onPress={() => onToggleActive(service)}
           accessibilityRole="switch"
-          accessibilityLabel={service.closed_at ? 'Relist listing' : service.is_active ? 'Pause listing advertising' : 'Resume listing advertising'}
+          accessibilityLabel={service.closed_at ? 'Relist listing' : service.is_active ? 'Pause advertising' : 'Resume advertising'}
           accessibilityState={{ checked: service.is_active }}>
           <View style={[styles.toggleThumb, service.is_active && styles.toggleThumbOn]} />
         </TouchableOpacity>
@@ -94,6 +97,9 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView }) {
       <Text style={[styles.statusText, !service.is_active && styles.statusTextPaused]}>
         {service.closed_at ? 'Listing closed · Switch on to relist' : service.is_active ? 'Advertising live' : 'Advertising paused'}
       </Text>
+
+      <Text style={styles.rowMeta}>{[availability.status, availability.lead, availability.updated].filter(Boolean).join(' · ')}</Text>
+      <Button title="Manage availability" icon="time-outline" onPress={() => onAvailability(service)} style={{marginTop: 8}} />
 
       <Text style={styles.rowMeta}>
         {service.category}  ·  <Icon name="location-outline" size={11} color={colors.textMuted} /> {service.location_name || '—'}
@@ -134,6 +140,7 @@ export default function MyServicesScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [userId, setUserId] = useState(null)
+  const [availabilityListing, setAvailabilityListing] = useState(null)
 
   useFocusEffect(useCallback(() => { fetchData() }, []))
 
@@ -317,12 +324,19 @@ export default function MyServicesScreen({ navigation, route }) {
               onEdit={handleEdit}
               onView={service => navigation.navigate('ServiceDetail', { service })}
               onDelete={handleDelete}
+              onAvailability={setAvailabilityListing}
             />
           )}
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         />
       )}
+      {availabilityListing && <ManageListingAvailability listing={availabilityListing} ownerId={userId}
+        onClose={() => setAvailabilityListing(null)}
+        onSaved={fields => {
+          setServices(rows => rows.map(row => row.id === availabilityListing.id ? {...row, ...fields} : row))
+          setAvailabilityListing(null)
+        }} />}
     </View>
   )
 }

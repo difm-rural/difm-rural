@@ -1,3 +1,4 @@
+import * as listingAvailability from '../shared/listingAvailability.ts'
 import * as cardCopy from '../shared/listingCardCopy.ts'
 import * as formatting from '../shared/formatting.js'
 import assert from 'node:assert/strict'
@@ -16,6 +17,7 @@ async function load(file,extra={}){
  const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  const module={exports:{}}
  vm.runInNewContext(compiled,{exports:module.exports,require(name){
+  if(name==='@shared/listingAvailability')return listingAvailability
   if(name==='@shared/formatting')return formatting
  if(name==='@shared/listingCardCopy')return cardCopy
  if(name==='react')return React;if(name==='react/jsx-runtime')return jsx
@@ -33,7 +35,7 @@ async function load(file,extra={}){
 }
 const thumb=await load('../thumb-img.tsx')
 const primary=await load('../job-primary-image.tsx')
-const cards=await load('listing-card.tsx',{'@/components/thumb-img':thumb,'@/components/job-primary-image':primary}),{ManageCard}=await load('manage-card.tsx',{'./listing-card':cards})
+const cards=await load('listing-card.tsx',{'@/components/thumb-img':thumb,'@/components/job-primary-image':primary}),{ManageCard}=await load('manage-card.tsx',{'./listing-card':cards,'./manage-availability':await load('manage-availability.tsx')})
 const id='2b8f6b59-b9f3-41a6-9816-55a7dfecf1f4'
 test('job cards use the authenticated image route while legacy cards keep their existing URL',()=>{
  const card=props=>renderToStaticMarkup(React.createElement(cards.CardImage,props))
@@ -50,8 +52,17 @@ test('live, paused and closed own listings expose a card link and explicit View 
   assert.match(html,/View listing<\/a>/)
   assert.match(html,/aria-label="View listing: Container moving"/)
   assert.match(html,/<\/a><div class="manage-actions/)
-  assert.match(html,/<button[^>]*>Pause<\/button>|<button[^>]*>Resume<\/button>/)
+  assert.match(html,/<button[^>]*>Pause advertising<\/button>|<button[^>]*>Resume advertising<\/button>/)
+  assert.match(html,/Manage availability/)
  }
+})
+test('management card keeps paused bookings and live advertising distinct, with the saved estimate',()=>{
+ const html=renderToStaticMarkup(React.createElement(ManageCard,{s:{id,title:'Water delivery',kind:'service',
+  is_active:true,availability_status:'paused',availability_updated_at:'2026-11-26T01:00:00Z',
+  lead_time_type:'range_days',lead_time_min_days:2,lead_time_max_days:4}}))
+ assert.match(html,/Advertising live/)
+ assert.match(html,/Temporarily paused/)
+ assert.match(html,/Estimated lead time: 2 to 4 days/)
 })
 test('ordinary listing cards remain unlinked internally so browse links cannot nest anchors',()=>{
  const html=renderToStaticMarkup(React.createElement(cards.ListingCard,{data:{title:'Example'}}))

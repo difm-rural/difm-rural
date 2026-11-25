@@ -25,5 +25,5 @@ export async function guestIntentDestination(client, intent) {
   if (error) throw error
   if (!data) return null
   if (isJob) return ['Jobs', {screen: 'JobDetail', params: {job: data}}]
-  return ['Browse', {screen: intent.action === 'booking' && data.is_active && !data.closed_at ? 'BookingConfirm' : 'ServiceDetail', params: {service: data}}]
+  return ['Browse', {screen: intent.action === 'booking' && data.is_active && !data.closed_at && data.availability_status !== 'paused' ? 'BookingConfirm' : 'ServiceDetail', params: {service: data}}]
 }

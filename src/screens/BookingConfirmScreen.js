@@ -1,6 +1,7 @@
 import ExpectedDurationControl from '../components/ExpectedDurationControl'
 import {durationPolicy,durationFields,durationEstimate,durationLabel,validateGrazingQuantity,mobilePricingSnapshot,DURATION_AGREEMENT} from '../../shared/bookingDuration'
 import {saveGuestIntent} from '../lib/guestIntent'
+import {listingAvailability, LISTING_AVAILABILITY_COLUMNS, ESTIMATED_TIMING_NOTE, PAUSED_REQUEST_MESSAGE, isPausedRequestError} from '../../shared/listingAvailability'
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
 import React, { useEffect, useState, useRef } from 'react'
@@ -91,6 +92,18 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const { service, quantity: initialQty, selectedOption } = route.params || {}
   const option = selectedOption || null
+  const [freshAvailability, setFreshAvailability] = useState(null)
+  const attemptedRequest = useRef(false)
+  const availability = listingAvailability(freshAvailability || service || {})
+  useEffect(() => {
+    if (!service?.id) return
+    let current = true
+    supabase.from('services_public').select('availability,' + LISTING_AVAILABILITY_COLUMNS)
+      .eq('id', service.id).maybeSingle().then(({data}) => {
+        if (current && data) setFreshAvailability(data)
+      })
+    return () => { current = false }
+  }, [service?.id])
   const isGrazing = service?.kind === 'grazing'
   const locationPolicy=bookingLocationPolicy(service?.kind)
   const [duration,setDuration]=useState(()=>durationPolicy({...service,...option}).quantityIsTime&&initialQty!=null?String(listingEstimate(service,option,initialQty).quantity):'')
@@ -248,6 +261,10 @@ export default function BookingConfirmScreen({ route, navigation }) {
 
   async function handleConfirm() {
     if(submitting||createdBooking)return
+    if (availability.paused && !attemptedRequest.current) {
+      Alert.alert('Requests paused', PAUSED_REQUEST_MESSAGE)
+      return
+    }
     const problem = quantityProblem()
     if (problem) { Alert.alert('Check quantity', problem); return }
     if(scheduleType==='specific'&&!date){Alert.alert('Choose a date','Select your preferred date.');return}
@@ -260,6 +277,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
     }
 
     if(!submission.start())return
+    attemptedRequest.current = true
     setSubmitting(true)
     try {
       const {error}=await supabase.from('bookings').upsert(buildBookingPayload(user.id),{onConflict:'id',ignoreDuplicates:true})
@@ -268,7 +286,16 @@ export default function BookingConfirmScreen({ route, navigation }) {
       if(readError)throw readError
       submission.finish(true)
       setCreatedBooking({...buildBookingPayload(user.id),...created,service})
-    } catch(error){submission.finish(false);Alert.alert('Could not send request',error.message)}
+    } catch(error){
+      submission.finish(false)
+      if (isPausedRequestError(error)) {
+        attemptedRequest.current = false
+        setFreshAvailability(current => ({...(current || service), availability_status: 'paused'}))
+        Alert.alert('Requests paused', PAUSED_REQUEST_MESSAGE)
+      } else {
+        Alert.alert('Could not send request', error.message)
+      }
+    }
     finally{setSubmitting(false)}
   }
 
@@ -306,6 +333,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Request summary</Text>
           <SummaryRow label="Listing" value={service.title} />
+          {!!availability.lead && !availability.paused && <Text style={styles.paymentInfoText}>{availability.lead}{availability.estimate ? '. ' + ESTIMATED_TIMING_NOTE : ''}</Text>}
+          {availability.paused && <Text accessibilityRole="alert" style={styles.paymentInfoText}>{PAUSED_REQUEST_MESSAGE}</Text>}
           <SummaryRow label="Unit price" value={readableRate(effectivePricingType,option?.rate ?? service.rate,option?.unit_label ?? service.unit_label,option?.min_charge ?? service.min_charge)} />
           <SummaryRow label="Provider" value={service.profile?.full_name || 'Provider'} />
           {option?.label ? <SummaryRow label="Rate option" value={option.label} /> : null}
@@ -486,7 +515,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           title={requestCopy.action}
           onPress={handleConfirm}
           loading={submitting}
-          disabled={!showPrice}
+          disabled={!showPrice || (availability.paused && !attemptedRequest.current)}
           accessibilityLabel={requestCopy.action}
         />
       </View>

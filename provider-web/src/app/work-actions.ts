@@ -1,4 +1,5 @@
 'use server'
+
 import {bookingLocationFields} from '@shared/bookingLocation'
 import {propertyJobOrigin,linkPostedPropertyJob} from '@shared/propertyNetworkJobs'
 import { CATEGORIES } from '@shared/categories'
@@ -266,6 +267,7 @@ export async function acceptOffer(_: ActionState, data: FormData): Promise<Actio
 }
 
 export async function requestBooking(_:ActionState,data:FormData):Promise<ActionState>{
+  const {PAUSED_REQUEST_MESSAGE, isPausedRequestError}=await import('@shared/listingAvailability')
   const {supabase,user}=await requireProvider(),id=text(data,'service_id'),requestId=text(data,'request_id'),location=text(data,'location'),quantity=Number(text(data,'quantity'))
   if(!validId(id)||!validId(requestId)||!Number.isFinite(quantity)||quantity<=0||quantity>10000000)return {error:'Choose a valid listing and a positive quantity.'}
   const notes=text(data,'notes'),locationNote=text(data,'location_note'),schedule=text(data,'schedule_type'),date=text(data,'date'),lat=text(data,'latitude'),lng=text(data,'longitude')
@@ -277,6 +279,12 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   if(existing)redirect('/activity/booking/'+existing.id+'/manage')
   const {data:s,error}=await supabase.from('services_public').select('*').eq('id',id).single()
   if(error)return failed()
+  if(s?.availability_status==='paused'){
+    const {data:retry,error:retryError}=await supabase.from('bookings').select('id').eq('id',requestId).eq('requester_id',user.id).eq('service_id',id).maybeSingle()
+    if(retryError)return failed()
+    if(retry)redirect('/activity/booking/'+retry.id+'/manage')
+    return {error:PAUSED_REQUEST_MESSAGE}
+  }
   if(!s||!s.is_active||s.closed_at||s.provider_id===user.id||['for_sale','lease'].includes(s.kind))return {error:'This listing is unavailable for booking requests. Go back to the listing to check its status.'}
   let locationFields
   try{locationFields=bookingLocationFields(s.kind,{location,latitude:lat,longitude:lng,note:locationNote})}catch(error){return {error:error instanceof Error?error.message:'Check the booking location.'}}
@@ -300,7 +308,14 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   let expected
  try{const rate=selectedRate(s,text(data,'variant_index')).rate;validateGrazingQuantity(rate,quantity);expected=durationFields(rate,text(data,'expected_duration'),text(data,'expected_duration_unit'),snapshot.quantity)}catch(error){return {error:error instanceof Error?error.message:'Check expected duration.'}}
  const {error:saveError}=await supabase.from('bookings').insert({...expected,id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,...locationFields,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
-  if(saveError)return failed()
+  if(saveError){
+    if(isPausedRequestError(saveError))return {error:PAUSED_REQUEST_MESSAGE}
+    if(saveError.code==='23505'){
+      const {data:retry}=await supabase.from('bookings').select('id').eq('id',requestId).eq('requester_id',user.id).eq('service_id',id).maybeSingle()
+      if(retry)redirect('/activity/booking/'+retry.id+'/manage')
+    }
+    return failed()
+  }
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/browse/'+id)
   redirect('/bookings/'+requestId+'?sent=1')
 }
