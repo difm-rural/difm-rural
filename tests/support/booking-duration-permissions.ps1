@@ -1,6 +1,6 @@
 # Existing local-only PostgreSQL fixture. Real schema, policies and update guards;
 # all fixture DDL, migration application and test data roll back together.
-param([int]$Port=56432,[string]$Database='postgres',[string]$Psql='C:/Program Files/PostgreSQL/17/bin/psql.exe')
+param([switch]$Lifecycle,[int]$Port=56432,[string]$Database='postgres',[string]$Psql='C:/Program Files/PostgreSQL/17/bin/psql.exe')
 $ErrorActionPreference='Stop'
 $repo=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $baseline=Get-Content (Join-Path $repo 'supabase/migrations/00000000000000_baseline.sql') -Raw
@@ -23,6 +23,14 @@ create view public.services_public as select * from public.services where is_act
 $checks=Get-Content (Join-Path $repo 'tests/sql/booking-duration.test.sql') -Raw
 $snapshot=Get-Content (Join-Path $repo 'supabase/migrations/20261019150000_booking_pricing_snapshot.sql') -Raw
 $duration=Get-Content (Join-Path $repo 'supabase/migrations/20261125140000_booking_expected_duration.sql') -Raw
+if($Lifecycle){
+ $reviews=[regex]::Match($baseline,'(?s)CREATE TABLE public.reviews \(.*?\r?\n\);').Value
+ $reviewIndex=[regex]::Match($baseline,'CREATE UNIQUE INDEX reviews_booking_reviewer_role_unique .*?;').Value
+ $reviewPolicies=([regex]::Matches($baseline,'(?m)^CREATE POLICY .*? ON public.reviews .*?;\r?$') | ForEach-Object Value) -join "`n"
+ $setup+="`n"+$reviews+"`n"+$reviewIndex+"`n"+$reviewPolicies
+ $setup=$setup.Replace('provider_id uuid);','provider_id uuid,closed_at timestamptz);')
+ $checks+="`n"+(Get-Content (Join-Path $repo 'supabase/migrations/20261016120000_complete_grazing_arrangement.sql') -Raw)+"`n"+(Get-Content (Join-Path $repo 'tests/sql/booking-lifecycle.test.sql') -Raw)
+}
 $sql=$setup+"`n"+$table+"`n"+$guard+"`n"+$policies+"`n"+$snapshot+"`n"+$duration+"`n"+$checks+"`nrollback;"
 $file=Join-Path ([IO.Path]::GetTempPath()) ('rc-booking-duration-'+[guid]::NewGuid()+'.sql')
 try {

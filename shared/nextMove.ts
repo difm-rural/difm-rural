@@ -190,8 +190,7 @@ export function bookingNextMove(
 
   if (booking.status === 'confirmed' || booking.status === 'in_progress') {
     if ((service as { kind?: string }).kind === 'grazing') {
-      return move('Arrangement accepted', 'Grazing arrangement accepted', 'Use Chat to agree ongoing grazing details, dates and payment directly with each other.'
-        + (viewerRole === 'provider' ? ' When the arrangement has finished, choose Complete arrangement to close the listing or relist for new requests.' : ''), {
+      return move('Grazing booking confirmed', 'Grazing booking confirmed', 'Use Chat to agree the grazing dates, duration, access and payment arrangements.', {
         tone: 'active', icon: 'chatbubble-outline', actionLabel: 'View booking',
       })
     }

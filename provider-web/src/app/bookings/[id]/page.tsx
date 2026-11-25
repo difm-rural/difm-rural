@@ -1,4 +1,5 @@
-import {formatDate as nzDate} from '@shared/formatting'
+import {grazingCompletionFeedback} from '@shared/bookingLifecycleUx'
+import {BookingSentNotice} from '@/components/work/booking-sent-notice'
 import {bookingNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
@@ -7,10 +8,9 @@ import { SideKicker } from '@/components/side-kicker'
 import { requireProvider } from '@/lib/auth'
 import { markNotificationsReadFor } from '@/lib/notification-read'
 import { LiveRefresh } from '@/components/live-refresh'
-import { statusLabel } from '@/lib/work'
 import { loadActivityWork } from '@/lib/activity-data'
 import { workActions, workRole } from '@/lib/activity-policy'
-import { BookingDetails } from '../../activity/booking-details'
+import { BookingDetails,BookingResponses } from '../../activity/booking-details'
 import { BookingSchedule } from '../../activity/booking-schedule'
 import { loadConversation } from '@/lib/messaging-data'
 import { Conversation } from '@/components/conversation/conversation'
@@ -48,39 +48,33 @@ export default async function BookingWorkspace({params,searchParams}:{params:Pro
 
   const {data:listingLocation}=role==='requester'&&['confirmed','in_progress','completed','cancellation_requested'].includes(work.status)?await supabase.from('service_private_locations').select('location_name,latitude,longitude').eq('service_id',work.booking!.service_id).maybeSingle():{data:null}
   const b=work.booking!
-  const timeline:string[]=['Requested '+nzDate(b.created_at)]
-  if(b.quote_amount!=null)timeline.push('Quote sent')
-  if(['confirmed','in_progress','awaiting_completion','completed'].includes(work.status))timeline.push('Confirmed')
-  if(work.status==='completed')timeline.push('Completed')
-  if(received||ownReview)timeline.push('Reviewed')
   const history=['completed','cancelled','withdrawn','declined'].includes(work.status)
 
-  const headerCard=<article className="card work-detail"><h2>Booking details</h2><p>{role==='provider'?'Requester':'Provider'}: {person?.full_name || (other?'Name unavailable':'—')}</p>
+  const headerCard=<div><p>{role==='provider'?'Requester':'Provider'}: {person?.full_name || (other?'Name unavailable':'—')}</p>
     {person?.created_at && <p className="muted">Member since {new Date(person.created_at).toLocaleDateString('en-NZ',{month:'long',year:'numeric'})}</p>}
     {other && <p><Link href={'/people/'+other+'/reviews?role='+(role==='provider'?'requester':'provider')} className="card-link">View profile & reviews →</Link></p>}
     {work.status==='cancellation_requested' && <p className="home-load-error">Cancellation requested — waiting for the provider to confirm.</p>}
     {work.cancellationReason && <p>Cancellation reason: {work.cancellationReason}</p>}
     {work.cancellationNote && <p className="work-description">{work.cancellationNote}</p>}
-  </article>
+  </div>
 
   const mainColumn=<>
-    {sent==='1'&&role==='requester'&&work.status==='pending'&&<section className="card" role="status"><h2>Booking request sent!</h2><p>Your request has been sent to {person?.full_name || 'the provider'}. They’ll review it and respond.</p><p>{work.title} · Waiting for response</p><Link className="lform-save" href={'/bookings/'+id}>View booking</Link> <Link className="card-link" href="/browse">Back to listings</Link></section>}
-    {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
-    {headerCard}
-    {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
-    {actions.filter(a=>a!=='review').length>0&&<div className="lform-actions"><a className="lform-cancel" href="#manage">Manage this booking</a></div>}
-    {listingLocation&&<section className="card"><h2>Private listing location</h2><p>Shared with authorised booking participants only.</p><p>{listingLocation.location_name}</p>{listingLocation.latitude!=null&&listingLocation.longitude!=null&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(listingLocation.latitude+','+listingLocation.longitude)} target="_blank" rel="noopener noreferrer">Open agreed listing location</a>}</section>}
-    <BookingDetails booking={work.booking!} userId={user.id}/>
+    {sent==='1'&&role==='requester'&&work.status==='pending'&&<BookingSentNotice id={id} provider={person?.full_name||'the provider'}/>}
+    {work.listingKind==='grazing'&&work.status==='completed'&&<section className="card" role="status"><h2>Grazing booking completed</h2><p>{role==='requester'?'The provider has marked this arrangement complete.':grazingCompletionFeedback(!!b.service?.is_active&&!b.service?.closed_at).message}</p>{reviewError?<p>Refresh to load your review.</p>:ownReview?<p>Your review has been submitted. <a href="#reviews" className="card-link">View your review →</a></p>:actions.includes('review')&&<a className="lform-save" href="#reviews">{role==='requester'?'Leave a review':'Review requester'}</a>}</section>}
+    {next&&work.listingKind!=='grazing'&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
+    <BookingDetails booking={work.booking!} userId={user.id} participant={headerCard} privateLocation={listingLocation} includeResponses={false}/>
     {work.listingKind!=='grazing' && ['confirmed','in_progress','completed'].includes(work.status) && <BookingSchedule bookingId={id} userId={user.id} providerId={work.providerId!} status={work.status}/>}
-    <ManageActions kind="booking" id={id} actions={actions} otherFirst={otherFirst}/>
-    {work.status==='completed'&&<ReviewsSection kind="booking" id={id} actions={actions} personName={person?.full_name || null} personId={other} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'}/>}
+    <section className="card"><h2>Reviews and booking management</h2>
+    <BookingResponses booking={b} userId={user.id} embedded/>
+    <ManageActions kind="booking" id={id} actions={actions} otherFirst={otherFirst} embedded/>
+    {work.status==='completed'&&<ReviewsSection kind="booking" id={id} actions={actions} personName={person?.full_name || null} personId={other} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'} embedded/>}
+    </section>
     {work.status==='completed'&&role==='requester'&&ownReview&&other&&<PropertyNetworkSuggestion owner={user.id} providerId={other} providerName={person?.full_name||null} category={(b.service as {category?:string|null}|null)?.category} kind={work.listingKind} title={work.title}/>}
-    {work.status==='completed'&&<p className="home-clear">Booking complete. You can find it again in History.</p>}
   </>
 
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
     <Link href={'/activity'+(history?'?view=history':'')} className="card-link">Back to {history?'History':'Activity'}</Link>
-    <header className="home-heading work-head listing-head"><div><SideKicker side="listing" label="Listings · offered"/><p className="eyebrow">{next?.badge || statusLabel(work.status)}</p><h1>{work.title}</h1></div><LiveRefresh/></header>
+    <header className="home-heading work-head listing-head"><div><SideKicker side="listing" label={role==='provider'?'Listings · offered':'Listings · requested'}/><h1>{work.title}</h1></div><LiveRefresh/></header>
     {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
   </section></AppShell>
 }

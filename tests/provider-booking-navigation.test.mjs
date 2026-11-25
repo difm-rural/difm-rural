@@ -1,3 +1,4 @@
+import * as lifecycleUx from '../shared/bookingLifecycleUx.ts'
 import * as bookingDuration from '../shared/bookingDuration.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -19,7 +20,7 @@ const booking={id:'booking',provider_id:'provider',requester_id:'requester',stat
 function screen(file,{states={},route={},record=booking}={}){
  let index=0;const calls=[],writes=[],alerts=[]
  const react={useState(v){const at=index++;return [at in states?states[at]:typeof v==='function'?v():v,()=>{}]},useEffect(){},useCallback:f=>f,useRef:v=>({current:v})};react.default=react
- const mods={'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
+ const mods={'../../shared/bookingLifecycleUx':lifecycleUx,'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
   'react-native':{Platform:{OS:'android'},StyleSheet:{create:v=>v},Alert:{alert:(...v)=>alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','RefreshControl','FlatList','KeyboardAvoidingView'].map(n=>[n,n]))},
   '@react-navigation/native':{useFocusEffect(){}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
   '@react-native-async-storage/async-storage':{__esModule:true,default:{}},
@@ -34,7 +35,8 @@ function screen(file,{states={},route={},record=booking}={}){
   if(name.endsWith('/listingEstimate'))return estimate
   if(name.endsWith('/nextMove'))return {bookingNextMove,jobNextMove}
   if(name.endsWith('/roles'))return {canProvide:()=>true}
-  if(name.endsWith('/bookingActions'))return new Proxy({},{get:(_,action)=>async(...v)=>{writes.push([action,...v]);return {error:null}}})
+  if(name.endsWith('/supabase'))return {supabase:{auth:{getUser:async()=>({data:{user:{id:'provider'}}})},rpc:async(...v)=>{writes.push(['rpc',...v]);return {error:null}}}}
+  if(name.endsWith('/bookingActions'))return new Proxy({},{get:(_,action)=>async(...v)=>{writes.push([action,...v]);return action==='saveBookingReview'?{id:'saved-review',rating:5}:{error:null}}})
   if(name.includes('/components/'))return {__esModule:true,default:name.split('/').at(-1),CARD_GAP:12,SNAP_INTERVAL:276}
   if(name.includes('/lib/')||name.includes('/shared/'))return {}
   throw Error('Missing '+name)
@@ -77,7 +79,7 @@ test('acceptance requires an explicit confirmation and preserves the existing pe
  const button=detail.all.find(n=>n.type==='Button'&&n.props.title==='Accept booking request')
  assert.ok(button);assert.equal(button.props.style.flexBasis,'100%')
  assert.deepEqual(detail.writes,[]);button.props.onPress();assert.deepEqual(detail.writes,[])
- const [title,message,options]=detail.alerts[0];assert.equal(title,'Accept booking request?');assert.match(message,/confirms the booking with the requester/)
+ const [title,message,options]=detail.alerts[0];assert.equal(title,'Accept booking request?');assert.match(message,/not confirming final payment/)
  assert.equal(options[0].style,'cancel');assert.equal(options[0].onPress,undefined)
  assert.equal(options[1].text,'Accept booking request');await options[1].onPress()
  assert.deepEqual(detail.writes,[['updateBookingStatus',booking.id,'confirmed',[lifecycle.BOOKING_STATUS.PENDING]]])
@@ -95,4 +97,41 @@ test('web Activity already links to the full details route, and acceptance is ex
  assert.match(bookings,/View details & actions/);assert.doesNotMatch(bookings,/<ActionForm|respondBooking/)
  const detail=source('provider-web/src/app/activity/booking-details.tsx')
  assert.match(detail,/Accept booking request/);assert.match(detail,/This accepts the request and confirms the booking/)
+})
+
+test('confirmed grazing makes Chat primary and completion secondary without truncating controls',()=>{
+ const detail=screen('ServiceBookingDetailScreen.js',{record:{...booking,status:'confirmed'}})
+ const buttons=detail.all.filter(n=>n.type==='Button')
+ const complete=buttons.find(n=>n.props.title==='Complete booking');assert.ok(complete);assert.equal(complete.props.variant,'secondary');assert.equal(complete.props.style.flexBasis,'100%')
+ assert.ok(buttons.some(n=>n.props.title?.includes('Chat')))
+ complete.props.onPress();const [title,message,options]=detail.alerts[0]
+ assert.equal(title,'Complete grazing arrangement?');assert.match(message,/does not collect or record payment/)
+ assert.deepEqual(options.map(o=>o.text),['Cancel','Complete & Relist','Complete & Close Listing'])
+ assert.equal(options[0].style,'cancel');assert.equal(options[0].onPress,undefined);assert.deepEqual(detail.writes,[])
+})
+for(const role of ['provider','requester'])test(`completed ${role} sees independent review or submitted state`,()=>{
+ const opts={record:{...booking,status:'completed'},route:{viewerRole:role},states:{14:true}}
+ const detail=screen('ServiceBookingDetailScreen.js',opts)
+ assert.ok(detail.all.some(n=>n.type==='Button'&&n.props.title===(role==='provider'?'Review requester':'Leave a review')))
+ const submitted=screen('ServiceBookingDetailScreen.js',{...opts,states:{14:true,11:{id:'own',rating:5,comment:'Great'}}})
+ assert.ok(submitted.all.some(n=>n.type==='Button'&&n.props.title==='Edit review'))
+ assert.ok(!submitted.all.some(n=>n.type==='Button'&&['Leave a review','Review requester'].includes(n.props.title)))
+ const failed=screen('ServiceBookingDetailScreen.js',{...opts,states:{14:true,15:true}})
+ assert.ok(failed.all.some(n=>n.type==='Button'&&n.props.title==='Retry loading review'))
+ assert.ok(!failed.all.some(n=>n.type==='Button'&&['Leave a review','Review requester'].includes(n.props.title)))
+})
+
+for(const relist of [true,false])test(`completion sends only selected booking and relist=${relist}`,async()=>{
+ const detail=screen('ServiceBookingDetailScreen.js',{record:{...booking,status:'confirmed'}})
+ detail.all.find(n=>n.type==='Button'&&n.props.title==='Complete booking').props.onPress()
+ const choice=detail.alerts[0][2].find(o=>o.text===(relist?'Complete & Relist':'Complete & Close Listing'));await choice.onPress()
+ assert.deepEqual(detail.writes,[['rpc','complete_grazing_arrangement',{p_booking_id:booking.id,p_relist:relist}]])
+})
+
+test('repeated review submissions share the existing save workflow and are guarded while in flight',async()=>{
+ const detail=screen('ServiceBookingDetailScreen.js',{record:{...booking,status:'completed'},states:{14:true}})
+ const modal=detail.all.find(n=>n.type==='ReviewModal');assert.ok(modal)
+ await Promise.all([modal.props.onSubmit({rating:5,comment:'Great'}),modal.props.onSubmit({rating:5,comment:'Great'})])
+ assert.equal(detail.writes.filter(w=>w[0]==='saveBookingReview').length,1)
+ assert.ok(detail.alerts.some(a=>a[0]==='Review saved'))
 })

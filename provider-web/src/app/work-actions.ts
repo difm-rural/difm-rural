@@ -318,5 +318,5 @@ export async function respondBooking(_:ActionState,data:FormData):Promise<Action
   const result=await query.select('id')
   if(result.error||!result.data?.length)return {error:'Could not save. This request or quote may have changed. Refresh and try again.'}
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/activity/booking/'+id+'/manage');revalidatePath('/browse/'+b.service_id)
-  return {error:'',success:intent==='quote'?'Quote sent for the requester to review.':intent==='decline'?'Request declined.':'Booking confirmed. Use Chat to arrange the details and payment.'}
+  return {error:'',success:intent==='quote'?'Quote sent for the requester to review.':intent==='decline'?'Request declined.':intent==='confirm'?'Booking accepted. The requester has been notified. Use Chat to agree the remaining arrangements.':'Quote accepted. Use Chat to agree the remaining arrangements.'}
 }

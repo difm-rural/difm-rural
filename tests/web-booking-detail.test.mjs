@@ -38,7 +38,7 @@ test('booking responses follow participant roles, saved pricing and current stat
  assert.deepEqual(bookingResponseActions(booking({status:'quote_sent'}),'outsider','quote_required'),[])
  assert.deepEqual(bookingResponseActions(booking({status:'confirmed',quote_amount:200,quote_sent_at:'2026-10-19T00:00:00Z'}),provider,'quote_required'),[])
  assert.deepEqual(bookingResponseActions(booking({status:'confirmed'}),provider,'quote_required'),['quote'])
- assert.match(bookingNextStep('pending','requester',false),/waiting/);assert.match(bookingNextStep('confirmed','requester',false,'grazing'),/ongoing/)
+ assert.match(bookingNextStep('pending','requester',false),/waiting/);assert.match(bookingNextStep('confirmed','requester',false,'grazing'),/grazing dates/)
 })
 let jobSource=(await readFile(new URL('../provider-web/src/lib/job-input.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(new URL('../shared/categories.ts',import.meta.url).href))
 let offerSource=(await readFile(new URL('../provider-web/src/lib/offer-input.ts',import.meta.url),'utf8')).replace("'@shared/offers'",JSON.stringify(new URL('../shared/offers.ts',import.meta.url).href))

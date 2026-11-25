@@ -31,8 +31,8 @@ export async function manageArrangement(_:ActionState,data:FormData):Promise<Act
       if(!rows?.length)return {error:'The arrangement has already changed. Refresh to see its current state.'}
     }
     revalidatePath('/');revalidatePath('/activity');revalidatePath('/listings');revalidatePath('/browse')
-    revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath('/jobs/'+id)
-    return {error:'',success:kind==='job'&&intent==='complete'?'Job completed.':intent==='request_cancel'?'Cancellation requested. The provider needs to confirm.':intent==='relist'?'Your listing is live again.':'Saved. The arrangement has been updated.'}
+    revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath(kind==='job'?'/jobs/'+id:'/bookings/'+id)
+    return {error:'',success:kind==='job'&&intent==='complete'?'Job completed.':intent==='request_cancel'?'Cancellation requested. The provider needs to confirm.':intent==='relist'?'Your listing is live again.':intent==='relist_grazing'?'Grazing booking completed. The booking is complete and your listing is available for new requests. Both parties can leave reviews.':intent==='close_grazing'?'Grazing booking completed. The booking is complete and your listing is now closed. Both parties can leave reviews.':'Saved. The arrangement has been updated.'}
   }catch{return {error:'Could not save this change. Check your connection, refresh and try again.'}}
 }
 

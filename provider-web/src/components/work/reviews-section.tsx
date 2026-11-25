@@ -14,9 +14,9 @@ function stars(n:number){return '★'.repeat(n)+'☆'.repeat(5-n)}
 // The reviews block for a completed job or booking: the review you received, your
 // own review shown read-only (edit behind a toggle), and — before you've reviewed
 // — the form to leave one. Shared by the job and booking workspaces.
-export function ReviewsSection({kind,id,actions,personName,personId,received,ownReview,reviewError,justReviewed,otherReviewRole}:{
+export function ReviewsSection({kind,id,actions,personName,personId,received,ownReview,reviewError,justReviewed,otherReviewRole,embedded=false}:{
   kind:'job'|'booking';id:string;actions:WorkAction[];personName:string|null;personId?:string|null;
-  received?:WorkReview;ownReview?:WorkReview;reviewError:boolean;justReviewed?:boolean;otherReviewRole?:string}){
+  received?:WorkReview;ownReview?:WorkReview;reviewError:boolean;justReviewed?:boolean;otherReviewRole?:string;embedded?:boolean}){
   const firstName=personName?personName.trim().split(/\s+/)[0]:'the other person'
   const reviewForm=kind==='job'
     ? <JobReviewForm key={ownReview?.id || 'new'} id={id} rating={ownReview?.rating} comment={ownReview?.comment} editing={!!ownReview}/>
@@ -28,7 +28,8 @@ export function ReviewsSection({kind,id,actions,personName,personId,received,own
       <p className="muted">Your rating and comments are public.</p>
     </ActionForm>
   )
-  return <section className="card" id="reviews"><h2>Reviews</h2>
+  const Heading=embedded?'h3':'h2'
+  return <section className={embedded?undefined:'card'} id="reviews"><Heading>Reviews</Heading>
     {justReviewed && <p className="home-clear" role="status">Thanks — your review is posted.</p>}
     {reviewError?<p role="alert">Could not load reviews. Refresh before adding or editing your review.</p>:<>
       {received && <article className="activity-received"><h3>{personName || 'Their'} review of you</h3><p><span aria-label={received.rating+' out of 5'}>{stars(received.rating)}</span> · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}

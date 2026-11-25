@@ -39,9 +39,9 @@ export function bookingResponseActions(b:BookingResponse,userId:string,pricingTy
 export function bookingNextStep(status:string,role:'requester'|'provider',quote:boolean,kind?:string|null){
  if(status==='pending')return role==='provider'?(quote?'Review the request and send a quote for the requester to approve.':'Review the request, then accept or decline it.'):'Your request is waiting for the provider. It is confirmed when they accept or you accept their quote.'
  if(status==='quote_sent')return role==='provider'?'Your quote is waiting for the requester to accept.':'Review the quote amount and what is included. Accepting confirms the booking.'
- if(['confirmed','in_progress'].includes(status))return kind==='grazing'?'Arrangement accepted. Use Chat to agree ongoing dates, details and payment. When it finishes, the provider can complete it and close or relist the listing.':'Booking confirmed. Use Chat to agree timing, access, details and direct payment. The provider marks it complete when the work is finished.'
+ if(['confirmed','in_progress'].includes(status))return kind==='grazing'?'Use Chat to agree the grazing dates, duration, access and payment arrangements.':'Booking confirmed. Use Chat to agree timing, access, details and direct payment. The provider marks it complete when the work is finished.'
  if(status==='cancellation_requested')return 'Cancellation requested. The arrangement remains active until the provider confirms cancellation.'
- if(status==='completed')return 'Arrangement complete. Both people can leave a review.'
+ if(status==='completed')return kind==='grazing'?'Grazing booking completed. Both people can leave a review.':'Booking completed. Both people can leave a review.'
  return 'This request is closed. You can find it again in Activity History.'
 }
 

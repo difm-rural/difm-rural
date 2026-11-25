@@ -1,3 +1,4 @@
+import * as lifecycleUx from '../shared/bookingLifecycleUx.ts'
 import * as bookingDuration from '../shared/bookingDuration.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -113,8 +114,8 @@ test('native Home shows a safe summary when lifecycle retrieval fails',async()=>
 
 function nativeDetail(role,privateLocation=false,status='pending'){
  const jsx=(type,props)=>({type,props}),exports={}
- const react={useState:v=>[typeof v==='function'?v():v,()=>{}],useEffect(){}};react.default=react
- const imports={'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
+ const react={useState:v=>[typeof v==='function'?v():v,()=>{}],useEffect(){},useRef:v=>({current:v})};react.default=react
+ const imports={'../../shared/bookingLifecycleUx':lifecycleUx,'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
   'react-native':{Platform:{OS:'android'},StyleSheet:{create:v=>v},...Object.fromEntries(['View','Text','TouchableOpacity','ScrollView','KeyboardAvoidingView','TextInput'].map(n=>[n,n]))},
   'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../lib/lifecycle':lifecycle,
   '../lib/listingEstimate':estimate,'../lib/nextMove':{bookingNextMove},'../../shared/bookingLocation':location,
@@ -144,7 +145,7 @@ for(const role of ['requester','provider'])test(`native grazing details show ${r
 })
 for(const role of ['requester','provider'])test(`web grazing details use ${role} wording and keep authorized private data secondary`,()=>{
  const webRequire=createRequire(new URL('../provider-web/package.json',import.meta.url)),jsx=webRequire('react/jsx-runtime'),{renderToStaticMarkup}=webRequire('react-dom/server'),ts=require('typescript')
- const imports={'@shared/bookingDuration':bookingDuration,'react/jsx-runtime':jsx,'@shared/bookingLocation':location,'@shared/formatting':formatting,'@shared/listingPricing':pricing,
+ const imports={'@shared/bookingLifecycleUx':lifecycleUx,'@shared/nextMove':{bookingNextMove},'@/lib/work':{statusLabel:lifecycle.bookingStatusLabel},'@shared/bookingDuration':bookingDuration,'react/jsx-runtime':jsx,'@shared/bookingLocation':location,'@shared/formatting':formatting,'@shared/listingPricing':pricing,
   '@/lib/booking-detail':detail,'@/components/navigation-link':{default:'a'},'@/components/action-form':{ActionForm:({children})=>jsx.jsx('div',{children})},'./quote-form':{QuoteForm:()=>null},'../work-actions':{respondBooking(){throw Error('No writes')}}}
  const code=ts.transpileModule(source('provider-web/src/app/activity/booking-details.tsx'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText,exports={}
  new Function('exports','require',code)(exports,name=>{assert.ok(name in imports,name);return imports[name]})
@@ -153,7 +154,7 @@ for(const role of ['requester','provider'])test(`web grazing details use ${role}
  const render=b=>renderToStaticMarkup(jsx.jsx(exports.BookingDetails,{booking:b,userId:role==='provider'?'viewer':'customer'}))
  const html=render(record)
  assert.match(html,/Expected duration: 4 weeks/);assert.match(html,/Estimated total: \$400/)
- assert.ok(html.includes(bookingLocationHelp('grazing',role)))
+ assert.ok(html.includes(bookingLocationHelp('grazing',role,'confirmed',service.location_name,false)))
  assert.match(html,/<strong>Cambridge<\/strong>/);assert.doesNotMatch(html,/123 Private Road|Private booking location:/)
  const authorized=render({...record,location_name:'Authorized booking address'})
  assert.match(authorized,/<p class="muted">Private booking location: Authorized booking address<\/p>/)

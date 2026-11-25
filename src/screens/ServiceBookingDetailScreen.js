@@ -1,9 +1,9 @@
-import {bookingDurationSummary,durationPolicy,DURATION_AGREEMENT} from '../../shared/bookingDuration'
+import {BOOKING_ACCEPTED,GRAZING_COMPLETION,grazingCompletionFeedback,bookingAcceptanceMessage,savedBookingSummary} from '../../shared/bookingLifecycleUx'
+import {durationPolicy,DURATION_AGREEMENT} from '../../shared/bookingDuration'
 import {bookingLocationHelp,bookingPublicArea} from '../../shared/bookingLocation'
-import {readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import {formatDateLabel} from '../../shared/formatting.js'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import {
   Alert,
   KeyboardAvoidingView,
@@ -88,6 +88,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const [myReview, setMyReview] = useState(null)
   const [receivedReview, setReceivedReview] = useState(null)
   const [savingReview, setSavingReview] = useState(false)
+  const [reviewsLoaded,setReviewsLoaded]=useState(false)
+  const [reviewLoadError,setReviewLoadError]=useState(false)
+  const reviewBusy=useRef(false)
   const [workSchedule, setWorkSchedule] = useState(null)
   const [arrivalModalVisible, setArrivalModalVisible] = useState(false)
   const [savingArrival, setSavingArrival] = useState(false)
@@ -103,9 +106,10 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }, [booking?.status, booking?.id])
 
   async function loadMyReview() {
+    setReviewLoadError(false)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) throw new Error('Sign in to view your review.')
       const review = await loadReview({ bookingId: booking.id, reviewerId: user.id, reviewerRole: viewerRole })
       setMyReview(review)
       // The review the other party left about you (for this booking).
@@ -118,7 +122,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         .eq('reviewer_role', fromRole)
         .maybeSingle()
       setReceivedReview(data || null)
-    } catch { /* reviews table not provisioned yet */ }
+    } catch {setReviewLoadError(true)}
+    finally {setReviewsLoaded(true)}
   }
 
   // Reputation of the other party — the requester's rating/reviews for a
@@ -186,7 +191,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const provider = booking.provider || { full_name: booking.providerName }
   const otherUser = viewerRole === 'provider' ? requester : provider
   const otherRoleLabel = viewerRole === 'provider' ? 'Requester' : 'Provider'
-  const durationSummary=bookingDurationSummary(booking)
+  const durationSummary=savedBookingSummary(booking)
   const showDuration=durationPolicy({...service,...booking.pricing_snapshot}).enabled||booking.expected_duration!=null
   const isQuoteRequired = bookingPricingType(booking) === 'quote_required'
   const nextMove = bookingNextMove(booking, viewerRole, { otherName: otherUser?.full_name })
@@ -253,7 +258,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
     Alert.alert('Update sent', `The other party has been told you are about ${minutes} minutes late.`)
   }
 
-  async function updateStatus(nextStatus, allowedStatuses, message) {
+  async function updateStatus(nextStatus, allowedStatuses, message,successTitle='Updated') {
     const { error } = await updateBookingStatus(booking.id, nextStatus, allowedStatuses)
     if (error) {
       Alert.alert('Could not update booking', error.message)
@@ -261,7 +266,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       return
     }
     setBooking(prev => ({ ...prev, status: nextStatus }))
-    if (message) Alert.alert('Updated', message)
+    if (message) Alert.alert(successTitle, message)
   }
 
   async function sendQuote() {
@@ -306,9 +311,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
   function confirmBooking() {
     Alert.alert('Accept booking request?',
-      `Accepting "${service.title || 'this request'}" confirms the booking with the requester. Use Chat to agree timing, access and payment.`, [
+      `${service.title || 'Booking request'}\n\n${bookingAcceptanceMessage(booking,requester?.full_name || booking.requesterName || 'Requester')}`, [
         {text:'Not now',style:'cancel'},
-        {text:'Accept booking request',onPress:()=>updateStatus('confirmed', [BOOKING_STATUS.PENDING], 'The requester can now see this booking is confirmed.')},
+        {text:'Accept booking request',onPress:()=>updateStatus('confirmed', [BOOKING_STATUS.PENDING], BOOKING_ACCEPTED.message,BOOKING_ACCEPTED.title)},
       ])
   }
 
@@ -335,20 +340,25 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
       })
       if (error) throw error
       await fetchBooking()
-      Alert.alert('Arrangement complete', relist
-        ? 'The listing is live for new enquiries and booking requests. You can both leave a review of this arrangement.'
-        : 'The listing is closed and hidden from discovery. You can both leave a review. Relist when grazing is available again.')
+      const feedback=grazingCompletionFeedback(relist)
+      Alert.alert(feedback.title,feedback.message)
     } catch (error) {
       Alert.alert('Could not complete arrangement', error.message || 'Check your connection and try again.')
     } finally { setSavingArrangement(false) }
   }
 
   function finishGrazing() {
-    Alert.alert('Complete grazing arrangement?',
-      'Make sure grazing payment has been sorted or agreed. When the arrangement has finished, mark it complete and close this listing. If grazing is available again, choose relist to keep it advertised. Other bookings are unchanged.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Complete & close listing', onPress: () => completeGrazing(false) },
-        { text: 'Complete & relist', onPress: () => completeGrazing(true) },
+    Alert.alert(GRAZING_COMPLETION.title,
+      `${GRAZING_COMPLETION.message}
+
+${GRAZING_COMPLETION.payment}
+
+Complete & Relist: ${GRAZING_COMPLETION.relist}
+
+Complete & Close Listing: ${GRAZING_COMPLETION.close}`, [
+        {text:'Cancel',style:'cancel'},
+        {text:'Complete & Relist',onPress:()=>completeGrazing(true)},
+        {text:'Complete & Close Listing',onPress:()=>completeGrazing(false)},
       ])
   }
 
@@ -368,17 +378,23 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   }
 
   async function submitReview({ rating, comment }) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if(reviewBusy.current)return
+    reviewBusy.current=true
     setSavingReview(true)
     try {
+      const {data:{user}}=await supabase.auth.getUser()
+      if(!user)throw new Error('Sign in to save your review.')
       const review = await saveBookingReview({ booking, viewerRole, reviewerId: user.id, rating, comment })
+      if(!review?.id)throw new Error('Could not confirm your saved review. Refresh before trying again.')
       setMyReview(review)
+      setReviewsLoaded(true)
+      setReviewLoadError(false)
       setReviewVisible(false)
       Alert.alert('Review saved', 'Thanks for your feedback.')
     } catch (e) {
       Alert.alert('Could not save review', e.message)
     } finally {
+      reviewBusy.current=false
       setSavingReview(false)
     }
   }
@@ -433,6 +449,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const providerCanConfirmCancel = viewerRole === 'provider' && booking.status === 'cancellation_requested'
   const providerCanDismiss = viewerRole === 'provider' && isBookingDismissable(booking.status)
   const canReview = booking.status === 'completed'
+  const activeGrazing=service.kind==='grazing'&&isBookingUnderway(booking.status)
+  const completedGrazing=service.kind==='grazing'&&canReview
+  const hasPrivateLocation=!!(listingLocation?.location_name||listingLocation?.latitude!=null||booking.location_name||booking.latitude!=null)
 
   return (
     <KeyboardAvoidingView
@@ -447,9 +466,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         </TouchableOpacity>
         <Text style={styles.kicker}>Service booking</Text>
         <Text style={styles.title} numberOfLines={2}>{service.title || 'Service booking'}</Text>
-        <View style={styles.statusPill}>
+        {!activeGrazing&&!completedGrazing&&<View style={styles.statusPill}>
           <Text style={styles.statusText}>{bookingStatusLabel(booking.status)}</Text>
-        </View>
+        </View>}
       </View>
 
       <ScrollView
@@ -457,7 +476,15 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets={true}>
-        {listingLocation&&<View style={styles.card}><Text style={styles.cardLabel}>Private listing location · booking participants only</Text><Text>{listingLocation.location_name}</Text>{listingLocation.latitude!=null&&listingLocation.longitude!=null&&<Button variant="secondary" title="Open agreed listing location" onPress={()=>Linking.openURL('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(listingLocation.latitude+','+listingLocation.longitude))}/>}</View>}
+        {completedGrazing&&<View style={styles.card}>
+          <Text style={styles.completionTitle}>Grazing booking completed</Text>
+          <Text style={styles.detailValue}>{viewerRole==='requester'?'The provider has marked this arrangement complete.':grazingCompletionFeedback(!!service.is_active&&!service.closed_at).message}</Text>
+          {reviewLoadError?<Button variant="secondary" title="Retry loading review" onPress={loadMyReview}/>:!reviewsLoaded?<Text>Loading your review…</Text>:myReview?<>
+            <Text style={styles.cardLabel}>Your review submitted</Text><Text style={styles.detailValue}>{myReview.rating} / 5 · {myReview.comment || 'No written comment.'}</Text>
+            <Button variant="secondary" title="Edit review" onPress={()=>setReviewVisible(true)}/>
+          </>:<Button title={viewerRole==='requester'?'Leave a review':'Review requester'} onPress={()=>setReviewVisible(true)}/>}
+        </View>}
+        {listingLocation&&<View style={styles.card}><Text style={styles.cardLabel}>Private listing location · booking participants only</Text><Text>{listingLocation.location_name}</Text>{listingLocation.latitude!=null&&listingLocation.longitude!=null&&<Button variant="secondary" title={service.kind==='grazing'?'View grazing location':'View listing location'} onPress={()=>Linking.openURL('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(listingLocation.latitude+','+listingLocation.longitude))}/>}</View>}
         <NextMoveBanner nextMove={nextMove} style={{ marginBottom: 14 }} />
 
         {service.kind !== 'grazing' && ['confirmed', 'in_progress'].includes(booking.status) ? (
@@ -508,7 +535,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>{service.kind==='grazing'?'Grazing area':service.kind==='hire'?'Collection / delivery':'Where'}</Text>
           {service.kind==='grazing'&&<Text style={styles.publicArea}>{bookingPublicArea(service.location_name)}</Text>}
-          {['grazing','hire'].includes(service.kind)&&<Text style={styles.detailValue}>{bookingLocationHelp(service.kind,viewerRole)}</Text>}
+          {['grazing','hire'].includes(service.kind)&&<Text style={styles.detailValue}>{bookingLocationHelp(service.kind,viewerRole,booking.status,service.location_name,hasPrivateLocation)}</Text>}
           <DetailRow label="Private booking location" value={booking.location_name} />
           {service.kind!=='grazing'&&<DetailRow label="Public listing area" value={service.location_name} />}
           {booking.latitude && booking.longitude ? (
@@ -527,13 +554,13 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Job details</Text>
+          <Text style={styles.cardLabel}>Booking summary</Text>
           <DetailRow label="Service" value={service.title} />
           <DetailRow label="Category" value={service.category} />
           <DetailRow label="Selected rate" value={booking.pricing_snapshot?.option_label} />
-          <DetailRow label="Unit price" value={readableRate(isQuoteRequired?'quote_required':booking.pricing_snapshot?.pricing_type || service.pricing_type,booking.pricing_snapshot?.rate ?? service.rate,booking.pricing_snapshot?.unit_label || service.unit_label,booking.pricing_snapshot?.min_charge ?? service.min_charge)} />
+          <DetailRow label="Unit price" value={durationSummary.unitRate} />
           <DetailRow label="Timing" value={formatDateLabel(booking.scheduled_date)} />
-          <DetailRow label="Quantity" value={`${booking.quantity ?? 1} ${quantityUnit(booking.pricing_snapshot?.unit_label || service.unit_label || 'unit',booking.quantity ?? 1)}`} />
+          <DetailRow label="Quantity" value={durationSummary.quantityLabel} />
           {showDuration&&<><DetailRow label="Expected duration" value={durationSummary.duration}/>
             {durationSummary.period&&<DetailRow label={durationSummary.periodLabel} value={durationSummary.periodAmount===null?'Not recorded':nzMoney(durationSummary.periodAmount)}/>}
             <DetailRow label="Estimated total" value={durationSummary.totalLabel}/><Text style={styles.detailValue}>Expected duration is a request, not a binding agreement. {DURATION_AGREEMENT}</Text></>}
@@ -581,10 +608,10 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 
       </ScrollView>
 
-      <View style={[styles.footer, providerCanConfirm&&{flexWrap:'wrap'}, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.footer, (providerCanConfirm||activeGrazing||completedGrazing)&&{flexWrap:'wrap'}, { paddingBottom: insets.bottom + 12 }]}>
         {providerCanConfirm&&<Button title="Accept booking request" onPress={confirmBooking} style={styles.acceptBookingBtn}/>}
-        <Button variant="secondary" title="Chat" onPress={openChat} style={styles.footerBtn} />
-        {viewerRole==='requester'&&['pending','quote_sent','confirmed','in_progress'].includes(booking.status)&&<Button variant="secondary" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} onPress={()=>setCancelVisible(true)} style={styles.footerBtn}/>}
+        <Button variant={activeGrazing?'primary':'secondary'} title={canReview?'View messages':'Chat'} onPress={openChat} style={activeGrazing||completedGrazing?styles.acceptBookingBtn:styles.footerBtn} />
+        {viewerRole==='requester'&&['pending','quote_sent','confirmed','in_progress'].includes(booking.status)&&<Button variant="secondary" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} onPress={()=>setCancelVisible(true)} style={activeGrazing?styles.acceptBookingBtn:styles.footerBtn}/>}
         {providerCanQuote && (
           <Button title={booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}
             onPress={sendQuote} loading={savingQuote} style={styles.footerBtn} />
@@ -599,13 +626,13 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <Button title="Mark complete" onPress={markReady} style={styles.footerBtn} />
         )}
         {viewerRole === 'provider' && service.kind === 'grazing' && isBookingUnderway(booking.status) && (
-          <Button title="Complete arrangement" onPress={finishGrazing} loading={savingArrangement} style={styles.footerBtn} />
+          <Button variant="secondary" title="Complete booking" onPress={finishGrazing} loading={savingArrangement} style={styles.acceptBookingBtn} />
         )}
         {viewerRole === 'provider' && service.kind === 'grazing' && booking.status === 'completed' && service.closed_at && (
-          <Button title="Relist grazing" onPress={relistGrazing} loading={savingArrangement} style={styles.footerBtn} />
+          <Button variant="secondary" title="Relist grazing" onPress={relistGrazing} loading={savingArrangement} style={styles.acceptBookingBtn} />
         )}
 
-        {canReview && (
+        {canReview && !completedGrazing && (
           <Button
             title={myReview ? 'Edit review' : `Review ${otherRoleLabel.toLowerCase()}`}
             onPress={() => setReviewVisible(true)}
@@ -649,6 +676,7 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  completionTitle:{fontSize:20,fontWeight:'700',color:colors.textPrimary,marginBottom:10},
   publicArea:{fontSize:18,fontWeight:'700',color:colors.textPrimary,marginBottom:8},
   screen: { flex: 1, backgroundColor: colors.background },
   header: { backgroundColor: colors.background, paddingHorizontal: 20, paddingBottom: 14 },

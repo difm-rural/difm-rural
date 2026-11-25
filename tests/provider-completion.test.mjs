@@ -17,11 +17,11 @@ test('accepted grazing directs both parties to ongoing arrangements rather than 
   for (const role of ['provider', 'requester']) {
     for (const status of ['confirmed', 'in_progress']) {
       const next = bookingNextMove({ status, scheduled_date: '2026-11-01', service: { kind: 'grazing' } }, role)
-      assert.match(JSON.stringify(next), /Grazing arrangement accepted/)
+      assert.match(JSON.stringify(next), /Grazing booking confirmed/)
       assert.match(JSON.stringify(next), /Use Chat/)
       assert.match(JSON.stringify(next), /payment/)
       assert.doesNotMatch(JSON.stringify(next), /Complete the service/)
-      if (role === 'provider') assert.match(JSON.stringify(next), /close the listing or relist/)
+      assert.doesNotMatch(JSON.stringify(next), /close the listing or relist/)
     }
   }
 })
