@@ -1,3 +1,4 @@
+import * as tokens from '../src/theme/tokens.js'
 import * as lifecycleUx from '../shared/bookingLifecycleUx.ts'
 import * as bookingDuration from '../shared/bookingDuration.ts'
 import test from 'node:test'
@@ -17,11 +18,11 @@ const require=createRequire(import.meta.url),jsx=(type,props)=>({type,props})
 const source=f=>readFileSync(new URL('../'+f,import.meta.url),'utf8')
 const nodes=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)]
 const booking={id:'booking',provider_id:'provider',requester_id:'requester',status:'pending',service:{title:'Grazing for winter cattle',kind:'grazing',pricing_type:'fixed'}}
-function screen(file,{states={},route={},record=booking}={}){
+function screen(file,{states={},route={},record=booking,platform='android'}={}){
  let index=0;const calls=[],writes=[],alerts=[]
  const react={useState(v){const at=index++;return [at in states?states[at]:typeof v==='function'?v():v,()=>{}]},useEffect(){},useCallback:f=>f,useRef:v=>({current:v})};react.default=react
  const mods={'../../shared/bookingLifecycleUx':lifecycleUx,'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
-  'react-native':{Platform:{OS:'android'},StyleSheet:{create:v=>v},Alert:{alert:(...v)=>alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','RefreshControl','FlatList','KeyboardAvoidingView'].map(n=>[n,n]))},
+  'react-native':{Platform:{OS:platform},StyleSheet:{create:v=>v},Alert:{alert:(...v)=>alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','RefreshControl','FlatList','KeyboardAvoidingView'].map(n=>[n,n]))},
   '@react-navigation/native':{useFocusEffect(){}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
   '@react-native-async-storage/async-storage':{__esModule:true,default:{}},
   '../../../shared/homeSummary':summary,'../../../shared/homeMode':modes,'../../../shared/onTheGo':{rankOnTheGo},
@@ -102,7 +103,7 @@ test('web Activity already links to the full details route, and acceptance is ex
 test('confirmed grazing makes Chat primary and completion secondary without truncating controls',()=>{
  const detail=screen('ServiceBookingDetailScreen.js',{record:{...booking,status:'confirmed'}})
  const buttons=detail.all.filter(n=>n.type==='Button')
- const complete=buttons.find(n=>n.props.title==='Complete booking');assert.ok(complete);assert.equal(complete.props.variant,'secondary');assert.equal(complete.props.style.flexBasis,'100%')
+ const complete=buttons.find(n=>n.props.title==='Complete booking');assert.ok(complete);assert.equal(complete.props.variant,'secondary');assert.equal(complete.props.style.width,'100%')
  assert.ok(buttons.some(n=>n.props.title?.includes('Chat')))
  complete.props.onPress();const [title,message,options]=detail.alerts[0]
  assert.equal(title,'Complete grazing arrangement?');assert.match(message,/does not collect or record payment/)
@@ -134,4 +135,37 @@ test('repeated review submissions share the existing save workflow and are guard
  await Promise.all([modal.props.onSubmit({rating:5,comment:'Great'}),modal.props.onSubmit({rating:5,comment:'Great'})])
  assert.equal(detail.writes.filter(w=>w[0]==='saveBookingReview').length,1)
  assert.ok(detail.alerts.some(a=>a[0]==='Review saved'))
+})
+
+// Expand the real shared Button so label/variant regressions cannot hide behind
+// the screen harness's string component stubs.
+const buttonExports={}
+const buttonCode=require('@babel/core').transformSync(source('src/components/Button.js'),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
+new Function('exports','require',buttonCode)(buttonExports,name=>{
+ if(name==='react')return {__esModule:true,default:{}}
+ if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'}
+ if(name==='react-native')return {StyleSheet:{create:v=>v},...Object.fromEntries(['ActivityIndicator','Text','TouchableOpacity','View'].map(n=>[n,n]))}
+ if(name==='../theme/tokens')return tokens
+ if(name==='./Icon')return {__esModule:true,default:'Icon'}
+ throw Error('Missing real Button dependency '+name)
+})
+const flattenStyle=value=>Object.assign({},...(Array.isArray(value)?value.flat(Infinity):[value]).filter(v=>v&&typeof v==='object'))
+for(const platform of ['android','ios'])for(const status of ['confirmed','in_progress'])for(const role of ['provider','requester'])test(`${platform} ${role} ${status} grazing footer keeps real Chat label in an explicit full-width column`,()=>{
+ const detail=screen('ServiceBookingDetailScreen.js',{platform,record:{...booking,status},route:{viewerRole:role}})
+ const footer=detail.all.find(n=>n.type==='View'&&Array.isArray(n.props.style)&&flattenStyle(n.props.style).borderTopWidth===1&&flattenStyle(n.props.style).gap===10)
+ assert.ok(footer);const layout=flattenStyle(footer.props.style)
+ assert.equal(layout.flexDirection,'column');assert.equal(layout.flexWrap,'nowrap');assert.equal(layout.alignItems,'stretch');assert.equal(layout.paddingHorizontal,16)
+ const actions=nodes(footer).filter(n=>n.type==='Button'),chat=actions[0]
+ assert.equal(chat.props.title,'Chat');assert.equal(chat.props.variant,'primary')
+ if(role==='provider'){assert.deepEqual(actions.map(n=>n.props.title),['Chat','Complete booking']);assert.equal(actions[1].props.variant,'secondary')}
+ for(const action of actions){
+  const button=buttonExports.default(action.props),buttonNodes=nodes(button),style=flattenStyle(button.props.style)
+  assert.equal(style.width,'100%');assert.equal(style.alignSelf,'stretch');assert.equal(style.flexBasis,undefined);assert.equal(style.flex,undefined)
+  assert.equal(style.flexShrink,0);assert.equal(style.minHeight,52)
+  assert.ok(buttonNodes.some(n=>n.type==='Text'&&n.props.children===action.props.title))
+ }
+ const rendered=buttonExports.default(chat.props),label=nodes(rendered).find(n=>n.type==='Text')
+ assert.equal(flattenStyle(rendered.props.style).backgroundColor,tokens.colors.primary)
+ assert.equal(flattenStyle(label.props.style).color,tokens.colors.white);assert.equal(rendered.props.accessibilityLabel,'Chat')
+ rendered.props.onPress();assert.equal(detail.calls[0][0],'Chat');assert.equal(detail.calls[0][1].bookingId,booking.id);assert.deepEqual(detail.writes,[])
 })

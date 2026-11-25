@@ -612,10 +612,10 @@ Complete & Close Listing: ${GRAZING_COMPLETION.close}`, [
 
       </ScrollView>
 
-      <View style={[styles.footer, (providerCanConfirm||activeGrazing||completedGrazing)&&{flexWrap:'wrap'}, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.footer, (providerCanConfirm||completedGrazing)&&{flexWrap:'wrap'}, activeGrazing&&styles.stackedFooter, { paddingBottom: insets.bottom + 12 }]}>
         {providerCanConfirm&&<Button title="Accept booking request" onPress={confirmBooking} style={styles.acceptBookingBtn}/>}
-        <Button variant={activeGrazing?'primary':'secondary'} title={canReview?'View messages':'Chat'} onPress={openChat} style={activeGrazing||completedGrazing?styles.acceptBookingBtn:styles.footerBtn} />
-        {viewerRole==='requester'&&['pending','quote_sent','confirmed','in_progress'].includes(booking.status)&&<Button variant="secondary" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} onPress={()=>setCancelVisible(true)} style={activeGrazing?styles.acceptBookingBtn:styles.footerBtn}/>}
+        <Button variant={activeGrazing?'primary':'secondary'} title={canReview?'View messages':'Chat'} onPress={openChat} style={activeGrazing?styles.stackedFooterBtn:completedGrazing?styles.acceptBookingBtn:styles.footerBtn} />
+        {viewerRole==='requester'&&['pending','quote_sent','confirmed','in_progress'].includes(booking.status)&&<Button variant="secondary" title={isBookingWithdrawable(booking.status)?'Withdraw request':'Request cancellation'} onPress={()=>setCancelVisible(true)} style={activeGrazing?styles.stackedFooterBtn:styles.footerBtn}/>}
         {providerCanQuote && (
           <Button title={booking.status === 'quote_sent' ? 'Update quote' : 'Send quote'}
             onPress={sendQuote} loading={savingQuote} style={styles.footerBtn} />
@@ -630,7 +630,7 @@ Complete & Close Listing: ${GRAZING_COMPLETION.close}`, [
           <Button title="Mark complete" onPress={markReady} style={styles.footerBtn} />
         )}
         {viewerRole === 'provider' && service.kind === 'grazing' && isBookingUnderway(booking.status) && (
-          <Button variant="secondary" title="Complete booking" onPress={finishGrazing} loading={savingArrangement} style={styles.acceptBookingBtn} />
+          <Button variant="secondary" title="Complete booking" onPress={finishGrazing} loading={savingArrangement} style={styles.stackedFooterBtn} />
         )}
         {viewerRole === 'provider' && service.kind === 'grazing' && booking.status === 'completed' && service.closed_at && (
           <Button variant="secondary" title="Relist grazing" onPress={relistGrazing} loading={savingArrangement} style={styles.acceptBookingBtn} />
@@ -718,5 +718,7 @@ const styles = StyleSheet.create({
   noticeText: { fontSize: 14, lineHeight: 20, color: colors.textSecondary },
   footer: { flexDirection: 'row', gap: 10, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 16, paddingTop: 14 },
   footerBtn: { flex: 1 },
+  stackedFooter:{flexDirection:'column',flexWrap:'nowrap',alignItems:'stretch'},
+  stackedFooterBtn:{width:'100%',alignSelf:'stretch',flexGrow:0,flexShrink:0},
   acceptBookingBtn:{flexBasis:'100%',flexGrow:0,flexShrink:0},
 })
