@@ -1,5 +1,6 @@
 # Reuse the existing isolated RC PostgreSQL fixture cluster (Property Network
-# tables, profiles and auth.uid()/jwt() shims). No database is created. All
+# tables, profiles and auth.uid() shim). Supply auth.jwt() inside the rollback
+# transaction so the harness also works in the older booking fixture. No database is created. All
 # temporary columns, policies, RPCs, map tables and fixture rows roll back.
 param(
  [string]$Database='postgres',
@@ -20,6 +21,9 @@ $readGuard=(Get-Content (Join-Path $repository 'supabase/migrations/202611252000
 $setup=@'
 \set ON_ERROR_STOP on
 begin;
+create or replace function auth.jwt() returns jsonb language sql stable as $jwt$
+ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb;
+$jwt$;
 create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb,created_at timestamptz);
 alter table public.profiles add column display_name text, add column primary_role text;
 '@
