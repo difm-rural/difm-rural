@@ -8,7 +8,7 @@ const grazing = { kind: 'grazing', pricing_type: 'per_unit', unit_label: 'head/w
 const limits = bookingQuantityLimits(grazing)
 
 test('valid grazing quantities use the listing capacity as the maximum and price that exact quantity', () => {
-  assert.deepEqual(limits, { minimum: 1, maximum: 2 })
+  assert.deepEqual(limits, { minimum: 1, maximum: 2, wholeHead: true })
   for (const raw of [1, 2, '1', '2', '2.0']) {
     const review = reviewBookingQuantity(grazing, null, raw)
     assert.equal(review.ok, true)
@@ -49,6 +49,38 @@ test('empty and invalid quantities have no estimate and cannot be submitted as a
   assert.equal(below.amount, null)
 })
 
+test('grazing head counts are whole numbers and a fraction is never priced', () => {
+  const priced = { ...grazing, rate: 50, max_units: 20 }
+  for (const raw of [1.5, '1.5', 0.5, '0.5', '1.5e0', -1.5]) {
+    const review = reviewBookingQuantity(priced, null, raw)
+    assert.equal(review.ok, false, String(raw))
+    assert.equal(review.amount, null)
+    assert.equal(review.quantity, null)
+    assert.equal(review.message, 'Enter a whole number of head.')
+    assert.equal(listingEstimate(priced, null, 1.5).baseAmount, null)
+    assert.notEqual(listingEstimate(priced, null, 1.5).baseAmount, 75)
+  }
+  for (const raw of ['2.0', 2.0, '2.00']) {
+    const review = reviewBookingQuantity(priced, null, raw)
+    assert.equal(review.ok, true, String(raw))
+    assert.equal(review.quantity, 2)
+    assert.equal(review.amount, 100)
+  }
+  const scientific = reviewBookingQuantity(priced, null, '1e1')
+  assert.equal(scientific.ok, true)
+  assert.equal(scientific.quantity, 10)
+  assert.equal(scientific.amount, 500)
+  assert.match(reviewBookingQuantity(grazing, null, '1e1').message, /up to 2 head/)
+  assert.equal(reviewBookingQuantity(grazing, null, '').amount, null)
+  assert.match(reviewBookingQuantity(grazing, null, -2).message, /at least 1/)
+  assert.equal(reviewBookingQuantity(grazing, null, 2).amount, 20)
+  assert.match(reviewBookingQuantity(grazing, null, 3).message, /up to 2 head/)
+  const hours = reviewBookingQuantity({ pricing_type: 'hourly', rate: 50, unit_label: 'hour' }, null, 1.5)
+  assert.equal(hours.ok, true)
+  assert.equal(hours.quantity, 1.5)
+  assert.equal(hours.amount, 75)
+})
+
 test('capacity applies only to grazing head periods, and fixed prices stay a single charge', () => {
   assert.equal(bookingQuantityLimits({ ...grazing, unit_label: 'ha' }).maximum, null)
   assert.equal(bookingQuantityLimits({ ...grazing, kind: 'service' }).maximum, null)
@@ -75,6 +107,17 @@ test('mobile confirmation books the maximum quantity at that quantity\'s price',
   assert.equal(screen.log.writes[0].payload.quantity, 2)
   assert.equal(screen.log.writes[0].payload.total_amount, 100)
   assert.equal(screen.log.alerts.length, 0)
+})
+
+test('mobile confirmation will not price or send a fractional head count', async () => {
+  const screen = openBooking({ service: mobile, quantity: 1.5 })
+  assert.match(screen.texts(), /whole number of head/)
+  assert.equal(screen.texts().includes('$75'), false)
+  const button = screen.find('Button', p => p.title === 'Send booking request')
+  assert.equal(button.props.disabled, true)
+  await screen.press('Send booking request')
+  assert.equal(screen.log.writes.length, 0)
+  assert.match(screen.log.alerts[0].join(' '), /whole number of head/)
 })
 
 test('mobile confirmation will not send a quantity above grazing capacity', async () => {

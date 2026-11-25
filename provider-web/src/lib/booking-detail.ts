@@ -1,4 +1,4 @@
-import {bookingQuantityLimits,bookingCapacityMessage} from '@shared/bookingQuantity'
+import {bookingQuantityLimits,bookingCapacityMessage,bookingWholeHeadMessage} from '@shared/bookingQuantity'
 import {bookingEstimate,type BookingRate} from './booking-estimate'
 import type {VariantDraft,AddOnDraft} from '@shared/listingPricing'
 export type PricingListing=BookingRate & {pricing_variants?:VariantDraft[]|null;pricing_add_ons?:AddOnDraft[]|null;pricing_terms?:string|null;payment_timing?:string|null;materials?:string|null}
@@ -13,6 +13,7 @@ export function selectedRate(s:PricingListing,index:string|null|undefined){
 export function pricingRevision(s:PricingListing){return JSON.stringify([s.kind,s.pricing_type,s.rate,s.unit_label,s.minimum_units,s.min_charge,s.max_units,s.pricing_variants || [],s.pricing_add_ons || [],s.pricing_terms,s.payment_timing,s.materials])}
 export function pricingSnapshot(s:PricingListing,index:string|null|undefined,quantity:number):PricingSnapshot{
  const choice=selectedRate(s,index),r=choice.rate,limits=bookingQuantityLimits(r)
+ if(limits.wholeHead&&!Number.isInteger(quantity))throw new Error(bookingWholeHeadMessage())
  if(limits.maximum!=null&&quantity>limits.maximum)throw new Error(bookingCapacityMessage(limits.maximum))
  const estimate=bookingEstimate(r,quantity)
  if(estimate.amount!==null&&(!Number.isFinite(estimate.amount)||estimate.amount<=0))throw new Error('This listing needs a valid rate before it can take requests.')

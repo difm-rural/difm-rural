@@ -21,6 +21,7 @@ export type QuantityOption = {
 export type QuantityLimits = {
   minimum: number
   maximum: number | null
+  wholeHead: boolean
 }
 
 function nonNegativeNumber(value: unknown, fallback = 0) {
@@ -37,16 +38,20 @@ export function bookingCapacityMessage(maximum: number) {
   return `This listing can take up to ${shown} head. Enter ${shown} or fewer.`
 }
 
+export function bookingWholeHeadMessage() {
+  return 'Enter a whole number of head.'
+}
+
 export function bookingQuantityLimits(service?: QuantityListing | null, option?: QuantityOption | null): QuantityLimits {
   const pricing = option || service || {}
   const minimum = Math.max(1, nonNegativeNumber(option ? option.min_units : service?.minimum_units, 1))
   const unitLabel = pricing.unit_label || ''
-  const capacity = service?.kind === 'grazing' && /^head\/(week|month)$/.test(unitLabel)
-    ? nonNegativeNumber(service.max_units) : 0
+  const wholeHead = service?.kind === 'grazing' && /^head\/(week|month)$/.test(unitLabel)
+  const capacity = wholeHead ? nonNegativeNumber(service?.max_units) : 0
   // A capacity below the minimum cannot be applied without making every
   // quantity invalid. Leave those listings uncapped, matching the estimate.
   const maximum = capacity >= minimum ? capacity : null
-  return { minimum, maximum }
+  return { minimum, maximum, wholeHead }
 }
 
 export type QuantityValidation = {
@@ -65,6 +70,8 @@ export function validateBookingQuantity(raw: unknown, limits: QuantityLimits): Q
     quantity = Number(text)
   } else return { ok: false, quantity: null, message: 'Enter a valid quantity.' }
   if (!Number.isFinite(quantity)) return { ok: false, quantity: null, message: 'Enter a valid quantity.' }
+  // 2.0 and 1e1 are whole numbers. 1.5 is not, and it is not rounded.
+  if (limits.wholeHead && !Number.isInteger(quantity)) return { ok: false, quantity: null, message: bookingWholeHeadMessage() }
   if (quantity < limits.minimum) return { ok: false, quantity: null, message: `Enter at least ${formatBookingQuantity(limits.minimum)}.` }
   if (limits.maximum != null && quantity > limits.maximum) return { ok: false, quantity: null, message: bookingCapacityMessage(limits.maximum) }
   return { ok: true, quantity, message: null }
