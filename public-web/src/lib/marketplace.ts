@@ -2,6 +2,7 @@ import {LISTING_AVAILABILITY_COLUMNS, type ListingAvailability} from '@shared/li
 import {resolvePublicJobLocations} from './job-discovery'
 import {matchesHelpFilter} from '@shared/findLocalHelp'
 import {CATEGORIES} from '@shared/categories'
+import {availabilityFilterValue,LEAD_TIME_SORT,matchesAvailabilityFilter,sortByLeadTime} from '@shared/availabilityDiscovery'
 import type {SupabaseClient} from '@supabase/supabase-js'
 import {point,distance,type Point} from './nearby'
 export const JOB_COLUMNS='id,title,description,category,price_type,price,location_area,photos,created_at,schedule_type,scheduled_date,date_from,date_to,materials_type,access_conditions,hide_exact_location'
@@ -9,9 +10,9 @@ export const LISTING_COLUMNS=`id,provider_id,title,description,category,kind,pri
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function browseFilters(values:Record<string,unknown>){
  const page=Number(values.page)
- return {q:typeof values.q==='string'?values.q.trim().slice(0,120):'',category:CATEGORIES.includes(String(values.category))?String(values.category):'',kind:['service','grazing','hire','lease','for_sale'].includes(String(values.kind))?String(values.kind):'',page:Number.isInteger(page)&&page>0?Math.min(page,100000):1}
+ return {q:typeof values.q==='string'?values.q.trim().slice(0,120):'',category:CATEGORIES.includes(String(values.category))?String(values.category):'',kind:['service','grazing','hire','lease','for_sale'].includes(String(values.kind))?String(values.kind):'',page:Number.isInteger(page)&&page>0?Math.min(page,100000):1,availability:availabilityFilterValue(values.availability),sort:values.sort===LEAD_TIME_SORT?LEAD_TIME_SORT:''}
 }
-export function browseHref(path:string,f:ReturnType<typeof browseFilters>){const q=new URLSearchParams();if(f.q)q.set('q',f.q);if(f.category)q.set('category',f.category);if(f.kind)q.set('kind',f.kind);if(f.page>1)q.set('page',String(f.page));return path+(q.size?'?'+q:'')}
+export function browseHref(path:string,f:Omit<ReturnType<typeof browseFilters>,'availability'|'sort'>&{availability?:string;sort?:string}){const q=new URLSearchParams();if(f.q)q.set('q',f.q);if(f.category)q.set('category',f.category);if(f.kind)q.set('kind',f.kind);if(f.availability)q.set('availability',f.availability);if(f.sort)q.set('sort',f.sort);if(f.page>1)q.set('page',String(f.page));return path+(q.size?'?'+q:'')}
 export function publicJobsQuery(client:SupabaseClient){return client.from('jobs_public').select(JOB_COLUMNS).eq('status','open').eq('visibility','public')}
 export function publicListingsQuery(client:SupabaseClient){return client.from('services_public').select(LISTING_COLUMNS).eq('is_active',true).is('closed_at',null)}
 export function publicQuery(client:SupabaseClient,kind:'jobs'|'listings'){return kind==='jobs'?publicJobsQuery(client):publicListingsQuery(client)}
@@ -32,11 +33,14 @@ export async function publicRows(client:SupabaseClient,kind:'jobs'|'listings',or
  }
  return rows.map(row=>({...row,distance:pins.get(row.id)?.distance ?? null,distanceApproximate:pins.get(row.id)?.approximate ?? false}))
 }
-type SearchRow={title?:string;description?:string|null;category?:string|null;kind?:string|null;location_area?:string|null;location_name?:string|null;distance?:number|null}
-export function publicResults<T extends SearchRow>(rows:T[],f:ReturnType<typeof browseFilters>,radius:number|null=null){
- const query=f.q.toLocaleLowerCase('en-NZ'),matching=rows.filter(r=>(!f.category||r.category===f.category)&&matchesHelpFilter(r,f.kind)&&(!query||[r.title,r.description,r.category,r.location_area,r.location_name].filter(Boolean).join(' ').toLocaleLowerCase('en-NZ').includes(query)))
+type SearchRow=ListingAvailability & {title?:string;description?:string|null;category?:string|null;kind?:string|null;location_area?:string|null;location_name?:string|null;distance?:number|null}
+// Availability filter and lead-time sort run on the complete matching set before
+// pagination; the existing order (newest, or nearest within a distance) breaks ties.
+export function publicResults<T extends SearchRow>(rows:T[],f:ReturnType<typeof browseFilters>,radius:number|null=null,today?:string){
+ const query=f.q.toLocaleLowerCase('en-NZ'),matching=rows.filter(r=>(!f.category||r.category===f.category)&&matchesHelpFilter(r,f.kind)&&(!query||[r.title,r.description,r.category,r.location_area,r.location_name].filter(Boolean).join(' ').toLocaleLowerCase('en-NZ').includes(query))&&matchesAvailabilityFilter(r,f.availability,today))
  const unlocated=matching.filter(r=>r.distance==null).length
- const filtered=radius===null?matching:matching.filter(r=>typeof r.distance==='number'&&Number.isFinite(r.distance)&&r.distance<=radius).sort((a,b)=>a.distance!-b.distance!)
+ const located=radius===null?matching:matching.filter(r=>typeof r.distance==='number'&&Number.isFinite(r.distance)&&r.distance<=radius).sort((a,b)=>a.distance!-b.distance!)
+ const filtered=f.sort===LEAD_TIME_SORT?sortByLeadTime(located,today):located
  const pages=Math.max(1,Math.ceil(filtered.length/18)),page=Math.min(f.page,pages)
  return {rows:filtered.slice((page-1)*18,page*18),count:filtered.length,pages,page,unlocated}
 }

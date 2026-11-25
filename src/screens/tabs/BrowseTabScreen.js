@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useCallback, useRef, useState } from 'react'
 import {
   Keyboard,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,6 +26,12 @@ import NearbyControls from '../../components/NearbyControls'
 import { filterNearby } from '../../lib/nearbyBrowsing'
 import {HELP_FILTERS,matchesHelpFilter,matchesListingSearch} from '../../../shared/findLocalHelp'
 import { availabilityDisplay } from '../../lib/providerAvailability'
+import {AVAILABILITY_FILTERS,LEAD_TIME_SORT,LEAD_TIME_SORT_LABEL,LEAD_TIME_SORT_NOTE,matchesAvailabilityFilter,sortByLeadTime} from '../../../shared/availabilityDiscovery'
+
+// One chip style for every listing filter, so availability options look like the existing kind chips.
+function FilterChip({ label, selected, onPress, accessibilityLabel }) {
+  return <TouchableOpacity onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{selected:!!selected}} style={[styles.chip,selected&&styles.chipSelected]}><Text style={[styles.chipText,selected&&styles.chipTextSelected]}>{label}</Text></TouchableOpacity>
+}
 
 function ServiceSection({ title, items, onPressItem }) {
   if (!items.length) return null
@@ -65,6 +72,9 @@ export default function BrowseTabScreen({ navigation, route }) {
   const [search,      setSearch]      = useState('')
   const [kind,setKind]=useState('')
   const [loadError, setLoadError] = useState(false)
+  // Release 2.1: appended after existing state so declaration order is unchanged.
+  const [availabilityFilter, setAvailabilityFilter] = useState('')
+  const [sort, setSort] = useState('default')
   const loadingRef = useRef(false)
 
   useFocusEffect(useCallback(() => { load() }, []))
@@ -155,8 +165,11 @@ export default function BrowseTabScreen({ navigation, route }) {
     navigation.navigate('ServiceDetail', { service: item })
   }
 
-  const result = filterNearby(services.filter(item => matchesHelpFilter(item,kind) && matchesListingSearch(item, search)), nearby)
-  const filtered = result.items
+  const result = filterNearby(services.filter(item => matchesHelpFilter(item,kind) && matchesListingSearch(item, search) && matchesAvailabilityFilter(item, availabilityFilter)), nearby)
+  // filterNearby keeps the default order (nearest, then newest); the lead-time sort is stable on top of it.
+  const filtered = sort === LEAD_TIME_SORT ? sortByLeadTime(result.items) : result.items
+  const optionsActive = !!kind || !!availabilityFilter || sort === LEAD_TIME_SORT
+  function resetOptions() { setKind(''); setAvailabilityFilter(''); setSort('default') }
   const isEmpty = filtered.length === 0
 
   return (
@@ -193,8 +206,19 @@ export default function BrowseTabScreen({ navigation, route }) {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:20,gap:8,paddingBottom:8}} style={{flexGrow:0}}>
-        {HELP_FILTERS.map(([value,label])=><TouchableOpacity key={value} onPress={()=>setKind(value)} accessibilityRole="button" accessibilityState={{selected:kind===value}} style={{padding:10,borderRadius:18,backgroundColor:kind===value?colors.primaryLight:colors.white}}><Text style={{color:colors.primary,fontWeight:kind===value?'700':'400'}}>{label}</Text></TouchableOpacity>)}
+        {HELP_FILTERS.map(([value,label])=><FilterChip key={value} label={label} selected={kind===value} onPress={()=>setKind(value)}/>)}
       </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:20,gap:8,paddingBottom:8}} style={{flexGrow:0}} accessibilityLabel="Availability and sort">
+        {AVAILABILITY_FILTERS.filter(([value])=>value).map(([value,label])=><FilterChip key={value} label={label} selected={availabilityFilter===value} accessibilityLabel={`Show ${label.toLowerCase()} only`} onPress={()=>setAvailabilityFilter(availabilityFilter===value?'':value)}/>)}
+        <FilterChip label={`Sort: ${LEAD_TIME_SORT_LABEL.toLowerCase()}`} selected={sort===LEAD_TIME_SORT} accessibilityLabel={`Sort by ${LEAD_TIME_SORT_LABEL.toLowerCase()}`} onPress={()=>setSort(sort===LEAD_TIME_SORT?'default':LEAD_TIME_SORT)}/>
+      </ScrollView>
+      {optionsActive && !loading && !loadError && (
+        <View style={styles.resultRow}>
+          <Text style={styles.resultCount} accessibilityLiveRegion="polite">{filtered.length} matching listing{filtered.length===1?'':'s'}</Text>
+          <TouchableOpacity onPress={resetOptions} accessibilityRole="button" accessibilityLabel="Reset filters and sort" hitSlop={10}><Text style={styles.resetText}>Reset</Text></TouchableOpacity>
+        </View>
+      )}
+      {sort === LEAD_TIME_SORT && <Text style={styles.sortNote}>{LEAD_TIME_SORT_NOTE}</Text>}
       {currentUserId && (
         <TouchableOpacity
           style={styles.manageListings}
@@ -234,7 +258,7 @@ export default function BrowseTabScreen({ navigation, route }) {
       ) : isEmpty ? (
           <EmptyState
             icon="pricetags-outline"
-            title={kind?'No listings match this filter':'No listings available yet'}
+            title={kind||availabilityFilter?'No listings match this filter':'No listings available yet'}
             body="Check back soon, or post a job to get offers from locals."
             actionLabel="Post a job"
             actionIcon="arrow-forward"
@@ -248,13 +272,21 @@ export default function BrowseTabScreen({ navigation, route }) {
           <ServiceSection title={result.active ? 'Near you' : 'All listings'} items={filtered} onPressItem={handlePress} />
         </>
       )}
-      {!loading&&!loadError&&isEmpty&&(search.trim()||result.active||kind)&&<TouchableOpacity onPress={()=>{if(!currentUserId)requirePostSignIn();else navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Browse'}})}} accessibilityRole="button" style={{padding:20}}><Text style={{color:colors.primary,fontWeight:'700'}}>Can’t find suitable help? Post a job →</Text></TouchableOpacity>}
+      {!loading&&!loadError&&isEmpty&&(search.trim()||result.active||kind||availabilityFilter)&&<TouchableOpacity onPress={()=>{if(!currentUserId)requirePostSignIn();else navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Browse'}})}} accessibilityRole="button" style={{padding:20}}><Text style={{color:colors.primary,fontWeight:'700'}}>Can’t find suitable help? Post a job →</Text></TouchableOpacity>}
       </ScrollView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  chip: {padding:10,borderRadius:18,backgroundColor:colors.white},
+  chipSelected: {backgroundColor:colors.primaryLight},
+  chipText: {color:colors.primary,fontWeight:'400'},
+  chipTextSelected: {fontWeight:'700'},
+  resultRow: {marginHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,minHeight:32},
+  resultCount: {flex:1,fontSize:13,color:colors.textSecondary},
+  resetText: {fontSize:13,fontWeight:'700',color:colors.primary},
+  sortNote: {marginHorizontal:20,fontSize:12,lineHeight:17,color:colors.textMuted},
   manageListings: {marginHorizontal:20,paddingVertical:10,minHeight:44,flexDirection:'row',alignItems:'center',gap:10},
   manageListingsText: {flex:1,minWidth:0,fontSize:14,fontWeight:'600',color:colors.primary},
   screen: { flex: 1, backgroundColor: colors.background },
