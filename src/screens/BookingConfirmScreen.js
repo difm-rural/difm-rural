@@ -1,3 +1,5 @@
+import ExpectedDurationControl from '../components/ExpectedDurationControl'
+import {durationPolicy,durationFields,durationEstimate,durationLabel,validateGrazingQuantity,mobilePricingSnapshot,DURATION_AGREEMENT} from '../../shared/bookingDuration'
 import {saveGuestIntent} from '../lib/guestIntent'
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
 import {toLocalIsoDate} from '../../shared/dates'
@@ -91,12 +93,17 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const option = selectedOption || null
   const isGrazing = service?.kind === 'grazing'
   const locationPolicy=bookingLocationPolicy(service?.kind)
-  const estimate = listingEstimate(service, option, initialQty)
+  const [duration,setDuration]=useState(()=>durationPolicy({...service,...option}).quantityIsTime&&initialQty!=null?String(listingEstimate(service,option,initialQty).quantity):'')
+  const durationRate={...service,...(option?{...option,minimum_units:option.min_units}:{} )}
+  const durationRules=durationPolicy(durationRate)
+  const requestedQuantity=durationRules.quantityIsTime&&duration?Number(duration):initialQty
+  const estimate = listingEstimate(service, option, requestedQuantity)
   const qty = estimate.quantity
   const effectivePricingType = estimate.pricingType
   const isQuoteRequired = effectivePricingType === 'quote_required'
   const requestCopy = bookingRequestCopy(isQuoteRequired)
   const total = estimate.baseAmount?.toFixed(2)
+  const durationCost=durationEstimate(durationRate,qty,duration,durationRules.unit)
 
   const unitLabel = effectivePricingType === 'hourly' ? 'hour'
     : effectivePricingType === 'day_rate' ? 'day'
@@ -110,7 +117,6 @@ export default function BookingConfirmScreen({ route, navigation }) {
   const [longitude, setLongitude] = useState(null)
   const [locationNote, setLocationNote] = useState('')
   const [notes, setNotes] = useState('')
-  const [duration,setDuration]=useState('')
   const [submitting, setSubmitting] = useState(false)
   const submission=useRef(bookingSubmission()).current
   const requestId=useRef(null)
@@ -141,7 +147,10 @@ export default function BookingConfirmScreen({ route, navigation }) {
   }, [route.params?.locationResult])
 
   function buildBookingPayload(requesterId) {
+    validateGrazingQuantity(durationRate,qty)
+    const expected=durationFields(durationRate,duration,duration?durationRules.unit:null,qty)
     return {
+      ...(durationRules.enabled?{...expected,pricing_snapshot:mobilePricingSnapshot(service,option,qty)}:{}),
       id: requestId.current,
       service_id:     service.id,
       requester_id:   requesterId,
@@ -152,7 +161,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
       status:         'pending',
       scheduled_date: scheduleType === 'specific' ? toLocalIsoDate(date) : scheduleType,
       ...bookingLocationFields(service.kind,{location,latitude,longitude,note:locationNote}),
-      notes:          [duration.trim()?`Expected duration: ${duration.trim()}`:'',notes.trim()].filter(Boolean).join('\n') || null,
+      notes:          notes.trim() || null,
     }
   }
 
@@ -290,12 +299,10 @@ export default function BookingConfirmScreen({ route, navigation }) {
           {effectivePricingType !== 'fixed' && !isQuoteRequired && (
             <SummaryRow label="Quantity" value={`${qty} ${quantityUnit(unitLabel,qty)}`} />
           )}
-          <SummaryRow label={isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Base estimate'} value={isQuoteRequired ? 'Awaiting quote' : `${nzMoney(total)}`} />
-          {isGrazing && !isQuoteRequired && /\/(week|month)$/.test(unitLabel) && (
-            <SummaryRow label="Estimate period" value={`One ${unitLabel.endsWith('/week') ? 'week' : 'month'}; agree the full duration with the provider`} />
-          )}
+          <SummaryRow label={isQuoteRequired?'Price':durationCost.period?`Estimated ${durationCost.period==='week'?'weekly':durationCost.period==='month'?'monthly':durationCost.period==='day'?'daily':'hourly'} cost`:'Base estimate'} value={isQuoteRequired?'Awaiting quote':nzMoney(durationCost.period?durationCost.periodAmount:total)} />
+          {durationRules.enabled&&<><SummaryRow label="Expected duration" value={durationLabel(duration,durationRules.unit)}/><SummaryRow label="Estimated total" value={durationCost.total===null?'To be agreed':nzMoney(durationCost.total)}/><Text style={styles.paymentInfoText}>{DURATION_AGREEMENT}</Text></>}
           {!isQuoteRequired && estimate.minimumCharge > 0 && (
-            <SummaryRow label="Minimum charge included" value={`${nzMoney(estimate.minimumCharge.toFixed(2))}`} />
+            <SummaryRow label={durationRules.enabled?'Minimum charge':'Minimum charge included'} value={`${nzMoney(estimate.minimumCharge.toFixed(2))}`} />
           )}
           {(service.kind||'service')==='service' && service.materials ? (
             <SummaryRow label="Materials" value={MATERIALS_LABELS[service.materials] || service.materials} />
@@ -325,7 +332,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           </View>
         ) : null}
 
-        {isGrazing&&<View style={styles.card}><Text style={styles.cardLabel}>Expected duration (optional)</Text><TextInput accessibilityLabel="Expected duration" maxLength={120} value={duration} onChangeText={setDuration} placeholder="For example, 6 weeks — agree with the provider" style={styles.input}/></View>}
+        {durationRules.enabled&&<View style={styles.card}><ExpectedDurationControl grazing={isGrazing} unit={durationRules.unit} value={duration} onChange={setDuration}/></View>}
         {/* Scheduling */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>When do you need this?</Text>
@@ -431,7 +438,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
           <View style={styles.inputWrap}>
             <TextInput
               style={[styles.input, styles.multiline]}
-              placeholder={isGrazing ? 'Livestock type, number of head, grazing duration and any requirements...' : 'Any specific requirements or details...'}
+              placeholder={isGrazing ? 'Livestock type and any specific requirements...' : 'Any specific requirements or details...'}
               placeholderTextColor={colors.textMuted}
               value={notes}
               onChangeText={setNotes}
@@ -447,8 +454,8 @@ export default function BookingConfirmScreen({ route, navigation }) {
         {/* Total + payment explanation */}
         <View style={styles.totalCard}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{isQuoteRequired ? 'Price' : isGrazing?'Estimated period cost':'Total base estimate'}</Text>
-            <Text style={styles.totalAmount}>{isQuoteRequired ? 'Quote' : `${nzMoney(total)}`}</Text>
+            <Text style={styles.totalLabel}>{isQuoteRequired?'Price':durationRules.enabled?'Estimated total':'Total base estimate'}</Text>
+            <Text style={styles.totalAmount}>{isQuoteRequired?'Quote':durationRules.enabled?(durationCost.total===null?'To be agreed':nzMoney(durationCost.total)):nzMoney(total)}</Text>
           </View>
           <View style={styles.paymentInfoBox}>
             <Text style={[styles.paymentInfoText, { marginBottom: 8 }]}>{requestCopy.nextStep}</Text>

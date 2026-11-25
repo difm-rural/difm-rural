@@ -1,3 +1,4 @@
+import * as bookingDuration from '../shared/bookingDuration.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
@@ -18,7 +19,7 @@ const booking={id:'booking',provider_id:'provider',requester_id:'requester',stat
 function screen(file,{states={},route={},record=booking}={}){
  let index=0;const calls=[],writes=[],alerts=[]
  const react={useState(v){const at=index++;return [at in states?states[at]:typeof v==='function'?v():v,()=>{}]},useEffect(){},useCallback:f=>f,useRef:v=>({current:v})};react.default=react
- const mods={react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
+ const mods={'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
   'react-native':{Platform:{OS:'android'},StyleSheet:{create:v=>v},Alert:{alert:(...v)=>alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','RefreshControl','FlatList','KeyboardAvoidingView'].map(n=>[n,n]))},
   '@react-navigation/native':{useFocusEffect(){}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
   '@react-native-async-storage/async-storage':{__esModule:true,default:{}},

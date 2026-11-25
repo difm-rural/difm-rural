@@ -1,3 +1,4 @@
+import * as bookingDuration from '../shared/bookingDuration.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
@@ -110,10 +111,10 @@ test('native Home shows a safe summary when lifecycle retrieval fails',async()=>
  assert.doesNotMatch(screen.text(),/caught up/);assert.match(screen.text(),/summary unavailable/)
 })
 
-function nativeDetail(role,privateLocation=false){
+function nativeDetail(role,privateLocation=false,status='pending'){
  const jsx=(type,props)=>({type,props}),exports={}
  const react={useState:v=>[typeof v==='function'?v():v,()=>{}],useEffect(){}};react.default=react
- const imports={react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
+ const imports={'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
   'react-native':{Platform:{OS:'android'},StyleSheet:{create:v=>v},...Object.fromEntries(['View','Text','TouchableOpacity','ScrollView','KeyboardAvoidingView','TextInput'].map(n=>[n,n]))},
   'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../lib/lifecycle':lifecycle,
   '../lib/listingEstimate':estimate,'../lib/nextMove':{bookingNextMove},'../../shared/bookingLocation':location,
@@ -126,7 +127,8 @@ function nativeDetail(role,privateLocation=false){
   if(name.includes('/lib/'))return {}
   throw Error('Missing '+name)
  })
- const record={...booking('pending'),location_name:privateLocation?'Authorized booking address':null,service:{...booking('pending').service,location_name:'123 Private Road, Cambridge 3434, New Zealand'}}
+ const service={...booking('pending').service,pricing_type:'per_unit',rate:50,unit_label:'head/week',location_name:'123 Private Road, Cambridge 3434, New Zealand'}
+ const record={...booking(status),quantity:2,expected_duration:4,expected_duration_unit:'week',pricing_snapshot:bookingDuration.mobilePricingSnapshot(service,null,2),location_name:privateLocation?'Authorized booking address':null,service}
  const tree=exports.default({route:{params:{booking:record,viewerRole:role}},navigation:{}})
  const expand=n=>!n||typeof n!=='object'?n:Array.isArray(n)?n.map(expand):typeof n.type==='function'&&n.type.name==='DetailRow'?expand(n.type(n.props)):{...n,props:{...n.props,children:expand(n.props?.children)}}
  return nodes(expand(tree))
@@ -134,19 +136,23 @@ function nativeDetail(role,privateLocation=false){
 for(const role of ['requester','provider'])test(`native grazing details show ${role} wording, public area first and only supplied private data`,()=>{
  const all=nativeDetail(role),copy=all.filter(n=>n.type==='Text').map(n=>n.props.children).flat().join(' ')
  assert.ok(copy.includes(bookingLocationHelp('grazing',role)))
+ assert.match(copy,/4 weeks/);assert.match(copy,/\$400/)
+ const confirmed=nativeDetail(role,false,'confirmed').filter(n=>n.type==='Text').map(n=>n.props.children).flat().join(' ');assert.match(confirmed,/4 weeks/);assert.match(confirmed,/\$400/)
  assert.match(copy,/Cambridge/);assert.doesNotMatch(copy,/123 Private Road|Authorized booking address/)
  const authorized=nativeDetail(role,true).filter(n=>n.type==='Text').map(n=>n.props.children).flat().join(' ')
  assert.ok(authorized.indexOf('Cambridge')<authorized.indexOf('Authorized booking address'))
 })
 for(const role of ['requester','provider'])test(`web grazing details use ${role} wording and keep authorized private data secondary`,()=>{
  const webRequire=createRequire(new URL('../provider-web/package.json',import.meta.url)),jsx=webRequire('react/jsx-runtime'),{renderToStaticMarkup}=webRequire('react-dom/server'),ts=require('typescript')
- const imports={'react/jsx-runtime':jsx,'@shared/bookingLocation':location,'@shared/formatting':formatting,'@shared/listingPricing':pricing,
+ const imports={'@shared/bookingDuration':bookingDuration,'react/jsx-runtime':jsx,'@shared/bookingLocation':location,'@shared/formatting':formatting,'@shared/listingPricing':pricing,
   '@/lib/booking-detail':detail,'@/components/navigation-link':{default:'a'},'@/components/action-form':{ActionForm:({children})=>jsx.jsx('div',{children})},'./quote-form':{QuoteForm:()=>null},'../work-actions':{respondBooking(){throw Error('No writes')}}}
  const code=ts.transpileModule(source('provider-web/src/app/activity/booking-details.tsx'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText,exports={}
  new Function('exports','require',code)(exports,name=>{assert.ok(name in imports,name);return imports[name]})
- const record={...booking('withdrawn'),service_id:'listing',quantity:1,total_amount:50,location_name:null,service:{...booking('pending').service,location_name:'123 Private Road, Cambridge 3434, New Zealand'}}
+ const service={...booking('pending').service,pricing_type:'per_unit',rate:50,unit_label:'head/week',location_name:'123 Private Road, Cambridge 3434, New Zealand'}
+ const record={...booking('confirmed'),service_id:'listing',quantity:2,total_amount:100,expected_duration:4,expected_duration_unit:'week',pricing_snapshot:bookingDuration.mobilePricingSnapshot(service,null,2),location_name:null,service}
  const render=b=>renderToStaticMarkup(jsx.jsx(exports.BookingDetails,{booking:b,userId:role==='provider'?'viewer':'customer'}))
  const html=render(record)
+ assert.match(html,/Expected duration: 4 weeks/);assert.match(html,/Estimated total: \$400/)
  assert.ok(html.includes(bookingLocationHelp('grazing',role)))
  assert.match(html,/<strong>Cambridge<\/strong>/);assert.doesNotMatch(html,/123 Private Road|Private booking location:/)
  const authorized=render({...record,location_name:'Authorized booking address'})

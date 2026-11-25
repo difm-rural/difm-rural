@@ -1,3 +1,4 @@
+import {bookingDurationSummary,durationPolicy,DURATION_AGREEMENT} from '../../shared/bookingDuration'
 import {bookingLocationHelp,bookingPublicArea} from '../../shared/bookingLocation'
 import {readableRate,quantityUnit} from '../../shared/findLocalHelp'
 import {formatDateLabel} from '../../shared/formatting.js'
@@ -185,6 +186,8 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const provider = booking.provider || { full_name: booking.providerName }
   const otherUser = viewerRole === 'provider' ? requester : provider
   const otherRoleLabel = viewerRole === 'provider' ? 'Requester' : 'Provider'
+  const durationSummary=bookingDurationSummary(booking)
+  const showDuration=durationPolicy({...service,...booking.pricing_snapshot}).enabled||booking.expected_duration!=null
   const isQuoteRequired = bookingPricingType(booking) === 'quote_required'
   const nextMove = bookingNextMove(booking, viewerRole, { otherName: otherUser?.full_name })
 
@@ -531,6 +534,9 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
           <DetailRow label="Unit price" value={readableRate(isQuoteRequired?'quote_required':booking.pricing_snapshot?.pricing_type || service.pricing_type,booking.pricing_snapshot?.rate ?? service.rate,booking.pricing_snapshot?.unit_label || service.unit_label,booking.pricing_snapshot?.min_charge ?? service.min_charge)} />
           <DetailRow label="Timing" value={formatDateLabel(booking.scheduled_date)} />
           <DetailRow label="Quantity" value={`${booking.quantity ?? 1} ${quantityUnit(booking.pricing_snapshot?.unit_label || service.unit_label || 'unit',booking.quantity ?? 1)}`} />
+          {showDuration&&<><DetailRow label="Expected duration" value={durationSummary.duration}/>
+            {durationSummary.period&&<DetailRow label={durationSummary.periodLabel} value={durationSummary.periodAmount===null?'Not recorded':nzMoney(durationSummary.periodAmount)}/>}
+            <DetailRow label="Estimated total" value={durationSummary.totalLabel}/><Text style={styles.detailValue}>Expected duration is a request, not a binding agreement. {DURATION_AGREEMENT}</Text></>}
           <DetailRow label={booking.quote_amount != null ? 'Quote' : 'Base estimate'} value={isQuoteRequired && booking.quote_amount == null ? 'Quote required' : formatMoney(booking.quote_amount ?? booking.total_amount, service)} />
           <DetailRow label="Quote note" value={booking.quote_notes} />
           <DetailRow label="Requester note" value={booking.notes} />

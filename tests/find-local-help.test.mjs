@@ -28,9 +28,13 @@ test('double taps create one request; success prevents repeat submission and Bac
 test('failed booking remains editable; retry uses the same ID and success navigation follows verified record',async()=>{
  const s=located({fail:true});await s.press('Send booking request');assert.ok(!s.texts().includes('Booking request sent!'));assert.equal(s.log.navigation.length,0);await s.press('Send booking request');assert.equal(s.log.writes.length,2);assert.equal(s.log.writes[0].payload.id,s.log.writes[1].payload.id);assert.equal(s.log.writes[1].options.ignoreDuplicates,true)
 })
-test('leaving without submission creates no request; duration uses optional notes only',async()=>{
- const s=located();assert.equal(s.log.writes.length,0);s.find('TextInput',p=>p.accessibilityLabel==='Expected duration').props.onChangeText('6 weeks');await s.press('Send booking request');assert.equal(s.log.writes[0].payload.notes,'Expected duration: 6 weeks');assert.ok(!('duration' in s.log.writes[0].payload))
+test('leaving without submission creates no request; duration is structured rather than appended to notes',async()=>{
+ const s=openBooking({service});assert.equal(s.log.writes.length,0)
+ s.find('ExpectedDurationControl').props.onChange('6')
+ await s.press('Send booking request');assert.equal(s.log.writes[0].payload.expected_duration,6)
+ assert.equal(s.log.writes[0].payload.expected_duration_unit,'week');assert.equal(s.log.writes[0].payload.notes,null)
 })
+
 test('role-specific pending copy is clear and completion/cancellation lifecycle remains distinct',()=>{
  const b={status:'pending',service};assert.equal(bookingNextMove(b,'requester',{otherName:'Peter Provider'}).badge,'Waiting for Peter to accept');assert.ok(!bookingNextMove(b,'requester').needsAction);assert.ok(bookingNextMove(b,'provider').needsAction);assert.equal(bookingNextMove({...b,status:'completed'},'requester'),null)
  const lock=bookingSubmission();assert.ok(lock.start());assert.ok(!lock.start());lock.finish(false);assert.ok(lock.start());lock.finish(true);assert.ok(!lock.start())

@@ -1,7 +1,8 @@
+export {durationFields,validateGrazingQuantity} from '../../../shared/bookingDuration'
 import {bookingEstimate,type BookingRate} from './booking-estimate'
 import type {VariantDraft,AddOnDraft} from '@shared/listingPricing'
 export type PricingListing=BookingRate & {pricing_variants?:VariantDraft[]|null;pricing_add_ons?:AddOnDraft[]|null;pricing_terms?:string|null;payment_timing?:string|null;materials?:string|null}
-export type PricingSnapshot={version:1;option_label:string|null;pricing_type:string;rate:number|null;unit_label:string|null;minimum_units:number;min_charge:number;quantity:number;base_amount:number|null;pricing_terms:string|null;pricing_add_ons:AddOnDraft[];payment_timing:string|null;materials:string|null}
+export type PricingSnapshot={version:1;kind?:string|null;option_label:string|null;pricing_type:string;rate:number|null;unit_label:string|null;minimum_units:number;min_charge:number;quantity:number;base_amount:number|null;pricing_terms:string|null;pricing_add_ons:AddOnDraft[];payment_timing:string|null;materials:string|null}
 export function selectedRate(s:PricingListing,index:string|null|undefined){
  if(index==null||index==='')return {rate:s,label:null,index:null}
  if(!/^\d+$/.test(index))throw new Error('Choose a valid rate option.')
@@ -13,7 +14,7 @@ export function pricingRevision(s:PricingListing){return JSON.stringify([s.kind,
 export function pricingSnapshot(s:PricingListing,index:string|null|undefined,quantity:number):PricingSnapshot{
  const choice=selectedRate(s,index),r=choice.rate,estimate=bookingEstimate(r,quantity)
  if(estimate.amount!==null&&(!Number.isFinite(estimate.amount)||estimate.amount<=0))throw new Error('This listing needs a valid rate before it can take requests.')
- return {version:1,option_label:choice.label,pricing_type:r.pricing_type,rate:r.rate,unit_label:r.unit_label || null,minimum_units:Math.max(1,r.minimum_units || 1),min_charge:Number(r.min_charge) || 0,quantity:estimate.quantity,base_amount:estimate.amount,pricing_terms:s.pricing_terms || null,pricing_add_ons:(s.pricing_add_ons || []).map(a=>({...a})),payment_timing:s.payment_timing || null,materials:s.materials || null}
+ return {version:1,kind:s.kind||'service',option_label:choice.label,pricing_type:r.pricing_type,rate:r.rate,unit_label:r.unit_label || null,minimum_units:Math.max(1,r.minimum_units || 1),min_charge:Number(r.min_charge) || 0,quantity:estimate.quantity,base_amount:estimate.amount,pricing_terms:s.pricing_terms || null,pricing_add_ons:(s.pricing_add_ons || []).map(a=>({...a})),payment_timing:s.payment_timing || null,materials:s.materials || null}
 }
 export function readPricingSnapshot(value:unknown):PricingSnapshot|null{
  if(!value||typeof value!=='object')return null
@@ -44,4 +45,4 @@ export function bookingNextStep(status:string,role:'requester'|'provider',quote:
  return 'This request is closed. You can find it again in Activity History.'
 }
 
-export type BookingRecord=BookingResponse & {service_id:string;quantity:number;total_amount:number;payment_timing:string|null;scheduled_date:string|null;location_name:string|null;latitude:number|null;longitude:number|null;location_note:string|null;notes:string|null;created_at:string;quote_accepted_at:string|null;service:(PricingListing & {id:string;title:string;closed_at:string|null;is_active:boolean;kind?:string|null;location_name?:string|null})|null}
+export type BookingRecord=BookingResponse & {service_id:string;quantity:number;total_amount:number;expected_duration?:number|null;expected_duration_unit?:string|null;payment_timing:string|null;scheduled_date:string|null;location_name:string|null;latitude:number|null;longitude:number|null;location_note:string|null;notes:string|null;created_at:string;quote_accepted_at:string|null;service:(PricingListing & {id:string;title:string;closed_at:string|null;is_active:boolean;kind?:string|null;location_name?:string|null})|null}

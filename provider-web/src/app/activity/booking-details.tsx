@@ -1,3 +1,4 @@
+import {bookingDurationSummary,durationPolicy,DURATION_AGREEMENT} from '@shared/bookingDuration'
 import {bookingLocationHelp,bookingPublicArea} from '@shared/bookingLocation'
 import {formatDateTime as nzDateTime,formatDate as nzDate,formatDateLabel,formatMoney as nzMoney} from '@shared/formatting'
 import Link from '@/components/navigation-link'
@@ -8,6 +9,7 @@ import {QuoteForm} from './quote-form'
 import {respondBooking} from '../work-actions'
 export function BookingDetails({booking:b,userId}:{booking:BookingRecord;userId:string}){
  const s=b.service,snapshot=readPricingSnapshot(b.pricing_snapshot),rate=snapshot || s,role=b.provider_id===userId?'provider':'requester',quote=(rate?.pricing_type || '')==='quote_required',responses=bookingResponseActions(b,userId,s?.pricing_type || '')
+ const duration=bookingDurationSummary(b),showDuration=durationPolicy({...s,...snapshot}).enabled||b.expected_duration!=null
  const extras=snapshot?.pricing_add_ons || s?.pricing_add_ons || [],terms=snapshot?snapshot.pricing_terms:s?.pricing_terms
  const money=nzMoney
  const timing=b.scheduled_date==='asap'?'As soon as possible':b.scheduled_date==='flexible'?'Flexible':b.scheduled_date ? formatDateLabel(b.scheduled_date) : 'To be arranged'
@@ -17,7 +19,7 @@ export function BookingDetails({booking:b,userId}:{booking:BookingRecord;userId:
  {rate&&<p>Rate: {formatRate(rate.pricing_type,rate.rate,rate.unit_label,rate.min_charge)}</p>}
  <strong>{quote?'Initial price: quote required':'Base estimate at request: '+money(snapshot?.base_amount ?? b.total_amount)}</strong>
  {snapshot?.min_charge? <p>Minimum charge included: {money(snapshot.min_charge)}</p>:null}
- {s?.kind==='grazing'&&/\/(week|month)$/.test(rate?.unit_label || '')&&<p>The base estimate covers one {rate?.unit_label?.endsWith('/week')?'week':'month'}. Agree the full grazing duration and payment schedule directly.</p>}
+ {showDuration&&<><p>Expected duration: {duration.duration}</p>{duration.period&&<p>{duration.periodLabel}: {duration.periodAmount===null?'Not recorded':money(duration.periodAmount)}</p>}<p><strong>Estimated total: {duration.totalLabel}</strong></p><p className="muted">Expected duration is a request, not a binding agreement. {DURATION_AGREEMENT}</p></>}
  {!snapshot&&<p className="muted">This older request has no saved pricing breakdown. The stored request amount is shown; rate, extras and terms below reflect the current listing.</p>}
  {!!extras.length&&<section><h3>Extra charges — outside the base estimate</h3>{extras.map((a,i)=><p key={i}>{addOnDisplay(a)}</p>)}</section>}
  {terms&&<section><h3>Pricing terms</h3><p className="work-description">{terms}</p></section>}<p className="muted">Extra charges may apply — agree the final price with the provider.</p>
