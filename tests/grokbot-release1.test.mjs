@@ -44,7 +44,7 @@ test('job review indicators keep each person and an unavailable lookup independe
 })
 
 test('the initial login hint distinguishes email, password and email-code steps',()=>{
- assert.match(signInMethodHint(''),/Enter your email/)
+ assert.equal(signInMethodHint(''),'')
  assert.match(signInMethodHint('review@ruralconnections.nz'),/password/)
  assert.match(signInMethodHint('user@example.invalid'),/email you a sign-in code/)
 })

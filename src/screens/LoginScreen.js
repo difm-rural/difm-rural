@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import {GUEST_INTENT_KEY} from '../lib/guestIntent'
 import DevelopmentBadge from '../components/DevelopmentBadge'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -44,8 +46,10 @@ function getBiometricLabel(type) {
 
 export default function LoginScreen({ navigation, route }) {
   // Accounts are passwordless (email code) and auto-created, so "Create account"
-  // and "Sign in" are the same screen — `intent` only adjusts the copy.
-  const isRegister = route?.params?.intent === 'register'
+  // and "Sign in" are the same email-first screen.
+  useEffect(() => navigation.addListener('beforeRemove', () => {
+    if (!verified.current) AsyncStorage.multiRemove([GUEST_INTENT_KEY, 'pendingJobView', 'pendingListingEnquiry']).catch(() => {})
+  }), [navigation])
   const insets = useSafeAreaInsets()
   const [stage, setStage] = useState('email') // 'email' | 'verify' | 'password'
   const [email, setEmail] = useState('')
@@ -501,13 +505,13 @@ export default function LoginScreen({ navigation, route }) {
         </View>
 
         <Text style={styles.title} accessibilityRole="header">
-          {isRegister ? 'Create your account' : 'Sign in'}
+          Sign in or join
         </Text>
         <Text style={styles.subtitle}>
-          {isRegister
-            ? 'Enter your email to continue and create your account.'
-            : 'Enter your email to continue.'}
+          Enter your email to access Rural Connections.
         </Text>
+
+        <Text style={styles.subtitle}>New here? We'll help you create an account.</Text>
 
         <TextInput
           style={styles.input}
@@ -526,7 +530,7 @@ export default function LoginScreen({ navigation, route }) {
           accessibilityLabel="Email address"
         />
 
-        <Text style={styles.subtitle} accessibilityLiveRegion="polite">{signInMethodHint(email)}</Text>
+        {!!email.trim()&&<Text style={styles.subtitle} accessibilityLiveRegion="polite">{signInMethodHint(email)}</Text>}
 
         <Button
           title={EMAIL_STEP_ACTION}
@@ -548,10 +552,10 @@ export default function LoginScreen({ navigation, route }) {
           />
         )}
 
-        <Text style={styles.footerText}>
-          New to Rural Connections? Just enter your email —{'\n'}
-          we'll create your account automatically.
-        </Text>
+        <TouchableOpacity style={[styles.resendBtn,{minHeight:44,justifyContent:'center'}]}
+          disabled={loading} onPress={()=>navigation.goBack()} accessibilityRole="button">
+          <Text style={styles.resendText}>Continue browsing without signing in</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   )

@@ -1,3 +1,5 @@
+import {saveGuestIntent} from '../lib/guestIntent'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { resolvePublicJobLocations } from '../lib/jobDiscovery'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -107,13 +109,13 @@ export default function GuestJobFeedScreen({ navigation }) {
     init()
   }
 
-  function handleGuestAction() {
+  function handleGuestAction(_action, item) {
     Alert.alert(
       'Sign in required',
       'Sign in to save this item.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign in', onPress: () => navigation.navigate('Login') },
+        { text: 'Sign in', onPress: async () => {try{if(item?.id)await saveGuestIntent(AsyncStorage,item._type==='job'?'job':'listing',item.id);navigation.navigate('Login')}catch{Alert.alert('Could not continue','Please try again.')}} },
       ]
     )
   }

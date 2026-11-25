@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
 import { JOB_ACTIVE_STATUSES, BOOKING_ACTIVE_STATUSES, isJobAwarded, isBookingWithdrawable, isBookingUnderway, isBookingDismissable } from '../../lib/lifecycle'
 import {
-  confirmBooking as apiConfirmBooking,
   declineBooking as apiDeclineBooking,
   markBookingReady as apiMarkBookingReady,
   confirmBookingCancellation as apiConfirmBookingCancellation,
@@ -37,16 +36,12 @@ import { markNotificationsReadFor } from '../../lib/notifications'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { bookingNextMove, jobNextMove } from '../../lib/nextMove'
 
-function bookingNeedsQuote(booking) {
-  return bookingPricingType(booking || {}) === 'quote_required'
-}
-
 function BookingWorkCard({
   booking,
   viewerRole,
   fullWidth=false,
+  detailsOnly=false,
   onPress,
-  onConfirm,
   onDecline,
   onReady,
   onCancelRequest,
@@ -86,7 +81,12 @@ function BookingWorkCard({
         nextMove={nextMove}
       />
 
-      {providerPending && (
+      {detailsOnly && <TouchableOpacity style={styles.miniPrimaryBtn} onPress={onPress}
+        accessibilityRole="button" accessibilityLabel="View booking details">
+        <Text style={styles.miniPrimaryText}>View booking details →</Text>
+      </TouchableOpacity>}
+
+      {!detailsOnly && providerPending && (
         <View style={styles.miniActionRow}>
           <TouchableOpacity
             style={styles.miniDangerBtn}
@@ -97,15 +97,15 @@ function BookingWorkCard({
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.miniPrimaryBtn}
-            onPress={onConfirm}
+            onPress={onPress}
             accessibilityRole="button"
-            accessibilityLabel="Confirm booking">
-            <Text style={styles.miniPrimaryText}>Confirm</Text>
+            accessibilityLabel="View booking details">
+            <Text style={styles.miniPrimaryText}>Review request</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {providerNeedsQuote && (
+      {!detailsOnly && providerNeedsQuote && (
         <View style={styles.miniActionRow}>
           <TouchableOpacity
             style={styles.miniDangerBtn}
@@ -124,7 +124,7 @@ function BookingWorkCard({
         </View>
       )}
 
-      {providerActive && (
+      {!detailsOnly && providerActive && (
         <TouchableOpacity
           style={styles.miniPrimaryBtn}
           onPress={onReady}
@@ -134,7 +134,7 @@ function BookingWorkCard({
         </TouchableOpacity>
       )}
 
-      {providerCanConfirmCancellation && (
+      {!detailsOnly && providerCanConfirmCancellation && (
         <TouchableOpacity
           style={styles.miniDangerBtn}
           onPress={onConfirmCancellation}
@@ -144,7 +144,7 @@ function BookingWorkCard({
         </TouchableOpacity>
       )}
 
-      {providerCanDismiss && (
+      {!detailsOnly && providerCanDismiss && (
         <TouchableOpacity
           style={styles.miniPrimaryBtn}
           onPress={onDismiss}
@@ -159,7 +159,7 @@ function BookingWorkCard({
         <Text style={styles.bookingHint}>Waiting for provider</Text>
       )}
 
-      {canReview && (
+      {!detailsOnly && canReview && (
         <TouchableOpacity
           style={styles.miniPrimaryBtn}
           onPress={onReview}
@@ -457,16 +457,6 @@ export default function ActivityTabScreen({ navigation,route }) {
     setCompletedJobs(jobs)
     setCompletedBookings(bookings)
     setCompletedCount(jobs.length + bookings.length)
-  }
-
-  async function confirmBooking(booking) {
-    if (bookingNeedsQuote(booking)) {
-      navigation.navigate('ServiceBookingDetail', { booking, viewerRole: 'provider' })
-      return
-    }
-    const { error } = await apiConfirmBooking(booking.id)
-    if (error) Alert.alert('Could not confirm booking', error.message)
-    load()   // re-sync either way so a raced item reflects reality
   }
 
   function declineBooking(bookingId) {
@@ -775,15 +765,16 @@ export default function ActivityTabScreen({ navigation,route }) {
           <View style={styles.cardSection}>
             <Text style={styles.sectionLabel}>Received requests and bookings</Text>
             <FlatList
-              horizontal
+              horizontal={!focus}
               data={shownProviderBookings}
               keyExtractor={b => `prov-booking-${b.id}`}
               renderItem={({ item: b }) => (
                 <BookingWorkCard
                   booking={b}
+                  fullWidth={!!focus}
+                  detailsOnly={!!focus}
                   viewerRole="provider"
                   onPress={() => navigation.navigate('ServiceBookingDetail', { booking: b, viewerRole: 'provider' })}
-                  onConfirm={() => confirmBooking(b)}
                   onDecline={() => declineBooking(b.id)}
                   onReady={() => completeBooking(b.id, b.requesterName)}
                   onConfirmCancellation={() => confirmCancellation(b.id)}
@@ -791,10 +782,10 @@ export default function ActivityTabScreen({ navigation,route }) {
                 />
               )}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hListContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              ListFooterComponent={<View style={{ width: 40 }} />}
-              snapToInterval={SNAP_INTERVAL}
+              contentContainerStyle={focus?{paddingHorizontal:20}:styles.hListContent}
+              ItemSeparatorComponent={() => <View style={focus?{height:CARD_GAP}:{width:CARD_GAP}} />}
+              ListFooterComponent={focus?null:<View style={{width:40}}/>}
+              snapToInterval={focus?undefined:SNAP_INTERVAL}
               decelerationRate="fast"
             />
           </View>

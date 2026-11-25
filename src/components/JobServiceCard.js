@@ -166,7 +166,7 @@ export default function JobServiceCard({
   function handleHeartPress() {
     if (isGuest) {
       if (onGuestAction) {
-        onGuestAction('watchlist')
+        onGuestAction('watchlist', item)
       } else {
         Alert.alert('Sign in required', 'Sign in to save this item.', [{ text: 'OK' }])
       }

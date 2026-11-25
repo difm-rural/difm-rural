@@ -1,32 +1,17 @@
-import {formatDate as nzDate} from '@shared/formatting'
-import {notificationBody} from '@shared/notificationBody'
-import {notificationSide, sideTag} from '@shared/marketSide'
 import {bookingNextMove,jobNextMove,type NextMove} from '@shared/nextMove'
 import {rankOnTheGo} from '@shared/onTheGo'
 import {HomeModes} from '@/components/home-modes'
-import {homeCustomerCount,homeUpcoming,homeWorkSummary} from '@shared/homeSummary'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '@shared/homeSummary'
 import {loadPropertyNetwork,propertyNetworkHomeLines} from '@shared/propertyNetwork'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
-import { ArrowRight, Plus, Search, Leaf, MessageSquare, Bell, ListChecks, UsersRound, Briefcase, Tag } from 'lucide-react'
+import { ArrowRight, Plus, Search, Leaf, ListChecks, UsersRound, Briefcase, Tag } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
-import { ACTIVE_JOBS, ACTIVE_BOOKINGS, notificationHref } from '@/lib/work'
+import { ACTIVE_JOBS, ACTIVE_BOOKINGS } from '@/lib/work'
 export const dynamic = 'force-dynamic'
-
-// "Needs attention" lists only things the user should act on. These types are
-// purely informational (an outcome, not a to-do) — they stay in Notifications
-// but never surface here. Actionable types (shown): new_message, new_bid,
-// new_booking, new_question, service_quote_sent, booking_cancellation_requested,
-// booking_completed, job_completed, work_completion_due, availability_check.
-const INFORMATIONAL_NOTICES = new Set([
-  'review_received', 'job_cancelled', 'booking_confirmed', 'booking_declined',
-  'booking_cancelled', 'service_booking_withdrawn', 'service_quote_accepted',
-  'bid_accepted', 'bid_rejected', 'bid_placed', 'question_answered',
-  'opportunity_match', 'opportunity_digest', 'saved_interest_match', 'zero_matches',
-])
 
 export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
@@ -34,7 +19,7 @@ export default async function HomePage() {
     supabase.from('jobs').select('id,title,status,created_at,accepted_at,scheduled_date,date_from').eq('requester_id', user.id).in('status', ACTIVE_JOBS),
     supabase.from('bookings').select('id,status,provider_id,requester_id,created_at,quote_sent_at,quote_accepted_at,scheduled_date,service:services_public(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
     supabase.from('bids').select('id,job_id,status,created_at,payment_method,payment_sorted_at,payment_details_sent_at').eq('provider_id', user.id).in('status', ['pending','accepted']),
-    supabase.from('notifications').select('id,type,body,metadata,created_at').eq('user_id', user.id).eq('read',false).order('created_at',{ascending:false}).limit(20),
+    supabase.from('notifications').select('id',{count:'exact',head:true}).eq('user_id', user.id).eq('read',false),
     supabase.from('services').select('id,is_active,closed_at').eq('provider_id',user.id),
     loadSeasonalReminders(supabase),
     loadPropertyNetwork(supabase,user.id).catch(()=>null),
@@ -112,7 +97,7 @@ export default async function HomePage() {
   function actions(work:boolean){
    const items=work?[
     {title:'Find work',text:'Browse available jobs.',href:'/jobs',icon:Search},
-    {title:'Create a listing',text:'Advertise a service.',href:'/listings/new',icon:Plus},
+    {title:'My listings',text:'Manage or create listings',href:'/listings',icon:ListChecks},
    ]:[
     {title:'Post a job',text:'Get help with something that needs doing.',href:'/jobs/new',icon:Plus},
     {title:'Find local help',text:'Browse local providers and services.',href:'/browse',icon:Search},
@@ -121,24 +106,24 @@ export default async function HomePage() {
   }
   function activity(role:'requester'|'provider'){
    const onTheGo=rankOnTheGo(goItems.filter(item=>item.viewerRole===role))
-   const pending=(bookings.data || []).filter(b=>role==='provider'
-    ? b.provider_id===user.id && ['pending','cancellation_requested'].includes(b.status)
-    : b.requester_id===user.id && b.status==='quote_sent')
-   const attention=(notifications.data || []).filter(n=>!INFORMATIONAL_NOTICES.has(n.type)&&(n.type==='new_message'||!pending.some(b=>b.id===n.metadata?.booking_id)))
-   const caughtUp=!notifications.error&&!bookings.error&&!pending.length&&!attention.length
+   const activityUnavailable=[jobs,bookings,offers,offerJobs,ownBids,ownQuestions,awardTimes,schedules].some(result=>result.error)
+   const attentionSummary=homeAttentionSummary(activityUnavailable?null:goItems.filter(item=>item.viewerRole===role),role==='provider'?invitations.count??null:0)
+   const attention=attentionSummary.items
    return <>
-      {!caughtUp && <section className="card home-attention"><div className="card-head"><h2>Needs attention</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link><Link href="/notifications" className="card-link">All notifications</Link></div>
-            <ul className="list">
-              {pending.slice(0,4).map(b => { const service = b.service as unknown as {title?:string;pricing_type?:string} | null;const tag = b.provider_id === user.id ? 'YOUR LISTING' : 'LISTING';return <li key={b.id}><Link className="row" href={'/activity#booking-' + b.id}><span className="attention-icon listing"><Bell size={18}/></span><span className="row-main"><span className="side-tag listing">{tag}</span><strong>{service?.title || 'Booking request'}</strong><span className="row-sub">{bookingNextMove({status:b.status,service},b.provider_id === user.id ? 'provider' : 'requester')?.badge || 'Waiting on you'}</span><span className="row-snippet">{b.status === 'pending' ? service?.pricing_type === 'quote_required' ? 'Send a quote or decline the request' : 'Confirm or decline the booking request' : b.status === 'quote_sent' ? 'Review and accept the quote' : 'Respond to the cancellation request'}</span></span><ArrowRight size={16}/></Link></li>})}
-              {attention.slice(0,5).map(n => { const side = notificationSide(n); const tag = sideTag(side, n);return <li key={n.id}><Link className="row" href={notificationHref(n)}>{side ? <span className={'attention-icon ' + side}><MessageSquare size={18}/></span> : <MessageSquare size={20}/>}<span className="row-main">{tag && <span className={'side-tag ' + side}>{tag}</span>}<strong>{notificationBody(n)}</strong><span className="row-sub">{nzDate(new Date(n.created_at))}</span></span><ArrowRight size={16}/></Link></li>})}
-            </ul>
-          </section>}
+      <p className="home-work-empty">{attentionSummary.text}</p>
+      <p><Link href="/notifications" className="card-link">All notifications{notifications.count!=null?` (${notifications.count} unread)`:''}</Link></p>
+      {attention.length>0 && <section className="card home-attention"><div className="card-head"><h2>Needs attention ({attention.length})</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link></div>
+        <ul className="list">{attention.slice(0,5).map(item=><li key={item.key}><Link className="row" href={item.href}>
+          <span className={'attention-icon '+item.side}>{item.side==='job'?<Briefcase size={18}/>:<Tag size={18}/>}</span>
+          <span className="row-main"><strong>{item.title}</strong><span className="row-sub">{item.next.label}</span><span className="row-snippet">{item.next.detail}</span><span className="card-link">{item.next.actionLabel || 'View details'} →</span></span><ArrowRight size={16}/>
+        </Link></li>)}</ul>
+      </section>}
       {/* On the go — what's in flight, by name, with whose turn it is (replaces the count tiles) */}
       {onTheGo.total > 0 && <section className="card home-attention home-onthego"><div className="card-head"><h2>On the go</h2><Link href="/activity" className="card-link">View all ›</Link></div>
         <ul className="list">{onTheGo.shown.map(item => <li key={item.key}><Link className="row" href={item.href}><span className={'attention-icon ' + item.side}>{item.side === 'job' ? <Briefcase size={18}/> : <Tag size={18}/>}</span><span className="row-main"><span className={'side-tag ' + item.side}>{(item.own ? 'YOUR ' : '') + (item.side === 'job' ? 'JOB' : 'LISTING')}</span><strong>{item.title}</strong><span className={'work-badge' + (item.next.badgeTone === 'attention' ? ' attention' : '')}>{item.next.badge}</span></span><ArrowRight size={16}/></Link></li>)}</ul>
         {onTheGo.more > 0 && <p className="muted home-onthego-more">+{onTheGo.more} more in Activity</p>}
       </section>}
-      {role==='requester'&&caughtUp&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or find local help to get started.</p></div>}
+      {role==='requester'&&attentionSummary.count===0&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or find local help to get started.</p></div>}
    </>
   }
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page home-v2">
@@ -161,7 +146,7 @@ export default async function HomePage() {
     <header className="home-heading"><div><h1>Your work, your opportunities</h1></div></header>
     {work.indicators.length>0?<section className="home-work-summary" aria-label="My Work overview">
      {work.indicators.map(item=><Link key={item.id} href={item.href} className="home-summary-item"><strong>{item.count}</strong> {item.label}</Link>)}
-    </section>:<p className="home-work-empty">{work.unavailable?'Work summary unavailable. Refresh to try again.':"You're all caught up."}</p>}
+    </section>:null}
     {actions(true)}
     <div className="home-work-links">
      <Link href="/connections?view=customers" className="card home-quick"><UsersRound size={22}/><span><strong>My Customers</strong>
