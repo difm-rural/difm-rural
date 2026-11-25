@@ -76,6 +76,13 @@ test('guest booking resumption keeps a draft whose quantity is above the grazing
  await pending.resume('requester')
  assert.equal(pending.posts.length,0);assert.notEqual(saved,null);assert.match(pending.alerts[0].join(' '),/up to 2 head/)
 })
+test('guest booking resumption keeps a draft with a fractional head count',async()=>{
+ let saved=JSON.stringify({booking:{id:'kept',service_id:'listing',quantity:1.5,total_amount:75}})
+ const storage={getItem:async()=>saved,setItem:async()=>{},removeItem:async()=>{saved=null}}
+ const pending=resumePending(storage,{id:'kept',listing:{kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',minimum_units:1,max_units:2},upsert:{error:null}})
+ await pending.resume('requester')
+ assert.equal(pending.posts.length,0);assert.notEqual(saved,null);assert.match(pending.alerts[0].join(' '),/whole number of head/)
+})
 test('failed guest submission retains a stable draft ID and never reports success',async()=>{
  let saved=JSON.stringify({booking:{service_id:'listing'}}),success=false
  const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}

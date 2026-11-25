@@ -58,6 +58,9 @@ test('grazing booking creation rejects a quantity above capacity and stores the 
  let supabase=client({services_public:[grazing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
  const rejected=await requestBooking({error:''},form({...values,quantity:4}))
  assert.match(rejected.error,/up to 2 head/);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ supabase=client({services_public:[grazing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ const fraction=await requestBooking({error:''},form({...values,quantity:1.5}))
+ assert.match(fraction.error,/whole number of head/);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
  for(const quantity of ['', 'abc', 0, -1]){
   supabase=client({services_public:[grazing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
   assert.ok((await requestBooking({error:''},form({...values,quantity}))).error);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)

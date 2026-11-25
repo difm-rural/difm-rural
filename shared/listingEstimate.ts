@@ -27,14 +27,18 @@ export function listingEstimate(service:EstimateListing|null|undefined, selected
   const limits = bookingQuantityLimits(service, selectedOption)
   const minimumUnits = limits.minimum
   const maximumUnits = limits.maximum ?? Infinity
-  const effectiveQuantity = perQuantity ? Math.min(maximumUnits, Math.max(minimumUnits, nonNegativeNumber(quantity, 1))) : 1
+  const requested = nonNegativeNumber(quantity, 1)
+  const fractionalHead = perQuantity && limits.wholeHead && !Number.isInteger(requested)
+  const effectiveQuantity = !perQuantity ? 1
+    : fractionalHead ? requested
+    : Math.min(maximumUnits, Math.max(minimumUnits, requested))
   const minimumCharge = nonNegativeNumber(pricing.min_charge)
-  const baseAmount = pricingType === 'quote_required' ? null
+  const baseAmount = pricingType === 'quote_required' || fractionalHead ? null
     : Number(Math.max(effectiveQuantity * nonNegativeNumber(pricing.rate), minimumCharge).toFixed(2))
   return { pricingType, quantity: effectiveQuantity, minimumUnits, minimumCharge, baseAmount }
 }
 
-export { bookingQuantityLimits, validateBookingQuantity, clampBookingQuantity, canIncreaseBookingQuantity, bookingCapacityMessage } from './bookingQuantity'
+export { bookingQuantityLimits, validateBookingQuantity, clampBookingQuantity, canIncreaseBookingQuantity, bookingCapacityMessage, bookingWholeHeadMessage } from './bookingQuantity'
 
 // Price only a quantity that passed validation. Fixed prices and quotes apply
 // once, so they stay valid. An over-capacity or empty per-unit entry has no

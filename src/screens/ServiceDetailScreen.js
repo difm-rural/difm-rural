@@ -108,6 +108,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
   const review = reviewBookingQuantity(service, selectedOption, pricedQuantity)
   const estimate = listingEstimate(service, selectedOption, review.ok ? review.quantity : pricedQuantity)
   const atCapacity = !canIncreaseBookingQuantity(pricedQuantity, quantityLimits)
+  const fractionalHead = quantityLimits.wholeHead && !Number.isInteger(pricedQuantity)
   const effectiveUnitLabel = effectivePricingType === 'hourly' ? 'hour'
     : effectivePricingType === 'day_rate' ? 'day'
     : (selectedOption ? (selectedOption.unit_label || 'unit') : (service.unit_label || 'unit'))
@@ -524,9 +525,11 @@ export default function ServiceDetailScreen({ route, navigation }) {
             <Text style={styles.cardLabel}>Estimate your cost</Text>
             {isEstimatable && <View style={styles.estimatorRow}>
               <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => setQuantity(clampBookingQuantity(estimate.quantity - 1, quantityLimits))}
+                style={[styles.qtyBtn, fractionalHead && styles.qtyBtnDisabled]}
+                disabled={fractionalHead}
+                onPress={() => { if (!fractionalHead) setQuantity(clampBookingQuantity(estimate.quantity - 1, quantityLimits)) }}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: fractionalHead }}
                 accessibilityLabel="Decrease quantity">
                 <Icon name="remove" size={22} color={colors.primary} />
               </TouchableOpacity>
@@ -535,19 +538,20 @@ export default function ServiceDetailScreen({ route, navigation }) {
                 <Text style={styles.qtyUnit}>{quantityUnit(effectiveUnitLabel, review.ok ? review.quantity : estimate.quantity)}</Text>
               </View>
               <TouchableOpacity
-                style={[styles.qtyBtn, atCapacity && styles.qtyBtnDisabled]}
-                disabled={atCapacity}
-                onPress={() => { if (!atCapacity) setQuantity(clampBookingQuantity(estimate.quantity + 1, quantityLimits)) }}
+                style={[styles.qtyBtn, (atCapacity || fractionalHead) && styles.qtyBtnDisabled]}
+                disabled={atCapacity || fractionalHead}
+                onPress={() => { if (!atCapacity && !fractionalHead) setQuantity(clampBookingQuantity(estimate.quantity + 1, quantityLimits)) }}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: atCapacity }}
+                accessibilityState={{ disabled: atCapacity || fractionalHead }}
                 accessibilityLabel="Increase quantity">
-                <Icon name="add" size={22} color={atCapacity ? colors.textMuted : colors.primary} />
+                <Icon name="add" size={22} color={atCapacity || fractionalHead ? colors.textMuted : colors.primary} />
               </TouchableOpacity>
             </View>}
             <View style={styles.estimateResult}>
               <Text style={styles.estimateLabel}>{review.ok ? `Base estimate for ${review.quantity}` : 'Base estimate'}</Text>
               <Text style={styles.estimateTotal}>{review.ok ? nzMoney(review.amount?.toFixed(2)) : '—'}</Text>
             </View>
+            {!review.ok && !!review.message && <Text accessibilityRole="alert" style={styles.descText}>{review.message}</Text>}
             {estimate.minimumCharge > 0 && (
               <DetailRow label="Minimum charge included" value={`${nzMoney(estimate.minimumCharge.toFixed(2))}`} last />
             )}

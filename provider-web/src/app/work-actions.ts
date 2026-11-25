@@ -286,10 +286,12 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   if(active.data?.length)return {error:'You already have an active request for this listing. Open Activity to view it.'}
   let snapshot
   try{
-    const {bookingQuantityLimits,bookingCapacityMessage}=await import('@shared/bookingQuantity')
+    const {bookingQuantityLimits,bookingCapacityMessage,bookingWholeHeadMessage}=await import('@shared/bookingQuantity')
     const limits=bookingQuantityLimits(selectedRate(s,text(data,'variant_index')).rate)
+    if(limits.wholeHead&&!Number.isInteger(quantity))return {error:bookingWholeHeadMessage()}
     if(limits.maximum!=null&&quantity>limits.maximum)return {error:bookingCapacityMessage(limits.maximum)}
     snapshot=pricingSnapshot(s,text(data,'variant_index'),quantity)
+    if(limits.wholeHead&&!Number.isInteger(snapshot.quantity))return {error:bookingWholeHeadMessage()}
     if(limits.maximum!=null&&snapshot.quantity>limits.maximum)return {error:bookingCapacityMessage(limits.maximum)}
   }catch(error){
     if(error instanceof Error&&error.message.includes('head'))return {error:error.message}
