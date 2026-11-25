@@ -26,9 +26,11 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{ne
           <div className="login-barn-mark" aria-hidden="true">
             <Image src="/brand/barn-badge-red.png" alt="" width={52} height={52} priority />
           </div>
-          <h2>Welcome to Rural Connections</h2>
-          <p className="muted">Sign in or create an account with your email.</p>
+          <h2>Sign in or join</h2>
+          <p className="muted">Enter your email to access Rural Connections.</p>
           {params.error==='link' && <p className="form-error" role="alert">That sign-in link could not be used. Request a new code below and enter it here.</p>}
+          <p className="muted">New here? We&apos;ll help you create an account.</p>
+          {destination!=='/'&&<p className="muted" role="status">Sign in to continue. You will return to your selected page; nothing is submitted automatically.</p>}
           <LoginForm destination={destination}/>
           <p className="muted">Once signed in, Home brings your jobs, listings, messages and bookings together.</p>
           <a href="https://ruralconnections.nz/" className="card-link">Continue browsing without signing in →</a>

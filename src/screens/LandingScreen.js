@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import {saveGuestIntent} from '../lib/guestIntent'
 import DevelopmentBadge from '../components/DevelopmentBadge'
 import { resolvePublicJobLocations } from '../lib/jobDiscovery'
 import React, { useEffect, useRef, useState } from 'react'
@@ -23,11 +25,11 @@ import EmptyState from '../components/EmptyState'
 import { SkeletonList } from '../components/SkeletonCard'
 import JobServiceCard, { CARD_GAP, SNAP_INTERVAL } from '../components/JobServiceCard'
 
-function HorizontalSection({ title, items, onPressItem, onGuestAction }) {
+function HorizontalSection({ title, items, onPressItem, onGuestAction, onSeeAll }) {
   if (!items.length) return null
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>{title}</Text><TouchableOpacity onPress={onSeeAll} accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`}><Text style={styles.seeAll}>See all →</Text></TouchableOpacity></View>
       <FlatList
         horizontal
         data={items}
@@ -131,13 +133,19 @@ export default function LandingScreen({ navigation }) {
     load()
   }
 
-  function handleGuestAction() {
+  function requireSignIn(action, id) {
+    Alert.alert('Sign in or join', 'Sign in to continue. Nothing will be submitted automatically.', [
+      {text:'Cancel',style:'cancel'}, {text:'Continue',onPress:async()=>{try{await saveGuestIntent(AsyncStorage,action,id);navigation.navigate('Login')}catch{Alert.alert('Could not continue','Please try again.')}}},
+    ])
+  }
+
+  function handleGuestAction(_action, item) {
     Alert.alert(
       'Sign in required',
       'Sign in to save this item.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign in', onPress: () => navigation.navigate('Login') },
+        { text: 'Sign in', onPress: async () => {try{if(item?.id)await saveGuestIntent(AsyncStorage,item._type==='job'?'job':'listing',item.id);navigation.navigate('Login')}catch{Alert.alert('Could not continue','Please try again.')}} },
       ]
     )
   }
@@ -170,13 +178,20 @@ export default function LandingScreen({ navigation }) {
         </View>
       </View>
 
+      <ScrollView
+        style={{ flex: 1 }}
+        alwaysBounceVertical
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title} accessibilityRole="header">Find rural help</Text>
-        <Text style={styles.subtitle}>Find nearby people with the practical skills your property needs — or turn your rural know-how into work in your community.</Text>
-        <Text style={styles.hint}>New here? Tap Account below to log in or sign up.</Text>
+        <Text style={styles.title} accessibilityRole="header">Get jobs done. Find work.</Text>
+        <Text style={styles.subtitle}>Connect with rural people nearby for practical help, services, equipment and more.</Text>
+        <Text style={styles.hint}>Browse freely. Sign in or join when you want to take part.</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search water, fencing, tractor..."
+          placeholder="Search jobs, services and equipment..."
           placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -185,13 +200,9 @@ export default function LandingScreen({ navigation }) {
         />
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        alwaysBounceVertical
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        showsVerticalScrollIndicator={false}>
+      <View style={styles.entryCards}>
+        {[{title:'Find help',description:'Find services and people to help.',action:'Browse listings',icon:'construct-outline',onPress:()=>navigation.navigate('ServicesList')},{title:'Find work',description:'Find jobs posted near you.',action:'Browse jobs',icon:'briefcase-outline',onPress:()=>navigation.navigate('GuestJobFeed')}].map(item=><TouchableOpacity key={item.title} style={styles.entryCard} onPress={item.onPress} accessibilityRole="button" accessibilityLabel={`${item.title}. ${item.action}`}><Icon name={item.icon} size={24} color={colors.primary}/><Text style={styles.entryTitle}>{item.title}</Text><Text style={styles.entryDescription}>{item.description}</Text><Text style={styles.entryAction}>{item.action} →</Text></TouchableOpacity>)}
+      </View>
       <NearbyControls nearby={nearby} unlocated={listingResult.unlocated + (showJobs ? jobResult.unlocated : 0)} />
       {loading ? (
         <SkeletonList count={3} style={{ paddingHorizontal: 16, paddingTop: 16 }} />
@@ -210,13 +221,14 @@ export default function LandingScreen({ navigation }) {
           body={jobResult.active ? 'Try a wider distance or browse All New Zealand.' : search.trim() ? `Nothing matches “${search.trim()}”. Try another word or clear your search.`
             : 'Be the first in your area — check back soon, or post a job to get started.'}
           actionLabel={jobResult.active ? 'All New Zealand' : search.trim() ? 'Clear search' : 'Post a job'}
-          onAction={jobResult.active ? () => nearby.setRadius(null) : search.trim() ? () => setSearch('') : () => navigation.navigate('GuestPostJob')}
+          onAction={jobResult.active ? () => nearby.setRadius(null) : search.trim() ? () => setSearch('') : () => requireSignIn('post-job')}
         />
       ) : (
         <>
           {showJobs && (
             <HorizontalSection
               title="Open jobs"
+              onSeeAll={()=>navigation.navigate('GuestJobFeed')}
               items={filteredJobs}
               onPressItem={item => navigation.navigate('GuestJobDetail', { job: item })}
               onGuestAction={handleGuestAction}
@@ -224,6 +236,7 @@ export default function LandingScreen({ navigation }) {
           )}
           <HorizontalSection
             title="Available listings"
+            onSeeAll={()=>navigation.navigate('ServicesList')}
             items={filteredServices}
             onPressItem={item => navigation.navigate('ServiceDetail', { service: item })}
             onGuestAction={handleGuestAction}
@@ -252,7 +265,7 @@ export default function LandingScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tab}
-          onPress={() => navigation.navigate('GuestPostJob')}
+          onPress={() => requireSignIn('post-job')}
           accessibilityRole="button">
           <Icon name="add-circle-outline" size={22} color={colors.textMuted} />
           <Text style={styles.tabLabel}>Post</Text>
@@ -301,6 +314,13 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
 
+  entryCards:{flexDirection:'row',gap:14,paddingHorizontal:20,marginBottom:16},
+  entryCard:{flex:1,minWidth:0,padding:14,borderRadius:12,borderWidth:1,borderColor:colors.border,backgroundColor:colors.white},
+  entryTitle:{fontSize:19,fontWeight:'700',color:colors.textPrimary,marginTop:8},
+  entryDescription:{fontSize:14,lineHeight:20,color:colors.textSecondary,marginTop:6,flex:1},
+  entryAction:{fontSize:14,fontWeight:'700',color:colors.primary,marginTop:12},
+  sectionHeading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingRight:14,marginBottom:10},
+  seeAll:{color:colors.primary,fontWeight:'600',paddingVertical:12},
   section: { marginTop: 20 },
   sectionTitle: {
     fontSize: 17,

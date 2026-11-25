@@ -1,10 +1,7 @@
+import {GUEST_INTENT_KEY, parseGuestIntent, guestIntentDestination} from '../lib/guestIntent'
 import PropertyMapScreen from '../screens/PropertyMapScreen'
 import PropertyNetworkScreen from '../screens/PropertyNetworkScreen'
 import { setCurrentScreen } from '../lib/currentScreen'
-import {publicAreaError} from '../../shared/publicArea'
-import {postingTextError} from '../../shared/postingText'
-import {moneyInputError} from '../../shared/postingMoney'
-import {jobScheduleError} from '../../shared/postingDates'
 import { NavigationContainer, useNavigationContainerRef, getFocusedRouteNameFromRoute } from '@react-navigation/native'
 import { tabRootAction } from '../../shared/stackNavigation'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
@@ -17,7 +14,6 @@ import { supabase } from '../lib/supabase'
 import { colors } from '../theme/tokens'
 import { updateLastSeen } from '../lib/preferences'
 import { clearSessionTokens, isBiometricEnabled, saveSession } from '../lib/biometrics'
-import { uploadJobPhotos } from '../lib/jobPhotos'
 import { registerForPushNotifications, addPushResponseListener } from '../lib/push'
 
 // ─── Tab screens ──────────────────────────────────────────────────────────────
@@ -33,9 +29,6 @@ import { onBadgeRefresh, requestBadgeRefresh } from '../lib/badgeEvents'
 import { watchNotifications } from '../lib/liveNotifications'
 import { canResumeGuestAction, listingEnquiryNavigationState, parsePendingListingEnquiry, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
 import { ONBOARDING_DESTINATIONS } from '../lib/onboarding'
-import {newJobId} from '../lib/draftId'
-import {fetchBookingDetail} from '../lib/bookingDetail'
-import { bookingQuantityLimits, validateBookingQuantity } from '../lib/listingEstimate'
 
 // ─── Post job wizard screens ──────────────────────────────────────────────────
 import PostJobStep1JobType  from '../screens/postjob/PostJobStep1JobType'
@@ -446,8 +439,6 @@ export default function AppNavigator() {
   const [servicesBadge,    setServicesBadge]    = useState(0)
 
   const navigationRef = useNavigationContainerRef()
-  const [bookingSuccessResult,setBookingSuccessResult]=useState(null)
-  const pendingBookingPostingRef=useRef(false)
   const sessionRef = useRef(null)
   const profileRef = useRef(null)
   const onboardingDestinationRef = useRef(null)
@@ -529,11 +520,6 @@ export default function AppNavigator() {
       // INITIAL_SESSION (cold start), SIGNED_IN (just logged in), USER_UPDATED
       setSession(session)
       if (session) {
-        // Only a brand-new sign-in can have a pending guest draft to flush.
-        if (event === 'SIGNED_IN') {
-          await postPendingJobIfAny(session.user.id)
-          await postPendingBookingIfAny(session.user.id)
-        }
         registerForPushNotifications() // fire-and-forget; reassigns this device to the current user
         fetchProfile(session.user.id)
       } else {
@@ -564,18 +550,6 @@ export default function AppNavigator() {
   // mounted (after onboarding for new accounts). Enquiries restore a listing
   // beneath Chat so Back returns to the listing instead of the login screen.
   const authedTabsActive = canResumeGuestAction(session, profile, loading, showOnboarding)
-  useEffect(()=>{
-    if(!authedTabsActive||!bookingSuccessResult)return
-    if(bookingSuccessResult.requester_id!==session?.user?.id){setBookingSuccessResult(null);return}
-    let cancelled=false
-    ;(async()=>{
-      for(let attempt=0;attempt<50&&!navigationRef.isReady();attempt++)await new Promise(resolve=>setTimeout(resolve,100))
-      if(cancelled||!navigationRef.isReady())return
-      navigationRef.navigate('Browse',{screen:'BookingConfirm',params:{service:{...bookingSuccessResult.service,profile:bookingSuccessResult.provider},createdBooking:bookingSuccessResult}})
-      setBookingSuccessResult(null)
-    })()
-    return ()=>{cancelled=true}
-  },[authedTabsActive,bookingSuccessResult,session?.user?.id])
   useEffect(() => {
     if (!authedTabsActive) return
     let cancelled = false
@@ -595,6 +569,28 @@ export default function AppNavigator() {
     }
     ;(async () => {
       try {
+        const intentRaw = await AsyncStorage.getItem(GUEST_INTENT_KEY)
+        if (cancelled) return
+        if (intentRaw) {
+          const intent = parseGuestIntent(intentRaw)
+          if (!intent) await AsyncStorage.removeItem(GUEST_INTENT_KEY)
+          else {
+            const destination = await guestIntentDestination(supabase, intent)
+            for (let attempt=0;attempt<40;attempt++) {
+              if (cancelled) return
+              const root = navigationRef.isReady() ? navigationRef.getRootState() : null
+              if (root?.routeNames?.includes('Browse')) {
+                if (destination) navigationRef.navigate(...destination)
+                else Alert.alert('No longer available', 'Please browse for another job or listing.')
+                onboardingDestinationRef.current = null
+                await AsyncStorage.removeItem(GUEST_INTENT_KEY)
+                return
+              }
+              await new Promise(resolve=>setTimeout(resolve,100))
+            }
+            return
+          }
+        }
         const enquiryRaw = await AsyncStorage.getItem(PENDING_LISTING_ENQUIRY_KEY)
         if (cancelled) return
         if (enquiryRaw) {
@@ -643,81 +639,6 @@ export default function AppNavigator() {
     })()
     return () => { cancelled = true }
   }, [authedTabsActive])
-
-  async function postPendingJobIfAny(userId) {
-    try {
-      const raw = await AsyncStorage.getItem('pendingJob')
-      if (!raw) return
-      const { _photos = [], ...job } = JSON.parse(raw)
-      const areaError=publicAreaError(job.location_area,false)
-      if(areaError){Alert.alert('Check your saved job',areaError);return}
-      const textError=postingTextError(job.title,'title')||postingTextError(job.description,'description')
-      if(textError){Alert.alert('Check your saved job',textError);return}
-      const moneyError=job.price_type==='fixed'?moneyInputError(job.price,'Budget'):''
-      if(moneyError){Alert.alert('Job not posted',moneyError+' Your draft is saved. Review its budget before posting.');return}
-      const dateError=jobScheduleError(job)
-      if(dateError){Alert.alert('Job not posted',dateError+' Your draft is saved. Review its dates before posting.');return}
-
-      const { data: newJob, error } = await supabase
-        .from('jobs')
-        .insert({ ...job, requester_id: userId, status: 'open' })
-        .select('id')
-        .single()
-
-      // The draft carries its own id: a clash means an earlier flush already
-      // posted it, so clear the draft instead of alerting or posting twice.
-      if (error?.code === '23505' && job.id) {
-        await AsyncStorage.removeItem('pendingJob')
-        return
-      }
-      if (error) {
-        // Keep the draft so the user can retry — don't silently lose their work.
-        Alert.alert('Job not posted', `${error.message}\n\nYour details are saved — please try posting again from your jobs.`)
-        return
-      }
-
-      await AsyncStorage.removeItem('pendingJob')
-
-      if (_photos.length > 0) {
-        const urls = await uploadJobPhotos(newJob.id, _photos)
-        if (urls.length > 0) {
-          await supabase.from('jobs').update({ photos: urls }).eq('id', newJob.id)
-        }
-      }
-
-      Alert.alert('Job posted!', 'Your job has been posted successfully.')
-    } catch (error) {
-      console.log('Error posting pending job:', error)
-    }
-  }
-
-  async function postPendingBookingIfAny(userId) {
-    if(pendingBookingPostingRef.current)return
-    pendingBookingPostingRef.current=true
-    try {
-      const raw = await AsyncStorage.getItem('pendingBooking')
-      if (!raw) return
-      const pending = JSON.parse(raw)
-      const booking = pending.booking || pending
-      if(!booking.id){booking.id=newJobId();await AsyncStorage.setItem('pendingBooking',JSON.stringify({...pending,booking:{...booking}}))}
-      const {data:listing,error:listingError}=await supabase.from('services_public').select('kind,pricing_type,unit_label,minimum_units,max_units').eq('id',booking.service_id).maybeSingle()
-      const quantitySource=pending.quantityLimits || (!listingError && listing ? listing : null)
-      if(quantitySource){
-        const check=validateBookingQuantity(booking.quantity,bookingQuantityLimits(quantitySource))
-        if(!check.ok || check.quantity!==Number(booking.quantity)){
-          Alert.alert('Booking not sent',`${check.message || 'Enter a quantity within this listing\'s capacity.'}\n\nYour details are saved — please try booking again.`)
-          return
-        }
-      }
-      const {error}=await supabase.from('bookings').upsert({...booking,requester_id:userId,status:booking.status || 'pending'},{onConflict:'id',ignoreDuplicates:true})
-      if(error){Alert.alert('Booking not sent',`${error.message}\n\nYour details are saved — please try booking again.`);return}
-      const created=await fetchBookingDetail(supabase,booking.id)
-      await AsyncStorage.removeItem('pendingBooking')
-      setBookingSuccessResult(created)
-    } catch (error) {
-      Alert.alert('Could not confirm your booking request','Your details are saved. Check Activity before trying again.')
-    } finally { pendingBookingPostingRef.current=false }
-  }
 
   function handleOnboardingComplete(destination = 'home') {
     onboardingDestinationRef.current = destination

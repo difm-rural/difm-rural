@@ -1,3 +1,5 @@
+import {saveGuestIntent} from '../../lib/guestIntent'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useCallback, useRef, useState } from 'react'
 import {
   Keyboard,
@@ -45,6 +47,15 @@ function ServiceSection({ title, items, onPressItem }) {
 }
 
 export default function BrowseTabScreen({ navigation, route }) {
+  function requirePostSignIn() {
+    Alert.alert('Sign in to post a job', 'Sign in or join to continue. Nothing is posted automatically.', [
+      {text:'Cancel',style:'cancel'},
+      {text:'Continue',onPress:async()=>{
+        try { await saveGuestIntent(AsyncStorage,'post-job'); navigation.navigate('Login') }
+        catch { Alert.alert('Could not continue','Please try again.') }
+      }},
+    ])
+  }
   const insets = useSafeAreaInsets()
   const [currentUserId, setCurrentUserId] = useState(null)
   const [services,    setServices]    = useState([])
@@ -186,11 +197,13 @@ export default function BrowseTabScreen({ navigation, route }) {
       </ScrollView>
       {currentUserId && (
         <TouchableOpacity
-          style={{paddingHorizontal:20,paddingVertical:8,alignSelf:'flex-start'}}
+          style={styles.manageListings}
           onPress={() => navigation.navigate('MyServices')}
           accessibilityRole="button"
-          accessibilityLabel="My listings">
-          <Text style={{color:colors.primary,fontWeight:'600'}}>My listings</Text>
+          accessibilityLabel="Manage my listings">
+          <Icon name="list-outline" size={20} color={colors.primary}/>
+          <Text style={styles.manageListingsText}>Manage my listings</Text>
+          <Icon name="chevron-forward" size={16} color={colors.textMuted}/>
 
         </TouchableOpacity>
       )}
@@ -226,7 +239,7 @@ export default function BrowseTabScreen({ navigation, route }) {
             actionLabel="Post a job"
             actionIcon="arrow-forward"
             onAction={() => {
-              if (!currentUserId) navigation.navigate('GuestPostJob')
+              if (!currentUserId) requirePostSignIn()
               else navigation.getParent()?.navigate('Jobs', { screen: 'PostJob', params: { origin: 'Browse' } })
             }}
           />
@@ -235,13 +248,15 @@ export default function BrowseTabScreen({ navigation, route }) {
           <ServiceSection title={result.active ? 'Near you' : 'All listings'} items={filtered} onPressItem={handlePress} />
         </>
       )}
-      {!loading&&!loadError&&isEmpty&&(search.trim()||result.active||kind)&&<TouchableOpacity onPress={()=>{if(!currentUserId)navigation.navigate('GuestPostJob');else navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Browse'}})}} accessibilityRole="button" style={{padding:20}}><Text style={{color:colors.primary,fontWeight:'700'}}>Can’t find suitable help? Post a job →</Text></TouchableOpacity>}
+      {!loading&&!loadError&&isEmpty&&(search.trim()||result.active||kind)&&<TouchableOpacity onPress={()=>{if(!currentUserId)requirePostSignIn();else navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Browse'}})}} accessibilityRole="button" style={{padding:20}}><Text style={{color:colors.primary,fontWeight:'700'}}>Can’t find suitable help? Post a job →</Text></TouchableOpacity>}
       </ScrollView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  manageListings: {marginHorizontal:20,paddingVertical:10,minHeight:44,flexDirection:'row',alignItems:'center',gap:10},
+  manageListingsText: {flex:1,minWidth:0,fontSize:14,fontWeight:'600',color:colors.primary},
   screen: { flex: 1, backgroundColor: colors.background },
 
   header: {

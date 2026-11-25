@@ -28,9 +28,13 @@ test('double taps create one request; success prevents repeat submission and Bac
 test('failed booking remains editable; retry uses the same ID and success navigation follows verified record',async()=>{
  const s=located({fail:true});await s.press('Send booking request');assert.ok(!s.texts().includes('Booking request sent!'));assert.equal(s.log.navigation.length,0);await s.press('Send booking request');assert.equal(s.log.writes.length,2);assert.equal(s.log.writes[0].payload.id,s.log.writes[1].payload.id);assert.equal(s.log.writes[1].options.ignoreDuplicates,true)
 })
-test('leaving without submission creates no request; duration uses optional notes only',async()=>{
- const s=located();assert.equal(s.log.writes.length,0);s.find('TextInput',p=>p.accessibilityLabel==='Expected duration').props.onChangeText('6 weeks');await s.press('Send booking request');assert.equal(s.log.writes[0].payload.notes,'Expected duration: 6 weeks');assert.ok(!('duration' in s.log.writes[0].payload))
+test('leaving without submission creates no request; duration is structured rather than appended to notes',async()=>{
+ const s=openBooking({service,quantity:2});assert.equal(s.log.writes.length,0)
+ s.find('ExpectedDurationControl').props.onChange('6')
+ await s.press('Send booking request');assert.equal(s.log.writes[0].payload.expected_duration,6)
+ assert.equal(s.log.writes[0].payload.expected_duration_unit,'week');assert.equal(s.log.writes[0].payload.notes,null)
 })
+
 test('role-specific pending copy is clear and completion/cancellation lifecycle remains distinct',()=>{
  const b={status:'pending',service};assert.equal(bookingNextMove(b,'requester',{otherName:'Peter Provider'}).badge,'Waiting for Peter to accept');assert.ok(!bookingNextMove(b,'requester').needsAction);assert.ok(bookingNextMove(b,'provider').needsAction);assert.equal(bookingNextMove({...b,status:'completed'},'requester'),null)
  const lock=bookingSubmission();assert.ok(lock.start());assert.ok(!lock.start());lock.finish(false);assert.ok(lock.start());lock.finish(true);assert.ok(!lock.start())
@@ -54,39 +58,7 @@ test('kind and search filtering compose with unchanged distance filtering and Al
 import {readFileSync} from 'node:fs'
 import {bookingQuantityLimits,validateBookingQuantity} from '../shared/bookingQuantity.ts'
 const navigatorSource=readFileSync(new URL('../src/navigation/AppNavigator.js',import.meta.url),'utf8')
-const pendingSource=navigatorSource.slice(navigatorSource.indexOf('  async function postPendingBookingIfAny('),navigatorSource.indexOf('  function handleOnboardingComplete'))
-const listingQuery=data=>({select(){const q={eq(){return q},maybeSingle:async()=>({data,error:null})};return q}})
-function resumePending(storage,supabase,alerts=[]){
- const posts=[],success=[]
- let created
- const client={from(table){return table==='services_public'?listingQuery(supabase.listing):{upsert:async row=>{posts.push(row);created=row;return supabase.upsert}}}}
- const resume=new Function('AsyncStorage','newJobId','supabase','fetchBookingDetail','setBookingSuccessResult','Alert','pendingBookingPostingRef','validateBookingQuantity','bookingQuantityLimits','return ('+pendingSource+')')(storage,()=>supabase.id,{from:client.from},async()=>({...created,id:supabase.id}),row=>success.push(row),{alert:(...a)=>alerts.push(a)},{current:false},validateBookingQuantity,bookingQuantityLimits)
- return {resume,posts,success,alerts}
-}
-test('guest booking resumption supports legacy drafts, guards concurrent sign-in events and confirms the saved record',async()=>{
- let saved=JSON.stringify({service_id:'listing',provider_id:'provider',quantity:7,total_amount:350})
- const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}
- const pending=resumePending(storage,{id:'known-uuid',listing:null,upsert:{error:null}})
- await Promise.all([pending.resume('requester'),pending.resume('requester')]);assert.equal(pending.posts.length,1);assert.equal(pending.success[0].id,'known-uuid');assert.equal(saved,null);assert.equal(pending.alerts.length,0)
-})
-test('guest booking resumption keeps a draft whose quantity is above the grazing capacity',async()=>{
- let saved=JSON.stringify({booking:{id:'kept',service_id:'listing',quantity:4,total_amount:40}})
- const storage={getItem:async()=>saved,setItem:async()=>{},removeItem:async()=>{saved=null}}
- const pending=resumePending(storage,{id:'kept',listing:{kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',minimum_units:1,max_units:2},upsert:{error:null}})
- await pending.resume('requester')
- assert.equal(pending.posts.length,0);assert.notEqual(saved,null);assert.match(pending.alerts[0].join(' '),/up to 2 head/)
-})
-test('guest booking resumption keeps a draft with a fractional head count',async()=>{
- let saved=JSON.stringify({booking:{id:'kept',service_id:'listing',quantity:1.5,total_amount:75}})
- const storage={getItem:async()=>saved,setItem:async()=>{},removeItem:async()=>{saved=null}}
- const pending=resumePending(storage,{id:'kept',listing:{kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',minimum_units:1,max_units:2},upsert:{error:null}})
- await pending.resume('requester')
- assert.equal(pending.posts.length,0);assert.notEqual(saved,null);assert.match(pending.alerts[0].join(' '),/whole number of head/)
-})
-test('failed guest submission retains a stable draft ID and never reports success',async()=>{
- let saved=JSON.stringify({booking:{service_id:'listing'}}),success=false
- const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}
- const pending=resumePending(storage,{id:'retry-uuid',listing:null,upsert:{error:{message:'offline'}}})
- const resume=user=>{success=false;return pending.resume(user)}
- await resume('requester');await resume('requester');assert.equal(JSON.parse(saved).booking.id,'retry-uuid');assert.equal(pending.success.length,0)
+test('guest authentication never automatically posts jobs or bookings',()=>{
+ assert.doesNotMatch(navigatorSource,/postPending(Job|Booking)IfAny|from\('bookings'\)\.upsert/)
+ assert.match(navigatorSource,/guestIntentDestination\(supabase, intent\)/)
 })

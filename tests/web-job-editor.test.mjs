@@ -40,8 +40,9 @@ const offerSource=(await readFile(new URL('../provider-web/src/lib/offer-input.t
 const offerUrl='data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(offerSource)).toString('base64')
 const {offerInput}=await import(offerUrl)
 test('itemised offers calculate their amount, retain pricing terms and reject inconsistent inputs',()=>{
- const values={item_label:['Labour','Travel'],item_amount:['120','30'],pricing_type:'hourly',message:'',materials:'estimate',available_from:'2026-10-22',estimated_duration:'One day'}
- const r=offerInput(form(values),true);assert.equal(r.ok,true);assert.equal(r.value.amount,150);assert.equal(r.value.pricing_type,'hourly');assert.equal(r.value.materials,'estimate');assert.equal(r.value.available_from,'2026-10-22')
+ const availableDate=new Date(Date.now()+7*86400000).toISOString().slice(0,10)
+ const values={item_label:['Labour','Travel'],item_amount:['120','30'],pricing_type:'hourly',message:'',materials:'estimate',available_from:availableDate,estimated_duration:'One day'}
+ const r=offerInput(form(values),true);assert.equal(r.ok,true);assert.equal(r.value.amount,150);assert.equal(r.value.pricing_type,'hourly');assert.equal(r.value.materials,'estimate');assert.equal(r.value.available_from,availableDate)
  assert.equal(offerInput(form({...values,item_amount:['-1','20']}),true).ok,false)
  assert.equal(offerInput(form({...values,available_from:'2026-02-30'}),true).ok,false)
  assert.equal(offerInput(form({...values,item_label:['Only one']}),true).ok,false)

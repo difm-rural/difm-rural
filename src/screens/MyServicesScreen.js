@@ -284,14 +284,15 @@ export default function MyServicesScreen({ navigation, route }) {
             <Text style={styles.headerTitle} accessibilityRole="header">My listings</Text>
             <Text style={styles.headerSub}>{services.length} listed</Text>
           </View>
-          <Button
-            size="sm"
-            icon="add"
-            title="Add"
-            onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
-            accessibilityLabel="Add new listing"
-          />
         </View>
+        <Button
+          size="sm"
+          style={{marginTop:12}}
+          icon="add"
+          title="Create a listing"
+          onPress={() => navigation.navigate('CreateService', { newListing: Date.now() })}
+          accessibilityLabel="Create a listing"
+        />
       </View>
 
       {loading ? (

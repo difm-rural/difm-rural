@@ -1,14 +1,13 @@
+import {saveGuestIntent} from '../lib/guestIntent'
 import JobPrimaryImage, {showJobPrimaryMedia} from '../components/JobPrimaryImage'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useState } from 'react'
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { colors } from '../theme/tokens'
 import { coarseSuburb, stripPlusCode } from '../lib/location'
 import Icon from '../components/Icon'
 import Button from '../components/Button'
-import { PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
 
 export default function GuestJobDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
@@ -27,8 +26,7 @@ export default function GuestJobDetailScreen({ route, navigation }) {
   // once they've signed in (and finished onboarding, for brand-new accounts).
   async function savePendingJobView() {
     try {
-      await AsyncStorage.setItem('pendingJobView', JSON.stringify({ job, savedAt: Date.now() }))
-      await AsyncStorage.removeItem(PENDING_LISTING_ENQUIRY_KEY)
+      await saveGuestIntent(AsyncStorage, 'job', job.id)
     } catch (e) {
       console.log('Could not save pending job view:', e)
     }

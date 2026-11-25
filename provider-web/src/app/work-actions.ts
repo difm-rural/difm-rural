@@ -11,7 +11,7 @@ import { removedThumbPaths } from '@shared/photos'
 import { parseNzDate } from '@shared/dates'
 import type { ActionState } from '@/components/action-form'
 import { offerInput } from '@/lib/offer-input'
-import { pricingRevision, pricingSnapshot, selectedRate, bookingResponseActions } from '@/lib/booking-detail'
+import { pricingRevision, pricingSnapshot,selectedRate,durationFields,validateGrazingQuantity, bookingResponseActions } from '@/lib/booking-detail'
 
 const text = (data: FormData, name: string) => String(data.get(name) || '').trim()
 const failed = (): ActionState => ({ error: 'Could not save. Check your connection, refresh this page and try again.' })
@@ -268,7 +268,7 @@ export async function acceptOffer(_: ActionState, data: FormData): Promise<Actio
 export async function requestBooking(_:ActionState,data:FormData):Promise<ActionState>{
   const {supabase,user}=await requireProvider(),id=text(data,'service_id'),requestId=text(data,'request_id'),location=text(data,'location'),quantity=Number(text(data,'quantity'))
   if(!validId(id)||!validId(requestId)||!Number.isFinite(quantity)||quantity<=0||quantity>10000000)return {error:'Choose a valid listing and a positive quantity.'}
-  const notes=[text(data,'expected_duration')?'Expected duration: '+text(data,'expected_duration').slice(0,120):'',text(data,'notes')].filter(Boolean).join('\n'),locationNote=text(data,'location_note'),schedule=text(data,'schedule_type'),date=text(data,'date'),lat=text(data,'latitude'),lng=text(data,'longitude')
+  const notes=text(data,'notes'),locationNote=text(data,'location_note'),schedule=text(data,'schedule_type'),date=text(data,'date'),lat=text(data,'latitude'),lng=text(data,'longitude')
   if(notes.length>5000)return {error:'Keep notes to 5,000 characters and arrival directions to 2,000.'}
   const isoDate=schedule==='specific'?parseNzDate(date):null
   if(!['asap','flexible','specific'].includes(schedule)||(schedule==='specific'&&!isoDate))return {error:'Choose a valid preferred date or flexible timing.'}
@@ -297,7 +297,9 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
     if(error instanceof Error&&error.message.includes('head'))return {error:error.message}
     return {error:'This rate option has changed. Go back to the listing and choose a rate again.'}
   }
-  const {error:saveError}=await supabase.from('bookings').insert({id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,...locationFields,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
+  let expected
+ try{const rate=selectedRate(s,text(data,'variant_index')).rate;validateGrazingQuantity(rate,quantity);expected=durationFields(rate,text(data,'expected_duration'),text(data,'expected_duration_unit'),snapshot.quantity)}catch(error){return {error:error instanceof Error?error.message:'Check expected duration.'}}
+ const {error:saveError}=await supabase.from('bookings').insert({...expected,id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,...locationFields,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
   if(saveError)return failed()
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/browse/'+id)
   redirect('/bookings/'+requestId+'?sent=1')
@@ -327,5 +329,5 @@ export async function respondBooking(_:ActionState,data:FormData):Promise<Action
   const result=await query.select('id')
   if(result.error||!result.data?.length)return {error:'Could not save. This request or quote may have changed. Refresh and try again.'}
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/activity/booking/'+id+'/manage');revalidatePath('/browse/'+b.service_id)
-  return {error:'',success:intent==='quote'?'Quote sent for the requester to review.':intent==='decline'?'Request declined.':'Booking confirmed. Use Chat to arrange the details and payment.'}
+  return {error:'',success:intent==='quote'?'Quote sent for the requester to review.':intent==='decline'?'Request declined.':intent==='confirm'?'Booking accepted. The requester has been notified. Use Chat to agree the remaining arrangements.':'Quote accepted. Use Chat to agree the remaining arrangements.'}
 }

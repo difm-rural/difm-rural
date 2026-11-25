@@ -29,6 +29,20 @@ export function bookingPublicArea(location?:string|null) {
  return area&&!/\b(road|rd|street|avenue|ave|lane|ln|drive|dr|highway|hwy|address)\b/i.test(area)?area:'Area to be confirmed with the provider'
 }
 
+export function bookingLocationHelp(kind:string|null|undefined,role:'requester'|'provider',status='pending',publicLocation?:string|null,hasPrivateLocation=false) {
+ if(kind==='grazing'&&status==='completed'){
+  const area=bookingPublicArea(publicLocation)
+  return area==='Area to be confirmed with the provider'?'Grazing arrangement completed. Public area not recorded.':`Grazing arrangement completed in ${area}.`
+ }
+ if(kind==='grazing'&&['confirmed','in_progress','cancellation_requested'].includes(status))return role==='provider'
+  ? 'Confirm access arrangements with the requester.'
+  : hasPrivateLocation?'Grazing location shared. Agree access details with the provider.':'Agree the exact grazing location and access arrangements with the provider.'
+ if(kind==='grazing')return role==='provider'
+  ? 'Confirm the exact grazing location and access arrangements with the requester.'
+  : 'The provider will confirm the exact grazing location and access arrangements.'
+ return bookingLocationPolicy(kind).help
+}
+
 type LocationInput={location?:unknown;latitude?:unknown;longitude?:unknown;note?:unknown}
 // Used by mobile payload creation and the web server action. Grazing ignores
 // even forged/stale requester input; the public summary is never an address.

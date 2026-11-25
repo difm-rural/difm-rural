@@ -40,7 +40,7 @@ test('booking responses follow participant roles, saved pricing and current stat
  assert.deepEqual(bookingResponseActions(booking({status:'quote_sent'}),'outsider','quote_required'),[])
  assert.deepEqual(bookingResponseActions(booking({status:'confirmed',quote_amount:200,quote_sent_at:'2026-10-19T00:00:00Z'}),provider,'quote_required'),[])
  assert.deepEqual(bookingResponseActions(booking({status:'confirmed'}),provider,'quote_required'),['quote'])
- assert.match(bookingNextStep('pending','requester',false),/waiting/);assert.match(bookingNextStep('confirmed','requester',false,'grazing'),/ongoing/)
+ assert.match(bookingNextStep('pending','requester',false),/waiting/);assert.match(bookingNextStep('confirmed','requester',false,'grazing'),/grazing dates/)
 })
 let jobSource=(await readFile(new URL('../provider-web/src/lib/job-input.ts',import.meta.url),'utf8')).replace("'@shared/categories'",JSON.stringify(new URL('../shared/categories.ts',import.meta.url).href))
 let offerSource=(await readFile(new URL('../provider-web/src/lib/offer-input.ts',import.meta.url),'utf8')).replace("'@shared/offers'",JSON.stringify(new URL('../shared/offers.ts',import.meta.url).href))
@@ -132,10 +132,11 @@ test('failed web request stays on the form rather than showing confirmation',asy
  const result=await requestBooking({error:''},form(requestValues));assert.ok(result.error)
  assert.equal(supabase.calls.filter(c=>c[0]==='insert').length,1)
 })
-test('optional grazing duration is carried as editable notes without changing price or lifecycle',async()=>{
- const supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
- await assert.rejects(requestBooking({error:''},form({...requestValues,expected_duration:'6 weeks',notes:'Two quiet cattle'})),{message:'REDIRECT:/bookings/'+id+'?sent=1'})
- const payload=supabase.calls.find(c=>c[0]==='insert')[2];assert.equal(payload.notes,'Expected duration: 6 weeks\nTwo quiet cattle');assert.equal(payload.status,'pending');assert.ok(!('duration' in payload))
+test('optional grazing duration persists structured terms without changing the base price or lifecycle',async()=>{
+ const item={...listing,kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',rate:50,min_charge:0,pricing_variants:[]}
+ const db=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase:db,user:{id:requester}}
+ await assert.rejects(requestBooking({error:''},form({...requestValues,variant_index:'',quantity:2,expected_duration:'4',expected_duration_unit:'week',location:'',notes:'Bring water',pricing_revision:pricingRevision(item)})),/REDIRECT/)
+ const row=db.calls.find(c=>c[0]==='insert')[2];assert.equal(row.expected_duration,4);assert.equal(row.expected_duration_unit,'week');assert.equal(row.total_amount,100);assert.equal(row.notes,'Bring water');assert.equal(row.status,'pending')
 })
 
 test('web derives location ownership from listing and ignores forged grazing coordinates',async()=>{
@@ -160,5 +161,14 @@ test('web location changes preserve listing ownership and enquiry-only restricti
   const item={...listing,kind};const supabase=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:userId}}
   assert.ok((await requestBooking({error:''},form({...requestValues,location:'',pricing_revision:pricingRevision(item)}))).error)
   assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ }
+})
+
+test('web action rejects invalid structured durations before inserting a booking',async()=>{
+ const item={...listing,kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',rate:50,min_charge:0,pricing_variants:[]}
+ for(const values of [{expected_duration:'3',expected_duration_unit:'week'},{expected_duration:'4',expected_duration_unit:'day'},{expected_duration:'0',expected_duration_unit:'week'},{expected_duration:'',expected_duration_unit:'week'},{quantity:1.5,expected_duration:'4',expected_duration_unit:'week'}]){
+  const db=client({services_public:[item],bookings:[]});globalThis.__bookingTestAuth={supabase:db,user:{id:requester}}
+  const result=await requestBooking({error:''},form({...requestValues,variant_index:'',quantity:2,location:'',pricing_revision:pricingRevision(item),...values}))
+  assert.ok(result.error);assert.equal(db.calls.some(c=>c[0]==='insert'),false)
  }
 })

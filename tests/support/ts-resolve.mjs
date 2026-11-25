@@ -12,6 +12,10 @@ import { fileURLToPath } from 'node:url'
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith('@shared/')) {
+      const name=specifier.slice('@shared/'.length)
+      return nextResolve(new URL('../../shared/'+name+(/\.[jt]s$/.test(name)?'':'.ts'),import.meta.url).href,context)
+    }
     if ((specifier.startsWith('./') || specifier.startsWith('../')) && !/\.[cm]?[jt]sx?$/i.test(specifier) && context.parentURL?.startsWith('file:')) {
       try {
         const url = new URL(specifier + '.ts', context.parentURL)

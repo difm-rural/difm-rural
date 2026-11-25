@@ -92,7 +92,7 @@ for (const status of ['confirmed', 'in_progress']) {
   check(`badge · ${status} · requester`, bk({ status, ...fixed }, 'requester', 'Sam'), ['Waiting on Sam to complete', 'muted'])
   check(`badge · ${status} · provider, scheduled ahead`, bk({ status, scheduled_date: future, ...fixed }, 'provider'), ['Waiting on you to complete', 'muted'])
   check(`badge · ${status} · requester, scheduled ahead`, bk({ status, scheduled_date: future, ...fixed }, 'requester', 'Sam'), ['Waiting on Sam to complete', 'muted'])
-  check(`badge · ${status} · grazing`, bk({ status, service: { kind: 'grazing' } }, 'provider'), ['Arrangement accepted', 'muted'])
+  check(`badge · ${status} · grazing`, bk({ status, service: { kind: 'grazing' } }, 'provider'), ['Grazing booking confirmed', 'muted'])
 }
 check('badge · cancellation requested · provider', bk({ status: 'cancellation_requested', ...fixed }, 'provider'), ['Waiting on you to respond', 'attention'])
 check('badge · cancellation requested · requester', bk({ status: 'cancellation_requested', ...fixed }, 'requester', 'Sam'), ['Waiting on Sam to respond', 'muted'])
@@ -129,7 +129,7 @@ check('short · quote sent · requester', short(bookingNextMove({ status: 'quote
 check('short · confirmed booking · provider', short(bookingNextMove({ status: 'confirmed', ...fixed }, 'provider')), 'Your turn')
 check('short · confirmed booking · requester', short(bookingNextMove({ status: 'confirmed', ...fixed }, 'requester', { otherName: 'Sam' })), "Sam's turn")
 check('short · cancellation · requester', short(bookingNextMove({ status: 'cancellation_requested', ...fixed }, 'requester', { otherName: 'Sam' })), "Sam's turn")
-check('short · grazing arrangement is unchanged', short(bookingNextMove({ status: 'confirmed', service: { kind: 'grazing' } }, 'provider')), 'Arrangement accepted')
+check('short · grazing arrangement is unchanged', short(bookingNextMove({ status: 'confirmed', service: { kind: 'grazing' } }, 'provider')), 'Grazing booking confirmed')
 check('short · the full badge is still there for wide headers', jobNextMove({ status: 'accepted' }, 'requester', { otherName: 'Sam Rata' })!.badge, 'Waiting on Sam to confirm')
 // Whenever the viewer must act, the short badge is "Your turn".
 for (const m of [

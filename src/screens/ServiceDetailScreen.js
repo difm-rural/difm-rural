@@ -1,3 +1,4 @@
+import {saveGuestIntent, GUEST_INTENT_KEY} from '../lib/guestIntent'
 import {formatDateLabel} from '../../shared/formatting.js'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -188,6 +189,19 @@ export default function ServiceDetailScreen({ route, navigation }) {
     setIsBooked(!!booking)
   }
 
+  async function openBooking() {
+    if (!review.ok) return
+    try {
+      const {data:{user},error}=await supabase.auth.getUser()
+      if(error && error.name!=='AuthSessionMissingError') throw error
+      if(user) { navigation.navigate('BookingConfirm', {service,quantity:estimate.quantity,...(selectedOption?{selectedOption}:{})}); return }
+      Alert.alert('Sign in to request a booking','Sign in or join to continue. Review and send your request after signing in.',[
+        {text:'Cancel',style:'cancel'},
+        {text:'Continue',onPress:async()=>{try{await saveGuestIntent(AsyncStorage,'booking',service.id);navigation.navigate('Login')}catch{Alert.alert('Could not continue','Please try again.')}}},
+      ])
+    } catch { Alert.alert('Could not continue','Check your connection and try again.') }
+  }
+
   async function handleEnquiry() {
     if (openingEnquiry) return
     setOpeningEnquiry(true)
@@ -212,7 +226,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
                   service: { ...service, profile }, savedAt: Date.now(),
                 }))
                 // The most recently chosen guest action wins after sign-in.
-                await AsyncStorage.removeItem('pendingJobView')
+                await AsyncStorage.multiRemove(['pendingJobView', GUEST_INTENT_KEY])
                 navigation.navigate('Login')
               } catch {
                 Alert.alert('Could not continue', 'Please try opening your enquiry again.')
@@ -586,7 +600,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
                     booking: { ...activeBooking, service, provider: profile },
                     viewerRole: 'requester',
                   })
-                : () => { if (!review.ok) return; navigation.navigate('BookingConfirm', { service, quantity: review.quantity, ...(selectedOption ? { selectedOption } : {}) }) }}
+                : openBooking}
               accessibilityLabel={isOwnService ? 'Manage your listings' : isBooked ? 'View your booking' : 'Book this service'}
             />
             {service.kind === 'grazing' && !isOwnService && (

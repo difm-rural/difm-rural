@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../../shared/postingText'
 import {editorScheduleType,jobScheduleError,nzCalendarDay,nzToday} from '../../../shared/postingDates'
@@ -109,6 +110,29 @@ export default function PostJobStep1JobType({ navigation, route }) {
   function openPicker(which) {
     openDateTimePicker({ ...pickerOptions(which), onShow: () => setPicker(which) })
   }
+
+  useEffect(() => {
+    if (!route.params?.resumeGuestDraft) return
+    let cancelled=false
+    ;(async()=>{
+      try {
+        const raw=await AsyncStorage.getItem('pendingJob')
+        if(cancelled||!raw)return
+        const saved=JSON.parse(raw),age=Date.now()-saved._savedAt
+        if(!saved._draft||!Number.isFinite(age)||age<0||age>=60*60*1000)return
+        updateJobData(saved._draft)
+        setTitle(saved._draft.title||'')
+        setScheduleType(saved._draft.scheduleType||'')
+        setScheduledDate(saved._draft.scheduledDate ? localDate(nzCalendarDay(saved._draft.scheduledDate)) : null)
+        setDateFrom(saved._draft.dateFrom ? localDate(nzCalendarDay(saved._draft.dateFrom)) : null)
+        setDateTo(saved._draft.dateTo ? localDate(nzCalendarDay(saved._draft.dateTo)) : null)
+        navigation.setParams({resumeGuestDraft:false})
+        navigation.navigate('PostJobStep5Review')
+        await AsyncStorage.removeItem('pendingJob')
+      } catch { /* Safe starting point remains available; never submit a draft. */ }
+    })()
+    return ()=>{cancelled=true}
+  }, [route.params?.resumeGuestDraft])
 
   // Seed context from editJob whenever this edit opens. Each branch also records
   // what it opened with, so Cancel only asks when something has changed.

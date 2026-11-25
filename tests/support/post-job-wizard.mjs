@@ -12,7 +12,7 @@ const compile=path=>require('@babel/core').transformSync(readFileSync(new URL(pa
 const real={}
 for(const name of ['categories','dates','formatting.js','jobAnswers','jobEdit','jobGuidance','jobSuggestion','locality','photos','postJobCancel','postingDates','postingMoney','postingText','publicArea','submission','propertyNetworkJobs'])
  real['../../../shared/'+name]=real['../../shared/'+name]=await import('../../shared/'+name)
-for(const name of ['categories','quickPickDates','repeatJob','draftId'])
+for(const name of ['categories','quickPickDates','repeatJob','draftId','guestIntent'])
  real['../../lib/'+name]=real['../lib/'+name]=await import('../../src/lib/'+name+'.js')
 
 const SCREENS={PostJob:'PostJobStep1JobType',PostJobStep2Location:'PostJobStep2Location',PostJobStep3Details:'PostJobStep3Details',
@@ -24,8 +24,10 @@ const contextCode=compile('context/PostJobContext.js')
 const nodes=node=>!node||typeof node!=='object'?[]:Array.isArray(node)?node.flatMap(nodes):[node,...nodes(node.props?.children)]
 export const flush=async()=>{for(let i=0;i<30;i++)await new Promise(resolve=>setImmediate(resolve))}
 
-export function openWizard({row,params}){
+export function openWizard({row,params,savedDraft}){
  const log={updates:[],inserts:[],rpc:[],alerts:[],gps:0,areaFails:false,links:[],postFails:false,linkFails:false,userId:'me'}
+ const local=new Map(savedDraft?[['pendingJob',JSON.stringify(savedDraft)]]:[])
+ log.local=local
  let current=null,dirty=false
  const hooks={
   useState(init){const me=current,at=me.i++;if(!(at in me.slots))me.slots[at]=typeof init==='function'?init():init
@@ -55,7 +57,7 @@ export function openWizard({row,params}){
   'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
   'react-native-maps':{...stub('MapView'),Marker:'Marker',Polygon:'Polygon'},
   'expo-location':{Accuracy:{},requestForegroundPermissionsAsync:async()=>{log.gps++;return {status:'denied'}}},
-  'expo-image-picker':{},'../../lib/draftJob':{},'@react-native-async-storage/async-storage':stub({}),
+  'expo-image-picker':{},'../../lib/draftJob':{},'@react-native-async-storage/async-storage':stub({getItem:async k=>local.get(k)??null,setItem:async(k,v)=>local.set(k,v),removeItem:async k=>local.delete(k),multiRemove:async keys=>keys.forEach(k=>local.delete(k))}),
   '../../theme/tokens':{colors:{}},'../theme/tokens':{colors:{}},
   '../../lib/supabase':{supabase},'../../lib/analytics':{trackEvent(){}},'../../lib/preferences':{trackCategoryInterest(){}},
   '../../lib/location':{reverseGeocode:async()=>'9 New Road, Elsewhere 0999, New Zealand',coarseSuburb:address=>address?address.split(',').map(part=>part.trim()).filter(part=>part!=='New Zealand').at(-1):''},
