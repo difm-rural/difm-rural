@@ -19,6 +19,33 @@ Migration `20261118180000_private_property_map.sql` adds an owner-scoped `privat
 
 ## Deployment
 
+### Security review — 25 November 2026 (NZ)
+
+**Reviewed, not deployed.** Branch `feature/property-map-security-review` from `origin/main` `555dd05`, with the preserved validation-scripts commit cherry-picked. Nothing pushed, merged or applied.
+
+**Access matrix for `private_property_maps`** (boundary, pin, gates, tanks, pumps, troughs, buildings, driveways and details are all in the one `profile` row):
+
+| Caller | Read | Create | Modify | Delete row |
+| --- | --- | --- | --- | --- |
+| Owner, app session (`auth.uid() = owner_id`, no `client_id`) | yes | yes (own row only) | yes (own row only; features removed by saving) | no grant |
+| Same owner via OAuth assistant token (`client_id` present) | **no** (new) | no | no | no |
+| Another signed-in member | no | no | no | no |
+| `anon` / guest | no (no grant) | no | no | no |
+| `service_role` | bypasses RLS; server-only; no Edge Function uses it for this table | | | |
+
+- **Finding (fixed):** assistant tokens could still **read** the full private map. The owner policy is `FOR ALL`, so it covers SELECT, and an assistant token carries the owner's subject. Only writes were guarded. rc-mcp never reads the table and promises towns/areas only. The sibling private tables (`property_network_contacts`, `property_network_contact_links`, `property_network_jobs`) already refuse assistant reads. New migration `20261125200000_private_property_map_assistant_read_guard.sql` adds a restrictive `"Assistants cannot read"` SELECT policy. It fails if any of the four guards is missing, if `anon` can read or if DELETE is granted.
+- **Confirmed:** the three restrictive write guards, owner-only `WITH CHECK` (no creating or moving a row onto another account), no DELETE grant, no SECURITY DEFINER routine referencing the table, and geometry/size validation in the CHECK constraint. `property-address-search` refuses assistant tokens before auth or LINZ calls, with gateway JWT verification on. `maps-proxy` is unchanged.
+- **AI suggestions:** map details only *suggest* support areas in the UI. Adding one needs an explicit owner tap, which goes through owner RLS and `accept_property_network_suggestion` / `link_property_network_provider`, and those refuse assistant tokens. Saving a map never changes support areas (SQL-tested).
+- **Tests:** `tests/sql/private-property-map.test.sql` now asserts assistant read denial and continued owner read. It lifts the read guard inside the rolled-back transaction, so UPDATE/DELETE are still refused by their own guards. `tests/support/property-map-security.ps1` loads the deployed `is_assistant_token()` functions and the new migration. Passed on a fresh isolated PostgreSQL 17 cluster. Negative controls failed as intended: without the read guard (`Assistant read private map`) and without the update guard (`Assistant updated private map`).
+
+**Deployment plan (when approved):**
+1. Preserve `20261125140000_booking_expected_duration.sql` from the Booking Lifecycle baseline and its applied remote ledger entry. The final development integration includes that file; do not repair or reapply its migration history.
+2. `supabase db push --dry-run` should list only `20261125200000_private_property_map_assistant_read_guard.sql`. Then push.
+3. Read back the policies: four `RESTRICTIVE` policies on `private_property_maps`.
+4. Hosted check: `tests/property-map-live.mjs` with a real OAuth assistant JWT must now also be denied **SELECT**, and owner save/reload must still work.
+5. No Edge Function, provider-web or Expo release is needed: no client code changed.
+
+
 ### Deployment attempt — 19 November 2026 (NZ)
 
 **Stopped before deployment for a material security issue**, as required by the deployment request. No migration, Edge Function, Vercel release, Expo update, or centre-node activation was performed in this attempt.

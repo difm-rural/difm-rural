@@ -41,8 +41,19 @@ begin
  then raise exception 'Owner could not update boundary'; end if;
  -- An assistant uses the same role and owner subject; only client_id differs.
  perform set_config('request.jwt.claims',jsonb_build_object('sub',owner,'role','authenticated','client_id','map-regression')::text,true);
+ -- Assistants may not read the private map either (pin, boundary, gates).
+ if exists(select from public.private_property_maps where owner_id=owner)
+ then raise exception 'Assistant read private map'; end if;
+ if exists(select from public.private_property_maps)
+ then raise exception 'Assistant listed private maps'; end if;
+ -- With the read guard in place the rows are invisible, which would mask the
+ -- write guards. Lift it (inside this rolled-back transaction) so UPDATE and
+ -- DELETE are refused by their own restrictive policies.
+ reset role;
+ drop policy if exists "Assistants cannot read" on public.private_property_maps;
+ set local role authenticated;
  if not exists(select from public.private_property_maps where owner_id=owner)
- then raise exception 'Read-only assistant cannot read owner map'; end if;
+ then raise exception 'Fixture: assistant should see the row with the read guard lifted'; end if;
  update public.private_property_maps set revision=99 where owner_id=owner;
  get diagnostics affected=row_count;
  if affected<>0 then raise exception 'Assistant updated private map'; end if;
@@ -53,6 +64,8 @@ begin
  exception when insufficient_privilege then null;
  end;
  reset role;
+ create policy "Assistants cannot read" on public.private_property_maps
+  as restrictive for select to public using (not public.is_assistant_token());
  -- Remove only this transaction's fixture so INSERT tests owner identity too.
  delete from public.private_property_maps where owner_id=owner;
  set local role authenticated;
@@ -83,6 +96,8 @@ begin
  perform set_config('request.jwt.claims','{}',true);
  set local role authenticated;
  insert into public.private_property_maps values(owner,fixture,5);
+ if not exists(select from public.private_property_maps where owner_id=owner and revision=5)
+ then raise exception 'Owner app session lost read access'; end if;
  begin
   update public.private_property_maps set profile=jsonb_set(profile,'{boundary}','[{"latitude":-41.2,"longitude":173.8}]');
   raise exception 'Incomplete boundary persisted' using errcode='P9000';
