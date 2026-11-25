@@ -11,7 +11,7 @@ import { removedThumbPaths } from '@shared/photos'
 import { parseNzDate } from '@shared/dates'
 import type { ActionState } from '@/components/action-form'
 import { offerInput } from '@/lib/offer-input'
-import { pricingRevision, pricingSnapshot, bookingResponseActions } from '@/lib/booking-detail'
+import { pricingRevision, pricingSnapshot, selectedRate, bookingResponseActions } from '@/lib/booking-detail'
 
 const text = (data: FormData, name: string) => String(data.get(name) || '').trim()
 const failed = (): ActionState => ({ error: 'Could not save. Check your connection, refresh this page and try again.' })
@@ -285,7 +285,16 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   if(active.error)return failed()
   if(active.data?.length)return {error:'You already have an active request for this listing. Open Activity to view it.'}
   let snapshot
-  try{snapshot=pricingSnapshot(s,text(data,'variant_index'),quantity)}catch{return {error:'This rate option has changed. Go back to the listing and choose a rate again.'}}
+  try{
+    const {bookingQuantityLimits,bookingCapacityMessage}=await import('@shared/bookingQuantity')
+    const limits=bookingQuantityLimits(selectedRate(s,text(data,'variant_index')).rate)
+    if(limits.maximum!=null&&quantity>limits.maximum)return {error:bookingCapacityMessage(limits.maximum)}
+    snapshot=pricingSnapshot(s,text(data,'variant_index'),quantity)
+    if(limits.maximum!=null&&snapshot.quantity>limits.maximum)return {error:bookingCapacityMessage(limits.maximum)}
+  }catch(error){
+    if(error instanceof Error&&error.message.includes('head'))return {error:error.message}
+    return {error:'This rate option has changed. Go back to the listing and choose a rate again.'}
+  }
   const {error:saveError}=await supabase.from('bookings').insert({id:requestId,service_id:id,provider_id:s.provider_id,requester_id:user.id,status:'pending',quantity:snapshot.quantity,total_amount:snapshot.base_amount ?? 0,payment_timing:s.payment_timing,pricing_snapshot:snapshot,...locationFields,scheduled_date:schedule==='specific'?isoDate:schedule,notes:notes||null})
   if(saveError)return failed()
   revalidatePath('/');revalidatePath('/activity');revalidatePath('/browse/'+id)

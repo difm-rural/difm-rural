@@ -18,8 +18,10 @@ test('selected rate uses its own minimum charge and quantity, and stores the rev
 })
 test('quotes have no fabricated price and grazing capacity/cadence are retained',()=>{
  assert.equal(pricingSnapshot({...listing,pricing_type:'quote_required'},'',1).base_amount,null)
- const snapshot=pricingSnapshot({...listing,kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',rate:10,max_units:20,min_charge:0},'',30)
+ const grazing={...listing,kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',rate:10,max_units:20,min_charge:0}
+ const snapshot=pricingSnapshot(grazing,'',20)
  assert.equal(snapshot.quantity,20);assert.equal(snapshot.base_amount,200);assert.equal(snapshot.unit_label,'head/week')
+ assert.throws(()=>pricingSnapshot(grazing,'',30),/up to 20 head/)
  assert.match(paymentCopy({kind:'grazing',materials:'estimate'}),/duration and payment schedule/)
 })
 test('malformed or missing pricing snapshots fall back safely for old requests',()=>{
@@ -50,6 +52,21 @@ source=source.replace("import { redirect } from 'next/navigation'","const redire
 const {requestBooking,respondBooking}=await import(moduleUrl(source))
 function client(tables,{beforeUpdate,insertError=null}={}){const calls=[];return {calls,from(table){let rows=[...(tables[table] || [])],patch=null;const q={select(){return q},eq(key,value){calls.push(['eq',table,key,value]);rows=rows.filter(row=>row[key]===value);return q},is(key,value){rows=rows.filter(row=>row[key]===value);return q},in(key,values){rows=rows.filter(row=>values.includes(row[key]));return q},single(){return {data:rows[0]?structuredClone(rows[0]):null,error:null}},maybeSingle(){return q.single()},insert(value){calls.push(['insert',table,value]);return {error:insertError}},update(value){beforeUpdate?.(tables,table);rows=[...(tables[table] || [])];patch=value;calls.push(['update',table,value]);return q},then(resolve){const result=rows.map(row=>({...row,...(patch || {})}));return Promise.resolve({data:result,error:null}).then(resolve)}};return q}}}
 const requestValues={service_id:listing.id,request_id:id,quantity:1,location:'Cambridge property',schedule_type:'flexible',pricing_revision:pricingRevision(listing),variant_index:'0'}
+test('grazing booking creation rejects a quantity above capacity and stores the maximum quantity at its own price',async()=>{
+ const grazing={...listing,kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',rate:10,max_units:2,min_charge:0,minimum_units:1,pricing_variants:[],materials:null}
+ const values={...requestValues,location:'',variant_index:'',pricing_revision:pricingRevision(grazing)}
+ let supabase=client({services_public:[grazing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ const rejected=await requestBooking({error:''},form({...values,quantity:4}))
+ assert.match(rejected.error,/up to 2 head/);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ for(const quantity of ['', 'abc', 0, -1]){
+  supabase=client({services_public:[grazing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+  assert.ok((await requestBooking({error:''},form({...values,quantity}))).error);assert.equal(supabase.calls.some(c=>c[0]==='insert'),false)
+ }
+ supabase=client({services_public:[grazing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
+ await assert.rejects(requestBooking({error:''},form({...values,quantity:2})),{message:'REDIRECT:/bookings/'+id+'?sent=1'})
+ const payload=supabase.calls.find(c=>c[0]==='insert')[2]
+ assert.equal(payload.quantity,2);assert.equal(payload.total_amount,20);assert.equal(payload.pricing_snapshot.quantity,2);assert.equal(payload.pricing_snapshot.base_amount,20);assert.equal(payload.status,'pending')
+})
 test('request submission stores minimum-adjusted variant pricing and opens that exact request',async()=>{
  const supabase=client({services_public:[listing],bookings:[]});globalThis.__bookingTestAuth={supabase,user:{id:requester}}
  await assert.rejects(requestBooking({error:''},form(requestValues)),{message:'REDIRECT:/bookings/'+id+'?sent=1'})

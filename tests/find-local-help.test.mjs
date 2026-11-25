@@ -52,17 +52,34 @@ test('kind and search filtering compose with unchanged distance filtering and Al
  assert.equal(filterNearby(filtered,{point:origin,radius:null}).items.length,3)
 })
 import {readFileSync} from 'node:fs'
+import {bookingQuantityLimits,validateBookingQuantity} from '../shared/bookingQuantity.ts'
 const navigatorSource=readFileSync(new URL('../src/navigation/AppNavigator.js',import.meta.url),'utf8')
 const pendingSource=navigatorSource.slice(navigatorSource.indexOf('  async function postPendingBookingIfAny('),navigatorSource.indexOf('  function handleOnboardingComplete'))
+const listingQuery=data=>({select(){const q={eq(){return q},maybeSingle:async()=>({data,error:null})};return q}})
+function resumePending(storage,supabase,alerts=[]){
+ const posts=[],success=[]
+ let created
+ const client={from(table){return table==='services_public'?listingQuery(supabase.listing):{upsert:async row=>{posts.push(row);created=row;return supabase.upsert}}}}
+ const resume=new Function('AsyncStorage','newJobId','supabase','fetchBookingDetail','setBookingSuccessResult','Alert','pendingBookingPostingRef','validateBookingQuantity','bookingQuantityLimits','return ('+pendingSource+')')(storage,()=>supabase.id,{from:client.from},async()=>({...created,id:supabase.id}),row=>success.push(row),{alert:(...a)=>alerts.push(a)},{current:false},validateBookingQuantity,bookingQuantityLimits)
+ return {resume,posts,success,alerts}
+}
 test('guest booking resumption supports legacy drafts, guards concurrent sign-in events and confirms the saved record',async()=>{
- let saved=JSON.stringify({service_id:'listing',provider_id:'provider',quantity:7,total_amount:350}),created,posts=[],success=[],alerts=[]
+ let saved=JSON.stringify({service_id:'listing',provider_id:'provider',quantity:7,total_amount:350})
  const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}
- const resume=new Function('AsyncStorage','newJobId','supabase','fetchBookingDetail','setBookingSuccessResult','Alert','pendingBookingPostingRef','return ('+pendingSource+')')(storage,()=> 'known-uuid',{from:()=>({upsert:async row=>{posts.push(row);created=row;return {error:null}}})},async(c,id)=>({...created,id}),row=>success.push(row),{alert:(...a)=>alerts.push(a)},{current:false})
- await Promise.all([resume('requester'),resume('requester')]);assert.equal(posts.length,1);assert.equal(success[0].id,'known-uuid');assert.equal(saved,null);assert.equal(alerts.length,0)
+ const pending=resumePending(storage,{id:'known-uuid',listing:null,upsert:{error:null}})
+ await Promise.all([pending.resume('requester'),pending.resume('requester')]);assert.equal(pending.posts.length,1);assert.equal(pending.success[0].id,'known-uuid');assert.equal(saved,null);assert.equal(pending.alerts.length,0)
+})
+test('guest booking resumption keeps a draft whose quantity is above the grazing capacity',async()=>{
+ let saved=JSON.stringify({booking:{id:'kept',service_id:'listing',quantity:4,total_amount:40}})
+ const storage={getItem:async()=>saved,setItem:async()=>{},removeItem:async()=>{saved=null}}
+ const pending=resumePending(storage,{id:'kept',listing:{kind:'grazing',pricing_type:'per_unit',unit_label:'head/week',minimum_units:1,max_units:2},upsert:{error:null}})
+ await pending.resume('requester')
+ assert.equal(pending.posts.length,0);assert.notEqual(saved,null);assert.match(pending.alerts[0].join(' '),/up to 2 head/)
 })
 test('failed guest submission retains a stable draft ID and never reports success',async()=>{
  let saved=JSON.stringify({booking:{service_id:'listing'}}),success=false
  const storage={getItem:async()=>saved,setItem:async(k,v)=>{saved=v},removeItem:async()=>{saved=null}}
- const resume=new Function('AsyncStorage','newJobId','supabase','fetchBookingDetail','setBookingSuccessResult','Alert','pendingBookingPostingRef','return ('+pendingSource+')')(storage,()=> 'retry-uuid',{from:()=>({upsert:async()=>({error:{message:'offline'}})})},async()=>{throw Error('Should not load success')},()=>{success=true},{alert(){}},{current:false})
- await resume('requester');await resume('requester');assert.equal(JSON.parse(saved).booking.id,'retry-uuid');assert.equal(success,false)
+ const pending=resumePending(storage,{id:'retry-uuid',listing:null,upsert:{error:{message:'offline'}}})
+ const resume=user=>{success=false;return pending.resume(user)}
+ await resume('requester');await resume('requester');assert.equal(JSON.parse(saved).booking.id,'retry-uuid');assert.equal(pending.success.length,0)
 })

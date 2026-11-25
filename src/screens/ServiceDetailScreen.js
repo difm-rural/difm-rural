@@ -25,7 +25,7 @@ import SideHeader from '../components/SideHeader'
 import Button from '../components/Button'
 import { KIND_ENQUIRY, KIND_ENQUIRY_ONLY } from '../../shared/listingPricing'
 import { listingChatParams, PENDING_LISTING_ENQUIRY_KEY } from '../lib/listingEnquiry'
-import { listingEstimate, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION } from '../lib/listingEstimate'
+import { listingEstimate, reviewBookingQuantity, formatExtraCharge, BASE_ESTIMATE_EXPLANATION, EXTRA_CHARGES_EXPLANATION, bookingQuantityLimits, clampBookingQuantity, canIncreaseBookingQuantity } from '../lib/listingEstimate'
 
 function getInitials(name) {
   if (!name) return '?'
@@ -103,14 +103,16 @@ export default function ServiceDetailScreen({ route, navigation }) {
   // Effective option drives the estimator + what flows to the booking. Falls back
   // to the base service fields; note variant uses min_units, base uses minimum_units.
   const effectivePricingType = selectedOption ? selectedOption.pricing_type : service.pricing_type
-  const estimate = listingEstimate(service, selectedOption, quantity)
-  const effectiveMin = estimate.minimumUnits
+  const quantityLimits = bookingQuantityLimits(service, selectedOption)
+  const pricedQuantity = clampBookingQuantity(Number(quantity) || quantityLimits.minimum, quantityLimits)
+  const review = reviewBookingQuantity(service, selectedOption, pricedQuantity)
+  const estimate = listingEstimate(service, selectedOption, review.ok ? review.quantity : pricedQuantity)
+  const atCapacity = !canIncreaseBookingQuantity(pricedQuantity, quantityLimits)
   const effectiveUnitLabel = effectivePricingType === 'hourly' ? 'hour'
     : effectivePricingType === 'day_rate' ? 'day'
     : (selectedOption ? (selectedOption.unit_label || 'unit') : (service.unit_label || 'unit'))
   const isEstimatable = ['hourly', 'per_unit', 'day_rate'].includes(effectivePricingType)
   const isQuoteRequired = effectivePricingType === 'quote_required'
-  const total = estimate.baseAmount?.toFixed(2)
   const baseRateToken = service.pricing_type === 'quote_required'
     ? 'Quote required'
     : formatVariantValue({ pricing_type: service.pricing_type, rate: service.rate, unit_label: service.unit_label, min_units: service.minimum_units > 1 ? service.minimum_units : null, min_charge: service.min_charge })
@@ -523,26 +525,28 @@ export default function ServiceDetailScreen({ route, navigation }) {
             {isEstimatable && <View style={styles.estimatorRow}>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQuantity(Math.max(effectiveMin, estimate.quantity - 1))}
+                onPress={() => setQuantity(clampBookingQuantity(estimate.quantity - 1, quantityLimits))}
                 accessibilityRole="button"
                 accessibilityLabel="Decrease quantity">
                 <Icon name="remove" size={22} color={colors.primary} />
               </TouchableOpacity>
               <View style={styles.qtyDisplay}>
-                <Text style={styles.qtyNum}>{estimate.quantity}</Text>
-                <Text style={styles.qtyUnit}>{quantityUnit(effectiveUnitLabel,estimate.quantity)}</Text>
+                <Text style={styles.qtyNum}>{review.ok ? review.quantity : estimate.quantity}</Text>
+                <Text style={styles.qtyUnit}>{quantityUnit(effectiveUnitLabel, review.ok ? review.quantity : estimate.quantity)}</Text>
               </View>
               <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => setQuantity(estimate.quantity + 1)}
+                style={[styles.qtyBtn, atCapacity && styles.qtyBtnDisabled]}
+                disabled={atCapacity}
+                onPress={() => { if (!atCapacity) setQuantity(clampBookingQuantity(estimate.quantity + 1, quantityLimits)) }}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: atCapacity }}
                 accessibilityLabel="Increase quantity">
-                <Icon name="add" size={22} color={colors.primary} />
+                <Icon name="add" size={22} color={atCapacity ? colors.textMuted : colors.primary} />
               </TouchableOpacity>
             </View>}
             <View style={styles.estimateResult}>
-              <Text style={styles.estimateLabel}>Base estimate</Text>
-              <Text style={styles.estimateTotal}>{nzMoney(total)}</Text>
+              <Text style={styles.estimateLabel}>{review.ok ? `Base estimate for ${review.quantity}` : 'Base estimate'}</Text>
+              <Text style={styles.estimateTotal}>{review.ok ? nzMoney(review.amount?.toFixed(2)) : '—'}</Text>
             </View>
             {estimate.minimumCharge > 0 && (
               <DetailRow label="Minimum charge included" value={`${nzMoney(estimate.minimumCharge.toFixed(2))}`} last />
@@ -578,7 +582,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
                     booking: { ...activeBooking, service, provider: profile },
                     viewerRole: 'requester',
                   })
-                : () => navigation.navigate('BookingConfirm', { service, quantity: estimate.quantity, ...(selectedOption ? { selectedOption } : {}) })}
+                : () => { if (!review.ok) return; navigation.navigate('BookingConfirm', { service, quantity: review.quantity, ...(selectedOption ? { selectedOption } : {}) }) }}
               accessibilityLabel={isOwnService ? 'Manage your listings' : isBooked ? 'View your booking' : 'Book this service'}
             />
             {service.kind === 'grazing' && !isOwnService && (
@@ -734,6 +738,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
   },
+  qtyBtnDisabled: { opacity: 0.4 },
   qtyBtnText:  { fontSize: 22, fontWeight: '700', color: colors.primary, lineHeight: 26 },
   qtyDisplay:  { alignItems: 'center', minWidth: 80 },
   qtyNum:      { fontSize: 32, fontWeight: 'bold', color: colors.primary },
