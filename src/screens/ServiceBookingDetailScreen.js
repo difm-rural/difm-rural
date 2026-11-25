@@ -1,5 +1,5 @@
-import {BOOKING_ACCEPTED,GRAZING_COMPLETION,grazingCompletionFeedback,bookingAcceptanceMessage,savedBookingSummary} from '../../shared/bookingLifecycleUx'
-import {durationPolicy,DURATION_AGREEMENT} from '../../shared/bookingDuration'
+import {BOOKING_PRICING_EXPLANATION,BOOKING_ACCEPTED,GRAZING_COMPLETION,grazingCompletionFeedback,bookingAcceptanceMessage,savedBookingSummary} from '../../shared/bookingLifecycleUx'
+import {durationPolicy} from '../../shared/bookingDuration'
 import {bookingLocationHelp,bookingPublicArea} from '../../shared/bookingLocation'
 import {formatDateLabel} from '../../shared/formatting.js'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
@@ -194,6 +194,10 @@ export default function ServiceBookingDetailScreen({ route, navigation }) {
   const durationSummary=savedBookingSummary(booking)
   const showDuration=durationPolicy({...service,...booking.pricing_snapshot}).enabled||booking.expected_duration!=null
   const isQuoteRequired = bookingPricingType(booking) === 'quote_required'
+  const grazingPrice=service.kind==='grazing'&&!isQuoteRequired
+  const hasExpectedDuration=booking.expected_duration!=null
+  const hideBaseEstimate=grazingPrice&&(!hasExpectedDuration||durationSummary.total!==null)
+  const periodCost=durationSummary.periodAmount??(grazingPrice&&!hasExpectedDuration?booking.total_amount:null)
   const nextMove = bookingNextMove(booking, viewerRole, { otherName: otherUser?.full_name })
 
   function openMap() {
@@ -562,9 +566,9 @@ Complete & Close Listing: ${GRAZING_COMPLETION.close}`, [
           <DetailRow label="Timing" value={formatDateLabel(booking.scheduled_date)} />
           <DetailRow label="Quantity" value={durationSummary.quantityLabel} />
           {showDuration&&<><DetailRow label="Expected duration" value={durationSummary.duration}/>
-            {durationSummary.period&&<DetailRow label={durationSummary.periodLabel} value={durationSummary.periodAmount===null?'Not recorded':nzMoney(durationSummary.periodAmount)}/>}
-            <DetailRow label="Estimated total" value={durationSummary.totalLabel}/><Text style={styles.detailValue}>Expected duration is a request, not a binding agreement. {DURATION_AGREEMENT}</Text></>}
-          <DetailRow label={booking.quote_amount != null ? 'Quote' : 'Base estimate'} value={isQuoteRequired && booking.quote_amount == null ? 'Quote required' : formatMoney(booking.quote_amount ?? booking.total_amount, service)} />
+            {(durationSummary.period||(grazingPrice&&!hasExpectedDuration))&&<DetailRow label={durationSummary.period?durationSummary.periodLabel:'Estimated weekly cost'} value={periodCost==null?'Not recorded':nzMoney(periodCost)}/>}
+            <DetailRow label="Estimated total" value={durationSummary.totalLabel}/><Text style={styles.pricingExplanation}>{BOOKING_PRICING_EXPLANATION}</Text></>}
+          {(!hideBaseEstimate||booking.quote_amount!=null)&&<DetailRow label={booking.quote_amount != null ? 'Quote' : 'Base estimate'} value={isQuoteRequired && booking.quote_amount == null ? 'Quote required' : formatMoney(booking.quote_amount ?? booking.total_amount, service)} />}
           <DetailRow label="Quote note" value={booking.quote_notes} />
           <DetailRow label="Requester note" value={booking.notes} />
         </View>
@@ -691,6 +695,7 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 16, marginBottom: 8 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f2f2f2' },
   detailLabel: { width: 92, fontSize: 13, color: colors.textMuted, fontWeight: '700' },
+  pricingExplanation:{fontSize:12,lineHeight:18,fontWeight:'400',textAlign:'left',color:colors.textMuted,paddingHorizontal:16,marginTop:6,marginBottom:10},
   detailValue: { flex: 1, fontSize: 14, color: colors.textPrimary, fontWeight: '600', textAlign: 'right', lineHeight: 20 },
   linkValue: { color: colors.primary, fontWeight: '700' },
 

@@ -1,6 +1,6 @@
 import {bookingNextMove} from '@shared/nextMove'
-import {savedBookingSummary} from '@shared/bookingLifecycleUx'
-import {durationPolicy,DURATION_AGREEMENT} from '@shared/bookingDuration'
+import {BOOKING_PRICING_EXPLANATION,savedBookingSummary} from '@shared/bookingLifecycleUx'
+import {durationPolicy} from '@shared/bookingDuration'
 import {bookingLocationHelp,bookingPublicArea} from '@shared/bookingLocation'
 import {formatDateTime as nzDateTime,formatDate as nzDate,formatDateLabel,formatMoney as nzMoney} from '@shared/formatting'
 import type {ReactNode} from 'react'
@@ -15,6 +15,9 @@ export type BookingPrivateLocation={location_name:string|null;latitude:number|nu
 export function BookingDetails({booking:b,userId,participant,privateLocation,includeResponses=true}:{booking:BookingRecord;userId:string;participant?:ReactNode;privateLocation?:BookingPrivateLocation|null;includeResponses?:boolean}){
  const s=b.service,snapshot=readPricingSnapshot(b.pricing_snapshot),rate=snapshot,role=b.provider_id===userId?'provider':'requester',quote=(snapshot?.pricing_type||s?.pricing_type)==='quote_required'
  const summary=savedBookingSummary(b),showDuration=durationPolicy({...s,...snapshot}).enabled||b.expected_duration!=null
+ const grazingPrice=s?.kind==='grazing'&&!quote,hasExpectedDuration=b.expected_duration!=null
+ const hideBaseEstimate=grazingPrice&&(!hasExpectedDuration||summary.total!==null)
+ const periodCost=summary.periodAmount??(grazingPrice&&!hasExpectedDuration?b.total_amount:null)
  const extras=snapshot?.pricing_add_ons||[],terms=snapshot?.pricing_terms,money=nzMoney
  const timing=b.scheduled_date==='asap'?'As soon as possible':b.scheduled_date==='flexible'?'Flexible':b.scheduled_date?formatDateLabel(b.scheduled_date):'To be arranged'
  const next=bookingNextMove(b,role)
@@ -25,9 +28,9 @@ export function BookingDetails({booking:b,userId,participant,privateLocation,inc
  {s?.kind==='grazing'&&['confirmed','in_progress'].includes(b.status)&&<p>Use Chat to agree the grazing dates, duration, access and payment arrangements.</p>}
  <p>Quantity: {summary.quantityLabel}</p>{snapshot?.option_label&&<p>Selected option: {snapshot.option_label}</p>}
  <p>Rate: {summary.unitRate}</p>
- <p>{quote?'Initial price: quote required':'Base estimate at request: '+money(snapshot?.base_amount??b.total_amount)}</p>
+ {!hideBaseEstimate&&<p>{quote?'Initial price: quote required':'Base estimate at request: '+money(snapshot?.base_amount??b.total_amount)}</p>}
  {snapshot?.min_charge?<p>Minimum charge: {money(snapshot.min_charge)}</p>:null}
- {showDuration&&<><p>Expected duration: {summary.duration}</p>{summary.period&&<p>{summary.periodLabel}: {summary.periodAmount===null?'Not recorded':money(summary.periodAmount)}</p>}<p><strong>Estimated total: {summary.totalLabel}</strong></p><p className="muted">Expected duration and estimates are indicative until agreed. {DURATION_AGREEMENT}</p></>}
+ {showDuration&&<><p>Expected duration: {summary.duration}</p>{(summary.period||(grazingPrice&&!hasExpectedDuration))&&<p>{summary.period?summary.periodLabel:'Estimated weekly cost'}: {periodCost==null?'Not recorded':money(periodCost)}</p>}<p><strong>Estimated total: {summary.totalLabel}</strong></p><p className="muted booking-pricing-explanation">{BOOKING_PRICING_EXPLANATION}</p></>}
  {!snapshot&&<p className="muted">This older booking has no saved unit-rate breakdown. Its stored request amount and original notes are retained.</p>}
  {!!extras.length&&<section><h3>Extra charges — outside the base estimate</h3>{extras.map((a,i)=><p key={i}>{addOnDisplay(a)}</p>)}</section>}
  {terms&&<section><h3>Requested pricing terms</h3><p className="work-description">{terms}</p></section>}

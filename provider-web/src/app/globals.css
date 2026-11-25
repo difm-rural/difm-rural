@@ -905,3 +905,5 @@ a.row:hover { background: var(--sage); }
 .listing-management-link span { flex:1; min-width:0; overflow-wrap:anywhere; }
 .listing-management-link svg { flex-shrink:0; }
 .listing-management-link:hover { text-decoration:underline; }
+
+.work-detail .booking-pricing-explanation { font-size: 13px; line-height: 1.5; font-weight: 400; text-align: left; }

@@ -112,7 +112,7 @@ test('native Home shows a safe summary when lifecycle retrieval fails',async()=>
  assert.doesNotMatch(screen.text(),/caught up/);assert.match(screen.text(),/summary unavailable/)
 })
 
-function nativeDetail(role,privateLocation=false,status='pending'){
+function nativeDetail(role,privateLocation=false,status='pending',overrides={}){
  const jsx=(type,props)=>({type,props}),exports={}
  const react={useState:v=>[typeof v==='function'?v():v,()=>{}],useEffect(){},useRef:v=>({current:v})};react.default=react
  const imports={'../../shared/bookingLifecycleUx':lifecycleUx,'../../shared/bookingDuration':bookingDuration,react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
@@ -129,7 +129,7 @@ function nativeDetail(role,privateLocation=false,status='pending'){
   throw Error('Missing '+name)
  })
  const service={...booking('pending').service,pricing_type:'per_unit',rate:50,unit_label:'head/week',location_name:'123 Private Road, Cambridge 3434, New Zealand'}
- const record={...booking(status),quantity:2,expected_duration:4,expected_duration_unit:'week',pricing_snapshot:bookingDuration.mobilePricingSnapshot(service,null,2),location_name:privateLocation?'Authorized booking address':null,service}
+ const record={...booking(status),quantity:2,total_amount:100,expected_duration:4,expected_duration_unit:'week',pricing_snapshot:bookingDuration.mobilePricingSnapshot(service,null,2),location_name:privateLocation?'Authorized booking address':null,service,...overrides}
  const tree=exports.default({route:{params:{booking:record,viewerRole:role}},navigation:{}})
  const expand=n=>!n||typeof n!=='object'?n:Array.isArray(n)?n.map(expand):typeof n.type==='function'&&n.type.name==='DetailRow'?expand(n.type(n.props)):{...n,props:{...n.props,children:expand(n.props?.children)}}
  return nodes(expand(tree))
@@ -154,9 +154,42 @@ for(const role of ['requester','provider'])test(`web grazing details use ${role}
  const render=b=>renderToStaticMarkup(jsx.jsx(exports.BookingDetails,{booking:b,userId:role==='provider'?'viewer':'customer'}))
  const html=render(record)
  assert.match(html,/Expected duration: 4 weeks/);assert.match(html,/Estimated total: \$400/)
+ assert.doesNotMatch(html,/Base estimate at request/);assert.equal((html.match(/Estimated weekly cost/g)||[]).length,1)
+ assert.ok(html.includes('<p class="muted booking-pricing-explanation">'+lifecycleUx.BOOKING_PRICING_EXPLANATION+'</p>'))
+ assert.match(html,/Estimated total: \$400<\/strong><\/p><p class="muted booking-pricing-explanation">/)
+ for(const pricing_snapshot of [record.pricing_snapshot,null]){
+  const legacy=render({...record,expected_duration:null,expected_duration_unit:null,pricing_snapshot,service:{...service,rate:999}})
+  assert.match(legacy,/Estimated weekly cost: \$100/);assert.match(legacy,/Estimated total: To be agreed/)
+  assert.doesNotMatch(legacy,/Base estimate at request|Estimated weekly cost: \$1,998/)
+ }
+ assert.match(render({...record,service:{...service,kind:'service'}}),/Base estimate at request/)
+
  assert.ok(html.includes(bookingLocationHelp('grazing',role,'confirmed',service.location_name,false)))
  assert.match(html,/<strong>Cambridge<\/strong>/);assert.doesNotMatch(html,/123 Private Road|Private booking location:/)
  const authorized=render({...record,location_name:'Authorized booking address'})
  assert.match(authorized,/<p class="muted">Private booking location: Authorized booking address<\/p>/)
  assert.ok(authorized.indexOf('Cambridge')<authorized.indexOf('Authorized booking address'))
+})
+
+for(const role of ['requester','provider'])for(const legacy of [false,true])test(`native ${role} grazing pricing removes duplicate base row with ${legacy?'no duration':'duration and total'}`,()=>{
+ const all=nativeDetail(role,false,'confirmed',legacy?{expected_duration:null,expected_duration_unit:null}:{}),texts=all.filter(n=>n.type==='Text')
+ const copy=texts.flatMap(n=>n.props.children).join(' ')
+ assert.doesNotMatch(copy,/Base estimate/);assert.equal(texts.filter(n=>n.props.children==='Estimated weekly cost').length,1)
+ assert.match(copy,/\$100/);assert.match(copy,legacy?/To be agreed/:/\$400/)
+ const at=texts.findIndex(n=>n.props.children===lifecycleUx.BOOKING_PRICING_EXPLANATION);assert.ok(at>=0)
+ assert.equal(texts[at-2].props.children,'Estimated total')
+ assert.equal(texts[at].props.style.textAlign,'left');assert.equal(texts[at].props.style.fontWeight,'400');assert.equal(texts[at].props.style.fontSize,12)
+})
+for(const role of ['requester','provider'])test(`native legacy ${role} keeps the saved one-week amount without reconstructing a live rate`,()=>{
+ const all=nativeDetail(role,false,'confirmed',{expected_duration:null,expected_duration_unit:null,pricing_snapshot:null,service:{kind:'grazing',pricing_type:'per_unit',rate:999,unit_label:'head/week'}})
+ const copy=all.filter(n=>n.type==='Text').flatMap(n=>n.props.children).join(' ')
+ assert.match(copy,/Estimated weekly cost/);assert.match(copy,/\$100/);assert.doesNotMatch(copy,/Base estimate|\$1,998|\$999/)
+})
+test('non-grazing mobile booking retains its base estimate',()=>{
+ const all=nativeDetail('provider',false,'confirmed',{expected_duration:null,expected_duration_unit:null,pricing_snapshot:null,service:{kind:'service',pricing_type:'fixed',rate:100}})
+ assert.ok(all.some(n=>n.type==='Text'&&n.props.children==='Base estimate'))
+})
+
+test('web pricing explanation uses a small normal-weight left-aligned style',()=>{
+ assert.match(source('provider-web/src/app/globals.css'),/\.work-detail \.booking-pricing-explanation\s*\{[^}]*font-size: 13px;[^}]*font-weight: 400;[^}]*text-align: left;/)
 })

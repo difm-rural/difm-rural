@@ -1,5 +1,6 @@
 import {bookingDurationSummary} from './bookingDuration'
 import {readableRate,quantityUnit} from './findLocalHelp'
+export const BOOKING_PRICING_EXPLANATION='Estimated pricing only. Final dates, duration and payment arrangements are agreed directly between requester and provider.'
 export const BOOKING_ACCEPTED={title:'Booking accepted',message:'The requester has been notified. Use Chat to agree the remaining arrangements.'}
 export const GRAZING_CONFIRMED={title:'Grazing booking confirmed',message:'Use Chat to agree the grazing dates, duration, access and payment arrangements.'}
 export const GRAZING_COMPLETION={title:'Complete grazing arrangement?',message:'Confirm that the grazing arrangement has finished.',payment:'Payment is arranged directly between requester and provider. Completing the booking does not collect or record payment.',
