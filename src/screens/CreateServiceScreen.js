@@ -1,5 +1,6 @@
 import {formatMoney as nzMoney,formatDate as nzDate} from '../../shared/formatting.js'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '../../shared/postingText'
+import {publicAreaError} from '../../shared/publicArea'
 import {runSubmission} from '../../shared/submission'
 import {travelRangeError,travelRangeValue} from '../../shared/travelRange'
 import {listingAmountError,listingMoneyError} from '../../shared/postingMoney'
@@ -359,8 +360,8 @@ export default function CreateServiceScreen({ navigation, route }) {
     if (step === 1) return !postingTextError(title,'title') && !!(title.trim() && category)
     if (step === 2) return !postingTextError(description,'description')
     if (step === 3) return !moneyError && !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
-    if (step === 4) return !travelRangeError(travelRange) && !listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && !!locationName.trim()
-    if (step === 5) return !travelRangeError(travelRange) && !moneyError && !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && locationName.trim())
+    if (step === 4) return !travelRangeError(travelRange) && !listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && !publicAreaError(locationName)
+    if (step === 5) return !travelRangeError(travelRange) && !moneyError && !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && !publicAreaError(locationName))
     return true
   }
 
@@ -868,7 +869,8 @@ export default function CreateServiceScreen({ navigation, route }) {
     if(textError){Alert.alert('Check listing text',textError);setStep(postingTextError(title,'title')?1:2);return}
     setAttempted(true)
     if(!title.trim()||!category){setStep(1);return}
-    if(!locationName.trim()){setStep(4);return}
+    const areaError=publicAreaError(locationName)
+    if(areaError){Alert.alert('Check public town or area',areaError);setStep(4);return}
 
     const rangeError=travelRangeError(travelRange)
     if(rangeError){Alert.alert('Check travel range',rangeError);setStep(4);return}
@@ -1681,7 +1683,7 @@ export default function CreateServiceScreen({ navigation, route }) {
         <Text style={styles.stepHeading}>Where is it available?</Text>
 
         <Text style={styles.fieldLabel}>Location</Text>
-        <View style={attempted && !locationName.trim() ? {borderColor:colors.danger,borderWidth:2,borderRadius:8} : undefined}>
+        <View style={attempted && publicAreaError(locationName) ? {borderColor:colors.danger,borderWidth:2,borderRadius:8} : undefined}>
         <AddressAutocomplete
           inline
           placeholder="Search for a town or address..."
@@ -1691,7 +1693,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           onSelectingChange={setLocationSelecting}
         />
         </View>
-        {attempted && !locationName.trim() && <Text accessibilityRole="alert" style={{color:colors.danger}}>Enter the listing location.</Text>}
+        {attempted && !!publicAreaError(locationName) && <Text accessibilityRole="alert" style={{color:colors.danger}}>{publicAreaError(locationName)}</Text>}
         <Text style={styles.locationHelp}>{locationPin ? 'Map location selected — this listing can appear in nearby searches.' : 'Choose a suggestion, or just type your town — we find it on the map when you publish, so people searching nearby can see your listing.'} This listing location is public; choose a town if you prefer not to show an exact address.</Text>
 
         <Text style={styles.fieldLabel}>Travel range <Text style={styles.optional}>(optional)</Text></Text>
@@ -1743,7 +1745,7 @@ export default function CreateServiceScreen({ navigation, route }) {
       !category && 'Choose category',
       !pricingType && 'Choose pricing type',
       pricingType !== 'quote_required' && !rate.trim() && 'Add rate',
-      !locationName.trim() && 'Add service area',
+      publicAreaError(locationName) && 'Add a public town or area',
       ...draftMissingFields,
     ].filter(Boolean)
     const uniqueMissingItems = [...new Set(missingItems)]

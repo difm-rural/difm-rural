@@ -55,4 +55,7 @@ Edge Function logs.
 ```
 
 `to` may be one address or an array of up to ten. Supply `text`, `html`, or
-both. `idempotencyKey` is recommended when retrying a database event.
+both. `html` is kept for existing callers and is treated as plain text: it is
+escaped into the standard Rural Connections template and is not rendered as
+markup. When both are present, `text` is the message. `idempotencyKey` is
+recommended when retrying a database event.

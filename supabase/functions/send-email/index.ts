@@ -15,6 +15,8 @@
 // Sender identity is deliberately fixed to the verified Resend subdomain so a
 // compromised caller cannot spoof arbitrary From addresses.
 
+import { transactionalEmail } from '../../../shared/emailHtml.js'
+
 const RESEND_ENDPOINT = 'https://api.resend.com/emails'
 const FROM = 'Rural Connections <notifications@updates.ruralconnections.nz>'
 const DEFAULT_REPLY_TO = 'support@ruralconnections.nz'
@@ -83,14 +85,17 @@ Deno.serve(async (req) => {
   const { recipients, error } = validate(payload)
   if (error || !recipients) return json({ error }, 400)
 
+  // html is accepted so existing callers keep working, but it is never
+  // forwarded as markup. The message is escaped into the standard template.
+  const message = transactionalEmail({ text: payload.text, html: payload.html })
   const resendPayload: Record<string, unknown> = {
     from: FROM,
     to: recipients,
     subject: payload.subject!.trim(),
     reply_to: payload.replyTo?.trim() || DEFAULT_REPLY_TO,
+    text: message.text,
+    html: message.html,
   }
-  if (payload.html?.trim()) resendPayload.html = payload.html
-  if (payload.text?.trim()) resendPayload.text = payload.text
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
