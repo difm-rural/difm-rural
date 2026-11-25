@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { ManageCard, type Listing } from './manage-card'
+import { LISTING_AVAILABILITY_COLUMNS } from '@shared/listingAvailability'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +14,7 @@ export default async function ListingsPage({ searchParams }: { searchParams: Pro
   // RLS also exposes everyone's active services, so filter to mine (incl. paused/closed).
   const { data } = await supabase
     .from('services')
-    .select('id, title, kind, pricing_type, rate, unit_label, is_active, closed_at, close_reason, photos, card_headline, card_supporting_text, card_style, category, location_name')
+    .select(`id, title, kind, pricing_type, rate, unit_label, is_active, closed_at, close_reason, photos, card_headline, card_supporting_text, card_style, category, location_name, availability,${LISTING_AVAILABILITY_COLUMNS}`)
     .eq('provider_id', user.id)
   const rows = (data ?? []) as Listing[]
 

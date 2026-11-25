@@ -10,6 +10,7 @@ import { categoryImage } from '../lib/categoryImages'
 import { categoryVisual, applyVariantHeadline } from './JobServiceCard'
 import Icon from './Icon'
 import { availabilityDisplay } from '../lib/providerAvailability'
+import { listingAvailability } from '../../shared/listingAvailability'
 
 function servicePrice(item) {
   const { pricing_type, rate, unit_label } = item
@@ -39,6 +40,7 @@ export default function ServiceListCard({ item, onPress }) {
   const ratingText   = ratingCount > 0 ? `★ ${Number(item.ratingAverage || 0).toFixed(1)} (${ratingCount})` : '★ New'
   const providerName = profile.full_name || 'Provider'
   const paused    = item.is_active === false
+  const listingTiming = listingAvailability(item).card
   const availability = availabilityDisplay(
     profile.availability_status,
     profile.availability_until,
@@ -51,7 +53,7 @@ export default function ServiceListCard({ item, onPress }) {
       onPress={onPress}
       activeOpacity={0.75}
       accessibilityRole="button"
-      accessibilityLabel={`${item.title} by ${providerName}`}>
+      accessibilityLabel={[`${item.title} by ${providerName}`, ...listingTiming].join(', ')}>
 
       {photoUrl ? (
         <ThumbImage uri={photoUrl} style={styles.thumb} resizeMode="cover" />
@@ -69,6 +71,7 @@ export default function ServiceListCard({ item, onPress }) {
           <Text style={styles.tagKind} numberOfLines={1}>{LISTING_KINDS.find(k => k.id === (item.kind || 'service'))?.label || 'Service'}</Text>
         </View>
         <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
+        {listingTiming.map(line => <Text key={line} style={styles.listingTiming}>{line}</Text>)}
         <Text style={[styles.provider, !!copy.headline && styles.cardHeadlineCompact]} numberOfLines={1}>
           {copy.headline || providerName}
         </Text>
@@ -128,6 +131,7 @@ const styles = StyleSheet.create({
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
 
   content:  { flex: 1, minWidth: 0 },
+  listingTiming: {color: colors.listingInk, fontWeight: '700', marginBottom: 3},
   tagRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   sideTag:  { backgroundColor: colors.listingFill, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   sideTagText: { fontSize: 11, fontWeight: '700', color: colors.listingInk },

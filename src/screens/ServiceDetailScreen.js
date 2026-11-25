@@ -1,5 +1,5 @@
 import {saveGuestIntent, GUEST_INTENT_KEY} from '../lib/guestIntent'
-import {formatDateLabel} from '../../shared/formatting.js'
+import {listingAvailability, ESTIMATED_TIMING_NOTE, PAUSED_REQUEST_MESSAGE} from '../../shared/listingAvailability'
 import {formatMoney as nzMoney} from '../../shared/formatting.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
@@ -190,6 +190,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
   }
 
   async function openBooking() {
+    if (listingAvailability(service).paused) { Alert.alert('Requests paused', PAUSED_REQUEST_MESSAGE); return }
     if (!review.ok) return
     try {
       const {data:{user},error}=await supabase.auth.getUser()
@@ -290,9 +291,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
     : service.pricing_type === 'day_rate' ? 'day'
     : (service.unit_label || 'unit')
 
-  const availabilityText = service.availability?.length
-    ? service.availability.map(formatDateLabel).join(', ')
-    : 'Flexible'
+  const availability = listingAvailability(service)
   const photos = Array.isArray(service.photos) ? service.photos : []
   const isOwnService = !!currentUserId && currentUserId === service.provider_id
   const isEnquiryKind = KIND_ENQUIRY_ONLY.includes(service.kind)
@@ -456,7 +455,9 @@ export default function ServiceDetailScreen({ route, navigation }) {
           {service.travel_range_km ? (
             <DetailRow label="Travel range" value={`${service.travel_range_km} km`} />
           ) : null}
-          <DetailRow label="Availability" value={availabilityText} last={!paymentValue} />
+          {(availability.visibleStatus || availability.lead || availability.message || availability.updated) && (
+            <DetailRow label="Availability" value={[availability.visibleStatus, availability.lead, availability.estimate && ESTIMATED_TIMING_NOTE, availability.message, availability.updated].filter(Boolean).join('\n')} last={!paymentValue} />
+          )}
           {paymentValue && (
             <DetailRow label="Payment" value={paymentValue} last />
           )}
@@ -580,7 +581,12 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
       {/* Book button */}
       <View style={[styles.bookFooter, { paddingBottom: insets.bottom + 12 }]}>
-        {isEnquiryKind && !isOwnService ? (
+        {!isOwnService && !isBooked && availability.paused && !isEnquiryKind ? (
+          <>
+            <Text accessibilityRole="alert" style={styles.providerMeta}>{PAUSED_REQUEST_MESSAGE}</Text>
+            <Button title="Enquire" onPress={handleEnquiry} loading={openingEnquiry} />
+          </>
+        ) : isEnquiryKind && !isOwnService ? (
           <Button
             variant="primary"
             title="Enquire"

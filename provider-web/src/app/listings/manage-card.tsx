@@ -7,8 +7,10 @@ import { Eye, LoaderCircle, Pencil, Trash2 } from 'lucide-react'
 import { KIND_ENQUIRY,formatRate } from '@shared/listingPricing'
 import { createClient } from '@/lib/supabase/client'
 import { ListingCard, type CardStyle } from './listing-card'
+import { ManageAvailability } from './manage-availability'
+import type { ListingAvailability } from '@shared/listingAvailability'
 
-export type Listing = {
+export type Listing = ListingAvailability & {
   id: string
   title: string | null
   kind: string | null
@@ -102,10 +104,11 @@ export function ManageCard({ s }: { s: Listing }) {
       footer={
         <div className={closed ? 'manage-actions closed' : 'manage-actions'}>
           {error && <span className="row-err">{error}</span>}
+          <ManageAvailability listing={s} />
           <div className="manage-actions-row">
             <Link href={`/listings/${s.id}`} className="manage-view" aria-label={'View listing: '+(s.title||'Untitled listing')}><Eye size={15} aria-hidden="true"/> View listing</Link>
             {busy && <LoaderCircle className="spin" size={15} aria-hidden="true"/>}
-            <button type="button" onClick={pauseResume} disabled={busy} aria-label={(s.is_active?'Pause':'Resume')+' listing: '+(s.title||'Untitled listing')}>{s.is_active ? 'Pause' : 'Resume'}</button>
+            <button type="button" onClick={pauseResume} disabled={busy}>{s.is_active ? 'Pause advertising' : 'Resume advertising'}</button>
             {canClose && <button type="button" onClick={markClosed} disabled={busy} aria-label={CLOSE[s.kind as string].label+': '+(s.title||'Untitled listing')}>{CLOSE[s.kind as string].label}</button>}
             {closed && <button type="button" onClick={reopen} disabled={busy} aria-label={'Reopen listing: '+(s.title||'Untitled listing')}>Reopen</button>}
             <Link href={`/listings/${s.id}/edit`} className="manage-view" aria-label={'Edit listing: '+(s.title||'Untitled listing')}><Pencil size={15} aria-hidden="true"/> Edit</Link>
