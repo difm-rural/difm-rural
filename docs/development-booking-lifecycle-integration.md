@@ -29,8 +29,8 @@ Eight conflicted files: web request form, server work actions, booking-detail he
 
 ## Validation
 
-- Complete `npm test`: **688 tests: 687 passed, 1 failed**.
-- Remaining failure: `tests/public-area-format.test.mjs`, exhaustive BMP JavaScript/SQL parity, at U+088F. Reproduced from untouched `origin/main` sources in a separate fixture. Node v24.14.1 uses Unicode 17; JavaScript considers this a letter while the existing SQL migration's fixed ranges reject it. No test was skipped and no unrelated public-area schema/rule was changed. This is an outstanding deployment gate.
+- Complete `npm test` after the Unicode correction: **692 tests passed, 0 failed**.
+- The original U+088F JavaScript/SQL parity failure is resolved by pinning the client to the existing database character ranges. SQL and privacy rules are unchanged; see the correction section below.
 - All booking duration/lifecycle/navigation/quantity, Home attention, guest sign-in and listing navigation regressions passed, including four added combined duration/invalid-quantity checks.
 - Local `tests/support/booking-duration-permissions.ps1 -Lifecycle`: passed. Loads actual booking RLS/update guard, pending duration migration, both current-main quantity triggers, existing completion RPC and review policies/index together; all fixture changes rolled back.
 - Standalone current-main SQL tests `tests/booking-quantity-capacity.sql` and `tests/booking-head-whole-number.sql`: passed, rolled back.
@@ -50,7 +50,7 @@ Local compatibility is verified with omitted-field requests, invalid values, imm
 
 ## Coordinated deployment sequence (requires further approval)
 
-1. Resolve the known public-area Unicode parity failure in a separately reviewed fix, then require a green full suite. Retain this integration and the currently deployed privacy-compatible versions for rollback.
+1. Review the Unicode correction and require the full suite to remain green. Retain this integration and the currently deployed privacy-compatible versions for rollback.
 2. Inspect development Supabase migration ledger/schema and existing Vercel project/team, provider/public deployments and Expo preview/runtime configuration. Confirm authentication without stale saved-token overrides. Check whether main's public-area, capacity and whole-head migrations are already applied; review any other drift before proceeding.
 3. Preview the exact migration plan. If the earlier duration timestamp is behind applied migrations, review an explicit include-all dry run and verify the only intended additions. Apply only the approved outstanding migrations with approval, including expected duration before duration-aware clients. Stop on any failure.
 4. Run live permission and legacy-client omitted-duration creation checks using existing test accounts/data. Verify private listing locations remain protected and no unrelated member can mutate bookings.
@@ -63,4 +63,14 @@ Rollback: restore previous compatible web deployments and Expo preview bundles i
 
 ## Recommendation
 
-Integration is prepared locally for review. **Do not deploy yet**: the full suite has one independently reproduced current-main Unicode parity failure. After a reviewed fix, rerun the full suite and confirm the remote migration ledger. Physical-device narrow-layout, signed-in end-to-end and live permission smoke tests remain deployment-time/manual checks.
+Integration is prepared locally for review; the automated Unicode blocker is resolved. Local tests and SQL checks pass. Deployment still requires approval, remote migration-ledger/schema verification and the coordinated sequence above. Physical-device narrow-layout, signed-in end-to-end and live permission smoke tests remain deployment-time/manual checks.
+
+## Unicode policy correction
+
+The database migration implements fixed ranges for letters, marks and numbers plus ` .,'’()&/-`, and requires at least one letter. The former client used runtime Unicode property regexes, so a Node/ICU update admitted U+088F while the database still rejected it.
+
+The smallest correction preserves the authoritative database policy: `shared/publicAreaCharacters.ts` contains the exact existing SQL ranges and punctuation, with a binary range lookup. The client uses those fixed ranges instead of runtime categories. Tests compare both tables exactly, exercise every BMP scalar and every range edge (including supplementary planes), and cover Māori/macrons, Arabic, Devanagari, Chinese, Deseret, combining marks, numbers, U+088F, format controls, emoji, markup and unpaired surrogates. Future character expansions require an explicit reviewed policy/migration change, rather than an automatic runtime upgrade.
+
+Client length now counts Unicode code points, matching PostgreSQL `char_length`, including the 150/151 supplementary-letter boundary. This allows the same number of supplementary letters as the existing database policy; it adds no character to the allowed set. Only ASCII edge spaces are trimmed, matching PostgreSQL `btrim`; edge tabs/non-breaking/ideographic spaces are rejected rather than silently accepted by the client and rejected by SQL. Existing public-area sanitisation, private addresses/pins, RLS, ownership, trigger ordering and permissions are unchanged.
+
+Validation: full suite 692/692 passed; expanded UTF-8 public-area SQL tests and combined duration/lifecycle/quantity/review permission checks passed with rollback. All migration files, including `20261125140000_booking_expected_duration.sql`, are byte-identical to integration commit `70642f4`. No new or remote migration was applied.

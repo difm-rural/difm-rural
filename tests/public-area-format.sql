@@ -120,4 +120,19 @@ do $$ begin
   end if;
 end $$;
 
+-- Pin the existing database policy at Unicode/runtime and length boundaries.
+do $$
+declare area text;
+begin
+ foreach area in array array['Te Kūiti',U&'O\0304taki','العربية','हिन्दी','北京',chr(66560),'W'||chr(120792)] loop
+  if public.public_area_error(area) is not null then raise exception 'Expected allowed public area: %',area;end if;
+ end loop;
+ foreach area in array array['W'||chr(2191),'W'||chr(2192),'W'||chr(8205),'W'||chr(8203),'W😀','W<','W"',chr(772),'123',chr(9)||'Waitoki','Waitoki'||chr(10),chr(160)||'Waitoki','Waitoki'||chr(12288)] loop
+  if public.public_area_error(area) is null then raise exception 'Expected rejected public area: %',area;end if;
+ end loop;
+ if public.public_area_error(repeat(chr(66560),150)) is not null then raise exception '150 supplementary letters rejected';end if;
+ if public.public_area_error(repeat(chr(66560),151)) not like '%150%' then raise exception '151 supplementary letters accepted';end if;
+ if public.public_area_error('  Te Kūiti  ') is not null then raise exception 'ASCII edge spaces rejected';end if;
+end $$;
+
 rollback;
