@@ -267,7 +267,7 @@ export async function acceptOffer(_: ActionState, data: FormData): Promise<Actio
 }
 
 export async function requestBooking(_:ActionState,data:FormData):Promise<ActionState>{
-  const {PAUSED_REQUEST_MESSAGE, isPausedRequestError}=await import('@shared/listingAvailability')
+  const {PAUSED_REQUEST_MESSAGE, isPausedRequestError, listingBookingsPaused}=await import('@shared/listingAvailability')
   const {supabase,user}=await requireProvider(),id=text(data,'service_id'),requestId=text(data,'request_id'),location=text(data,'location'),quantity=Number(text(data,'quantity'))
   if(!validId(id)||!validId(requestId)||!Number.isFinite(quantity)||quantity<=0||quantity>10000000)return {error:'Choose a valid listing and a positive quantity.'}
   const notes=text(data,'notes'),locationNote=text(data,'location_note'),schedule=text(data,'schedule_type'),date=text(data,'date'),lat=text(data,'latitude'),lng=text(data,'longitude')
@@ -279,7 +279,7 @@ export async function requestBooking(_:ActionState,data:FormData):Promise<Action
   if(existing)redirect('/activity/booking/'+existing.id+'/manage')
   const {data:s,error}=await supabase.from('services_public').select('*').eq('id',id).single()
   if(error)return failed()
-  if(s?.availability_status==='paused'){
+  if(s && listingBookingsPaused(s)){
     const {data:retry,error:retryError}=await supabase.from('bookings').select('id').eq('id',requestId).eq('requester_id',user.id).eq('service_id',id).maybeSingle()
     if(retryError)return failed()
     if(retry)redirect('/activity/booking/'+retry.id+'/manage')

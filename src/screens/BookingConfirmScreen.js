@@ -290,7 +290,7 @@ export default function BookingConfirmScreen({ route, navigation }) {
       submission.finish(false)
       if (isPausedRequestError(error)) {
         attemptedRequest.current = false
-        setFreshAvailability(current => ({...(current || service), availability_status: 'paused'}))
+        setFreshAvailability(current => ({...(current || service), availability_enabled: true, availability_status: 'paused'}))
         Alert.alert('Requests paused', PAUSED_REQUEST_MESSAGE)
       } else {
         Alert.alert('Could not send request', error.message)

@@ -98,8 +98,10 @@ function ServiceRow({ service, onToggleActive, onEdit, onDelete, onView, onAvail
         {service.closed_at ? 'Listing closed · Switch on to relist' : service.is_active ? 'Advertising live' : 'Advertising paused'}
       </Text>
 
-      <Text style={styles.rowMeta}>{[availability.status, availability.lead, availability.updated].filter(Boolean).join(' · ')}</Text>
-      <Button title="Manage availability" icon="time-outline" onPress={() => onAvailability(service)} style={{marginTop: 8}} />
+      {availability.enabled && <>
+        <Text style={styles.rowMeta}>{[availability.status, availability.lead, availability.updated].filter(Boolean).join(' · ')}</Text>
+        <Button title="Manage availability" variant="secondary" icon="time-outline" onPress={() => onAvailability(service)} style={{marginTop: 8}} />
+      </>}
 
       <Text style={styles.rowMeta}>
         {service.category}  ·  <Icon name="location-outline" size={11} color={colors.textMuted} /> {service.location_name || '—'}

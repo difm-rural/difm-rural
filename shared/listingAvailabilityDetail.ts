@@ -2,6 +2,7 @@ import {ESTIMATED_TIMING_NOTE, listingAvailability, type ListingAvailability} fr
 
 export function listingAvailabilityDetail(listing: ListingAvailability) {
   const summary = listingAvailability(listing)
+  if (!summary.enabled) return null
   const message = summary.message?.trim() || ''
   if (!summary.visibleStatus && !summary.lead && !message && !summary.updated) return null
 

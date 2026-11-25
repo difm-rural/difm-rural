@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {availabilityDraft, availabilityPatch, LEAD_TIME_OPTIONS, listingAvailability, LISTING_AVAILABILITY_STATUSES} from './listingAvailability'
+import {availabilityDraft, availabilityPatch, LEAD_TIME_OPTIONS, listingAvailability, listingAvailabilityEditPatch, listingAvailabilityEnabled, listingBookingsPaused, LISTING_AVAILABILITY_STATUSES} from './listingAvailability'
 
 const updated = '2026-11-26T12:00:00Z'
 const future = '2099-11-26'
@@ -46,4 +46,25 @@ test('rules reject invalid dates, quantities and messages, and ignore irrelevant
   assert.throws(() => availabilityPatch({...draft,type:'earliest_date',date:'2099-02-31'}, {}), /valid/)
   assert.throws(() => availabilityPatch({...draft,message:'x'.repeat(251)}, {}), /250/)
   assert.equal(availabilityPatch({...draft,min:'invalid',message:'   '}, {}).availability_message, null)
+})
+
+test('owner opt-in defaults off and disabling preserves saved fields while unblocking requests', () => {
+  const start = availabilityDraft({})
+  assert.equal(listingAvailabilityEnabled({}), false)
+  assert.deepEqual(listingAvailabilityEditPatch(false, start), {})
+  const initial = listingAvailabilityEditPatch(true, {...start,status:'paused',type:'range_days',min:'4',max:'5'})
+  const enabled = {...initial, availability_updated_at: updated}
+  assert.equal(enabled.availability_enabled, true)
+  assert.equal(listingBookingsPaused(enabled), true)
+  assert.deepEqual(listingAvailabilityEditPatch(true, availabilityDraft(enabled), enabled), {})
+  const disable = listingAvailabilityEditPatch(false, availabilityDraft(enabled), enabled)
+  assert.deepEqual(disable, {availability_enabled: false})
+  const disabled = {...enabled,...disable,availability:[future]}
+  assert.equal(listingBookingsPaused(disabled), false)
+  const publicDisplay = listingAvailability(disabled)
+  assert.equal(publicDisplay.estimate, '')
+  assert.equal(publicDisplay.updated, '')
+  assert.match(publicDisplay.lead, /^Available from /)
+  const reenabling = listingAvailabilityEditPatch(true, availabilityDraft(disabled), disabled)
+  assert.deepEqual(reenabling, initial)
 })
