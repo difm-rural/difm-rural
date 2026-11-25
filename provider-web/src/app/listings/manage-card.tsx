@@ -8,7 +8,7 @@ import { KIND_ENQUIRY,formatRate } from '@shared/listingPricing'
 import { createClient } from '@/lib/supabase/client'
 import { ListingCard, type CardStyle } from './listing-card'
 import { ManageAvailability } from './manage-availability'
-import type { ListingAvailability } from '@shared/listingAvailability'
+import {listingAvailabilityEnabled, type ListingAvailability} from '@shared/listingAvailability'
 
 export type Listing = ListingAvailability & {
   id: string
@@ -104,7 +104,7 @@ export function ManageCard({ s }: { s: Listing }) {
       footer={
         <div className={closed ? 'manage-actions closed' : 'manage-actions'}>
           {error && <span className="row-err">{error}</span>}
-          <ManageAvailability listing={s} />
+          {listingAvailabilityEnabled(s) && <ManageAvailability listing={s} />}
           <div className="manage-actions-row">
             <Link href={`/listings/${s.id}`} className="manage-view" aria-label={'View listing: '+(s.title||'Untitled listing')}><Eye size={15} aria-hidden="true"/> View listing</Link>
             {busy && <LoaderCircle className="spin" size={15} aria-hidden="true"/>}

@@ -9,6 +9,7 @@ import {runSubmission} from '@shared/submission'
 import {travelRangeError,travelRangeValue} from '@shared/travelRange'
 import {listingMoneyError} from '@shared/postingMoney'
 import {listingDateError,nzToday} from '@shared/postingDates'
+import {availabilityDraft, AVAILABILITY_OPT_IN_HELP, DISABLE_PAUSED_AVAILABILITY_MESSAGE, listingAvailabilityEditPatch, listingAvailabilityEnabled, listingBookingsPaused, type ListingAvailability} from '@shared/listingAvailability'
 import {createPublicAreaCache,lookupPublicArea} from '@shared/publicJobArea'
 import {PHOTO_MAX,resizePhoto} from '@/lib/resize-photo'
 import {removeThumbnails,uploadThumbnail} from '@/lib/photo-thumbs'
@@ -28,6 +29,7 @@ import {
 import { LISTING_CATEGORIES } from '@shared/categories'
 import { createClient } from '@/lib/supabase/client'
 import { CardImage } from './listing-card'
+import {ListingAvailabilityFields} from './manage-availability'
 
 // B1 owns the non-pricing fields; B2a adds the DEFAULT pricing view (driven entirely
 // by KIND_PRICING[kind] from @shared — no rules derived here). The advanced levers
@@ -47,7 +49,7 @@ type StoredVariant = { label?: string; pricing_type?: string; rate?: number | st
 // one from the location text when it saves.
 const findPin = createPublicAreaCache(area => lookupPublicArea(process.env.NEXT_PUBLIC_SUPABASE_URL + '/functions/v1/maps-proxy', area))
 
-export type EditListing = {
+export type EditListing = ListingAvailability & {
   id: string
   latitude?: number | string | null
   longitude?: number | string | null
@@ -149,7 +151,10 @@ export function ListingForm({
       const areaError=publicAreaError(locationName)
       if(areaError)issues.location=areaError
       const travel=travelRangeError(travelRange);if(travel)issues.travel=travel
-      if(availMode==='from'){const date=!availableFrom?'Choose an available-from date.':listingDateError(availableFrom,mode==='edit'?initialAvailFrom:null);if(date)issues.available=date}
+      if (availabilityEnabled) {
+        try { listingAvailabilityEditPatch(true, listingAvailabilityDraft, listing) }
+        catch (error) { issues.availabilityManagement = error instanceof Error ? error.message : 'Check availability settings.' }
+      } else if(availMode==='from'){const date=!availableFrom?'Choose an available-from date.':listingDateError(availableFrom,mode==='edit'?initialAvailFrom:null);if(date)issues.available=date}
     }
     return issues
   }
@@ -233,6 +238,15 @@ export function ListingForm({
     : ''
   const [availMode, setAvailMode] = useState<'now' | 'from'>(initialAvailFrom ? 'from' : 'now')
   const [availableFrom, setAvailableFrom] = useState(initialAvailFrom)
+  const [availabilityEnabled, setAvailabilityEnabled] = useState(() => !!listing && listingAvailabilityEnabled(listing))
+  const [listingAvailabilityDraft, setListingAvailabilityDraft] = useState(() => availabilityDraft(listing ?? {}))
+
+  function changeAvailabilityEnabled(enabled: boolean) {
+    if (!enabled && listing && listingBookingsPaused(listing) &&
+      !window.confirm(DISABLE_PAUSED_AVAILABILITY_MESSAGE)) return
+    setAvailabilityEnabled(enabled)
+    setError('')
+  }
 
   // Photos (C1) — existing URL strings (edit) and newly picked files. A picked
   // file carries its own blob: preview URL, made once when it is picked and
@@ -342,8 +356,7 @@ export function ListingForm({
     if(rangeError){setError(rangeError);setStep(3);return}
     const moneyError=listingMoneyError({pricingType,rate,minCharge,addOns:pricingAddOns,variants:pricingVariants})
     if(moneyError){setError(moneyError);setStep(1);return}
-    const dateError=availMode==='from'?(!availableFrom?'Choose when the listing is available.':listingDateError(availableFrom,mode==='edit'?initialAvailFrom:null)):''
-    if(dateError){setError(dateError);setStep(3);return}
+    const availabilityPatch = listingAvailabilityEditPatch(availabilityEnabled, listingAvailabilityDraft, listing)
     if(!await locationWarning.check({area:locationName,kind:'listing'})){setBusy(false);goToStep(3);return}
 
     // Map pin for nearby searches. Keep an existing pin while the location text is
@@ -431,7 +444,9 @@ export function ListingForm({
       card_headline: cardHeadline.trim() || null,
       card_supporting_text: cardSupportingText.trim() || null,
       card_style: cardStyle || null, // only 'bold' | 'bottom' | 'clean' | null (check constraint)
-      availability: availMode === 'from' && availableFrom ? [availableFrom] : null,
+      ...(mode === 'new' || (!availabilityEnabled && (availMode === 'from' ? availableFrom : '') !== initialAvailFrom)
+        ? {availability: availMode === 'from' && availableFrom ? [availableFrom] : null} : {}),
+      ...availabilityPatch,
     }
 
     // 1. Write the row first (mirrors RN: the id is needed for the photo storage path).
@@ -1085,9 +1100,18 @@ export function ListingForm({
         <p className="muted">Optional. Enter a whole number from 0 to 2,000 km.</p>
       </div>
 
-      {/* Availability (B3) — optional */}
       <section className="lform-pricing">
-        <h2>Availability <span className="optional">(optional)</span></h2>
+        <label className="listing-availability-toggle">
+          <input type="checkbox" checked={availabilityEnabled} disabled={busy}
+            aria-describedby="listing-availability-help" onChange={event => changeAvailabilityEnabled(event.target.checked)} />
+          Enable availability management
+        </label>
+        <p id="listing-availability-help" className="muted">{AVAILABILITY_OPT_IN_HELP}</p>
+        {availabilityEnabled && <ListingAvailabilityFields draft={listingAvailabilityDraft} setDraft={setListingAvailabilityDraft} />}
+      </section>
+
+      {!availabilityEnabled && <section className="lform-pricing">
+        <h2>Available from <span className="optional">(optional)</span></h2>
         <div className="lform-field">
           <div className="lseg">
             <button
@@ -1115,7 +1139,7 @@ export function ListingForm({
             />{issue('available')}</>
           )}
         </div>
-      </section>
+      </section>}
 
       </div>
       {step === 4 && <section className="lform-review">
@@ -1144,7 +1168,7 @@ export function ListingForm({
         </section>
         <section className="lform-pricing">
           <div className="lform-review-heading"><h3>Location & availability</h3><button type="button" className="lform-review-edit" onClick={() => goToStep(3)}>Edit location</button></div>
-          <dl><dt>Location</dt><dd>{locationName}</dd>{travelRange && <><dt>Travel range</dt><dd>{travelRange} km</dd></>}<dt>Available</dt><dd>{availMode === 'now' ? 'Now' : nzDate(new Date(availableFrom + 'T12:00:00'))}</dd></dl>
+          <dl><dt>Location</dt><dd>{locationName}</dd>{travelRange && <><dt>Travel range</dt><dd>{travelRange} km</dd></>}{availabilityEnabled ? <><dt>Availability management</dt><dd>Enabled</dd></> : <><dt>Available</dt><dd>{availMode === 'now' ? 'Now' : nzDate(new Date(availableFrom + 'T12:00:00'))}</dd></>}</dl>
         </section>
       </section>}
       {busy && <p className="muted" role="status">{saveStatus}</p>}

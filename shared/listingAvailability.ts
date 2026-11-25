@@ -17,13 +17,16 @@ export const LEAD_TIME_OPTIONS = {
   contact_provider: 'Contact provider',
 } as const
 
-export const LISTING_AVAILABILITY_COLUMNS = 'availability_status,lead_time_type,lead_time_min_days,lead_time_max_days,lead_time_date,availability_message,availability_updated_at'
+export const LISTING_AVAILABILITY_COLUMNS = 'availability_enabled,availability_status,lead_time_type,lead_time_min_days,lead_time_max_days,lead_time_date,availability_message,availability_updated_at'
 export const AVAILABILITY_MESSAGE_LIMIT = 250
 export const PAUSED_REQUEST_MESSAGE = 'This listing is temporarily paused for new requests. You can still contact the provider.'
 export const ESTIMATED_TIMING_NOTE = 'Estimated timing only. Confirm the date with the provider.'
+export const AVAILABILITY_OPT_IN_HELP = 'Show customers your current availability and estimated lead time, or temporarily stop taking new bookings.'
+export const DISABLE_PAUSED_AVAILABILITY_MESSAGE = 'Saving with availability management off will allow new booking and quote requests again where the listing normally accepts them. Your saved settings will be kept.'
 export const isPausedRequestError = (error: {code?: string} | null) => error?.code === 'P0A01'
 
 export type ListingAvailability = {
+  availability_enabled?: boolean | null
   availability_status?: keyof typeof LISTING_AVAILABILITY_STATUSES | null
   lead_time_type?: keyof typeof LEAD_TIME_OPTIONS | null
   lead_time_min_days?: number | null
@@ -32,6 +35,17 @@ export type ListingAvailability = {
   availability_message?: string | null
   availability_updated_at?: string | null
   availability?: string[] | null
+}
+
+export function listingAvailabilityEnabled(listing: ListingAvailability) {
+  return listing.availability_enabled ?? !!(listing.availability_updated_at ||
+    (listing.availability_status && listing.availability_status !== 'accepting_bookings') ||
+    (listing.lead_time_type && listing.lead_time_type !== 'not_specified') ||
+    listing.availability_message?.trim())
+}
+
+export function listingBookingsPaused(listing: ListingAvailability) {
+  return listingAvailabilityEnabled(listing) && listing.availability_status === 'paused'
 }
 
 export function availabilityDraft(listing: ListingAvailability) {
@@ -71,14 +85,23 @@ export function availabilityPatch(draft: ReturnType<typeof availabilityDraft>, l
   }
 }
 
+export function listingAvailabilityEditPatch(enabled: boolean, draft: ReturnType<typeof availabilityDraft>, listing?: ListingAvailability | null) {
+  const previouslyEnabled = !!listing && listingAvailabilityEnabled(listing)
+  if (!enabled) return previouslyEnabled ? {availability_enabled: false} : {}
+  const fields = availabilityPatch(draft, listing ?? {})
+  if (!previouslyEnabled) return {...fields, availability_enabled: true}
+  const initial = availabilityDraft(listing!)
+  return (Object.keys(initial) as (keyof typeof initial)[]).some(key => draft[key] !== initial[key]) ? fields : {}
+}
+
 export function listingAvailability(listing: ListingAvailability) {
-  const configured = !!listing.availability_updated_at
-  const paused = listing.availability_status === 'paused'
+  const enabled = listingAvailabilityEnabled(listing)
+  const paused = listingBookingsPaused(listing)
   const status = LISTING_AVAILABILITY_STATUSES[listing.availability_status ?? 'accepting_bookings']
-  const legacy = !configured && listing.availability?.length
+  const legacy = !enabled && listing.availability?.length
     ? listing.availability.map(formatDateLabel).join(', ') : ''
   let estimate = ''
-  switch (listing.lead_time_type) {
+  switch (enabled ? listing.lead_time_type : null) {
     case 'same_day': estimate = 'Same day'; break
     case 'next_day': estimate = 'Next day'; break
     case 'fixed_days': estimate = listing.lead_time_min_days === 1 ? '1 day' : `${listing.lead_time_min_days} days`; break
@@ -87,12 +110,12 @@ export function listingAvailability(listing: ListingAvailability) {
     case 'contact_provider': estimate = 'Contact provider'; break
   }
   const lead = estimate ? `Estimated lead time: ${estimate}` : legacy ? `Available from ${legacy}` : ''
-  const visibleStatus = configured || paused ? status : ''
-  const updated = listing.availability_updated_at
+  const visibleStatus = enabled ? status : ''
+  const updated = enabled && listing.availability_updated_at
     ? `Updated ${formatDateLabel(nzCalendarDay(listing.availability_updated_at) ?? '')}` : ''
   return {
-    paused, status, visibleStatus, lead, estimate, updated,
+    enabled, paused, status, visibleStatus, lead, estimate, updated, legacy,
     card: [visibleStatus, lead].filter(Boolean),
-    message: listing.availability_message,
+    message: enabled ? listing.availability_message : null,
   }
 }

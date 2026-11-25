@@ -457,6 +457,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
           {service.travel_range_km ? (
             <DetailRow label="Travel range" value={`${service.travel_range_km} km`} />
           ) : null}
+          {!!availability.legacy && <DetailRow label="Available from" value={availability.legacy} last={!paymentValue} />}
           {paymentValue && (
             <DetailRow label="Payment" value={paymentValue} last />
           )}

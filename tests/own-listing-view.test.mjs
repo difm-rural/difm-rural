@@ -53,7 +53,7 @@ test('live, paused and closed own listings expose a card link and explicit View 
   assert.match(html,/aria-label="View listing: Container moving"/)
   assert.match(html,/<\/a><div class="manage-actions/)
   assert.match(html,/<button[^>]*>Pause advertising<\/button>|<button[^>]*>Resume advertising<\/button>/)
-  assert.match(html,/Manage availability/)
+  assert.doesNotMatch(html,/Manage availability/)
  }
 })
 test('management card keeps paused bookings and live advertising distinct, with the saved estimate',()=>{
@@ -63,6 +63,7 @@ test('management card keeps paused bookings and live advertising distinct, with 
  assert.match(html,/Advertising live/)
  assert.match(html,/Temporarily paused/)
  assert.match(html,/Estimated lead time: 2 to 4 days/)
+ assert.match(html,/class="lform-cancel"[^>]*aria-label="Manage availability/)
 })
 test('ordinary listing cards remain unlinked internally so browse links cannot nest anchors',()=>{
  const html=renderToStaticMarkup(React.createElement(cards.ListingCard,{data:{title:'Example'}}))

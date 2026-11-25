@@ -20,13 +20,12 @@ test('detail presentation separates compact lead time, message, disclaimer and d
   assert.equal(listingAvailability(listing).lead, 'Estimated lead time: 4 to 5 days')
 })
 
-test('legacy dates remain visible without a new status or an estimated-timing disclaimer', () => {
+test('legacy dates remain available to the detail rows without a dedicated availability card', () => {
   assert.equal(listingAvailabilityDetail({}), null)
-  const detail = listingAvailabilityDetail({availability: ['2026-12-04']})!
-  assert.equal(detail.lead, 'Available from 4 Dec 2026')
-  assert.equal(detail.leadLabel, '')
-  assert.equal(detail.status, '')
-  assert.equal(detail.disclaimer, '')
+  const listing = {availability: ['2026-12-04'], availability_enabled: false, availability_status: 'paused'} as const
+  const legacy = {...listing, availability: [...listing.availability]}
+  assert.equal(listingAvailabilityDetail(legacy), null)
+  assert.equal(listingAvailability(legacy).lead, 'Available from 4 Dec 2026')
 })
 
 test('paused status is prominent data even without an estimate; contact provider is a separate option', () => {

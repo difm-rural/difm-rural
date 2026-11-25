@@ -1,3 +1,5 @@
+import {listingBookingsPaused} from '../../shared/listingAvailability'
+
 // Only public identifiers and allowlisted actions survive authentication.
 export const GUEST_INTENT_KEY = 'guestActionIntent'
 const actions = new Set(['post-job', 'create-listing', 'job', 'listing', 'booking'])
@@ -25,5 +27,5 @@ export async function guestIntentDestination(client, intent) {
   if (error) throw error
   if (!data) return null
   if (isJob) return ['Jobs', {screen: 'JobDetail', params: {job: data}}]
-  return ['Browse', {screen: intent.action === 'booking' && data.is_active && !data.closed_at && data.availability_status !== 'paused' ? 'BookingConfirm' : 'ServiceDetail', params: {service: data}}]
+  return ['Browse', {screen: intent.action === 'booking' && data.is_active && !data.closed_at && !listingBookingsPaused(data) ? 'BookingConfirm' : 'ServiceDetail', params: {service: data}}]
 }

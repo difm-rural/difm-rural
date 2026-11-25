@@ -5,6 +5,8 @@ import {runSubmission} from '../../shared/submission'
 import {travelRangeError,travelRangeValue} from '../../shared/travelRange'
 import {listingAmountError,listingMoneyError} from '../../shared/postingMoney'
 import {listingDateError,nzCalendarDay} from '../../shared/postingDates'
+import {availabilityDraft, AVAILABILITY_OPT_IN_HELP, DISABLE_PAUSED_AVAILABILITY_MESSAGE, listingAvailabilityEditPatch, listingAvailabilityEnabled, listingBookingsPaused} from '../../shared/listingAvailability'
+import {ListingAvailabilityFields} from '../components/ManageListingAvailability'
 import {confirmPublishingLocation} from '../lib/publishingLocation'
 import React, { useEffect, useRef, useState } from 'react'
 import {
@@ -19,6 +21,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -271,6 +274,8 @@ export default function CreateServiceScreen({ navigation, route }) {
   const [locationSelecting, setLocationSelecting] = useState(false)
   const [travelRange, setTravelRange] = useState(editingService?.travel_range_km != null ? String(editingService.travel_range_km) : '')
   const [availableFrom,   setAvailableFrom]   = useState(toDateValue(editingService?.availability))
+  const [availabilityEnabled, setAvailabilityEnabled] = useState(() => !!editingService && listingAvailabilityEnabled(editingService))
+  const [listingAvailabilityDraft, setListingAvailabilityDraft] = useState(() => availabilityDraft(editingService || {}))
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [serviceActive, setServiceActive] = useState(editingService?.is_active !== false)
 
@@ -282,6 +287,25 @@ export default function CreateServiceScreen({ navigation, route }) {
 
   function openAvailabilityDatePicker() {
     openDateTimePicker({ ...availabilityPickerOptions(), onShow: () => setShowDatePicker(true) })
+  }
+
+  function changeAvailabilityEnabled(enabled) {
+    if (!enabled && editingService && listingBookingsPaused(editingService)) {
+      Alert.alert('Turn off availability management?', DISABLE_PAUSED_AVAILABILITY_MESSAGE, [
+        {text: 'Keep enabled', style: 'cancel'},
+        {text: 'Turn off', onPress: () => setAvailabilityEnabled(false)},
+      ])
+      return
+    }
+    setAvailabilityEnabled(enabled)
+  }
+
+  function availabilityIssue() {
+    if (!availabilityEnabled) return listingDateError(availableFrom, toDateValue(editingService?.availability))
+    try {
+      listingAvailabilityEditPatch(true, listingAvailabilityDraft, editingService)
+      return ''
+    } catch (error) { return error.message }
   }
 
   const [submitting, setSubmitting] = useState(false)
@@ -316,6 +340,8 @@ export default function CreateServiceScreen({ navigation, route }) {
     setLocationPin(null)
     setTravelRange('')
     setAvailableFrom(null)
+    setAvailabilityEnabled(false)
+    setListingAvailabilityDraft(availabilityDraft({}))
     setShowDatePicker(false)
     setServiceActive(true)
     setWebsiteInput('')
@@ -360,7 +386,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     if (step === 1) return !postingTextError(title,'title') && !!(title.trim() && category)
     if (step === 2) return !postingTextError(description,'description')
     if (step === 3) return !moneyError && !!(pricingType && (pricingType === 'quote_required' || rate.trim()))
-    if (step === 4) return !travelRangeError(travelRange) && !listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null) && !publicAreaError(locationName)
+    if (step === 4) return !travelRangeError(travelRange) && !availabilityIssue() && !publicAreaError(locationName)
     if (step === 5) return !travelRangeError(travelRange) && !moneyError && !!(title.trim() && category && pricingType && (pricingType === 'quote_required' || rate.trim()) && !publicAreaError(locationName))
     return true
   }
@@ -876,7 +902,7 @@ export default function CreateServiceScreen({ navigation, route }) {
     if(rangeError){Alert.alert('Check travel range',rangeError);setStep(4);return}
     const pricingError=listingMoneyError({pricingType,rate,minCharge,addOns:pricingAddOns,variants:pricingVariants})
     if(pricingError){Alert.alert('Check pricing',pricingError);setStep(3);return}
-    const dateError=listingDateError(availableFrom,isEditing?toDateValue(editingService?.availability):null)
+    const dateError=availabilityIssue()
     if(dateError){Alert.alert('Check availability',dateError);setStep(4);return}
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -955,7 +981,10 @@ export default function CreateServiceScreen({ navigation, route }) {
       card_style: cardStyle || null,
       payment_timing: paymentTiming,
       materials,
-      availability: formatAvailabilityPayload(availableFrom),
+      ...(!isEditing || (!availabilityEnabled &&
+        nzCalendarDay(availableFrom) !== nzCalendarDay(toDateValue(editingService?.availability)))
+        ? {availability: formatAvailabilityPayload(availableFrom)} : {}),
+      ...listingAvailabilityEditPatch(availabilityEnabled, listingAvailabilityDraft, editingService),
       is_active: isEditing ? serviceActive : true,
       ...(isEditing && photos.length === 0 ? { photos: [] } : {}),
     }
@@ -1709,6 +1738,16 @@ export default function CreateServiceScreen({ navigation, route }) {
         <Text style={styles.locationHelp}>Optional. Enter a whole number from 0 to 2,000 km.</Text>
         {!!travelRangeError(travelRange) && <Text accessibilityRole="alert" style={{ color: colors.danger }}>{travelRangeError(travelRange)}</Text>}
 
+        <View style={styles.availabilityToggle}>
+          <Text style={styles.availabilityToggleLabel}>Enable availability management</Text>
+          <Switch accessibilityLabel="Enable availability management" value={availabilityEnabled}
+            onValueChange={changeAvailabilityEnabled} disabled={submitting} />
+        </View>
+        <Text style={styles.locationHelp}>{AVAILABILITY_OPT_IN_HELP}</Text>
+        {availabilityEnabled ? <>
+          <ListingAvailabilityFields draft={listingAvailabilityDraft} setDraft={setListingAvailabilityDraft} disabled={submitting} />
+          {attempted && !!availabilityIssue() && <Text accessibilityRole="alert" style={{color: colors.danger}}>{availabilityIssue()}</Text>}
+        </> : <>
         <Text style={styles.fieldLabel}>Available from <Text style={styles.optional}>(optional)</Text></Text>
         <DateChips value={availableFrom} onSelect={setAvailableFrom} onOpen={openAvailabilityDatePicker} />
         <TouchableOpacity
@@ -1732,6 +1771,7 @@ export default function CreateServiceScreen({ navigation, route }) {
           {...availabilityPickerOptions()}
           onDone={() => setShowDatePicker(false)}
         />
+        </>}
 
       </>
     )
@@ -2013,6 +2053,8 @@ export default function CreateServiceScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  availabilityToggle: {flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 16},
+  availabilityToggleLabel: {flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary},
   locationHelp: { fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 8, marginBottom: 12 },
   keyboardToolbar: { backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'flex-end' },
   keyboardDone: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20 },

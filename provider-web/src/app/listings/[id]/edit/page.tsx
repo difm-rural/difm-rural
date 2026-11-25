@@ -1,4 +1,5 @@
 import {withPrivateListingLocations} from '@shared/privateListingLocation'
+import {LISTING_AVAILABILITY_COLUMNS} from '@shared/listingAvailability'
 import Link from '@/components/navigation-link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -16,7 +17,7 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   // RLS plus the explicit provider_id filter: a provider can only load their own row.
   const { data: listing } = await supabase
     .from('services')
-    .select('id, kind, title, category, description, location_name, latitude, longitude, travel_range_km, pricing_type, rate, unit_label, minimum_units, max_units, payment_timing, materials, pricing_add_ons, pricing_variants, pricing_terms, min_charge, card_headline, card_supporting_text, card_style, availability, photos')
+    .select(`id, kind, title, category, description, location_name, latitude, longitude, travel_range_km, pricing_type, rate, unit_label, minimum_units, max_units, payment_timing, materials, pricing_add_ons, pricing_variants, pricing_terms, min_charge, card_headline, card_supporting_text, card_style, availability, photos,${LISTING_AVAILABILITY_COLUMNS}`)
     .eq('id', id)
     .eq('provider_id', user.id)
     .maybeSingle()

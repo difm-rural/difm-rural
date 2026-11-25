@@ -41,3 +41,13 @@ test('a quote form opened before the pause handles the database rejection withou
   assert.ok(screen.find('Button', button => button.title === 'Request a quote').props.disabled)
   assert.equal(screen.log.navigation.length, 0)
 })
+
+test('mobile disabled availability ignores a retained paused state and allows a request', async () => {
+  const service = {...listing,availability_status:'paused',availability_enabled:false}
+  const screen = openBooking({service})
+  assert.doesNotMatch(screen.texts(), /temporarily paused|Estimated lead time/)
+  assert.equal(screen.find('Button',p=>p.title==='Send booking request').props.disabled,false)
+  screen.find('AddressAutocomplete').props.onChangeText('Testtown')
+  await screen.press('Send booking request')
+  assert.equal(screen.log.writes.length,1)
+})

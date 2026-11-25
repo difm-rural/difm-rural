@@ -12,18 +12,21 @@ import * as money from '../shared/postingMoney.ts'
 import * as travel from '../shared/travelRange.ts'
 import * as submission from '../shared/submission.ts'
 import * as publicArea from '../shared/publicArea.ts'
+import * as availability from '../shared/listingAvailability.ts'
 const require=createRequire(import.meta.url),ts=require('typescript')
 const source=await readFile(new URL('../provider-web/src/app/listings/listing-form.tsx',import.meta.url),'utf8')
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
 // defer: queue state updates until the next render, as React does (an updater
 // runs later, not inside the event handler).
-function harness(patch={},{defer=false,supabase,mode='edit'}={}){
+function harness(patch={},{defer=false,supabase,mode='edit',confirm=()=>true}={}){
  const state=[],refs=[],calls=[],pending=[];let index=0,refIndex=0,tree
  const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;const apply=value=>{state[i]=typeof value==='function'?value(state[i]):value};return [state[i],value=>defer?pending.push(()=>apply(value)):apply(value)]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(){},useMemo:fn=>fn()}
  const module={exports:{}}
  const modules={'@shared/listingPricing':pricing,'@shared/categories':categories,'@shared/postingDates':dates,'@shared/postingMoney':money,'@shared/travelRange':travel,'@shared/submission':submission,'@shared/publicArea':publicArea,'@shared/publicJobArea':{createPublicAreaCache:()=>async()=>null,lookupPublicArea:async()=>null},'@/lib/resize-photo':{resizePhoto:async file=>file},'@/lib/photo-thumbs':{uploadThumbnail:async()=>true,removeThumbnails:async()=>{}},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/photos':{removedThumbPaths:()=>[],thumbUrl:url=>url,fallbackImageSrc:()=>null}}
  vm.runInNewContext(compiled,{exports:module.exports,require(name){
  if(name==='@shared/postingText')return postingText
+ if(name==='@shared/listingAvailability')return availability
+ if(name==='./manage-availability')return {ListingAvailabilityFields:'AvailabilityFields'}
  if(name==='@shared/formatting')return formatting
  if(name==='@/components/date-input')return {DateInput:'input'}
  if(name==='react')return react;if(name==='react/jsx-runtime')return {jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props}),Fragment:'fragment'}
@@ -35,7 +38,7 @@ function harness(patch={},{defer=false,supabase,mode='edit'}={}){
  if(name==='./listing-card')return {ListingCard:()=>null,CardImage:()=>null}
  if(name==='lucide-react')return new Proxy({},{get:()=>()=>null})
  throw Error(name)
- },URL,Date,console,crypto:{randomUUID:()=>'new-listing-id'}})
+ },URL,Date,console,window:{confirm},crypto:{randomUUID:()=>'new-listing-id'}})
  const props=mode==='new'
   ? {mode:'new',userId:'test-user'}
   : {mode:'edit',userId:'test-user',listing:{id:'test-listing',kind:'service',title:'Move a container',category:'Transport & Delivery',description:'Local test',location_name:'Waitoki',pricing_type:'fixed',rate:50,photos:[],pricing_add_ons:[],pricing_variants:[],...patch}}
@@ -205,7 +208,50 @@ test('publishing a new listing creates one row and confirms on My listings',asyn
  const h=await publishNewHireListing(stub)
  assert.deepEqual(stub.calls.map(c=>c[0]),['insert'])
  assert.equal(stub.calls[0][1].id,'new-listing-id')
+ assert.equal(stub.calls[0][1].availability_enabled,undefined,'the database default keeps availability off')
  assert.ok(h.calls.includes('navigate:/listings?published=1'))
+})
+
+test('web creation opts in on Location and publishes the initial settings',async()=>{
+ const stub=saveStub()
+ const h=harness({},{mode:'new',supabase:stub.client})
+ h.click('Hire')
+ h.change('lf-title','Trailer hire')
+ h.click('Next');h.rate('120');h.click('Next');h.click('Next')
+ h.change('lf-location','Waitoki')
+ const toggle=()=>h.nodes().find(n=>n.props?.['aria-describedby']==='listing-availability-help')
+ assert.equal(toggle().props.checked,false)
+ assert.equal(h.nodes().find(n=>n.type==='AvailabilityFields'),undefined)
+ toggle().props.onChange({target:{checked:true}});h.render()
+ const editor=h.nodes().find(n=>n.type==='AvailabilityFields')
+ editor.props.setDraft(previous=>({...previous,status:'limited',type:'next_day',message:'Call to arrange access.'}))
+ h.render()
+ h.click('Review listing')
+ const publish=h.nodes().find(n=>n.type==='button'&&[n.props.children].flat(Infinity).includes('Publish listing'))
+ await publish.props.onClick()
+ assert.equal(stub.calls[0][1].availability_enabled,true)
+ assert.equal(stub.calls[0][1].availability_status,'limited')
+ assert.equal(stub.calls[0][1].lead_time_type,'next_day')
+})
+
+test('web editing asks before disabling a paused listing and keeps its draft on re-enable',()=>{
+ let approved=false
+ const notices=[]
+ const h=harness({availability_enabled:true,availability_status:'paused',lead_time_type:'next_day',
+  availability_updated_at:'2026-11-26T00:00:00Z'},{confirm:message=>{notices.push(message);return approved}})
+ h.click('Next');h.click('Next');h.click('Next')
+ const toggle=()=>h.nodes().find(n=>n.props?.['aria-describedby']==='listing-availability-help')
+ const change=checked=>{toggle().props.onChange({target:{checked}});h.render()}
+ change(false)
+ assert.equal(toggle().props.checked,true)
+ assert.match(notices[0],/allow new booking and quote requests/)
+ approved=true
+ change(false)
+ assert.equal(toggle().props.checked,false)
+ assert.equal(h.nodes().find(n=>n.type==='AvailabilityFields'),undefined)
+ change(true)
+ assert.equal(h.nodes().find(n=>n.type==='AvailabilityFields').props.draft.type,'next_day')
+ assert.equal(h.nodes().find(n=>n.type==='AvailabilityFields').props.draft.status,'paused')
 })
 test('a lost create response adopts the owned row instead of publishing a duplicate',async()=>{
  const stub=saveStub({insertError:{code:'23505'},ownedRow:{id:'new-listing-id'}})

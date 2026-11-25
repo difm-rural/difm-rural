@@ -565,8 +565,10 @@ a.row:hover { background: var(--sage); }
 .manage-availability > button { justify-self: start; }
 .manage-availability fieldset { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
 .manage-availability legend { padding: 0 4px; font-weight: 700; }
-.manage-availability label { display: grid; gap: 3px; font-size: 14px; font-weight: 600; }
-.manage-availability :is(select, input, textarea) { width: 100%; min-width: 0; min-height: 40px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: white; color: inherit; font: inherit; }
+.listing-availability-fields { display: grid; gap: 8px; margin: 8px 0; }
+.listing-availability-fields label { display: grid; gap: 3px; font-size: 14px; font-weight: 600; }
+.listing-availability-fields :is(select, input, textarea) { width: 100%; min-width: 0; min-height: 40px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: white; color: inherit; font: inherit; }
+.listing-availability-toggle { display: flex; align-items: baseline; gap: 8px; font-weight: 700; }
 .manage-availability .lform-save[type="submit"] { background: var(--forest); color: white; }
 .listing-lead-time { display: block; margin: 4px 0; padding: 0 16px; font-size: 13px; }
 .listing-lead-time:last-child { margin-bottom: 12px; }
