@@ -2,6 +2,7 @@
 import {DateInput} from '@/components/date-input'
 import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
 import {POSTING_TITLE_MAX,POSTING_DESCRIPTION_MAX,postingTextError} from '@shared/postingText'
+import {publicAreaError} from '@shared/publicArea'
 import {FieldFeedback,invalidField} from '@/components/field-feedback'
 import {listingAmountError} from '@shared/postingMoney'
 import {runSubmission} from '@shared/submission'
@@ -145,7 +146,8 @@ export function ListingForm({
       }})
     }
     if(index===3){
-      if(!locationName.trim())issues.location='Enter the listing location.'
+      const areaError=publicAreaError(locationName)
+      if(areaError)issues.location=areaError
       const travel=travelRangeError(travelRange);if(travel)issues.travel=travel
       if(availMode==='from'){const date=!availableFrom?'Choose an available-from date.':listingDateError(availableFrom,mode==='edit'?initialAvailFrom:null);if(date)issues.available=date}
     }
@@ -1063,6 +1065,7 @@ export function ListingForm({
         <input
           {...field('location')}
           value={locationName}
+          maxLength={150}
           onChange={e => setLocationName(e.target.value)}
           placeholder="e.g. Cambridge, Waikato"
         />{issue('location')}

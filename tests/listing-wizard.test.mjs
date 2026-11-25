@@ -11,6 +11,7 @@ import * as dates from '../shared/postingDates.ts'
 import * as money from '../shared/postingMoney.ts'
 import * as travel from '../shared/travelRange.ts'
 import * as submission from '../shared/submission.ts'
+import * as publicArea from '../shared/publicArea.ts'
 const require=createRequire(import.meta.url),ts=require('typescript')
 const source=await readFile(new URL('../provider-web/src/app/listings/listing-form.tsx',import.meta.url),'utf8')
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
@@ -20,7 +21,7 @@ function harness(patch={},{defer=false,supabase,mode='edit'}={}){
  const state=[],refs=[],calls=[],pending=[];let index=0,refIndex=0,tree
  const react={useState(initial){const i=index++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;const apply=value=>{state[i]=typeof value==='function'?value(state[i]):value};return [state[i],value=>defer?pending.push(()=>apply(value)):apply(value)]},useRef(initial){const i=refIndex++;return refs[i]??(refs[i]={current:initial})},useEffect(){},useMemo:fn=>fn()}
  const module={exports:{}}
- const modules={'@shared/listingPricing':pricing,'@shared/categories':categories,'@shared/postingDates':dates,'@shared/postingMoney':money,'@shared/travelRange':travel,'@shared/submission':submission,'@shared/publicJobArea':{createPublicAreaCache:()=>async()=>null,lookupPublicArea:async()=>null},'@/lib/resize-photo':{resizePhoto:async file=>file},'@/lib/photo-thumbs':{uploadThumbnail:async()=>true,removeThumbnails:async()=>{}},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/photos':{removedThumbPaths:()=>[],thumbUrl:url=>url,fallbackImageSrc:()=>null}}
+ const modules={'@shared/listingPricing':pricing,'@shared/categories':categories,'@shared/postingDates':dates,'@shared/postingMoney':money,'@shared/travelRange':travel,'@shared/submission':submission,'@shared/publicArea':publicArea,'@shared/publicJobArea':{createPublicAreaCache:()=>async()=>null,lookupPublicArea:async()=>null},'@/lib/resize-photo':{resizePhoto:async file=>file},'@/lib/photo-thumbs':{uploadThumbnail:async()=>true,removeThumbnails:async()=>{}},'@shared/categoryArtwork':{categoryArtwork:()=>'/images/general.png'},'@shared/photos':{removedThumbPaths:()=>[],thumbUrl:url=>url,fallbackImageSrc:()=>null}}
  vm.runInNewContext(compiled,{exports:module.exports,require(name){
  if(name==='@shared/postingText')return postingText
  if(name==='@shared/formatting')return formatting
@@ -182,6 +183,23 @@ async function publishNewHireListing(stub){
  h.render()
  return h
 }
+test('markup in a listing area stays on Location and is not saved',async()=>{
+ const stub=saveStub()
+ const h=harness({},{mode:'new',supabase:stub.client})
+ h.click('Hire')
+ h.change('lf-title','Trailer hire')
+ h.click('Next')
+ h.rate('120')
+ h.click('Next')
+ h.click('Next')
+ h.change('lf-location','<b>Waitoki</b> & "quotes" 😀')
+ h.click('Review listing')
+ assert.equal(h.heading(),'Location & availability')
+ assert.match(h.alert(),/town or area/)
+ assert.deepEqual(stub.calls,[])
+ const publish=h.nodes().find(n=>n.type==='button'&&[n.props.children].flat(Infinity).includes('Publish listing'))
+ assert.equal(publish,undefined)
+})
 test('publishing a new listing creates one row and confirms on My listings',async()=>{
  const stub=saveStub()
  const h=await publishNewHireListing(stub)
