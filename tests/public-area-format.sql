@@ -37,7 +37,7 @@ create trigger protect_listing_location
   before insert or update on public.services
   for each row execute function public.protect_listing_location();
 
-\ir ../supabase/migrations/20261125120000_public_area_format.sql
+\ir ../supabase/migrations/20261125004045_public_area_format.sql
 
 insert into public.jobs(id, title, status, location_area) values
   (1, 'Fence', 'open', '  Te Kūiti  '),

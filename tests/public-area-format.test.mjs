@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { publicAreaError } from '../shared/publicArea.ts'
 
-const sql = await readFile(new URL('../supabase/migrations/20261125120000_public_area_format.sql', import.meta.url), 'utf8')
+const sql = await readFile(new URL('../supabase/migrations/20261125004045_public_area_format.sql', import.meta.url), 'utf8')
 
 function spans(name) {
   const match = sql.match(new RegExp(`${name} integer\\[] := array\\[([\\s\\S]*?)\\n  \\]`))
