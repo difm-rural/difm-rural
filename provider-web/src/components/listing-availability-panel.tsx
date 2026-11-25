@@ -1,20 +1,18 @@
-import type {ReactNode} from 'react'
-import {listingAvailabilityDetail} from './listingAvailabilityDetail'
-import type {ListingAvailability} from './listingAvailability'
+import {CircleCheck, CirclePause, Clock} from 'lucide-react'
+import {listingAvailabilityDetail} from '@shared/listingAvailabilityDetail'
+import type {ListingAvailability} from '@shared/listingAvailability'
 
-type Tone = NonNullable<ReturnType<typeof listingAvailabilityDetail>>['tone']
+const statusIcons = {accepting: CircleCheck, limited: Clock, paused: CirclePause}
 
-export function ListingAvailabilityPanel({listing, icons}: {
-  listing: ListingAvailability
-  icons: Record<Tone, ReactNode>
-}) {
+export function ListingAvailabilityPanel({listing}: {listing: ListingAvailability}) {
   const detail = listingAvailabilityDetail(listing)
   if (!detail) return null
+  const StatusIcon = statusIcons[detail.tone]
 
   return <section className="listing-availability" aria-labelledby="listing-availability-heading">
     <h2 id="listing-availability-heading">Availability</h2>
     {detail.status && <p className="listing-availability-status" data-tone={detail.tone}>
-      {icons[detail.tone]}<span>{detail.status}</span>
+      <StatusIcon size={18} aria-hidden="true" /><span>{detail.status}</span>
     </p>}
     {detail.lead && <div>
       {detail.leadLabel && <p className="listing-availability-secondary">{detail.leadLabel}</p>}

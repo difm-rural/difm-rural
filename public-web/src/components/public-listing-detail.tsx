@@ -1,7 +1,6 @@
 import {durationPolicy,DURATION_AGREEMENT} from '@shared/bookingDuration'
 import {bookingLocationPolicy} from '@shared/bookingLocation'
-import {CircleCheck, CirclePause, Clock} from 'lucide-react'
-import {ListingAvailabilityPanel} from '@shared/ListingAvailabilityPanel'
+import {ListingAvailabilityPanel} from './listing-availability-panel'
 import {listingAvailability, PAUSED_REQUEST_MESSAGE} from '@shared/listingAvailability'
 import {formatDate as nzDate,formatMoney as nzMoney} from '@shared/formatting'
 /* eslint-disable @next/next/no-img-element -- Public storage photos are supplied by members. */
@@ -20,7 +19,7 @@ export async function PublicListingDetail({id}:{id:string}){
  const {data:provider,error:profileError}=await client.from('profiles_public').select('full_name,bio,region,created_at').eq('id',s.provider_id).maybeSingle()
  const {data:reviews,error:reviewsError}=await client.from('reviews').select('id,rating,comment,created_at').eq('reviewee_id',s.provider_id).eq('reviewee_role','provider').order('created_at',{ascending:false}).limit(20)
  return <MarketplaceShell><Link href="/listings" className="public-link">← Back to listings</Link><p className="eyebrow">{s.category} · {s.kind?.replace('_',' ')}</p><h1>{s.title}</h1><p>{s.location_name || 'Arrange location with the provider'}</p><div className="public-photos">{s.photos?.map((url:string,i:number)=><a key={i} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={s.title+' — photo '+(i+1)}/></a>)}</div>
- <ListingAvailabilityPanel listing={s} icons={{accepting:<CircleCheck size={18} aria-hidden="true"/>,limited:<Clock size={18} aria-hidden="true"/>,paused:<CirclePause size={18} aria-hidden="true"/>}} />
+ <ListingAvailabilityPanel listing={s} />
  <article className="public-panel"><h2>Listing details</h2>{['grazing','hire','for_sale','lease'].includes(s.kind)&&<p>{bookingLocationPolicy(s.kind).help}</p>}<p className="public-description">{s.description}</p><h3>Pricing</h3><strong>{formatRate(s.pricing_type,s.rate,s.unit_label,s.min_charge)}</strong>{s.min_charge!=null&&<p>Minimum charge: {nzMoney(s.min_charge)}</p>}{s.minimum_units>1&&<p>Minimum quantity: {s.minimum_units}</p>}{s.kind==='grazing'&&s.max_units&&<p>Grazing capacity: {s.max_units} head</p>}
  {!!s.pricing_variants?.length&&<><h3>Rate options</h3>{s.pricing_variants.map((v:Parameters<typeof variantDisplay>[0],i:number)=><p key={i}>{variantDisplay(v)}{Number(v.min_charge)>0?" · Minimum charge: "+nzMoney(v.min_charge)+'':''}</p>)}</>}
  {!!s.pricing_add_ons?.length&&<><h3>Extra charges</h3>{s.pricing_add_ons.map((a:Parameters<typeof addOnDisplay>[0],i:number)=><p key={i}>{addOnDisplay(a)}</p>)}<p>Extra charges are separate from the base rate. Agree which apply with the provider.</p></>}
