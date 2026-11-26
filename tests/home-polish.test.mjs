@@ -15,6 +15,9 @@ test('Home keeps My Property / My Work and its destinations; intro is one short 
  assert.match(home,/Find local help and keep track of who looks after your property\./)
  // The empty work line no longer repeats the two buttons right under it.
  assert.equal(homeAttentionSummary([]).text,"You're all caught up.")
+ // Never "all caught up" beside an unread bell.
+ assert.equal(homeAttentionSummary([],0,35).text,'Nothing needs your action. 35 unread updates in Notifications.')
+ assert.equal(homeAttentionSummary([],0,1).text,'Nothing needs your action. 1 unread update in Notifications.')
 })
 
 test('seasonal cards are shorter but keep their swipe width, dismiss target and two-line body',()=>{

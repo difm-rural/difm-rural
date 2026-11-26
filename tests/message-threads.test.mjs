@@ -4,6 +4,7 @@ import test from 'node:test'
 globalThis.threadTestClient = {}
 const source = (await readFile(new URL('../src/lib/messageThreads.js', import.meta.url), 'utf8'))
   .replace("import { supabase } from './supabase'", 'const supabase = globalThis.threadTestClient')
+  .replace("'../../shared/chatEvents'", JSON.stringify(new URL('../shared/chatEvents.ts', import.meta.url).href))
 const { groupMessageThreads, messagePreview, fetchMessageThreads } = await import(
   `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 

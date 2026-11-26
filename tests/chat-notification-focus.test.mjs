@@ -1,3 +1,4 @@
+import * as chatEvents from '../shared/chatEvents.ts'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
@@ -38,7 +39,7 @@ test('blurred chats stop reading notifications; reopening loads and reads only t
     '../components/EnquiryPersonCard': () => null,
     '../components/SideHeader': () => null,
     '../lib/shrinkPhoto': { PHOTO_MAX: 1600, shrinkPhoto: async asset => asset },
-    '../lib/location': {}, '../lib/notifications': { async markNotificationsReadFor(params) { reads.push(params) } },
+    '../lib/location': {}, '../../shared/chatEvents': chatEvents, '../lib/notifications': { async markNotificationsReadFor(params) { reads.push(params) } },
   }
   const module = { exports: {} }
   vm.runInNewContext(`(function(require,module,exports){${compiled}\n})`, { console, setTimeout })(

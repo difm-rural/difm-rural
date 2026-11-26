@@ -95,7 +95,7 @@ test('native Home ignores unread history after withdrawal and keeps its unread c
  const row=screen.nodes().find(n=>n.props?.accessibilityLabel?.startsWith(booking('pending').service.title))
  row.props.onPress();assert.equal(screen.navigation.at(-1)[0],'ServiceBookingDetail')
  screen.setMoves([]);screen.refresh();await screen.settle()
- assert.match(screen.text(),/You're all caught up/)
+ assert.match(screen.text(),/Nothing needs your action. 27 unread updates in Notifications./)
  assert.match(screen.text(),/All notifications \(27 unread\)/)
  assert.doesNotMatch(screen.text(),/Confirm or decline|Needs attention/)
  assert.ok(screen.inboxCalls.every(options=>options.limit===0))
@@ -105,7 +105,7 @@ test('a slower old native Home response cannot resurrect a withdrawn request',as
  screen.deferNext(()=>new Promise(resolve=>{resolveOld=resolve}));screen.refresh();await screen.settle()
  screen.setMoves([]);screen.refresh();await screen.settle()
  resolveOld([move('pending')]);await screen.settle()
- assert.match(screen.text(),/You're all caught up/);assert.doesNotMatch(screen.text(),/Confirm or decline/)
+ assert.match(screen.text(),/Nothing needs your action. 27 unread updates in Notifications./);assert.doesNotMatch(screen.text(),/Confirm or decline/)
 })
 test('native Home shows a safe summary when lifecycle retrieval fails',async()=>{
  const screen=await home(null)
