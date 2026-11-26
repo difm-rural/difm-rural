@@ -82,6 +82,7 @@ export default function JobPaymentHandoff({
       {agreedPaymentMethodLabels[method] && <Text style={styles.body}>Agreed method: {agreedPaymentMethodLabels[method]}</Text>}
       {canUpdate && (
         <Button
+          variant="secondary"
           title={busy ? 'Saving…' : sorted ? copy.undo : copy.mark}
           onPress={sorted ? undo : () => save(false)}
           disabled={busy}

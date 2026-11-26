@@ -43,8 +43,14 @@ test('unanswered questions are actionable while offer acceptance stays available
 for(const sorted of [null,'2026-11-23'])test('accepted provider: single status, chat before payment, payment attribution retained '+sorted,()=>{
  const s=screen({job:{status:'accepted'},acceptedBid:{bidId:'b',providerId:'p',providerName:'Peter Very Long Name',bidAmount:200,paymentSortedAt:sorted,paymentSortedBy:'me'}});const n=s.render()
  assert.equal(n.filter(v=>v.type==='NextMoveBanner').length,1);assert.ok(!s.text().includes('Job summary'))
- assert.ok(n.findIndex(v=>v.props?.onPress&&v.props.accessibilityLabel==='Chat with Peter')<n.findIndex(v=>v.type==='JobPaymentHandoff'))
- const payment=n.find(v=>v.type==='JobPaymentHandoff');assert.equal(payment.props.sortedAt,sorted);assert.equal(payment.props.sortedBy,'me')
+ if(sorted){
+  assert.ok(n.findIndex(v=>v.props?.onPress&&v.props.accessibilityLabel==='Chat with Peter')<n.findIndex(v=>v.type==='JobPaymentHandoff'))
+  const payment=n.find(v=>v.type==='JobPaymentHandoff');assert.equal(payment.props.sortedAt,sorted);assert.equal(payment.props.sortedBy,'me')
+ }else{
+  // Before Peter confirms there is nothing to mark yet: a note, not payment buttons.
+  assert.equal(n.find(v=>v.type==='JobPaymentHandoff'),undefined)
+  assert.ok(s.text().includes('will say how they'))
+ }
  s.press('Chat with Peter');assert.equal(s.log.navigate[0][0],'Chat')
 })
 test('later lifecycle retains schedule/review actions and expanded original details',()=>{

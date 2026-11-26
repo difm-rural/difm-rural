@@ -715,34 +715,24 @@ export default function ManageTaskScreen({ navigation, route }) {
                   </View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoBoxText}>
-                    Awarded · {nzMoney(acceptedBid.bidAmount)} · Use chat with {otherPartyFirstName} to confirm timing and details
-                  </Text>
-                </View>
+                <Text style={styles.agreedLine}>Agreed: {formatOfferAmount(acceptedBid.bidAmount, acceptedBid.pricingType)}</Text>
                 {focusedAccepted && <JobArrangementSummary duration={acceptedBid?.duration} />}
               </>
             ) : null}
           </View>
 
-          {/* Chat banner */}
+          {/* One clear action: chat (the profile opens from the name above). */}
           {acceptedBid ? (
-            <TouchableOpacity
-              style={styles.chatBanner}
-              onPress={handleChat}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel={`Chat with ${otherPartyFirstName}`}>
-              <Icon name="chatbubble-ellipses-outline" size={26} color={colors.white} style={styles.chatBannerIcon} />
-              <View style={styles.chatBannerContent}>
-                <Text style={styles.chatBannerTitle}>Chat with {otherPartyFirstName}</Text>
-                <Text style={styles.chatBannerSubtitle}>Discuss job details and start time</Text>
-              </View>
-              <Icon name="chevron-forward" size={24} color="rgba(255,255,255,0.7)" />
-            </TouchableOpacity>
+            <Button title={`Chat with ${otherPartyFirstName}`} icon="chatbubble-ellipses-outline" onPress={handleChat}
+              accessibilityLabel={`Chat with ${otherPartyFirstName}`} style={{ marginBottom: 12 }} />
           ) : null}
 
-          {focusedAccepted && isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && acceptedBid?.bidId ? (
+          {focusedAccepted && !jobConfirmed && !acceptedBid?.paymentSortedAt ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Payment</Text>
+              <Text style={styles.accessBody}>{otherPartyFirstName} will say how they&apos;d like to be paid when they confirm the job.</Text>
+            </View>
+          ) : focusedAccepted && isTaskOwner && ['accepted', 'in_progress', 'awaiting_completion', 'completed'].includes(job.status) && acceptedBid?.bidId ? (
             <JobPaymentHandoff
               bidId={acceptedBid.bidId}
               method={acceptedBid.paymentMethod}
@@ -757,18 +747,11 @@ export default function ManageTaskScreen({ navigation, route }) {
 
           {focusedAccepted && detailsJSX}
           {/* Actions */}
+          {/* Cancelling is rare: a quiet link, still behind its own confirmation. */}
           {isTaskOwner && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{focusedAccepted ? 'More actions' : 'Actions'}</Text>
-            <View style={styles.actionBtns}>
-              <Button
-                variant="destructive"
-                title="Cancel job"
-                onPress={handleCancel}
-                accessibilityLabel="Cancel job"
-              />
-            </View>
-          </View>
+            <TouchableOpacity onPress={handleCancel} accessibilityRole="button" accessibilityLabel="Cancel job" style={styles.cancelLink}>
+              <Text style={styles.cancelLinkText}>Cancel job</Text>
+            </TouchableOpacity>
           )}
 
           {!focusedAccepted && <>
@@ -1273,6 +1256,9 @@ const styles = StyleSheet.create({
   loadingText:  { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 16 },
 
   // ─── Info box ───────────────────────────────────────────────────
+  agreedLine:     { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginTop: 10 },
+  cancelLink:     { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16, marginBottom: 8 },
+  cancelLinkText: { fontSize: 14, color: colors.danger, textDecorationLine: 'underline' },
   infoBox: {
     marginHorizontal: 16,
     marginTop: 4,
