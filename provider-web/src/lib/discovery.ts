@@ -1,18 +1,20 @@
 import {matchesHelpFilter} from '@shared/findLocalHelp'
 import {CATEGORIES,LISTING_CATEGORIES} from '@shared/categories'
 import type {ListingKind} from '@shared/listingPricing'
+import {applyAvailabilityDiscovery,availabilityFilterValue,LEAD_TIME_SORT,type AvailabilityFilter,type DiscoverableListing} from '@shared/availabilityDiscovery'
 export type Coordinates={latitude:number;longitude:number}
-export type DiscoveryFilters={q:string;category:string;kind:string;sort:'newest'|'nearest';radius:number|null;page:number;interest:string}
+export type DiscoveryFilters={q:string;category:string;kind:string;sort:'newest'|'nearest'|'lead_time';radius:number|null;page:number;interest:string;availability?:AvailabilityFilter}
 export const RADII=[10,25,50,100,200]
 export function coordinates(lat:unknown,lng:unknown):Coordinates|null{
  if(lat==null||lng==null||lat===''||lng==='')return null
  const latitude=Number(lat),longitude=Number(lng)
  return Number.isFinite(latitude)&&Number.isFinite(longitude)&&Math.abs(latitude)<=90&&Math.abs(longitude)<=180?{latitude,longitude}:null
 }
-export function discoveryFilters(values:Record<string,unknown>):DiscoveryFilters{
+// Availability filter and lead-time sort apply to listings only; job boards ignore them.
+export function discoveryFilters(values:Record<string,unknown>,listings=false):DiscoveryFilters{
  const radius=Number(values.radius),page=Number(values.page)
  const kind=['service','grazing','hire','lease','for_sale'].includes(String(values.kind))?String(values.kind):''
- return {q:typeof values.q==='string'?values.q.trim().slice(0,120):'',category:discoveryCategories(kind).includes(String(values.category))?String(values.category):'',kind,sort:values.sort==='nearest'?'nearest':'newest',radius:Number.isInteger(radius)&&radius>=1&&radius<=200?radius:null,page:Number.isInteger(page)&&page>0?Math.min(page,100000):1,interest:typeof values.interest==='string'&&/^[a-f0-9-]{36}$/i.test(values.interest)?values.interest:''}
+ return {q:typeof values.q==='string'?values.q.trim().slice(0,120):'',category:discoveryCategories(kind).includes(String(values.category))?String(values.category):'',kind,sort:values.sort==='nearest'?'nearest':listings&&values.sort===LEAD_TIME_SORT?LEAD_TIME_SORT:'newest',radius:Number.isInteger(radius)&&radius>=1&&radius<=200?radius:null,page:Number.isInteger(page)&&page>0?Math.min(page,100000):1,interest:typeof values.interest==='string'&&/^[a-f0-9-]{36}$/i.test(values.interest)?values.interest:'',...(listings?{availability:availabilityFilterValue(values.availability)}:{})}
 }
 // The main categories, plus a resource kind's own (e.g. hire → Machinery).
 export function discoveryCategories(kind:string){
@@ -22,10 +24,12 @@ export function discoveryCategories(kind:string){
 export function discoveryHref(path:string,f:Partial<DiscoveryFilters>){const params=new URLSearchParams();for(const [k,v] of Object.entries(f))if(v!==null&&v!==''&&v!==undefined&&!(k==='page'&&v===1))params.set(k,String(v));return path+(params.size?'?'+params:'')}
 export function distanceKm(a:Coordinates,b:Coordinates){const r=Math.PI/180,dlat=(b.latitude-a.latitude)*r,dlng=(b.longitude-a.longitude)*r,h=Math.sin(dlat/2)**2+Math.cos(a.latitude*r)*Math.cos(b.latitude*r)*Math.sin(dlng/2)**2;return 6371*2*Math.atan2(Math.sqrt(Math.min(1,h)),Math.sqrt(Math.max(0,1-h)))}
 export type Discoverable={id:string;title:string;description?:string|null;category?:string|null;kind?:string|null;location_name?:string|null;location_area?:string|null;latitude?:number|null;longitude?:number|null;created_at:string;discovery_latitude?:number;discovery_longitude?:number;discovery_location_approximate?:boolean}
-export function discover<T extends Discoverable>(rows:T[],f:DiscoveryFilters,origin:Coordinates|null){
+export function discover<T extends Discoverable & DiscoverableListing>(rows:T[],f:DiscoveryFilters,origin:Coordinates|null,today?:string){
  const query=f.q.toLocaleLowerCase('en-NZ')
- const matching=rows.filter(row=>(!f.category||row.category===f.category)&&matchesHelpFilter(row,f.kind)&&(!query||[row.title,row.description,row.category,row.location_name,row.location_area].some(v=>String(v || '').toLocaleLowerCase('en-NZ').includes(query)))).map(row=>{const pin=coordinates(row.latitude,row.longitude)||coordinates(row.discovery_latitude,row.discovery_longitude);return {...row,distance:origin&&pin?distanceKm(origin,pin):null}}).filter(row=>!f.radius||(row.distance!==null&&row.distance<=f.radius))
- matching.sort((a,b)=>f.sort==='nearest'&&origin?(a.distance ?? Infinity)-(b.distance ?? Infinity)||b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id):b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id))
+ const nearest=f.sort==='nearest'||(f.sort===LEAD_TIME_SORT&&!!origin)   // lead time keeps the default order as its tie-break
+ let matching=rows.filter(row=>(!f.category||row.category===f.category)&&matchesHelpFilter(row,f.kind)&&(!query||[row.title,row.description,row.category,row.location_name,row.location_area].some(v=>String(v || '').toLocaleLowerCase('en-NZ').includes(query)))).map(row=>{const pin=coordinates(row.latitude,row.longitude)||coordinates(row.discovery_latitude,row.discovery_longitude);return {...row,distance:origin&&pin?distanceKm(origin,pin):null}}).filter(row=>!f.radius||(row.distance!==null&&row.distance<=f.radius))
+ matching.sort((a,b)=>nearest&&origin?(a.distance ?? Infinity)-(b.distance ?? Infinity)||b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id):b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id))
+ if(f.availability||f.sort===LEAD_TIME_SORT)matching=applyAvailabilityDiscovery(matching,f.availability || '',f.sort,today)
  const pages=Math.max(1,Math.ceil(matching.length/20)),page=Math.min(f.page,pages)
  return {rows:matching.slice((page-1)*20,page*20),count:matching.length,pages,page}
 }

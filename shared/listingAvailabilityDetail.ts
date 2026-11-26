@@ -14,7 +14,7 @@ export function listingAvailabilityDetail(listing: ListingAvailability) {
   return {
     status: summary.visibleStatus,
     tone,
-    leadLabel: hasTiming ? 'Estimated lead time' : '',
+    leadLabel: hasTiming ? summary.leadLabel : '',
     lead: estimate || summary.lead,
     message,
     disclaimer: hasTiming ? ESTIMATED_TIMING_NOTE : '',
