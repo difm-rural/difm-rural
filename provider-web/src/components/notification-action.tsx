@@ -88,11 +88,15 @@ export function NotificationRow({n,markRead,answerAvailability}:{n:NotificationR
   </li>
 }
 
-export function MarkAllRead({action,cutoff}:{action:(state:ActionState,data:FormData)=>Promise<ActionState>;cutoff:string}){
+// Stays mounted once everything is read (cutoff null) so its confirmation
+// can show; the button only appears while something is unread.
+export function MarkAllRead({action,cutoff}:{action:(state:ActionState,data:FormData)=>Promise<ActionState>;cutoff:string|null}){
   const [state,submit,pending]=useActionState(action,{error:''})
+  if(!cutoff&&!state.success)return null
   return <form action={submit} className="notification-mark-all" aria-busy={pending || undefined}>
-    <input type="hidden" name="all" value="true"/><input type="hidden" name="cutoff" value={cutoff}/>
-    <button className="lform-cancel" disabled={pending}><CheckCheck size={15}/> {pending?'Marking…':'Mark all read'}</button>
+    {cutoff&&<><input type="hidden" name="all" value="true"/><input type="hidden" name="cutoff" value={cutoff}/>
+    <button className="lform-cancel" disabled={pending}><CheckCheck size={15}/> {pending?'Marking…':'Mark all read'}</button></>}
     {state.error && <p className="form-error" role="alert">{state.error}</p>}
+    {!cutoff && state.success && <p className="home-clear" role="status">✓ {state.success}</p>}
   </form>
 }

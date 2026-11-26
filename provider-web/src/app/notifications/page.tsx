@@ -38,7 +38,7 @@ export default async function NotificationsPage({searchParams}:{searchParams:Pro
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page">
     <header className="home-heading"><div><h1>Notifications</h1></div>
       <div className="notification-header-actions">
-        {!latestError && latest?.[0] && <MarkAllRead action={updateNotification} cutoff={latest[0].created_at}/>}
+        {!latestError && <MarkAllRead action={updateNotification} cutoff={latest?.[0]?.created_at || null}/>}
         <LiveRefresh/>
       </div>
     </header>
