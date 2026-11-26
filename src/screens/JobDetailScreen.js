@@ -101,6 +101,9 @@ export default function JobDetailScreen({ route, navigation }) {
   const [job, setJob] = useState(initialJob)
   const [bids, setBids] = useState([])
   const [loading, setLoading] = useState(false)
+  // Set once the first load has worked out who you are on this job, so an
+  // accepted/completed job never flashes the general job layout first.
+  const [roleKnown, setRoleKnown] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const submittingBidRef = useRef(false)
@@ -171,7 +174,8 @@ export default function JobDetailScreen({ route, navigation }) {
   const questionFocusPending = useRef(false)
   const bidMessageRef = useRef(null)
 
-  useEffect(() => { if (focused) fetchData() }, [initialJob.id, focused])
+  // Even if a load fails, stop showing "Loading job…" (the screen then falls back to what it has).
+  useEffect(() => { if (focused) Promise.resolve(fetchData()).catch(() => {}).finally(() => setRoleKnown(true)) }, [initialJob.id, focused])
 
   useEffect(() => {
     if (job.status !== 'completed' || !currentUser?.id || myBid?.status !== 'accepted') return
@@ -203,18 +207,22 @@ export default function JobDetailScreen({ route, navigation }) {
     trackEvent('job_viewed', { job_id: currentJob.id, category: currentJob.category })
     recordJobProviderView(currentJob.id)
 
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    // Independent reads in one parallel round (they used to run one after another).
+    const [{ data: profileData }, schedule, { data: bidsData }, { data: reqProfile }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      fetchWorkSchedule({ jobId: currentJob.id }),
+      supabase
+        .from('bids')
+        .select('*, line_items, available_from, estimated_duration')
+        .eq('job_id', currentJob.id)
+        .order('created_at', { ascending: false }),
+      supabase.from('profiles_public').select('id, full_name, avatar_url').eq('id', currentJob.requester_id).single(),
+    ])
     setProfile(profileData)
-    const schedule = await fetchWorkSchedule({ jobId: currentJob.id })
+    setRequesterProfile(reqProfile)
     const confirmed = justConfirmed.current
     setWorkSchedule(schedule || (confirmed?.jobId === currentJob.id ? confirmed.arrival : null))
     if (schedule && confirmed?.jobId === currentJob.id) justConfirmed.current = null
-
-    const { data: bidsData } = await supabase
-      .from('bids')
-      .select('*, line_items, available_from, estimated_duration')
-      .eq('job_id', currentJob.id)
-      .order('created_at', { ascending: false })
 
     if (bidsData && bidsData.length > 0) {
       const providerIds = [...new Set(bidsData.map(b => b.provider_id))]
@@ -253,9 +261,7 @@ export default function JobDetailScreen({ route, navigation }) {
       }
     }
 
-    const { data: reqProfile } = await supabase
-      .from('profiles_public').select('id, full_name, avatar_url').eq('id', currentJob.requester_id).single()
-    setRequesterProfile(reqProfile)
+    setRoleKnown(true)
 
     // Invited-provider context: show the "you were invited" banner, and mark the
     // invite seen so the requester can tell it's been opened.
@@ -665,6 +671,12 @@ export default function JobDetailScreen({ route, navigation }) {
     return <View style={styles.container}>{headerJSX}<Text style={styles.title}>{jobUnavailable ? 'This job is unavailable.' : 'Loading job…'}</Text></View>
   }
 
+  // Opened from Home / Activity with only an id and title: until the first load
+  // knows your role, show a brief loading state rather than the wrong layout.
+  if (!roleKnown && (initialJob._viewerRole === 'provider' || (initialJob.status && initialJob.status !== 'open'))) {
+    return <View style={styles.container}>{headerJSX}<Text style={styles.title} accessibilityRole="progressbar">Loading job…</Text></View>
+  }
+
   if (isAcceptedProvider) {
     const requesterFirstName = requesterProfile?.full_name?.split(' ')[0] || 'the requester'
     const otherBidCount = Math.max(0, bids.length - 1)
@@ -803,10 +815,10 @@ export default function JobDetailScreen({ route, navigation }) {
                 <Text style={styles.acceptedBadgeText}>{jobConfirmed ? 'Scheduled' : 'Confirm your arrival time'}</Text>
               </View>
             </View>}
-            <Text style={styles.detailValue}>Requester: {requesterProfile?.full_name || 'Requester'}</Text>
-            <Text style={styles.detailValue}>Agreed: {formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
+            <Text style={styles.summaryLine}>Requester: {requesterProfile?.full_name || 'Requester'}</Text>
+            <Text style={styles.summaryLine}>Agreed: {formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
             <Text style={styles.location}>{jobLocation(job)}</Text>
-            {workSchedule?.arrival_start_at && <Text style={styles.detailValue}>Arrival: {formatArrivalWindow(workSchedule)}</Text>}
+            {workSchedule?.arrival_start_at && <Text style={styles.summaryLine}>Arrival: {formatArrivalWindow(workSchedule)}</Text>}
           </View>
 
           {!isCompleted && !jobConfirmed && <View style={styles.section}>
@@ -816,8 +828,9 @@ export default function JobDetailScreen({ route, navigation }) {
             <Button title={requesterReview ? `Edit review (${requesterReview.rating}/5)` : 'Review requester'}
               variant={requesterReview ? 'secondary' : 'primary'} onPress={() => setReviewVisible(true)}
               accessibilityLabel={requesterReview ? 'Edit requester review' : 'Review requester'} />
-            {jobReviewStatus(requesterReview === undefined ? undefined : !!requesterReview, receivedReview === undefined ? undefined : !!receivedReview, 'Requester').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
-            <ReceivedReview review={receivedReview} fromLabel="requester" />
+            {/* The banner already says whether you've reviewed. Their review of you
+                shows once you've left yours, so it doesn't read as a leftover. */}
+            {requesterReview && <ReceivedReview review={receivedReview} fromLabel="requester" />}
           </View>}
           <View style={styles.section}>
             {!isCompleted && <Button title="Chat with requester" icon="chatbubble-ellipses-outline"
@@ -1602,8 +1615,8 @@ export default function JobDetailScreen({ route, navigation }) {
         {isJobOwner && job.status === 'completed' && acceptedBid && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Reviews</Text>
-            {jobReviewStatus(providerReview === undefined ? undefined : !!providerReview, receivedReview === undefined ? undefined : !!receivedReview, 'Provider').filter(Boolean).map(label => <Text key={label} style={styles.detailLabel}>{label}</Text>)}
-            <ReceivedReview review={receivedReview} fromLabel="provider" />
+            {/* Their review of you shows once you've left yours (same as the provider side). */}
+            {providerReview && <ReceivedReview review={receivedReview} fromLabel="provider" />}
             <Button
               title={providerReview ? `Edit review (${providerReview.rating}/5)` : `Review ${acceptedProviderName}`}
               onPress={() => setProviderReviewVisible(true)}
@@ -1863,6 +1876,7 @@ const styles = StyleSheet.create({
 
   detailRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#f2f2f2' },
   detailLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600', flex: 0, marginRight: 12 },
+  summaryLine: { fontSize: 14, color: colors.textPrimary, fontWeight: '500', marginBottom: 4 },
   detailValue: { fontSize: 13, color: colors.textPrimary, fontWeight: '500', textAlign: 'right', flex: 1 },
 
 
