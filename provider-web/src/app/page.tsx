@@ -1,6 +1,7 @@
 import {bookingNextMove,jobNextMove,type NextMove} from '@shared/nextMove'
 import {rankOnTheGo} from '@shared/onTheGo'
 import {loadReviewPrompts} from '@shared/reviewPrompts'
+import {DismissReview} from '@/components/dismiss-review'
 import {HomeModes} from '@/components/home-modes'
 import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '@shared/homeSummary'
 import {loadPropertyNetwork,propertyNetworkHomeLines} from '@shared/propertyNetwork'
@@ -65,7 +66,7 @@ export default async function HomePage() {
   ].filter(Boolean))]
   const people = nameIds.length ? await supabase.from('profiles_public').select('id,full_name').in('id', nameIds) : {data:[],error:null}
   const names = new Map((people.data || []).map(person => [person.id, person.full_name as string | null]))
-  type GoItem = {key:string;viewerRole:'requester'|'provider';pendingOffer?:boolean;arrivalAt?:string|null;side:'job'|'listing';own:boolean;title:string;href:string;next:NextMove;needsAction:boolean;updatedAt:unknown[]}
+  type GoItem = {review?:{kind:'job'|'booking';id:string};key:string;viewerRole:'requester'|'provider';pendingOffer?:boolean;arrivalAt?:string|null;side:'job'|'listing';own:boolean;title:string;href:string;next:NextMove;needsAction:boolean;updatedAt:unknown[]}
   const goItems: GoItem[] = []
   for (const job of ownJobs) {
     const accepted = acceptedOnOwn.get(job.id)
@@ -86,7 +87,7 @@ export default async function HomePage() {
     if (next) goItems.push({viewerRole:providing?'provider':'requester',key: 'booking:' + booking.id, side: 'listing', own: providing, title: service?.title || 'Booking', href: '/bookings/' + booking.id, next, needsAction: next.needsAction, updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at]})
   }
   // Completed work you haven't reviewed yet stays on Home until you do.
-  for (const prompt of reviewPrompts) goItems.push({viewerRole:prompt.viewerRole,key:prompt.key,side:prompt.kind==='job'?'job':'listing',own:prompt.viewerRole===(prompt.kind==='job'?'requester':'provider'),title:prompt.title,href:(prompt.kind==='job'?'/jobs/':'/bookings/')+prompt.id+'#reviews',next:prompt.next,needsAction:true,updatedAt:prompt.updatedAt})
+  for (const prompt of reviewPrompts) goItems.push({review:{kind:prompt.kind,id:prompt.id},viewerRole:prompt.viewerRole,key:prompt.key,side:prompt.kind==='job'?'job':'listing',own:prompt.viewerRole===(prompt.kind==='job'?'requester':'provider'),title:prompt.title,href:(prompt.kind==='job'?'/jobs/':'/bookings/')+prompt.id+'#reviews',next:prompt.next,needsAction:true,updatedAt:prompt.updatedAt})
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes, schedules, invitations].some(r => r.error)
   const networkLines=network?propertyNetworkHomeLines(network):[]
   const workItems=goItems.filter(item=>item.viewerRole==='provider')
@@ -109,7 +110,8 @@ export default async function HomePage() {
    return <div className="home-actions">{items.map((item,index)=><Link key={item.href} href={item.href} className={'home-action'+(index===0?' primary':'')}><item.icon size={22}/><strong>{item.title}</strong><span>{item.text}</span><ArrowRight size={18} className="home-action-arrow"/></Link>)}</div>
   }
   function activity(role:'requester'|'provider'){
-   const onTheGo=rankOnTheGo(goItems.filter(item=>item.viewerRole===role))
+   // Review prompts live in Needs attention only; On the go is work still in flight.
+   const onTheGo=rankOnTheGo(goItems.filter(item=>item.viewerRole===role&&!item.review))
    const activityUnavailable=[jobs,bookings,offers,offerJobs,ownBids,ownQuestions,awardTimes,schedules].some(result=>result.error)
    const attentionSummary=homeAttentionSummary(activityUnavailable?null:goItems.filter(item=>item.viewerRole===role),role==='provider'?invitations.count??null:0,notifications.count,
     role==='provider'?{label:'My Property',count:goItems.filter(item=>item.viewerRole==='requester'&&item.needsAction).length}:{label:'My Work',count:goItems.filter(item=>item.viewerRole==='provider'&&item.needsAction).length+(invitations.count||0)})
@@ -121,7 +123,7 @@ export default async function HomePage() {
         <ul className="list">{attention.slice(0,5).map(item=><li key={item.key}><Link className="row" href={item.href}>
           <span className={'attention-icon '+item.side}>{item.side==='job'?<Briefcase size={18}/>:<Tag size={18}/>}</span>
           <span className="row-main"><strong>{item.title}</strong><span className="row-sub">{item.next.label}</span><span className="row-snippet">{item.next.detail}</span><span className="card-link">{item.next.actionLabel || 'View details'} →</span></span><ArrowRight size={16}/>
-        </Link></li>)}</ul>
+        </Link>{item.review&&<DismissReview kind={item.review.kind} id={item.review.id} role={item.viewerRole} title={item.title}/>}</li>)}</ul>
       </section>}
       {/* On the go — what's in flight, by name, with whose turn it is (replaces the count tiles) */}
       {onTheGo.total > 0 && <section className="card home-attention home-onthego"><div className="card-head"><h2>On the go</h2><Link href="/activity" className="card-link">View all ›</Link></div>

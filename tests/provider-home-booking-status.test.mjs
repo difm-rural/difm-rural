@@ -71,6 +71,7 @@ async function home(initialMoves,{unreadCount=27,invites=[]}={}){
   '../../lib/notifications':{fetchNotificationInbox:async options=>{inboxCalls.push(options);return {items:[],unreadCount}}},
   '../../lib/invites':{fetchInvitedJobsForProvider:async()=>invites},
   '../../lib/seasonalReminders':{fetchSeasonalReminders:async()=>[],recordSeasonalEvent(){}},
+  '../../../shared/reviewPrompts':{dismissReviewPrompt:async()=>{}},
   '../../lib/nextMove':{fetchActiveNextMoves:async()=>{if(loadNext){const next=loadNext;loadNext=null;return next()}return currentMoves}},
   '../../lib/badgeEvents':{onBadgeRefresh:f=>{badge=f;return ()=>{}}},'../../theme/tokens':{colors:{}},
  }

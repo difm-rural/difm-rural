@@ -65,6 +65,7 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@/lib/auth':{requireProvider:async()=>({supabase:client,user:{id:'viewer'},profile:{full_name:'Fixture',region:'Test'}})},
   '@/components/app-shell':{AppShell:({children})=>children},
   '@/components/live-refresh':{LiveRefresh:()=>null},
+  '@/components/dismiss-review':{DismissReview:()=>null},
   '@/lib/work':{ACTIVE_JOBS:['open','accepted'],ACTIVE_BOOKINGS:['pending']},
   '@shared/reviewPrompts':{loadReviewPrompts:async()=>[]},
  }

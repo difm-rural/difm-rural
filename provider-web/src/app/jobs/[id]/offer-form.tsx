@@ -27,7 +27,10 @@ export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string
   setPricing(value)
   setItems(current=>updateOfferPricingDescription(current,value))
  }
- const guardSubmit=useSubmitGuard(state,pending)
+ // A typed date can get past the picker's minimum; say so before sending (an
+ // unchanged saved date is allowed, as on the server).
+ const pastDate=!!available&&available<today&&available!==(offer?.available_from||'')
+ const guardSubmit=useSubmitGuard(state,pending||pastDate)
  const total=items.reduce((sum,i)=>sum+(Number(i.amount)||0),0)
  // On success the server has revalidated the job page; a refresh re-renders it
  // with the saved "Your offer" card in place of this form. Focus the status
@@ -44,11 +47,11 @@ export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string
   {providerMaterials&&<label className="lform-field">Materials pricing<select name="materials" value={materials} onChange={e=>setMaterials(e.target.value)}>{OFFER_MATERIALS_OPTIONS.map(m=><option value={m.id} key={m.id}>{m.label}</option>)}</select></label>}
   <label className="lform-field">Message (optional)<textarea name="message" maxLength={5000} rows={4} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Explain how you can help and what your price includes."/></label>
   <p className="muted requested-date">Requested: <strong>{requestedLabel(schedule,today)}</strong></p>
-  <div className="lform-repeat-grid"><label className="lform-field">Available from (optional)<DateInput name="available_from" min={today} value={available} onChange={e=>setAvailable(e.target.value)}/></label><label className="lform-field">Start time (optional)<input name="available_time" type="time" step={900} value={availableTime} disabled={!available} onChange={e=>setAvailableTime(e.target.value)}/><small className="muted">{available?'You’ll confirm the exact arrival after acceptance.':'Choose an Available from date first.'}</small></label></div><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} value={duration} onChange={e=>setDuration(e.target.value)} placeholder="e.g. Half a day"/></label>
+  <div className="lform-repeat-grid"><label className="lform-field">Available from (optional)<DateInput name="available_from" min={today} value={available} onChange={e=>setAvailable(e.target.value)}/>{pastDate&&<span className="form-error" role="alert">Available from can&apos;t be in the past. Choose today or later.</span>}</label><label className="lform-field">Start time (optional)<input name="available_time" type="time" step={900} value={availableTime} disabled={!available} onChange={e=>setAvailableTime(e.target.value)}/><small className="muted">{available?'You’ll confirm the exact arrival after acceptance.':'Choose an Available from date first.'}</small></label></div><label className="lform-field">Estimated duration (optional)<input name="estimated_duration" maxLength={150} value={duration} onChange={e=>setDuration(e.target.value)} placeholder="e.g. Half a day"/></label>
   <p className="muted">The requester will review your offer. Work is agreed when they accept.</p>
  </fieldset>
  {state.error&&<p className="form-error" role="alert">{state.error}</p>}
- <button className="lform-save" disabled={pending}>{pending?'Saving…':(offer?'Save offer changes':'Send offer')}</button>
+ <button className="lform-save" disabled={pending||pastDate}>{pending?'Saving…':(offer?'Save offer changes':'Send offer')}</button>
  <PendingNote pending={pending}/>
  </form>
 }

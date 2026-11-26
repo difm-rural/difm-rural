@@ -22,7 +22,7 @@ function native(file,{viewer=true,rows=[]}={}){
   if(name.endsWith('/useNearbyBrowsing'))return {__esModule:true,default:()=>({})}
   if(name.endsWith('/nearbyBrowsing'))return {filterNearby:()=>({items:[],missingLocationCount:0})}
   if(name.includes('/components/'))return {__esModule:true,default:name.split('/').at(-1)}
-  if(name.includes('/lib/')||name.startsWith('../../shared/'))return {}
+  if(name.includes('/lib/')||name.startsWith('../../shared/')||name.startsWith('../../../shared/'))return {}
   throw Error('Missing '+name)
  })
  const nav={navigate:(...args)=>calls.push(args),getParent:()=>({navigate:(...args)=>calls.push(args)})}

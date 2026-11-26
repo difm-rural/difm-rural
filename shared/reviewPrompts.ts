@@ -39,15 +39,21 @@ export async function loadReviewPrompts(client: any, userId: string, now = new D
   const providedJobs = (doneBids.data || []).map(bid => (Array.isArray(bid.job) ? bid.job[0] : bid.job)).filter(Boolean)
   const jobIds = [...new Set([...ownIds, ...providedJobs.map(job => job.id)])]
   const bookingIds = (bookings.data || []).map(booking => booking.id)
-  const [winners, reviewedJobs, reviewedBookings]: Result[] = await Promise.all([
+  const [winners, reviewedJobs, reviewedBookings, dismissed]: Result[] = await Promise.all([
     ownIds.length ? client.from('bids').select('job_id,provider_id').in('job_id', ownIds).eq('status', 'accepted') : { data: [], error: null },
     jobIds.length ? client.from('reviews').select('job_id,reviewer_role').eq('reviewer_id', userId).in('job_id', jobIds) : { data: [], error: null },
     bookingIds.length ? client.from('reviews').select('booking_id,reviewer_role').eq('reviewer_id', userId).in('booking_id', bookingIds) : { data: [], error: null },
+    // Prompts the person chose to dismiss ("Not reviewing"). Best-effort: if this
+    // read fails, prompts still show rather than all disappearing.
+    jobIds.length || bookingIds.length
+      ? Promise.resolve(client.from('review_prompt_dismissals').select('job_id,booking_id,reviewer_role').eq('user_id', userId)).catch(() => ({ data: [], error: null }))
+      : { data: [], error: null },
   ])
   if (winners.error || reviewedJobs.error || reviewedBookings.error) return []
   const done = new Set([
     ...(reviewedJobs.data || []).map(r => 'job:' + r.job_id + ':' + r.reviewer_role),
     ...(reviewedBookings.data || []).map(r => 'booking:' + r.booking_id + ':' + r.reviewer_role),
+    ...(dismissed.error ? [] : dismissed.data || []).map(r => (r.job_id ? 'job:' + r.job_id : 'booking:' + r.booking_id) + ':' + r.reviewer_role),
   ])
   const winner = new Map((winners.data || []).map(bid => [bid.job_id, bid.provider_id as string]))
 
@@ -67,4 +73,16 @@ export async function loadReviewPrompts(client: any, userId: string, now = new D
     const otherName = row.otherId ? names.get(row.otherId) || null : null
     return { ...row, otherName, next: reviewNextMove(otherName, row.viewerRole) }
   })
+}
+
+// Hide one review prompt for good (the review itself stays possible from the
+// job or booking page). Throws on failure so the caller can say so.
+export async function dismissReviewPrompt(client: any, prompt: Pick<ReviewPrompt, 'kind' | 'id' | 'viewerRole'>): Promise<void> {
+  const { error } = await client.from('review_prompt_dismissals').insert({
+    job_id: prompt.kind === 'job' ? prompt.id : null,
+    booking_id: prompt.kind === 'booking' ? prompt.id : null,
+    reviewer_role: prompt.viewerRole,
+  })
+  // Already dismissed (unique violation) counts as done.
+  if (error && error.code !== '23505') throw error
 }

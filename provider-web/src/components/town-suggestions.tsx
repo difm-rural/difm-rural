@@ -36,5 +36,9 @@ export function TownSuggestions({query,onPick}:{query:string;onPick:(town:string
  // Typed in full: confirm the match instead of silently hiding the list.
  const match=towns.find(town=>town.toLowerCase()===query.trim().toLowerCase())
  if(match)return <small className="muted" role="status">✓ {match} found</small>
- return <ul aria-label="Town suggestions">{towns.map(town=><li key={town}><button type="button" className="lform-cancel" onClick={()=>onPick(town)}>{town}</button></li>)}</ul>
+ // Announced for screen readers ("3 town suggestions"); each is a button that fills the field.
+ return <div className="town-suggestions">
+  <span className="sr-only" role="status" aria-live="polite">{towns.length} town {towns.length===1?'suggestion':'suggestions'}</span>
+  <ul aria-label="Town suggestions">{towns.map(town=><li key={town}><button type="button" className="lform-cancel" aria-label={'Use '+town+' as the public town or area'} onClick={()=>onPick(town)}>{town}</button></li>)}</ul>
+ </div>
 }

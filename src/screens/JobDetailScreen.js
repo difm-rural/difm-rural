@@ -788,12 +788,21 @@ export default function JobDetailScreen({ route, navigation }) {
         <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
 
           {['accepted', 'completed'].includes(job.status) ? <>
-          <View style={styles.acceptedCard}>
-            <View style={styles.acceptedCardHeader}>
-              <View style={styles.acceptedBadge}>
-                <Text style={styles.acceptedBadgeText}>{isCompleted ? 'Completed' : jobConfirmed ? 'Scheduled' : 'Confirm your arrival time'}</Text>
-              </View>
+          {/* Finished work gets a clear banner rather than a small status chip. */}
+          {isCompleted && <View style={styles.completedBanner} accessibilityRole="header"
+            accessibilityLabel={`Work completed. ${requesterReview ? 'You have reviewed this job.' : `Leave a review for ${requesterFirstName}.`}`}>
+            <Icon name="checkmark-circle" size={32} color={colors.white} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.completedBannerTitle}>Work completed</Text>
+              <Text style={styles.completedBannerText}>{requesterReview ? 'Thanks — your review is in.' : `Leave a review for ${requesterFirstName} below.`}</Text>
             </View>
+          </View>}
+          <View style={styles.acceptedCard}>
+            {!isCompleted && <View style={styles.acceptedCardHeader}>
+              <View style={styles.acceptedBadge}>
+                <Text style={styles.acceptedBadgeText}>{jobConfirmed ? 'Scheduled' : 'Confirm your arrival time'}</Text>
+              </View>
+            </View>}
             <Text style={styles.detailValue}>Requester: {requesterProfile?.full_name || 'Requester'}</Text>
             <Text style={styles.detailValue}>Agreed: {formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
             <Text style={styles.location}>{jobLocation(job)}</Text>
@@ -813,7 +822,8 @@ export default function JobDetailScreen({ route, navigation }) {
           <View style={styles.section}>
             {!isCompleted && <Button title="Chat with requester" icon="chatbubble-ellipses-outline"
               variant={jobConfirmed ? 'primary' : 'secondary'} onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
-            {jobMapTarget(job) && <Button title={jobMapTarget(job)?.kind === 'address' ? 'Navigate to job' : 'View job pin'}
+            {/* Directions only matter while the work is still to be done. */}
+            {jobMapTarget(job) && !isCompleted && <Button title={jobMapTarget(job)?.kind === 'address' ? 'Navigate to job' : 'View job pin'}
               variant="secondary" icon="navigate-outline" onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })} />}
             {!isCompleted && <Button title="Mark as completed" variant="secondary" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
             {jobConfirmed && !isCompleted && <>
@@ -963,7 +973,7 @@ export default function JobDetailScreen({ route, navigation }) {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
-            {jobMapTarget(job) && (
+            {jobMapTarget(job) && !isCompleted && !isCancelled && (
               <Button
                 icon="navigate-outline"
                 title={jobMapTarget(job)?.kind==='address'?'Navigate to job':'View job pin'}
@@ -1826,6 +1836,9 @@ const styles = StyleSheet.create({
   qaActionRow:       { flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 8 },
 
   // Provider accepted view
+  completedBanner:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary, borderRadius: 12, padding: 18, marginBottom: 12 },
+  completedBannerTitle: { fontSize: 22, fontWeight: '800', color: colors.white },
+  completedBannerText:  { fontSize: 15, color: colors.white, marginTop: 2 },
   acceptedCard:       { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary },
   acceptedCategory: { flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   acceptedCardHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: spacing.sm },
