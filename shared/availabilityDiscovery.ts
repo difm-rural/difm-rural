@@ -3,8 +3,7 @@
 // availability filter and "Shortest lead time" sort behave identically on every
 // client. They read only the public Release 1.2 availability columns already
 // exposed by `services_public`, and never change what a listing displays.
-import {listingAvailabilityEnabled, listingBookingsPaused, type ListingAvailability} from './listingAvailability'
-import {KIND_ENQUIRY_ONLY, type ListingKind} from './listingPricing'
+import {availabilityEnquiryOnly, listingAvailabilityEnabled, listingBookingsPaused, type ListingAvailability} from './listingAvailability'
 import {nzCalendarDay, nzToday} from './postingDates'
 
 export type AvailabilityFilter = '' | 'accepting' | 'lead_time'
@@ -30,9 +29,7 @@ export function availabilityFilterLabel(value: AvailabilityFilter) {
 export type DiscoverableListing = ListingAvailability & {kind?: string | null}
 
 // For sale and lease listings take enquiries only; they never accept bookings.
-export function listingEnquiryOnly(listing: {kind?: string | null}) {
-  return KIND_ENQUIRY_ONLY.includes(listing.kind as ListingKind)
-}
+export const listingEnquiryOnly = availabilityEnquiryOnly
 
 const DAY = 86400000
 function calendarDays(from: string, to: string) {

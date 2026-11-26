@@ -205,3 +205,17 @@ test('visibility, privacy and location masking are unchanged',async()=>{
  const migrations=(await import('node:fs')).readdirSync(new URL('../supabase/migrations/',import.meta.url)).sort().at(-1)
  assert.equal(migrations,'20261126130000_optional_listing_availability.sql')
 })
+
+test('enquiry-only terminology reaches every client through the shared availability helpers',async()=>{
+ for(const file of ['../provider-web/src/components/listing-availability-panel.tsx','../public-web/src/components/listing-availability-panel.tsx','../src/components/ListingAvailabilityCard.js']){
+  const source=await readFile(new URL(file,import.meta.url),'utf8');assert.match(source,/listingAvailabilityDetail\(listing\)/);assert.doesNotMatch(source,/Accepting bookings|Estimated lead time|Temporarily paused/,file)
+ }
+ // Cards on every platform render listingAvailability(row).card, and every discovery query carries `kind`.
+ assert.ok(market.LISTING_COLUMNS.split(',').includes('kind'))
+ const sale=fixture().find(r=>r.id==='sale'),lease=fixture().find(r=>r.id==='lease')
+ assert.deepEqual(listingAvailability(sale).card,['Available','Estimated availability: Same day'])
+ assert.deepEqual(listingAvailability(lease).card,['Available','Estimated availability: Next day'])
+ assert.deepEqual(listingAvailability(fixture().find(r=>r.id==='paused')).card,['Temporarily paused','Estimated lead time: Same day'])
+ const pausedSale={...sale,availability_status:'paused'};assert.equal(listingAvailability(pausedSale).card[0],'Temporarily unavailable')
+ assert.deepEqual(ids(pub({availability:'accepting'},[sale,lease,pausedSale]).rows),[],'wording does not change discovery classification')
+})

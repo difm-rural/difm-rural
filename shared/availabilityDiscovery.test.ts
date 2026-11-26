@@ -163,3 +163,28 @@ test('helpers read availability only and never change displayed lead-time values
   assert.deepEqual(listingAvailability(rows[0]).card, display)
   assert.deepEqual(display, ['Accepting bookings', 'Estimated lead time: 2 to 5 days'])
 })
+
+test('enquiry-only listings use availability wording; bookable listings keep booking wording', async () => {
+  const {listingAvailabilityDetail} = await import('./listingAvailabilityDetail')
+  const wording = {accepting_bookings: 'Available', limited: 'Limited availability', paused: 'Temporarily unavailable'} as const
+  for (const kind of ['for_sale', 'lease']) {
+    for (const [status, label] of Object.entries(wording)) {
+      const listing = on({kind, availability_status: status as keyof typeof wording, lead_time_type: 'fixed_days', lead_time_min_days: 3})
+      assert.deepEqual(listingAvailability(listing).card, [label, 'Estimated availability: 3 days'], `${kind} ${status}`)
+      const detail = listingAvailabilityDetail(listing)!
+      assert.equal(detail.status, label); assert.equal(detail.leadLabel, 'Estimated availability'); assert.equal(detail.lead, '3 days')
+      // Presentation only: classification is unchanged and still never "accepting bookings".
+      assert.equal(matchesAvailabilityFilter(listing, 'accepting', today), false)
+      assert.deepEqual(leadTimeRank(listing, today), [3, 0])
+    }
+    assert.doesNotMatch(listingAvailability(on({kind, lead_time_type: 'earliest_date', lead_time_date: '2026-12-02'})).card.join(' '), /booking|lead time/i)
+    assert.equal(listingAvailability(on({kind, lead_time_type: 'contact_provider'})).lead, 'Estimated availability: Contact provider')
+    assert.deepEqual(listingAvailability({kind, availability_enabled: false, availability_status: 'paused'}).card, [], 'management off shows nothing, as before')
+  }
+  for (const kind of ['service', 'grazing', 'hire', null, undefined]) {
+    const listing = on({kind, availability_status: 'paused', lead_time_type: 'next_day'})
+    assert.deepEqual(listingAvailability(listing).card, ['Temporarily paused', 'Estimated lead time: Next day'], String(kind))
+    assert.equal(listingAvailabilityDetail(listing)!.leadLabel, 'Estimated lead time')
+  }
+  assert.deepEqual(listingAvailability(on({lead_time_type: 'same_day'})).card, ['Accepting bookings', 'Estimated lead time: Same day'])
+})

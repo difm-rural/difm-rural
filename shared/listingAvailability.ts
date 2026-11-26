@@ -1,11 +1,22 @@
 import {formatDateLabel} from './formatting.js'
 import {listingDateError, nzCalendarDay, nzToday} from './postingDates'
+import {KIND_ENQUIRY_ONLY, type ListingKind} from './listingPricing'
 
 export const LISTING_AVAILABILITY_STATUSES = {
   accepting_bookings: 'Accepting bookings',
   limited: 'Limited availability',
   paused: 'Temporarily paused',
 } as const
+// Customer-facing wording for enquiry-only listings (For sale, Lease), which never
+// take bookings. Settings, stored values and discovery classification are unchanged.
+export const ENQUIRY_AVAILABILITY_STATUSES = {
+  accepting_bookings: 'Available',
+  limited: 'Limited availability',
+  paused: 'Temporarily unavailable',
+} as const satisfies Record<keyof typeof LISTING_AVAILABILITY_STATUSES, string>
+export const LEAD_TIME_LABEL = 'Estimated lead time'
+export const ENQUIRY_LEAD_TIME_LABEL = 'Estimated availability'
+export const availabilityEnquiryOnly = (listing: {kind?: string | null}) => KIND_ENQUIRY_ONLY.includes(listing.kind as ListingKind)
 
 export const LEAD_TIME_OPTIONS = {
   not_specified: 'Not specified',
@@ -35,6 +46,7 @@ export type ListingAvailability = {
   availability_message?: string | null
   availability_updated_at?: string | null
   availability?: string[] | null
+  kind?: string | null
 }
 
 export function listingAvailabilityEnabled(listing: ListingAvailability) {
@@ -97,7 +109,9 @@ export function listingAvailabilityEditPatch(enabled: boolean, draft: ReturnType
 export function listingAvailability(listing: ListingAvailability) {
   const enabled = listingAvailabilityEnabled(listing)
   const paused = listingBookingsPaused(listing)
-  const status = LISTING_AVAILABILITY_STATUSES[listing.availability_status ?? 'accepting_bookings']
+  const enquiry = availabilityEnquiryOnly(listing)
+  const status = (enquiry ? ENQUIRY_AVAILABILITY_STATUSES : LISTING_AVAILABILITY_STATUSES)[listing.availability_status ?? 'accepting_bookings']
+  const leadLabel = enquiry ? ENQUIRY_LEAD_TIME_LABEL : LEAD_TIME_LABEL
   const legacy = !enabled && listing.availability?.length
     ? listing.availability.map(formatDateLabel).join(', ') : ''
   let estimate = ''
@@ -109,12 +123,12 @@ export function listingAvailability(listing: ListingAvailability) {
     case 'earliest_date': if (listing.lead_time_date) estimate = `From ${formatDateLabel(listing.lead_time_date)}`; break
     case 'contact_provider': estimate = 'Contact provider'; break
   }
-  const lead = estimate ? `Estimated lead time: ${estimate}` : legacy ? `Available from ${legacy}` : ''
+  const lead = estimate ? `${leadLabel}: ${estimate}` : legacy ? `Available from ${legacy}` : ''
   const visibleStatus = enabled ? status : ''
   const updated = enabled && listing.availability_updated_at
     ? `Updated ${formatDateLabel(nzCalendarDay(listing.availability_updated_at) ?? '')}` : ''
   return {
-    enabled, paused, status, visibleStatus, lead, estimate, updated, legacy,
+    enabled, paused, status, visibleStatus, lead, leadLabel, estimate, updated, legacy,
     card: [visibleStatus, lead].filter(Boolean),
     message: enabled ? listing.availability_message : null,
   }
