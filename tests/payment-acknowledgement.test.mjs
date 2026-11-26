@@ -23,6 +23,7 @@ function card({sortedAt=null,canUpdate=true,state={error:''},pending=false}={}){
   if(name==='react')return {useActionState:()=>[state,()=>{},pending],useEffect:()=>{},useId:()=>`id-${++nextId}`,useRef:current=>({current})}
   if(name==='@shared/paymentAcknowledgement')return {paymentAcknowledgement:copy}
   if(name==='../../work-actions')return {markJobPaymentSorted:()=>{}}
+  if(name==='@/components/pending-note')return {PendingNote:()=>null}
   throw Error(name)
  }})
  return elements(module.exports.PaymentSorted({bidId:'award',jobId:'job',sortedAt,actor:'provider',methodLabel:'Invoice',canUpdate}))

@@ -1,4 +1,4 @@
-import {chatEventText} from '@shared/chatEvents'
+import {chatEventPreview} from '@shared/chatEvents'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { groupInbox, chatPreview, conversationKey, noticeMatchesConversation, validConversation, type ChatMessage, type ConversationRef, type InboxThread, type Notice } from './messaging'
 
@@ -34,7 +34,7 @@ export async function loadInbox(client:SupabaseClient,userId:string,notices:Noti
   return threads.map(({ref,message})=>({ ...ref,key:conversationKey(ref),
     name:String(people.get(ref.person)?.full_name || people.get(ref.person)?.display_name || 'Community member'),
     title:String((ref.kind==='job'?jobs.get(ref.id)?.title:listings.get(ref.kind==='booking'?String(bookings.get(ref.id)?.service_id):ref.id)?.title) || (ref.kind==='listing'?'Listing enquiry':ref.kind==='job'?'Job':'Booking')),
-    preview:chatEventText(message.content,message.sender_id===userId,String(people.get(ref.person)?.full_name || ''))||(message.sender_id===userId?'You: ':'')+chatPreview(message.content),updatedAt:message.created_at,
+    preview:chatEventPreview(message.content,message.sender_id===userId,String(people.get(ref.person)?.full_name || ''))||(message.sender_id===userId?'You: ':'')+chatPreview(message.content),updatedAt:message.created_at,
     unread:notices.filter(n=>!n.read && noticeMatchesConversation(n,ref)).length,
   }))
 }

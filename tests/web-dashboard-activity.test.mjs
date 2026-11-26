@@ -66,6 +66,7 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@/components/app-shell':{AppShell:({children})=>children},
   '@/components/live-refresh':{LiveRefresh:()=>null},
   '@/lib/work':{ACTIVE_JOBS:['open','accepted'],ACTIVE_BOOKINGS:['pending']},
+  '@shared/reviewPrompts':{loadReviewPrompts:async()=>[]},
  }
  vm.runInNewContext(code,{exports,require(name){assert.ok(name in imports,name);return imports[name]}})
  return {html:renderToStaticMarkup(await exports.default()),calls}

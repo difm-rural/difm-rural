@@ -16,6 +16,7 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
   const [local,setLocal]=useState<ChatMessage[]>([]),[file,setFile]=useState<File|null>(null)
   const [location,setLocation]=useState<{latitude:number;longitude:number}|null>(null),[locating,setLocating]=useState(false)
   const [photoPreview,setPhotoPreview]=useState('')
+  const [pendingIds,setPendingIds]=useState<Set<string>>(()=>new Set())
   const ref=useMemo<ConversationRef>(()=>({kind:context.kind,id:context.id,person:context.person}),[context.kind,context.id,context.person])
   const attempt=useRef<{id:string;content:string}|null>(null),uploaded=useRef<{file:File;url:string}|null>(null),busyRef=useRef(false)
   const endRef=useRef<HTMLDivElement>(null),scrollRef=useRef<HTMLDivElement>(null),nearBottom=useRef(true)
@@ -85,9 +86,16 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
         content=JSON.stringify({type:'photo',url:uploaded.current!.url,caption:text.trim() || 'Photo'})
       }else if(location)content=JSON.stringify({type:'location',...location,text:(text.trim()?text.trim()+'\n':'')+'📍 '+location.latitude.toFixed(6)+', '+location.longitude.toFixed(6)})
       if(attempt.current?.content!==content)attempt.current={id:crypto.randomUUID(),content}
-      const result=await sendChatMessage(ref,content,attempt.current!.id)
-      if(result.error || !result.message)throw new Error(result.error || 'Your message could not be sent.')
-      nearBottom.current=true;setLocal(rows=>rows.some(m=>m.id===result.message!.id)?rows:[...rows,result.message!])
+      // Show it straight away under its final id; the saved row replaces it.
+      const optimisticId=attempt.current!.id
+      nearBottom.current=true
+      setPendingIds(ids=>new Set(ids).add(optimisticId))
+      setLocal(rows=>rows.some(m=>m.id===optimisticId)?rows:[...rows,{id:optimisticId,sender_id:context.userId,receiver_id:ref.person,content,created_at:new Date().toISOString(),[ref.kind==='booking'?'booking_id':ref.kind==='listing'?'service_id':'job_id']:ref.id} as ChatMessage])
+      let result:Awaited<ReturnType<typeof sendChatMessage>>
+      try{result=await sendChatMessage(ref,content,optimisticId)}
+      finally{setPendingIds(ids=>{const next=new Set(ids);next.delete(optimisticId);return next})}
+      if(result.error || !result.message){setLocal(rows=>rows.filter(m=>m.id!==optimisticId));throw new Error(result.error || 'Your message could not be sent.')}
+      setLocal(rows=>[...rows.filter(m=>m.id!==result.message!.id),result.message!])
       setText('');setFile(null);setLocation(null);uploaded.current=null;attempt.current=null
     }catch(e){setError(e instanceof Error?e.message:'Could not send. Your draft has been kept. Please try again.')}
     finally{busyRef.current=false;setSending(false)}
@@ -119,7 +127,7 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
         {body.type==='photo'?<><a href={body.url} target="_blank" rel="noopener noreferrer"><img className="message-photo" src={body.url} alt={body.caption || 'Shared photo'} loading="lazy"/></a>{body.caption && <p>{body.caption}</p>}</>
         :body.type==='location'?<><p>{body.text}</p>{body.latitude!==null && body.longitude!==null && <a className="message-map" target="_blank" rel="noopener noreferrer" href={'https://www.google.com/maps/search/?api=1&query='+body.latitude+','+body.longitude}>Open shared location in Maps ↗</a>}</>
         :<p>{body.text}</p>}
-        <time className="bubble-time" dateTime={m.created_at}>{nzDateTime(new Date(m.created_at))}</time>
+        <time className="bubble-time" dateTime={m.created_at}>{pendingIds.has(m.id)?'Sending…':nzDateTime(new Date(m.created_at))}</time>
       </article>})}<div ref={endRef}/>
     </div>
     {context.closed?<p className="message-closed">This arrangement has ended. You can still read its messages.</p>:<form className="reply message-compose" onSubmit={send}>

@@ -223,3 +223,13 @@ export function bookingNextMove(
 
   return null
 }
+
+// Completed work the viewer hasn't reviewed yet. Without this, Home drops the
+// job the moment it completes and nothing prompts the review.
+export const REVIEW_PROMPT_DAYS = 30
+export function reviewNextMove(otherName: string | null | undefined, viewerRole: string): NextMove {
+  const other = firstName(otherName, viewerRole === 'requester' ? 'the provider' : 'the requester')
+  return move('Waiting on you to review', 'Waiting on you', `Leave a review for ${other}`, {
+    needsAction: true, tone: 'attention', icon: 'star-outline', actionLabel: 'Leave a review',
+  })
+}

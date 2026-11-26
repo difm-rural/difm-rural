@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { chatEventText } from '../../shared/chatEvents'
+import { chatEventPreview } from '../../shared/chatEvents'
 
 export function groupMessageThreads(messages, userId) {
   const threads = new Map()
@@ -75,7 +75,7 @@ export async function fetchMessageThreads() {
     const subjectLabel = thread.type === 'listing' ? 'Listing enquiry' : thread.type === 'booking' ? 'Booking' : 'Job'
     return {
       ...thread, title: title || subjectLabel, otherUserName, subjectLabel,
-      preview: chatEventText(thread.message.content, thread.message.sender_id === user.id, otherUserName)
+      preview: chatEventPreview(thread.message.content, thread.message.sender_id === user.id, otherUserName)
         || `${thread.message.sender_id === user.id ? 'You: ' : ''}${messagePreview(thread.message.content)}`,
       chatParams: {
         [thread.type === 'booking' ? 'bookingId' : thread.type === 'listing' ? 'serviceId' : 'jobId']: thread.subjectId,

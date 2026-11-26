@@ -1,5 +1,6 @@
 import {bookingNextMove,jobNextMove,type NextMove} from '@shared/nextMove'
 import {rankOnTheGo} from '@shared/onTheGo'
+import {loadReviewPrompts} from '@shared/reviewPrompts'
 import {HomeModes} from '@/components/home-modes'
 import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '@shared/homeSummary'
 import {loadPropertyNetwork,propertyNetworkHomeLines} from '@shared/propertyNetwork'
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
-  const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations, customerCount] = await Promise.all([
+  const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations, customerCount, reviewPrompts] = await Promise.all([
     supabase.from('jobs').select('id,title,status,created_at,accepted_at,scheduled_date,date_from').eq('requester_id', user.id).in('status', ACTIVE_JOBS),
     supabase.from('bookings').select('id,status,provider_id,requester_id,created_at,quote_sent_at,quote_accepted_at,scheduled_date,service:services_public(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
     supabase.from('bids').select('id,job_id,status,created_at,payment_method,payment_sorted_at,payment_details_sent_at').eq('provider_id', user.id).in('status', ['pending','accepted']),
@@ -26,6 +27,7 @@ export default async function HomePage() {
     supabase.from('job_invites').select('id,job:jobs!inner(status)',{count:'exact',head:true})
       .eq('provider_id',user.id).in('status',['pending','seen']).eq('job.status','open'),
     homeCustomerCount(supabase,user.id),
+    loadReviewPrompts(supabase,user.id).catch(()=>[]),
   ])
   const offerIds = [...new Set((offers.data || []).map(o => o.job_id))]
   const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status,requester_id,created_at,scheduled_date,date_from').in('id',offerIds) : {data:[],error:null}
@@ -83,6 +85,8 @@ export default async function HomePage() {
     const next = bookingNextMove({...booking, service}, providing ? 'provider' : 'requester', {otherName: names.get(providing ? booking.requester_id : booking.provider_id)})
     if (next) goItems.push({viewerRole:providing?'provider':'requester',key: 'booking:' + booking.id, side: 'listing', own: providing, title: service?.title || 'Booking', href: '/bookings/' + booking.id, next, needsAction: next.needsAction, updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at]})
   }
+  // Completed work you haven't reviewed yet stays on Home until you do.
+  for (const prompt of reviewPrompts) goItems.push({viewerRole:prompt.viewerRole,key:prompt.key,side:prompt.kind==='job'?'job':'listing',own:prompt.viewerRole===(prompt.kind==='job'?'requester':'provider'),title:prompt.title,href:(prompt.kind==='job'?'/jobs/':'/bookings/')+prompt.id+'#reviews',next:prompt.next,needsAction:true,updatedAt:prompt.updatedAt})
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes, schedules, invitations].some(r => r.error)
   const networkLines=network?propertyNetworkHomeLines(network):[]
   const workItems=goItems.filter(item=>item.viewerRole==='provider')
@@ -129,7 +133,7 @@ export default async function HomePage() {
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page home-v2">
    {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Finish your profile</h2><p>Add your public name and town or region.</p><Link href="/setup" className="card-link">Finish your profile</Link></section>}
    {hasError&&<div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
-   <HomeModes owner={user.id} refresh={<LiveRefresh/>} property={<>
+   <HomeModes owner={user.id} attention={{property:goItems.filter(item=>item.viewerRole==='requester'&&item.needsAction).length,work:goItems.filter(item=>item.viewerRole==='provider'&&item.needsAction).length+(invitations.count||0)}} refresh={<LiveRefresh/>} property={<>
     <header className="home-heading"><div><h1>Your property, your people</h1><p className="muted">Find local help and keep track of who looks after your property.</p></div></header>
     {/* A line only once the network has something in it: no setup prompt. */}
     {networkLines.length>0&&<Link href="/property-network" className="home-network-line">

@@ -1,5 +1,6 @@
 'use client'
 import {DateInput} from '@/components/date-input'
+import {PendingNote} from '@/components/pending-note'
 import {useSubmitGuard} from '@/components/action-form'
 import {LoaderCircle} from 'lucide-react'
 import {useActionState,useEffect,useState} from 'react'
@@ -31,13 +32,17 @@ function ArrivalFields({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;
 
 // Provider card for an accepted job: one step to confirm arrival + payment, then
 // a summary with "Change time" / "Change payment".
-export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availableFrom,arrivalStart,amount,pricingType}:{
- bidId:string;jobId:string;jobTitle:string;requesterFirst:string;schedule:JobSchedule;availableFrom:string|null;arrivalStart:string|null;amount:number|null;pricingType:string|null}){
+export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availableFrom,availableTime=null,arrivalStart,amount,pricingType}:{
+ bidId:string;jobId:string;jobTitle:string;requesterFirst:string;schedule:JobSchedule;availableFrom:string|null;availableTime?:string|null;arrivalStart:string|null;amount:number|null;pricingType:string|null}){
  // ── Confirm form (not yet confirmed) ──
  const [state,submit,pending]=useActionState(confirmJob,{error:''})
  const guardSubmit=useSubmitGuard(state,pending)
  const confirmedArrival=arrivalStart || state.arrivalStart
- const [arrival,setArrival]=useState(()=>(arrivalDayChoices(schedule,{today:nzToday(),offerDay:availableFrom}).preselect || '')+'T')
+ // Starts on the offer's day and, when it gave one, its start time.
+ const [arrival,setArrival]=useState(()=>{
+  const day=arrivalDayChoices(schedule,{today:nzToday(),offerDay:availableFrom}).preselect || ''
+  return day+'T'+(day&&day===availableFrom&&availableTime?availableTime.slice(0,5):'')
+ })
  const [choice,setChoice]=useState('agreed')
  const [acct,setAcct]=useState(''),[acctNo,setAcctNo]=useState(''),[reference,setReference]=useState('Payment for '+jobTitle)
  const [note,setNote]=useState('')
@@ -83,6 +88,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
   {state.error&&<p className="form-error" role="alert">{state.error}</p>}
   <p className="muted" role="status">{pending?'Confirming the job and sending your arrival message…':null}</p>
   <button className="lform-save" disabled={blocked||pending}>{pending&&<LoaderCircle size={16} className="spin" aria-hidden="true"/>}{pending?'Confirming…':'Confirm job'}</button>
+  <PendingNote pending={pending}/>
  </form>
 }
 

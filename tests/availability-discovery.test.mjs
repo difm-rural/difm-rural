@@ -250,8 +250,9 @@ test('visibility, privacy and location masking are unchanged',async()=>{
  // Displayed availability text is unchanged by discovery.
  const before=fixture().map(r=>listingAvailability(r).card);assert.deepEqual(provider({sort:'lead_time'}).rows.map(r=>listingAvailability(r).card),SORTED.map(id=>before[fixture().findIndex(r=>r.id===id)]))
  // No database change: the feature reads only columns Release 1.2 already exposes.
- const migrations=(await import('node:fs')).readdirSync(new URL('../supabase/migrations/',import.meta.url)).sort().at(-1)
- assert.equal(migrations,'20261126130000_optional_listing_availability.sql')
+ const fs=await import('node:fs'),dir=new URL('../supabase/migrations/',import.meta.url)
+ const later=fs.readdirSync(dir).sort().filter(name=>name>'20261126130000_optional_listing_availability.sql')
+ for(const name of later)assert.doesNotMatch(fs.readFileSync(new URL(name,dir),'utf8'),/services/,name)
 })
 
 test('enquiry-only terminology reaches every client through the shared availability helpers',async()=>{

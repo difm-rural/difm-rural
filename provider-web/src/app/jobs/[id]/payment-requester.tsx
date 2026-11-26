@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useId, useRef, type FormEvent } from 'react'
+import { PendingNote } from '@/components/pending-note'
 import { paymentAcknowledgement as copy } from '@shared/paymentAcknowledgement'
 import { markJobPaymentSorted } from '../../work-actions'
 
@@ -53,6 +54,7 @@ export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canU
           <button type="submit" className="lform-save payment-ack-button" disabled={pending}>{pending ? 'Saving…' : copy.mark}</button>
         </form>
       ))}
+      {canUpdate && <PendingNote pending={pending}/>}
       <dialog ref={dialog} className="publishing-location-dialog" aria-labelledby={titleId} aria-describedby={detailId}>
         <h2 id={titleId}>{copy.undoTitle}</h2>
         <p id={detailId}>{copy.undoDetail}</p>

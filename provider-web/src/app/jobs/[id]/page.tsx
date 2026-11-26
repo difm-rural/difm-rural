@@ -39,20 +39,22 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const {supabase,user,profile}=await requireProvider('/jobs/'+id)
  const [{data:job,error}]=await Promise.all([supabase.from('jobs_public').select('*').eq('id',id).maybeSingle(),markNotificationsReadFor(supabase,user.id,{jobId:id})])
  if(error)throw new Error('Could not load this job. Refresh to try again.');if(!job)notFound()
- const {data:gallery}=process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'
-  ? await supabase.rpc('list_job_private_photos',{p_job:id})
-  : {data:null}
- const additionalPhotos=(gallery as JobPrivatePhoto[]|null)?.filter(photo=>photo.slot!==0)??[]
- const {data:watched,error:watchError}=await supabase.from('watchlist').select('id').eq('user_id',user.id).eq('job_id',id).maybeSingle()
  const own=job.requester_id===user.id
  const canAskQuestion=!own&&job.status==='open'
- let offerQuery=supabase.from('bids').select('id,provider_id,amount,message,status,available_from,estimated_duration,line_items,pricing_type,materials,payment_method,payment_sorted_at,payment_sorted_by').eq('job_id',id).order('created_at',{ascending:false})
+ let offerQuery=supabase.from('bids').select('id,provider_id,amount,message,status,available_from,available_time,estimated_duration,line_items,pricing_type,materials,payment_method,payment_sorted_at,payment_sorted_by').eq('job_id',id).order('created_at',{ascending:false})
  if(!own)offerQuery=offerQuery.eq('provider_id',user.id)
- const [{data:offers,error:offerError},{data:questions,error:questionError}]=await Promise.all([offerQuery,supabase.from('job_questions').select('id,asker_id,question,answer,created_at').eq('job_id',id).order('created_at',{ascending:true})])
- const {data:sentInvites,error:sentInviteError}=own?await supabase.from('job_invites').select('id,provider_id,status,revision').eq('job_id',id).eq('requester_id',user.id):{data:[],error:null}
- const {data:receivedInvitation}=!own&&job.status==='open'
-  ?await supabase.from('job_invites').select('id,status,revision').eq('job_id',id).eq('provider_id',user.id).in('status',ACTIVE_JOB_INVITATIONS).maybeSingle()
-  :{data:null}
+ // Everything that only needs the job: one round of parallel reads, not a chain.
+ const [{data:gallery},{data:watched,error:watchError},{data:offers,error:offerError},{data:questions,error:questionError},{data:sentInvites,error:sentInviteError},{data:receivedInvitation},reviewResult,{data:workSchedule}]=await Promise.all([
+  process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'?supabase.rpc('list_job_private_photos',{p_job:id}):Promise.resolve({data:null}),
+  supabase.from('watchlist').select('id').eq('user_id',user.id).eq('job_id',id).maybeSingle(),
+  offerQuery,
+  supabase.from('job_questions').select('id,asker_id,question,answer,created_at').eq('job_id',id).order('created_at',{ascending:true}),
+  own?supabase.from('job_invites').select('id,provider_id,status,revision').eq('job_id',id).eq('requester_id',user.id):Promise.resolve({data:[],error:null}),
+  !own&&job.status==='open'?supabase.from('job_invites').select('id,status,revision').eq('job_id',id).eq('provider_id',user.id).in('status',ACTIVE_JOB_INVITATIONS).maybeSingle():Promise.resolve({data:null}),
+  job.status==='completed'?supabase.from('reviews').select('id,reviewer_id,reviewer_role,rating,comment,created_at').eq('job_id',id):Promise.resolve(null),
+  ['accepted','in_progress','awaiting_completion','completed'].includes(job.status)?supabase.from('work_schedules').select('arrival_start_at').eq('job_id',id).maybeSingle():Promise.resolve({data:null}),
+ ])
+ const additionalPhotos=(gallery as JobPrivatePhoto[]|null)?.filter(photo=>photo.slot!==0)??[]
  const ids=[...new Set([job.requester_id,...(sentInvites || []).map(i=>i.provider_id),...(offers || []).map(b=>b.provider_id),...(questions || []).map(q=>q.asker_id)])]
  const {data:people}=await supabase.from('profiles_public').select('id,full_name').in('id',ids)
  const names=new Map((people || []).map(p=>[p.id,p.full_name]))
@@ -81,26 +83,25 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
 
  // Reviews (completed only).
  let reviews:{id:string;reviewer_id:string;reviewer_role:string;rating:number;comment:string|null;created_at:string}[]|null=null,reviewError=false
- if(job.status==='completed'){const r=await supabase.from('reviews').select('id,reviewer_id,reviewer_role,rating,comment,created_at').eq('job_id',id);reviewError=!!r.error;reviews=r.data}
+ if(reviewResult){reviewError=!!reviewResult.error;reviews=reviewResult.data}
  const ownReview=reviews?.find(x=>x.reviewer_id===user.id&&x.reviewer_role===manageRole)
  const received=reviews?.find(x=>x.reviewer_id===otherId&&x.reviewer_role!==manageRole)
 
  const showPayment=!!manageRole&&!!acceptedOffer&&['accepted','in_progress','awaiting_completion','completed'].includes(job.status)
  const payMethod=acceptedOffer?.payment_method || null
  let workArrival:string|null=null
- if(showPayment){
-   const {data:ws}=await supabase.from('work_schedules').select('arrival_start_at').eq('job_id',id).maybeSingle()
-   workArrival=ws?.arrival_start_at || null
- }
+ if(showPayment)workArrival=workSchedule?.arrival_start_at || null
  const next=nextRole?jobNextMove(job,nextRole,{otherName:nextOtherName,bidCount:own&&!offerError?offers?.filter(offer=>offer.status==='pending').length||0:0,unansweredQuestionCount:own?(questions?.filter(q=>!q.answer).length||0):0,hasPendingBid:myOffer?.status==='pending',hasArrival:!!workArrival,arrivalAt:workArrival}):null
  const confirmationCard=showPayment&&acceptedOffer&&isAcceptedProvider&&['accepted','in_progress'].includes(job.status)
-   ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} schedule={jobSchedule} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>
+   ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} schedule={jobSchedule} availableFrom={acceptedOffer.available_from} availableTime={acceptedOffer.available_time} arrivalStart={workArrival} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>
    : null
- const agreed=showPayment?agreedJobDetails(workArrival,acceptedOffer?.estimated_duration,acceptedOffer?.available_from):null
+ const agreed=showPayment?agreedJobDetails(workArrival,acceptedOffer?.estimated_duration,acceptedOffer?.available_from,acceptedOffer?.available_time):null
  const providerFirst=(acceptedProviderId?names.get(acceptedProviderId):'')?.trim().split(/\s+/)[0] || 'the provider'
+ // One wording for the not-yet-confirmed start, wherever it shows.
+ const startPending=agreed?.proposedStart?'from '+agreed.proposedStart+(isAcceptedProvider?' (confirm your arrival time below)':' (waiting for '+providerFirst+' to confirm)'):''
  const arrangements=(agreed?.arrival||agreed?.proposedStart||agreed?.duration)&&<section className="card"><h2>Agreed arrangements</h2>
   {agreed.arrival&&<p><strong>Arrival:</strong> {agreed.arrival}</p>}
-  {agreed.proposedStart&&<p><strong>Start:</strong> from {agreed.proposedStart} <span className="muted">({isAcceptedProvider?'confirm your arrival time below':'waiting for '+providerFirst+' to confirm the arrival time'})</span></p>}
+  {agreed.proposedStart&&<p><strong>Start:</strong> {startPending}</p>}
   {agreed.duration&&<p><strong>Estimated duration:</strong> {agreed.duration}</p>}
  </section>
  const paymentCard=showPayment&&acceptedOffer
@@ -135,14 +136,15 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const detailsCard=<article className="card work-detail">{job.category&&<p>Category: {job.category}</p>}<p>Location: {job.location_area || job.location_name || 'To be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
    ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'Budget '+nzMoney(job.price):'open to offers')}</p></>
    : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}{agreed?.arrival?<><p>Start: {agreed.arrival}</p><p className="muted">Requested: {schedule}</p></>
-   :agreed?.proposedStart?<><p>Start: from {agreed.proposedStart} (to be confirmed)</p><p className="muted">Requested: {schedule}</p></>
+   :agreed?.proposedStart?<><p>Start: {startPending}</p><p className="muted">Requested: {schedule}</p></>
    :<p>{schedule}</p>}<p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
    {job.location_name&&<p>Property location: {job.location_name}</p>}{job.location_note&&<p className="work-description">Location note: {job.location_note}</p>}
    {mapTarget&&<a className="card-link" href={mapTarget.href} target="_blank" rel="noopener noreferrer">{mapTarget.label}</a>}
    {(job.hide_exact_location||job.location_exact===false)&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}
    {job.materials_type&&<p>Materials: {MATERIALS[job.materials_type as keyof typeof MATERIALS] || job.materials_type}</p>}
    {job.access_conditions?.length>0&&<p>Site access: {job.access_conditions.map((a:string)=>ACCESS[a as keyof typeof ACCESS] || a).join(', ')}</p>}
-   {process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&(!job.photos?.length||gallery?.some((photo:JobPrivatePhoto)=>photo.slot===0))&&<div className="job-photo-grid"><JobPrimaryImage key={id} jobId={id}/></div>}
+   {/* Only when a primary photo exists: requesting it for a job with no photos is a guaranteed 404. */}
+   {process.env.NEXT_PUBLIC_JOB_PRIMARY_MEDIA==='true'&&gallery?.some((photo:JobPrivatePhoto)=>photo.slot===0)&&<div className="job-photo-grid"><JobPrimaryImage key={id} jobId={id}/></div>}
    {additionalPhotos.length>0&&<div className="job-photo-grid">{additionalPhotos.map((photo,index)=>{
     const url='/job-media/'+id+'?photo='+photo.id
     return <a href={url} key={photo.id} target="_blank" rel="noopener noreferrer"><img src={url} alt={'Additional job photo '+(index+1)}/></a>
@@ -155,7 +157,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
 
  const offersSection=offerError?<p role="alert" className="card">Could not load offers. Refresh to try again.</p>:<section className="card" id="offer"><h2>{own?'Offers':myOffer?'Your offer':'Send an offer'}</h2>
    {own&&!offers?.length&&<p className="muted">Offers will appear here when people respond.</p>}
-   {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<><Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link> · </>:null}{formatOfferAmount(b.amount,b.pricing_type)}{b.pricing_type==='fixed'?' · Fixed price':''}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{(b.line_items?.length>1||b.line_items?.some((item:{label:string})=>item.label))&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}{b.line_items.length>1?': '+nzMoney(item.amount):''}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {formatOfferAvailability(b.available_from)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
+   {offers?.map(b=><article className="work-offer" key={b.id} id={'offer-'+b.id} style={{scrollMarginTop:96}}><h3>{own?<><Link href={'/people/'+b.provider_id} className="card-link">{names.get(b.provider_id) || 'Provider'}</Link> · </>:null}{formatOfferAmount(b.amount,b.pricing_type)}{b.pricing_type==='fixed'?' · Fixed price':''}</h3><p className="work-description">{b.message}</p><p>{b.status==='pending'?'Awaiting response':b.status==='rejected'?'Not selected':statusLabel(b.status)}</p>{(b.line_items?.length>1||b.line_items?.some((item:{label:string})=>item.label))&&<ul>{b.line_items.map((item:{label:string;amount:number},i:number)=><li key={i}>{item.label}{b.line_items.length>1?': '+nzMoney(item.amount):''}</li>)}</ul>}{b.materials&&<p>{OFFER_MATERIALS_LABELS[b.materials as keyof typeof OFFER_MATERIALS_LABELS] || b.materials}</p>}{b.available_from&&<p>Available from: {formatOfferAvailability(b.available_from,b.available_time)}</p>}{b.estimated_duration&&<p>Estimated duration: {b.estimated_duration}</p>}
     {own&&job.status==='open'&&b.status!=='rejected'&&<Link className="card-link" href={'/jobs/'+id+'?thread='+b.provider_id+'#offer-'+b.id}>Message {names.get(b.provider_id)?.trim().split(/\s+/)[0] || 'this provider'}</Link>}
     {job.status==='open'&&b.status==='pending'&&(own?<details className="activity-action"><summary className="lform-save">Accept this offer</summary><ActionForm action={acceptOffer} label="Confirm acceptance"><input type="hidden" name="offer_id" value={b.id}/><p>Accepting awards this job to {names.get(b.provider_id) || 'this provider'} and declines the other pending offers. The accepted provider can see the exact location.</p></ActionForm></details>:<>
      <details className="activity-action"><summary>Edit your offer</summary><OfferForm jobId={id} offer={b} providerMaterials={job.materials_type==='provider'} schedule={jobSchedule}/></details>

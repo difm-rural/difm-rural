@@ -4,8 +4,13 @@ import {parseNzDate} from './dates'
 // and every place that displays an offer read the same. Mirrors the service
 // pricing model (see CreateServiceScreen / lib pricing).
 
-export function formatOfferAvailability(value: unknown): string {
-  return formatWorkDate(parseNzDate(value))
+// "Tue 1 Dec 2026", or "Tue 1 Dec 2026, 9:00 am" when the offer gives a start time ("09:00[:00]").
+export function formatOfferAvailability(value: unknown, time?: unknown): string {
+  const day = formatWorkDate(parseNzDate(value))
+  const m = typeof time === 'string' ? /^(\d{2}):(\d{2})/.exec(time) : null
+  if (!m || day === '—') return day
+  const hour = Number(m[1])
+  return `${day}, ${hour % 12 || 12}:${m[2]} ${hour < 12 ? 'am' : 'pm'}`
 }
 
 // Pricing basis the provider chooses for their offer.

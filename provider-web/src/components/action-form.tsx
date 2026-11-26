@@ -1,5 +1,6 @@
 'use client'
 import { useActionState, useEffect, useRef, type FormEvent, type ReactNode } from 'react'
+import { PendingNote } from './pending-note'
 export type ActionState = { error: string; success?: string }
 
 export function useSubmitGuard(state: ActionState, blocked: boolean) {
@@ -20,6 +21,6 @@ export function ActionForm({ action, label, children, disabled=false, submitDisa
     {state.error && <p className="form-error" role="alert">{state.error}</p>}
     {state.success && <p className="home-clear" role="status">{state.success}</p>}
     <button className="lform-save" disabled={pending || disabled || submitDisabled}>{pending ? pendingLabel : label}</button>
-    {pendingMessage && <p className="muted" role="status">{pending ? pendingMessage : ''}</p>}
+    {pendingMessage ? <p className="muted" role="status">{pending ? pendingMessage : ''}</p> : <PendingNote pending={pending}/>}
   </form>
 }
