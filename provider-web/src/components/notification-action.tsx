@@ -71,7 +71,7 @@ export function NotificationRow({n,markRead,answerAvailability}:{n:NotificationR
         <span className="notification-body">{unread && <span className="sr-only">Unread: </span>}{n.body}</span>
         {n.arrangement&&<span className="notification-arrangement">{n.arrangement}</span>}
         {notificationHint(n.type)&&<span className="notification-hint">{notificationHint(n.type)}</span>}
-        <time dateTime={n.created_at} title={n.fullDate}>{n.relative}</time>
+        <time dateTime={n.created_at} title={n.fullDate}>{n.relative}{n.relative!==n.fullDate&&<span className="notification-exact"> · {n.fullDate}</span>}</time>
       </span>
       {unread && <span className="notification-dot" aria-hidden="true"/>}
     </Link>

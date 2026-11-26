@@ -202,7 +202,7 @@ test('completion cancellation writes nothing; completion remains available befor
  await app.press('Mark job as completed');let sheet=app.all().find(n=>n.type==='MarkCompleteSheet');assert.equal(sheet.props.visible,true)
  await sheet.props.onClose();await app.settle();assert.deepEqual(app.log.completed,[])
  await app.press('Job details');await app.press('Mark job as completed');sheet=app.all().find(n=>n.type==='MarkCompleteSheet');await sheet.props.onConfirm();await app.settle()
- assert.deepEqual(app.log.completed,['job']);assert.ok(app.text().includes('Completed'));assert.ok(!app.text().includes('Your offer was accepted'));assert.ok(!app.text().includes(baseJob.description))
+ assert.deepEqual(app.log.completed,['job']);assert.ok(app.text().includes('Work completed'));assert.ok(!app.text().includes('Your offer was accepted'));assert.ok(!app.text().includes(baseJob.description))
  assert.equal(app.all().find(n=>n.type==='Button').props.title,'Review requester');await app.press('Review requester');assert.equal(app.all().find(n=>n.type==='ReviewModal').props.visible,true)
  const payment=app.all().find(n=>n.type==='JobPaymentHandoff');assert.equal(payment.props.bidId,'q');assert.equal(payment.props.canUpdate,true);assert.equal(payment.props.canEditMethod,false)
 })
@@ -210,7 +210,9 @@ test('completed provider preserves reviewed state, payment attribution and secon
  const app=await openScreen({job:{status:'completed'},bids:[{...acceptedOffer,payment_sorted_at:'2026-11-23',payment_sorted_by:'q'}],userId:'q',review:{rating:5,comment:'Great'}})
  const review=app.all().find(n=>n.props?.accessibilityLabel==='Edit requester review');assert.equal(review.props.variant,'secondary')
  const payment=app.all().find(n=>n.type==='JobPaymentHandoff');assert.equal(payment.props.sortedBy,'q');assert.equal(payment.props.sortedAt,'2026-11-23')
- assert.equal(app.all().find(n=>n.props?.title==='Navigate to job').props.variant,'secondary')
+ // Finished work needs no directions.
+ assert.equal(app.all().find(n=>n.props?.title==='Navigate to job'),undefined)
+ assert.ok(app.text().includes('Work completed'))
 })
 
 test('completion sheet uses the requested wording and full-width stacked buttons',()=>{

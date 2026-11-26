@@ -923,3 +923,7 @@ a.row:hover { background: var(--sage); }
 .listing-management-link:hover { text-decoration:underline; }
 
 .work-detail .booking-pricing-explanation { font-size: 13px; line-height: 1.5; font-weight: 400; text-align: left; }
+
+/* Home: "Not reviewing" beside a Leave-a-review row */
+.dismiss-review { margin: -6px 0 8px 52px; }
+.dismiss-review button { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }

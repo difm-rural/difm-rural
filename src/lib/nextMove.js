@@ -223,6 +223,7 @@ export async function fetchActiveNextMoves(userId, isProvider, {strict=false}={}
   const reviews = await loadReviewPrompts(supabase, userId).catch(() => [])
   ;(reviews || []).forEach(prompt => {
     items.push({
+      review: true,
       id: prompt.key,
       entityType: prompt.kind,
       entityId: prompt.id,

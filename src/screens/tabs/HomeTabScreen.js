@@ -2,6 +2,7 @@ import {rankOnTheGo} from '../../../shared/onTheGo'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
 import React, { useCallback, useRef, useState } from 'react'
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,7 @@ import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
 import { fetchActiveNextMoves } from '../../lib/nextMove'
+import { dismissReviewPrompt } from '../../../shared/reviewPrompts'
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
   const isPrimary = variant === 'primary'
@@ -159,8 +161,19 @@ export default function HomeTabScreen({ navigation }) {
     propertyMode?0:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null,unreadCount,
     propertyMode?{label:'My Work',count:modeAttention.work}:{label:'My Property',count:modeAttention.property})
   const nextMoves=actionSummary.items
-  const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
+  // Review prompts live in Needs attention only; On the go is work still in flight.
+  const onTheGo=rankOnTheGo(modeItems.filter(item=>!item.review).map(item=>({...item,needsAction:item.nextMove.needsAction})))
   const attention=nextMoves.slice(0,5)
+  // "Not reviewing": hide this review prompt for good (the review itself stays
+  // available on the job or booking screen).
+  async function dismissReview(item) {
+    try {
+      await dismissReviewPrompt(supabase, { kind: item.entityType, id: item.entityId, viewerRole: item.viewerRole })
+      setActiveMoves(moves => (moves || []).filter(move => move.id !== item.id))
+    } catch {
+      Alert.alert('Could not dismiss', 'Check your connection and try again.')
+    }
+  }
   function openAttentionItem(item) {
     if (item.entityType === 'job') {
       if (item.viewerRole === 'provider') navigation.navigate('JobDetail', { job: item.item })
@@ -285,6 +298,10 @@ export default function HomeTabScreen({ navigation }) {
                     <Text style={styles.nextMoveLabel}>{item.nextMove.label}</Text>
                     <Text style={styles.notifBody}>{item.nextMove.detail}</Text>
                     <Text style={styles.sectionLink}>{item.nextMove.actionLabel || 'View details'} →</Text>
+                    {item.review && <TouchableOpacity onPress={() => dismissReview(item)} hitSlop={8}
+                      accessibilityRole="button" accessibilityLabel={`Not reviewing ${item.title}`} style={styles.dismissReview}>
+                      <Text style={styles.dismissReviewText}>Not reviewing</Text>
+                    </TouchableOpacity>}
                   </View>
                   <View style={styles.notifDot} />
                 </TouchableOpacity>
@@ -444,6 +461,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sectionLink:  { fontSize: 13, fontWeight: '600', color: colors.primary },
+  dismissReview:     { alignSelf: 'flex-start', marginTop: 6, paddingVertical: 2 },
+  dismissReviewText: { fontSize: 13, color: colors.textSecondary, textDecorationLine: 'underline' },
 
   connCard: {
     flexDirection: 'row',
