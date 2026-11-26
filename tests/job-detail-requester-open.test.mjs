@@ -6,6 +6,7 @@ import * as offers from '../shared/offers.ts'
 import * as formatting from '../shared/formatting.js'
 import * as dates from '../shared/dates.ts'
 import * as requested from '../shared/requestedDate.ts'
+import * as postingDates from '../shared/postingDates.ts'
 import * as mapTarget from '../shared/jobMapTarget.ts'
 import * as tokens from '../src/theme/tokens.js'
 import {jobNextMove} from '../shared/nextMove.ts'
@@ -37,7 +38,7 @@ async function openScreen({review=null,schedule=null,stats={},providerName=null,
   return query
  }}
  const component=name=>({__esModule:true,default:name})
- const mocks={react,'react-native':{StyleSheet:{create:v=>v},Platform:{OS:'android'},Alert:{alert:(...v)=>log.alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','Image','KeyboardAvoidingView'].map(v=>[v,v]))},'@react-navigation/native':{useIsFocused:()=>focused},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../context/UserContext':{useUser:()=>({refreshProfile(){}})},'../theme/tokens':tokens,'../lib/supabase':{supabase},'../lib/roles':{canProvide:()=>true},'../lib/offers':offers,'../../shared/offers':offers,'../../shared/formatting.js':formatting,'../../shared/dates':dates,'../../shared/requestedDate':requested,'../../shared/jobMapTarget':mapTarget,'../lib/quickPickDates':{localDate:()=>null},'../lib/analytics':{trackEvent(){}},'../lib/listingPerformance':{recordJobProviderView(){}},'../lib/providerStats':{fetchProviderStats:async()=>stats},'../lib/workSchedule':{fetchWorkSchedule:async()=>schedule,saveArrivalWindow:async args=>{log.arrival.push(args);schedule={arrival_start_at:args.start,arrival_end_at:args.end};return {data:schedule,error:null}},sendRunningLate:async args=>{log.late.push(args);return {error:null}},addWorkToPhoneCalendar:async args=>{log.calendar.push(args)},formatArrivalWindow:schedule=>schedule.arrival_start_at},'../lib/location':{stripPlusCode:v=>v,coarseSuburb:v=>v},'../lib/maps':{staticMapUrl:()=>'/map.png',staticMapPolygonUrl:()=>'/polygon.png'},'../lib/jobActions':{markJobComplete:async id=>{log.completed.push(id);db.job={...db.job,status:'completed'};return {error:null}},acceptBid:async(job,offer)=>{log.accept.push({job,offer});db.job={...db.job,status:'accepted'};db.bids=db.bids.map(b=>({...b,status:b.id===offer.id?'accepted':'rejected'}));return {error:null}}},'../lib/watchlist':{},'../lib/reviews':{loadReview:async()=>review},'../../shared/jobReviewStatus':{jobReviewStatus:()=>[]},'../../shared/paymentAcknowledgement':{paymentAcknowledgementAvailable:()=>true},'../lib/lifecycle':{jobStatusLabel:status=>status},'../lib/nextMove':{jobNextMove},'../../shared/jobInvitations':{ACTIVE_JOB_INVITATIONS:[]},'../lib/invites':{respondToJobInvitation:async()=>({})},'../components/JobPrimaryImage':{JobPrivateGallery:'JobPrivateGallery'},'../components/JobArrangementSummary':{JobArrangementSummary:'JobArrangementSummary',JobStatusNotice:'JobStatusNotice'}}
+ const mocks={react,'react-native':{StyleSheet:{create:v=>v},Platform:{OS:'android'},Alert:{alert:(...v)=>log.alerts.push(v)},...Object.fromEntries(['View','Text','TextInput','TouchableOpacity','ScrollView','Image','KeyboardAvoidingView'].map(v=>[v,v]))},'@react-navigation/native':{useIsFocused:()=>focused},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../context/UserContext':{useUser:()=>({refreshProfile(){}})},'../theme/tokens':tokens,'../lib/supabase':{supabase},'../lib/roles':{canProvide:()=>true},'../lib/offers':offers,'../../shared/offers':offers,'../../shared/formatting.js':formatting,'../../shared/dates':dates,'../../shared/postingDates':postingDates,'../../shared/requestedDate':requested,'../../shared/jobMapTarget':mapTarget,'../lib/quickPickDates':{localDate:()=>null},'../lib/analytics':{trackEvent(){}},'../lib/listingPerformance':{recordJobProviderView(){}},'../lib/providerStats':{fetchProviderStats:async()=>stats},'../lib/workSchedule':{fetchWorkSchedule:async()=>schedule,saveArrivalWindow:async args=>{log.arrival.push(args);schedule={arrival_start_at:args.start,arrival_end_at:args.end};return {data:schedule,error:null}},sendRunningLate:async args=>{log.late.push(args);return {error:null}},addWorkToPhoneCalendar:async args=>{log.calendar.push(args)},formatArrivalWindow:schedule=>schedule.arrival_start_at},'../lib/location':{stripPlusCode:v=>v,coarseSuburb:v=>v},'../lib/maps':{staticMapUrl:()=>'/map.png',staticMapPolygonUrl:()=>'/polygon.png'},'../lib/jobActions':{markJobComplete:async id=>{log.completed.push(id);db.job={...db.job,status:'completed'};return {error:null}},acceptBid:async(job,offer)=>{log.accept.push({job,offer});db.job={...db.job,status:'accepted'};db.bids=db.bids.map(b=>({...b,status:b.id===offer.id?'accepted':'rejected'}));return {error:null}}},'../lib/watchlist':{},'../lib/reviews':{loadReview:async()=>review},'../../shared/jobReviewStatus':{jobReviewStatus:()=>[]},'../../shared/paymentAcknowledgement':{paymentAcknowledgementAvailable:()=>true},'../lib/lifecycle':{jobStatusLabel:status=>status},'../lib/nextMove':{jobNextMove},'../../shared/jobInvitations':{ACTIVE_JOB_INVITATIONS:[]},'../lib/invites':{respondToJobInvitation:async()=>({})},'../components/JobPrimaryImage':{JobPrivateGallery:'JobPrivateGallery'},'../components/JobArrangementSummary':{JobArrangementSummary:'JobArrangementSummary',JobStatusNotice:'JobStatusNotice'}}
  const module={exports:{}}
  new Function('setTimeout','clearTimeout','require','module','exports',code)((fn,ms)=>{const timer={fn,ms};log.timers.push(timer);return timer},()=>{},name=>{if(name in mocks)return mocks[name];if(name.includes('/components/'))return component(name.split('/').at(-1));throw new Error('Unexpected import '+name)},module,module.exports)
  const render=()=>{at=0;dirty=false;tree=module.exports.default({route:{params:{job:db.job,...params}},navigation:{navigate:(...args)=>log.navigate.push(args),goBack(){}}});const queue=effects;effects=[];queue.forEach(fn=>fn());return nodes(tree)}
@@ -189,16 +190,20 @@ test('provider scheduled: one arrival summary, ordered actions and scheduling co
  const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2099-01-01T03:00:00Z',arrival_end_at:'2099-01-01T04:00:00Z'}})
  assert.ok(app.text().includes('Scheduled'));assert.equal(app.text().split('2099-01-01T03:00:00Z').length-1,1)
  const buttons=app.all().filter(n=>n.type==='Button').map(n=>n.props.title)
- assert.deepEqual(buttons.slice(0,4),['Chat with requester','Navigate to job','Mark as completed','Update arrival window'])
+ // Before the arrival day: Chat is the main action, then Directions and More side by side.
+ assert.deepEqual(buttons.slice(0,3),['Chat with Requester','Directions','More'])
  await app.press('Chat with Requester');assert.equal(app.log.navigate.at(-1)[0],'Chat')
- await app.press('Navigate to job');assert.equal(app.log.navigate.at(-1)[0],'JobMap')
+ await app.press('Directions');assert.equal(app.log.navigate.at(-1)[0],'JobMap')
+ await app.press('More actions')
  await app.press('Add to phone calendar');assert.equal(app.log.calendar.length,1)
- await app.press('Update arrival window');const sheet=app.all().find(n=>n.type==='ArrivalWindowModal');assert.equal(sheet.props.visible,true)
+ await app.press('Change arrival time');const sheet=app.all().find(n=>n.type==='ArrivalWindowModal');assert.equal(sheet.props.visible,true)
  await sheet.props.onSave('2099-01-02T03:00:00Z','2099-01-02T04:00:00Z');await app.settle();assert.equal(app.log.arrival[0].jobId,'job');assert.ok(app.text().includes('2099-01-02T03:00:00Z'))
  await app.press("I'm running late");await app.log.alerts.at(-1)[2].find(b=>b.text==='15 minutes').onPress();await app.settle();assert.deepEqual(app.log.late[0],{jobId:'job',minutes:15})
 })
 test('completion cancellation writes nothing; completion remains available before future arrival, then prioritises review and payment',async()=>{
  const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2099-01-01T03:00:00Z'}})
+ // Before the arrival day, Mark as completed is still available under More.
+ await app.press('More actions')
  await app.press('Mark job as completed');let sheet=app.all().find(n=>n.type==='MarkCompleteSheet');assert.equal(sheet.props.visible,true)
  await sheet.props.onClose();await app.settle();assert.deepEqual(app.log.completed,[])
  await app.press('Job details');await app.press('Mark job as completed');sheet=app.all().find(n=>n.type==='MarkCompleteSheet');await sheet.props.onConfirm();await app.settle()
@@ -234,4 +239,20 @@ for(const status of ['open','accepted','completed','cancelled'])test('provider '
  const app=await openScreen({job:{status,title},bids:status==='open'?[]:[acceptedOffer],userId:'q'})
  assert.equal(app.text().split(title).length-1,1)
  const heading=app.all().find(n=>n.type==='Text'&&n.props.accessibilityRole==='header');assert.equal(text(heading),title);assert.equal(heading.props.numberOfLines,undefined)
+})
+
+test('accepted, not yet confirmed: Confirm is the only main action; no completion or payment buttons yet',async()=>{
+ const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q'})
+ const titles=app.all().filter(n=>n.type==='Button').map(n=>n.props.title)
+ assert.ok(titles.includes('Confirm job'));assert.ok(titles.includes('Chat'));assert.ok(titles.includes('Directions'))
+ for(const gone of ['Mark as completed','View requester profile','Navigate to job'])assert.ok(!titles.includes(gone),gone)
+ assert.equal(app.all().find(n=>n.type==='JobPaymentHandoff'),undefined)
+ assert.ok(app.text().includes('when you confirm the job'))
+})
+
+test('on the arrival day, Mark as completed becomes the main action',async()=>{
+ const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2020-01-01T03:00:00Z'}})
+ const buttons=app.all().filter(n=>n.type==='Button')
+ assert.equal(buttons[0].props.title,'Mark as completed');assert.notEqual(buttons[0].props.variant,'secondary')
+ assert.deepEqual(buttons.slice(1,4).map(b=>b.props.title),['Chat','Directions','More'])
 })

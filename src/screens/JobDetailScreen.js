@@ -10,6 +10,7 @@ import { useIsFocused } from '@react-navigation/native'
 import { respondToJobInvitation } from '../lib/invites'
 import { ACTIVE_JOB_INVITATIONS } from '../../shared/jobInvitations'
 import React, { useEffect, useRef, useState } from 'react'
+import { nzCalendarDay, nzToday } from '../../shared/postingDates'
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import DateChips from '../components/DateChips'
 import NativeDateTimePicker, { openDateTimePicker } from '../components/NativeDateTimePicker'
@@ -170,6 +171,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const [submittingQ,  setSubmittingQ]  = useState(false)
 
   const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const openJobScrollRef = useRef(null)
   const questionFocusPending = useRef(false)
   const bidMessageRef = useRef(null)
@@ -815,10 +817,22 @@ export default function JobDetailScreen({ route, navigation }) {
                 <Text style={styles.acceptedBadgeText}>{jobConfirmed ? 'Scheduled' : 'Confirm your arrival time'}</Text>
               </View>
             </View>}
-            <Text style={styles.summaryLine}>Requester: {requesterProfile?.full_name || 'Requester'}</Text>
+            {/* The name opens their profile and the address opens directions, so
+                neither needs its own button. */}
+            <TouchableOpacity onPress={() => navigation.navigate('RequesterProfile', { requesterId: job.requester_id })}
+              accessibilityRole="button" accessibilityLabel={`View ${requesterProfile?.full_name || 'requester'}'s profile`} style={styles.summaryLink}>
+              <Text style={styles.summaryLine}>Requester: <Text style={styles.summaryLinkText}>{requesterProfile?.full_name || 'Requester'}</Text></Text>
+              <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
             <Text style={styles.summaryLine}>Agreed: {formatOfferAmount(myBid.amount, myBid.pricing_type)}</Text>
-            <Text style={styles.location}>{jobLocation(job)}</Text>
             {workSchedule?.arrival_start_at && <Text style={styles.summaryLine}>Arrival: {formatArrivalWindow(workSchedule)}</Text>}
+            {jobMapTarget(job) && !isCompleted
+              ? <TouchableOpacity onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })}
+                  accessibilityRole="button" accessibilityLabel={`Directions to ${jobLocation(job)}`} style={styles.summaryLink}>
+                  <Text style={[styles.location, { flex: 1, marginBottom: 0 }]}>{jobLocation(job)}</Text>
+                  <Icon name="navigate-outline" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              : <Text style={styles.location}>{jobLocation(job)}</Text>}
           </View>
 
           {!isCompleted && !jobConfirmed && <View style={styles.section}>
@@ -832,23 +846,37 @@ export default function JobDetailScreen({ route, navigation }) {
                 shows once you've left yours, so it doesn't read as a leftover. */}
             {requesterReview && <ReceivedReview review={receivedReview} fromLabel="requester" />}
           </View>}
-          <View style={styles.section}>
-            {!isCompleted && <Button title="Chat with requester" icon="chatbubble-ellipses-outline"
-              variant={jobConfirmed ? 'primary' : 'secondary'} onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
-            {/* Directions only matter while the work is still to be done. */}
-            {jobMapTarget(job) && !isCompleted && <Button title={jobMapTarget(job)?.kind === 'address' ? 'Navigate to job' : 'View job pin'}
-              variant="secondary" icon="navigate-outline" onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })} />}
-            {!isCompleted && <Button title="Mark as completed" variant="secondary" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
-            {jobConfirmed && !isCompleted && <>
-              <Button title="Update arrival window" variant="secondary" onPress={() => setArrivalModalVisible(true)} />
-              <Button title="I'm running late" variant="secondary" onPress={handleRunningLate} />
-            </>}
-            {jobConfirmed && <Button title="Add to phone calendar" variant="secondary" onPress={() => addWorkToPhoneCalendar({
-              title: job.title, schedule: workSchedule, location: jobLocation(job), otherPartyName: requesterProfile?.full_name,
-            })} />}
-            <Button title="View requester profile" variant="secondary" onPress={() => navigation.navigate('RequesterProfile', { requesterId: job.requester_id })} />
-          </View>
-          {providerPaymentJSX}
+          {/* One main action per stage; Chat and Directions sit side by side. */}
+          {!isCompleted && (() => {
+            const arrivalDay = nzCalendarDay(workSchedule?.arrival_start_at)
+            const workDay = jobConfirmed && !!arrivalDay && arrivalDay <= nzToday()
+            const directions = jobMapTarget(job)
+            return <View style={styles.section}>
+              {workDay && <Button title="Mark as completed" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
+              {jobConfirmed && !workDay && <Button title={`Chat with ${requesterFirstName}`} icon="chatbubble-ellipses-outline" onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
+              <View style={styles.actionRow}>
+                {(!jobConfirmed || workDay) && <Button title="Chat" icon="chatbubble-ellipses-outline" variant="secondary" size="sm" style={styles.actionRowBtn}
+                  onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
+                {directions && <Button title="Directions" icon="navigate-outline" variant="secondary" size="sm" style={styles.actionRowBtn}
+                  onPress={() => navigation.navigate('JobMap', { job, requesterName: requesterProfile?.full_name || 'Requester' })} />}
+                {jobConfirmed && <Button title={moreOpen ? 'Less' : 'More'} icon={moreOpen ? 'chevron-up' : 'ellipsis-horizontal'} variant="secondary" size="sm" style={styles.actionRowBtn}
+                  onPress={() => setMoreOpen(open => !open)} accessibilityLabel={moreOpen ? 'Hide more actions' : 'More actions'} />}
+              </View>
+              {jobConfirmed && moreOpen && <View style={styles.moreActions}>
+                <Button title="Change arrival time" variant="secondary" onPress={() => setArrivalModalVisible(true)} />
+                <Button title="I'm running late" variant="secondary" onPress={handleRunningLate} />
+                <Button title="Add to phone calendar" variant="secondary" onPress={() => addWorkToPhoneCalendar({
+                  title: job.title, schedule: workSchedule, location: jobLocation(job), otherPartyName: requesterProfile?.full_name,
+                })} />
+                {!workDay && <Button title="Mark as completed" variant="secondary" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
+              </View>}
+            </View>
+          })()}
+          {/* Payment is set when you confirm; until then, just say so. */}
+          {!jobConfirmed && !isCompleted
+            ? <View style={styles.section}><Text style={styles.sectionTitle}>Payment</Text>
+                <Text style={styles.locationNote}>You&apos;ll choose how you&apos;d like to be paid when you confirm the job.</Text></View>
+            : providerPaymentJSX}
           <View style={styles.section}>
             <TouchableOpacity style={styles.detailsToggle} accessibilityRole="button" accessibilityLabel="Job details"
               accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(value => !value)}>
@@ -1852,6 +1880,11 @@ const styles = StyleSheet.create({
   completedBanner:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary, borderRadius: 12, padding: 18, marginBottom: 12 },
   completedBannerTitle: { fontSize: 22, fontWeight: '800', color: colors.white },
   completedBannerText:  { fontSize: 15, color: colors.white, marginTop: 2 },
+  summaryLink:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+  summaryLinkText:    { color: colors.primary, fontWeight: '700' },
+  actionRow:          { flexDirection: 'row', gap: 8, marginTop: 10 },
+  actionRowBtn:       { flex: 1, marginBottom: 0 },
+  moreActions:        { gap: 8, marginTop: 10 },
   acceptedCard:       { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1.5, borderColor: colors.primary },
   acceptedCategory: { flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   acceptedCardHeader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: spacing.sm },
