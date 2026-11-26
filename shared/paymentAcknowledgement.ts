@@ -17,7 +17,11 @@ export function paymentAcknowledgementActor(sortedBy?: string | null, requesterI
   return null
 }
 
-export function paymentAcknowledgementAvailable(status: string, bidStatus: string, participant: boolean) {
+// Payment can still be marked sorted after completion (people often pay
+// afterwards), but once a completed job's payment is sorted it is settled:
+// no Undo. Pass `sortedAt` to apply that.
+export function paymentAcknowledgementAvailable(status: string, bidStatus: string, participant: boolean, sortedAt?: string | null) {
+  if (status === 'completed' && sortedAt) return false
   return participant && bidStatus === 'accepted' && (status === 'accepted' || status === 'completed')
 }
 

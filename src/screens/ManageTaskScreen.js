@@ -652,7 +652,7 @@ export default function ManageTaskScreen({ navigation, route }) {
               sortedBy={acceptedBid.paymentSortedBy}
               requesterId={job.requester_id}
               providerId={acceptedBid.providerId}
-              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner)}
+              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner, acceptedBid.paymentSortedAt)}
               onChanged={fetchAcceptedBid}
             />
           ) : null}
@@ -732,7 +732,7 @@ export default function ManageTaskScreen({ navigation, route }) {
               sortedBy={acceptedBid.paymentSortedBy}
               requesterId={job.requester_id}
               providerId={acceptedBid.providerId}
-              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner)}
+              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner, acceptedBid.paymentSortedAt)}
               onChanged={fetchAcceptedBid}
             />
           ) : null}

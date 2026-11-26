@@ -108,7 +108,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    ? <PaymentSorted key={acceptedOffer.id} bidId={acceptedOffer.id} jobId={id} sortedAt={acceptedOffer.payment_sorted_at}
        actor={paymentAcknowledgementActor(acceptedOffer.payment_sorted_by,job.requester_id,acceptedProviderId)}
        methodLabel={payMethod ? agreedPaymentMethodLabels[payMethod] : undefined}
-       canUpdate={paymentAcknowledgementAvailable(job.status,acceptedOffer.status,!!manageRole)}/>
+       canUpdate={paymentAcknowledgementAvailable(job.status,acceptedOffer.status,!!manageRole,acceptedOffer.payment_sorted_at)}/>
    : null
 
 
@@ -134,8 +134,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  if(job.status==='completed')timeline.push('Completed')
 
  const detailsCard=<article className="card work-detail">{job.category&&<p>Category: {job.category}</p>}<p>Location: {job.location_area || job.location_name || 'To be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
-   ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'Budget '+nzMoney(job.price):'open to offers')}</p></>
-   : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}{agreed?.arrival?<><p>Start: {agreed.arrival}</p><p className="muted">Requested: {schedule}</p></>
+   ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'fixed price '+nzMoney(job.price):'open to offers')}</p></>
+   : <strong>{job.price_type==='fixed'?'Fixed price: '+nzMoney(job.price):'Open to offers'}</strong>}{agreed?.arrival?<><p>Start: {agreed.arrival}</p><p className="muted">Requested: {schedule}</p></>
    :agreed?.proposedStart?<><p>Start: {startPending}</p><p className="muted">Requested: {schedule}</p></>
    :<p>{schedule}</p>}<p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
    {job.location_name&&<p>Property location: {job.location_name}</p>}{job.location_note&&<p className="work-description">Location note: {job.location_note}</p>}

@@ -1,12 +1,18 @@
 'use server'
 import { requireProvider } from '@/lib/auth'
-import { loadConversation } from '@/lib/messaging-data'
+import { loadConversation, sendableThread } from '@/lib/messaging-data'
 import { attachment, noticeMatchesConversation, type ConversationRef, type ChatMessage, type Notice } from '@/lib/messaging'
 
 export async function sendChatMessage(ref:ConversationRef,content:string,id:string):Promise<{message?:ChatMessage;error?:string}>{
   const {supabase,user}=await requireProvider()
   try{
-    const context=await loadConversation(supabase,user.id,ref)
+    const table=ref.kind==='booking'?'service_booking_messages':'messages'
+    // Permission and the retry check together, in one parallel round.
+    const [fast,{data:existing,error:existingError}]=await Promise.all([
+      sendableThread(supabase,user.id,ref),
+      supabase.from(table).select('*').eq('id',id).eq('sender_id',user.id).maybeSingle(),
+    ])
+    const context=fast?(fast.ok?{closed:fast.closed}:null):await loadConversation(supabase,user.id,ref)
     if(!context)return {error:'This conversation is unavailable. Refresh to see its current state.'}
     if(!/^[0-9a-f-]{36}$/i.test(id) || !content.trim() || content.length>10000)return {error:'Add a message of up to 1,000 characters.'}
     const parsed=attachment(content)
@@ -17,8 +23,6 @@ export async function sendChatMessage(ref:ConversationRef,content:string,id:stri
     }else if(parsed.type==='location'){
       if(parsed.latitude===null || parsed.longitude===null)return {error:'The location could not be read. Please choose Share location again.'}
     }else if(content.trim().length>1000)return {error:'Keep your message to 1,000 characters or fewer.'}
-    const table=ref.kind==='booking'?'service_booking_messages':'messages'
-    const {data:existing,error:existingError}=await supabase.from(table).select('*').eq('id',id).eq('sender_id',user.id).maybeSingle()
     if(existingError)throw existingError
     if(existing){
       if(existing.receiver_id!==ref.person || existing.content!==content || existing[ref.kind==='booking'?'booking_id':ref.kind==='listing'?'service_id':'job_id']!==ref.id)return {error:'This send attempt has changed. Refresh and try again.'}

@@ -18,13 +18,13 @@ const bankMessage=(choice:string,acct:string,acctNo:string,reference:string)=>ch
   ? `Please pay by bank transfer.\nAccount name: ${acct||'—'}\nAccount number: ${acctNo||'—'}\nReference: ${reference||'—'}`
   : ''
 
-function ArrivalFields({schedule,offerDay,arrival,onPick}:{schedule:JobSchedule;offerDay:string|null;arrival:string;onPick:(value:string)=>void}){
+function ArrivalFields({schedule,offerDay,offerTime=null,arrival,onPick}:{schedule:JobSchedule;offerDay:string|null;offerTime?:string|null;arrival:string;onPick:(value:string)=>void}){
  const days=arrivalDayChoices(schedule,{today:nzToday(),offerDay})
  const [day,time='']=arrival.split('T')
  return <>
   <p className="muted requested-date">Requested: <strong>{days.requestedLabel}</strong></p>
   {days.chips.length>0&&<div className="payment-options">{days.chips.map(chip=>
-   <button key={chip.day} type="button" aria-pressed={day===chip.day} className={'lform-kind'+(day===chip.day?' active':'')} onClick={()=>onPick(chip.day+'T'+time)}>{chip.label}</button>)}</div>}
+   <button key={chip.day} type="button" aria-pressed={day===chip.day} className={'lform-kind'+(day===chip.day?' active':'')} onClick={()=>onPick(chip.day+'T'+(chip.day===offerDay&&offerTime?offerTime.slice(0,5):time))}>{chip.label}</button>)}</div>}
   <label className="lform-field">Arrival date<DateInput required value={day} onChange={e=>onPick(e.target.value+'T'+time)}/></label>
   <label className="lform-field">Arrival time (New Zealand time)<input type="time" required value={time} onChange={e=>onPick(day+'T'+e.target.value)}/></label>
  </>
@@ -71,7 +71,7 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
   <input type="hidden" name="method" value={choice}/><input type="hidden" name="message" value={message}/>
   <fieldset disabled={pending} className="work-fieldset">
    <p className="payment-substep">When will you arrive?</p>
-   <ArrivalFields schedule={schedule} offerDay={availableFrom} arrival={arrival} onPick={setArrival}/>
+   <ArrivalFields schedule={schedule} offerDay={availableFrom} offerTime={availableTime} arrival={arrival} onPick={setArrival}/>
    {isPast&&<p className="form-error" role="alert">That time has already passed. Pick a time later today or another day.</p>}
    {invalidTime&&<p className="form-error" role="alert">Choose a valid New Zealand arrival time.</p>}
    <p className="payment-substep">Payment method (optional)</p>

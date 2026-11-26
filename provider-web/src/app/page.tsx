@@ -111,7 +111,8 @@ export default async function HomePage() {
   function activity(role:'requester'|'provider'){
    const onTheGo=rankOnTheGo(goItems.filter(item=>item.viewerRole===role))
    const activityUnavailable=[jobs,bookings,offers,offerJobs,ownBids,ownQuestions,awardTimes,schedules].some(result=>result.error)
-   const attentionSummary=homeAttentionSummary(activityUnavailable?null:goItems.filter(item=>item.viewerRole===role),role==='provider'?invitations.count??null:0,notifications.count)
+   const attentionSummary=homeAttentionSummary(activityUnavailable?null:goItems.filter(item=>item.viewerRole===role),role==='provider'?invitations.count??null:0,notifications.count,
+    role==='provider'?{label:'My Property',count:goItems.filter(item=>item.viewerRole==='requester'&&item.needsAction).length}:{label:'My Work',count:goItems.filter(item=>item.viewerRole==='provider'&&item.needsAction).length+(invitations.count||0)})
    const attention=attentionSummary.items
    return <>
       <p className="home-work-empty">{attentionSummary.text}</p>

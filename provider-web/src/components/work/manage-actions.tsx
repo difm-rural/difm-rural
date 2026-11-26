@@ -24,7 +24,8 @@ export function ManageActions({kind,id,actions,otherFirst,embedded=false}:{kind:
   if(!list.length)return null
   const Heading=embedded?'h3':'h2'
   return <section className={embedded?undefined:'card'} id="manage"><Heading>{kind==='job'?'Manage this job':'Manage this booking'}</Heading><p className="muted">Choose an action to see what will happen before confirming.</p>
-    {list.map(intent=><details className="activity-action" key={intent}><summary>{ACTIONS[intent].label}</summary>
+    {/* Mark complete is the usual next step, so it starts open; the riskier actions stay collapsed. */}
+    {list.map(intent=><details className="activity-action" key={intent} open={intent==='complete'||undefined}><summary>{ACTIONS[intent].label}</summary>
       <ActionForm action={manageArrangement} label={ACTIONS[intent].label}>
         <input type="hidden" name="id" value={id}/><input type="hidden" name="kind" value={kind}/><input type="hidden" name="intent" value={intent}/>
         <p>{intent==='complete'&&kind==='job'

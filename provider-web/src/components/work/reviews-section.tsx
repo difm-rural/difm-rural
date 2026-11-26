@@ -30,7 +30,7 @@ export function ReviewsSection({kind,id,actions,personName,personId,received,own
   )
   const Heading=embedded?'h3':'h2'
   return <section className={embedded?undefined:'card'} id="reviews"><Heading>Reviews</Heading>
-    {justReviewed && <p className="home-clear" role="status">Thanks — your review is posted.</p>}
+    {justReviewed && <p className="status-banner job-success" role="status">Thanks — your review is posted.</p>}
     {reviewError?<p role="alert">Could not load reviews. Refresh before adding or editing your review.</p>:<>
       {received && <article className="activity-received"><h3>{personName || 'Their'} review of you</h3><p><span aria-label={received.rating+' out of 5'}>{stars(received.rating)}</span> · {nzDate(new Date(received.created_at))}</p><p className="work-description">{received.comment || 'No written comment.'}</p></article>}
       {kind==='job' && otherReviewRole && jobReviewStatus(!!ownReview,!!received,otherReviewRole).map(label=><p className="muted" key={label}>{label}</p>)}
