@@ -76,6 +76,9 @@ export function JobTextDraft({onUse}:{onUse:(draft:TextDraft)=>boolean}){
     <strong>{draft.title}</strong>
     <p>{draft.description}</p>
     <p>{jobDraftCategory(draft.category)}</p>
+    {draft.area&&<p>Town or area: {draft.area}</p>}
+    {typeof draft.stated_budget==='number'&&draft.stated_budget>0&&<p>Fixed price: ${draft.stated_budget}</p>}
+    <p className="muted">Only fields you haven&apos;t filled in yet are used. Your own wording in them is kept.</p>
     <button type="button" className="lform-cancel" onClick={()=>{if(onUse(draft))setDraft(null);else setError('Could not apply this suggestion. Your details are kept.')}}>Use suggestion in empty fields</button>
    </div>}
   </div>}

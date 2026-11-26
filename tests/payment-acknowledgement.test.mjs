@@ -171,7 +171,7 @@ test('web completion ignores a legacy payment checkbox and both participants can
   eq(){return this},
   async select(){return {data:[{id:'job'}],error:null}},
  }
- vm.runInNewContext(compiled,{exports:module.exports,require(name){
+ vm.runInNewContext(compiled,{exports:module.exports,performance,console,require(name){
   if(name==='next/cache')return {revalidatePath(){}}
   if(name==='next/navigation')return {}
   if(name==='@/lib/auth')return {requireProvider:async()=>({user:{id:'provider'},supabase:{

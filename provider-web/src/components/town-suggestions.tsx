@@ -32,6 +32,9 @@ export function useTownSuggestions(query:string){
 // some browsers never show. Hidden once the field matches a suggestion.
 export function TownSuggestions({query,onPick}:{query:string;onPick:(town:string)=>void}){
  const towns=useTownSuggestions(query)
- if(!towns.length||towns.some(town=>town.toLowerCase()===query.trim().toLowerCase()))return null
+ if(!towns.length)return null
+ // Typed in full: confirm the match instead of silently hiding the list.
+ const match=towns.find(town=>town.toLowerCase()===query.trim().toLowerCase())
+ if(match)return <small className="muted" role="status">✓ {match} found</small>
  return <ul aria-label="Town suggestions">{towns.map(town=><li key={town}><button type="button" className="lform-cancel" onClick={()=>onPick(town)}>{town}</button></li>)}</ul>
 }

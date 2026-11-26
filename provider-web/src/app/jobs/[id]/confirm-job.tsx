@@ -38,9 +38,12 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
  const [state,submit,pending]=useActionState(confirmJob,{error:''})
  const guardSubmit=useSubmitGuard(state,pending)
  const confirmedArrival=arrivalStart || state.arrivalStart
- // Starts on the offer's day and, when it gave one, its start time.
+ // The accepted offer's day (and start time, when it gave one) is what was
+ // agreed, so start there; otherwise the requested day, if there is one.
  const [arrival,setArrival]=useState(()=>{
-  const day=arrivalDayChoices(schedule,{today:nzToday(),offerDay:availableFrom}).preselect || ''
+  const today=nzToday()
+  const offerDay=availableFrom&&availableFrom>=today?availableFrom:null
+  const day=offerDay || arrivalDayChoices(schedule,{today,offerDay:availableFrom}).preselect || ''
   return day+'T'+(day&&day===availableFrom&&availableTime?availableTime.slice(0,5):'')
  })
  const [choice,setChoice]=useState('agreed')

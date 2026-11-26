@@ -196,6 +196,8 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {next&&<div className={'work-nextstep'+(next.needsAction?' needs-action':'')}>{nextMoveHeading(next)&&<strong>{nextMoveHeading(next)}</strong>}<span>{next.detail}</span></div>}
   {arrangements}
   {confirmationCard}
+  {/* Mark complete is the next step once work is underway — keep it near the top, not under earlier offers. */}
+  {actions.includes('complete')&&<ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>}
   {paymentCard}
   {job.visibility==='invite_only'&&<p className="account-current">Private invited job — visible to the requester and invited providers.</p>}
   {job.status==='open'&&!own&&(watchError?<p role="alert">Could not check saved-job status. Refresh before saving.</p>:<ActionForm action={saveWatchedJob} label={watched?'Remove saved job':'Save job'}><input name="job_id" type="hidden" value={id}/><input name="intent" type="hidden" value={watched?'remove':'save'}/></ActionForm>)}
@@ -204,7 +206,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
   {!!timeline.length&&<p className="work-timeline muted">{timeline.join(' · ')}</p>}
   {((own&&(ownerActions.edit||ownerActions.repeat))||canAskQuestion||job.status==='open')&&<div className="lform-actions">{own&&ownerActions.edit&&<Link className="lform-cancel" href={'/jobs/'+id+'/edit'}>Edit job</Link>}{own&&ownerActions.repeat&&<Link className="lform-cancel" href={'/jobs/new?repeat='+id}>Repeat this job</Link>}{canAskQuestion&&<a className="lform-cancel" href="#questions">Ask a question</a>}{job.status==='open'&&<ShareJob title={job.title} publicJob={job.visibility==='public'&&job.status==='open'}/>}</div>}
   {job.status==='open'?<>{receivedSection}{qaSection}{offersSection}{invitedSection}</>:<details className="card work-earlier"><summary>Earlier questions &amp; offers</summary>{qaSection}{offersSection}{invitedSection}</details>}
-  <ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>
+  {!actions.includes('complete')&&<ManageActions kind="job" id={id} actions={actions} otherFirst={otherFirst}/>}
   {job.status==='completed'&&manageRole&&<ReviewsSection kind="job" id={id} actions={actions} personName={(otherId?names.get(otherId):null) || null} personId={otherId} received={received} ownReview={ownReview} reviewError={reviewError} justReviewed={reviewed==='1'&&!!ownReview} otherReviewRole={manageRole==='requester'?'Provider':'Requester'}/>}
   {job.status==='completed'&&manageRole==='requester'&&ownReview&&otherId&&<PropertyNetworkSuggestion owner={user.id} providerId={otherId} providerName={names.get(otherId)||null} category={job.category} title={job.title}/>}
   {own&&ownerActions.delete&&<details className="card activity-action"><summary>Delete job</summary><ActionForm action={removeJob} label="Permanently delete job"><input type="hidden" name="job_id" value={id}/><p>This permanently deletes the job and its offers, messages, questions and associated records. It cannot be undone.</p><label className="account-setting"><input type="checkbox" name="confirmed" required/>I want to permanently delete this job.</label></ActionForm></details>}

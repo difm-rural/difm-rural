@@ -8,11 +8,15 @@ import type { ActionState } from '@/components/action-form'
 
 const value=(data:FormData,key:string)=>String(data.get(key) || '').trim()
 export async function manageArrangement(_:ActionState,data:FormData):Promise<ActionState>{
+  const started=performance.now()
   const {supabase,user}=await requireProvider()
+  const authenticated=performance.now()
+  let checked=authenticated,written=authenticated
   const id=value(data,'id'),kind=value(data,'kind'),intent=value(data,'intent') as WorkAction
   if(!['job','booking'].includes(kind))return {error:'Please reopen this arrangement from Activity.'}
   try {
     const work=await loadActivityWork(supabase,kind as 'job'|'booking',id)
+    checked=written=performance.now()
     if(!work || intent==='review' || !workActions(work,user.id).includes(intent))return {error:'This arrangement has changed or this action is unavailable to you. Refresh and try again.'}
     const reason=value(data,'reason'),note=value(data,'note')
     if(['cancel','withdraw','request_cancel'].includes(intent) && !reason)return {error:'Choose a reason before continuing.'}
@@ -30,10 +34,17 @@ export async function manageArrangement(_:ActionState,data:FormData):Promise<Act
       if(error)throw error
       if(!rows?.length)return {error:'The arrangement has already changed. Refresh to see its current state.'}
     }
+    written=performance.now()
     revalidatePath('/');revalidatePath('/activity');revalidatePath('/listings');revalidatePath('/browse')
     revalidatePath('/activity/'+kind+'/'+id+'/manage');revalidatePath(kind==='job'?'/jobs/'+id:'/bookings/'+id)
     return {error:'',success:kind==='job'&&intent==='complete'?'Job completed.':intent==='request_cancel'?'Cancellation requested. The provider needs to confirm.':intent==='relist'?'Your listing is live again.':intent==='relist_grazing'?'Grazing booking completed. The booking is complete and your listing is available for new requests. Both parties can leave reviews.':intent==='close_grazing'?'Grazing booking completed. The booking is complete and your listing is now closed. Both parties can leave reviews.':'Saved. The arrangement has been updated.'}
   }catch{return {error:'Could not save this change. Check your connection, refresh and try again.'}}
+  finally{
+    // Same shape as the review action's log: find where a slow save spends its time in Vercel logs.
+    const end=performance.now()
+    if(end-started>=3000)console.warn('Slow manage action',{kind,intent,authMs:Math.round(authenticated-started),
+      lookupMs:Math.round(checked-authenticated),writeMs:Math.round(written-checked),remainingMs:Math.round(end-written)})
+  }
 }
 
 export async function reviewArrangement(_:ActionState,data:FormData):Promise<ActionState>{
