@@ -530,7 +530,9 @@ export default function JobDetailScreen({ route, navigation }) {
 
   async function handleAcceptBid(bid) {
     if (acceptingOfferRef.current) return
-    Alert.alert('Accept Offer', `Accept offer of ${nzMoney(bid.amount)} from ${bid.profiles?.full_name}?`, [
+    Alert.alert('Accept Offer', `Accept offer of ${nzMoney(bid.amount)} from ${bid.profiles?.full_name}?${job.location_name ? `
+
+Accepting also shares your exact address with ${(bid.profiles?.full_name || 'them').split(' ')[0]}.` : ''}`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Accept',
