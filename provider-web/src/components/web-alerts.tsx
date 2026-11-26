@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation'
 import { createClient, refreshRealtimeAuth } from '@/lib/supabase/client'
 import { isLiveThreadRow, liveChannel } from '@/lib/realtime'
 
+// Last known badge counts, per signed-in account, for an instant bell on page load.
+const CACHE_KEY='rc:alert-counts'
+
 type Change = { table?: string; new?: Record<string, unknown> | null }
 
 export function useWebAlerts(enabled=true,refreshPage=true){
@@ -27,7 +30,11 @@ export function useWebAlerts(enabled=true,refreshPage=true){
           client.from('notifications').select('id',{count:'exact',head:true}).eq('user_id',user.id).eq('read',false),
           client.from('notifications').select('id',{count:'exact',head:true}).eq('user_id',user.id).eq('read',false).eq('type','new_message'),
         ])
-        if(alive && !all.error && !messages.error)setCounts({messages:messages.count || 0,notifications:all.count || 0})
+        if(alive && !all.error && !messages.error){
+          const next={messages:messages.count || 0,notifications:all.count || 0}
+          setCounts(next)
+          try{sessionStorage.setItem(CACHE_KEY,JSON.stringify({user:user.id,...next}))}catch{/* optional */}
+        }
       }finally{busy=false}
     }
     // Debounced: badge counts always; a page refresh only when something on the
@@ -49,6 +56,12 @@ export function useWebAlerts(enabled=true,refreshPage=true){
     const readChanged=()=>schedule(false)
     async function start(){
       const {data:{session}}=await client.auth.getSession();const user=session?.user;if(!alive || !user)return
+      // Show the last known counts for this account at once (each page load
+      // remounts the shell), then refresh them from the database.
+      try{
+        const cached=JSON.parse(sessionStorage.getItem(CACHE_KEY) || 'null')
+        if(cached?.user===user.id&&Number.isFinite(cached.notifications)&&Number.isFinite(cached.messages))setCounts({messages:cached.messages,notifications:cached.notifications})
+      }catch{/* optional */}
       await refreshCounts()
       if(!alive)return
       // Rejoins on its own if the channel errors, times out or is closed (e.g. an
