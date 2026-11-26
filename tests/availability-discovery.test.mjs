@@ -67,7 +67,8 @@ function mobile({services=fixture(),kind='',search='',availability='',sort='defa
  const section=all.find(n=>typeof n.type==='function'&&n.type.name==='ServiceSection')
  const chips=all.filter(n=>typeof n.type==='function'&&n.type.name==='FilterChip')
  const text=all.filter(n=>n.type==='Text').map(n=>[n.props.children].flat().join(''))
- return {all,sets,items:section?.props.items ?? [],chips,text}
+ const sheet=all.find(n=>n.type==='ListingFiltersSheet'),filters=all.find(n=>/^Filters/.test(n.props?.accessibilityLabel||''))
+ return {all,sets,items:section?.props.items ?? [],count:section?.props.count,chips,text,sheet,filters}
 }
 const provider=(params,rows=fixture(),origin=null)=>discover(rows,discoveryFilters(params,true),origin)
 const pub=(params,rows=fixture(),radius=null)=>market.publicResults(rows,market.browseFilters(params),radius)
@@ -76,7 +77,7 @@ test('accepting bookings filter matches on every platform, excluding paused and 
  const m=mobile({availability:'accepting'}),p=provider({availability:'accepting'}),w=pub({availability:'accepting'})
  assert.deepEqual(ids(m.items),ACCEPTING);assert.deepEqual(ids(p.rows),ACCEPTING);assert.deepEqual(ids(w.rows),ACCEPTING)
  assert.equal(p.count,ACCEPTING.length);assert.equal(w.count,ACCEPTING.length)
- assert.ok(m.text.includes(ACCEPTING.length+' matching listings'))
+ assert.equal(m.count,ACCEPTING.length+' listings','mobile count sits in the results heading')
 })
 
 test('published lead time filter needs availability management and a comparable estimate',()=>{
@@ -147,11 +148,11 @@ test('the default view is unchanged and filters reset to it',()=>{
  for(const bad of [{availability:'paused'},{sort:'cheapest'},{availability:'<script>'}]){assert.deepEqual(ids(provider(bad,rows).rows),defaultOrder);assert.deepEqual(ids(pub(bad,rows).rows),defaultOrder)}
  // Web reset: "Clear search & options" links to the bare page, which parses to the defaults.
  assert.equal(market.browseHref('/listings',market.browseFilters({})), '/listings')
- // Mobile reset clears kind, availability and sort.
+ // Mobile: Reset in the Filters sheet applies the defaults and closes it; the category chip is left alone.
  const m=mobile({availability:'lead_time',sort:'lead_time',kind:'grazing'})
- const reset=m.all.find(n=>n.props?.accessibilityLabel==='Reset filters and sort');assert.ok(reset);reset.props.onPress()
- assert.deepEqual(m.sets,[[5,''],[7,''],[8,'default']])
- const plain=mobile();assert.equal(plain.all.some(n=>n.props?.accessibilityLabel==='Reset filters and sort'),false,'no reset or count row on the default view')
+ m.sheet.props.onApply({availability:'',sort:'default'})
+ assert.deepEqual(m.sets,[[7,''],[8,'default'],[9,false]])
+ const plain=mobile();assert.equal(plain.all.some(n=>n.props?.accessibilityLabel==='Reset filters and sort'),false,'no standalone reset row on the Browse screen')
 })
 
 test('filter and sort state survive pagination and kind links, and stay off job boards',()=>{
@@ -163,20 +164,67 @@ test('filter and sort state survive pagination and kind links, and stay off job 
  assert.equal(new URL(discoveryHref('/jobs',jobs),'https://x.test').searchParams.has('availability'),false)
 })
 
-test('mobile reuses the existing chip control and keeps existing empty-result messages',async()=>{
- const m=mobile({availability:'accepting'})
- const labels=m.chips.map(c=>c.props.label)
- assert.deepEqual(labels,[...findLocalHelp.HELP_FILTERS.map(([,l])=>l),'Accepting bookings','Published lead time','Sort: shortest lead time'])
- assert.equal(m.chips.find(c=>c.props.label==='Accepting bookings').props.selected,true)
- m.chips.find(c=>c.props.label==='Accepting bookings').props.onPress();assert.deepEqual(m.sets.pop(),[7,''],'tapping the selected chip returns to All listings')
- m.chips.find(c=>c.props.label==='Published lead time').props.onPress();assert.deepEqual(m.sets.pop(),[7,'lead_time'])
- m.chips.find(c=>c.props.label==='Sort: shortest lead time').props.onPress();assert.deepEqual(m.sets.pop(),[8,'lead_time'])
+test('mobile keeps category chips and moves availability options into a Filters sheet',()=>{
+ const m=mobile()
+ assert.deepEqual(m.chips.map(c=>c.props.label),findLocalHelp.HELP_FILTERS.map(([,l])=>l),'only the category chip row remains')
+ assert.ok(m.filters,'compact Filters button beside search');assert.equal(m.filters.props.accessibilityLabel,'Filters')
+ assert.equal(m.sheet.props.visible,false,'sheet is closed by default')
+ assert.equal(m.count,'','no count in the heading on the default view')
+ assert.equal(m.text.some(t=>/matching listing/.test(t)),false,'no standalone count row')
+ assert.equal(m.text.includes(availabilityDiscovery.LEAD_TIME_SORT_NOTE),false)
+ assert.ok(m.all.some(n=>n.props?.accessibilityLabel==='Manage my listings'),'Manage my listings stays')
+ assert.ok(m.all.some(n=>n.type==='NearbyControls'),'location controls stay')
+ m.filters.props.onPress();assert.deepEqual(m.sets.pop(),[9,true],'Filters opens the sheet')
+ m.sheet.props.onApply({availability:'lead_time',sort:'lead_time'});assert.deepEqual(m.sets,[[7,'lead_time'],[8,'lead_time'],[9,false]])
+ m.sheet.props.onClose();assert.deepEqual(m.sets.pop(),[9,false])
+
+ // Active state: badge count, count in the results heading, sheet starts from the applied options.
+ const a=mobile({availability:'accepting',sort:'lead_time'})
+ assert.equal(a.filters.props.accessibilityLabel,'Filters, 2 active');assert.ok(a.text.includes('2'))
+ assert.equal(a.count,`${ACCEPTING.length} listings`)
+ assert.equal(a.sheet.props.availability,'accepting');assert.equal(a.sheet.props.sort,'lead_time');assert.equal(a.sheet.props.defaultSortLabel,'Newest first')
+ assert.equal(a.text.includes(availabilityDiscovery.LEAD_TIME_SORT_NOTE),false,'lead-time disclaimer stays on detail and booking screens only')
+ assert.equal(mobile({sort:'lead_time'}).filters.props.accessibilityLabel,'Filters, 1 active')
+ assert.equal(mobile({kind:'grazing'}).count,'1 listing','category chips also show the heading count')
+
+ // Empty results keep the existing title; an availability filter offers Reset filters.
  const empty=mobile({services:[row('paused',{availability_status:'paused'})],availability:'accepting'})
- const state=empty.all.find(n=>n.type==='EmptyState');assert.equal(state.props.title,'No listings match this filter')
- assert.ok(empty.text.includes('0 matching listings'))
- const sorted=mobile({sort:'lead_time'});assert.ok(sorted.text.includes(availabilityDiscovery.LEAD_TIME_SORT_NOTE))
- // Guests (no signed-in member) get the same controls and results.
- const guest=mobile({availability:'accepting',viewer:false});assert.deepEqual(ids(guest.items),ACCEPTING);assert.equal(guest.chips.length,m.chips.length)
+ const state=empty.all.find(n=>n.type==='EmptyState');assert.equal(state.props.title,'No listings match this filter');assert.equal(state.props.actionLabel,'Reset filters')
+ state.props.onAction();assert.deepEqual(empty.sets,[[7,''],[8,'default']])
+ assert.equal(mobile({services:[row('paused',{availability_status:'paused'})],kind:'for_sale'}).all.find(n=>n.type==='EmptyState').props.actionLabel,'Post a job')
+ // Guests get the same controls and results.
+ const guest=mobile({availability:'accepting',viewer:false});assert.deepEqual(ids(guest.items),ACCEPTING);assert.ok(guest.filters);assert.ok(guest.sheet)
+})
+
+// --- Filters sheet component harness.
+function sheet(props={},draft=[]){
+ let index=0;const sets=[]
+ const react={useState(initial){const at=index++;return [at in draft?draft[at]:initial,v=>sets.push([at,v])]},useEffect(){},useCallback:fn=>fn,useRef:v=>({current:v})}
+ const jsx=(type,p)=>({type,props:p})
+ const modules={react:{...react,default:react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},'react-native':{...Object.fromEntries(['Modal','View','Text','TouchableOpacity','ScrollView'].map(v=>[v,v])),StyleSheet:{create:v=>v,absoluteFill:{}}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},'../theme/tokens':{colors:{}},'./Icon':{__esModule:true,default:'Icon'},'./Button':{__esModule:true,default:'Button'},'../../shared/availabilityDiscovery':availabilityDiscovery}
+ const source=readFileSync(new URL('../src/components/ListingFiltersSheet.js',import.meta.url),'utf8'),code=require('@babel/core').transformSync(source,{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
+ const exports={};new Function('exports','require',code)(exports,name=>{if(name in modules)return modules[name];throw Error('Missing '+name)})
+ const applied=[],closed=[]
+ const nodes=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)]
+ const all=nodes(exports.default({visible:true,availability:'',sort:'default',onApply:v=>applied.push(v),onClose:()=>closed.push(1),...props}))
+ const options=all.filter(n=>typeof n.type==='function'&&n.type.name==='Option'),buttons=all.filter(n=>n.type==='Button')
+ return {all,sets,applied,closed,options,buttons}
+}
+
+test('Filters sheet offers the shared availability options and lead-time sort with Apply and Reset',()=>{
+ const s=sheet({defaultSortLabel:'Nearest first'})
+ assert.deepEqual(s.options.map(o=>o.props.label),[...availabilityDiscovery.AVAILABILITY_FILTERS.map(([,l])=>l),'Nearest first',availabilityDiscovery.LEAD_TIME_SORT_LABEL])
+ assert.deepEqual(s.options.filter(o=>o.props.selected).map(o=>o.props.label),['All listings','Nearest first'])
+ assert.deepEqual(s.buttons.map(b=>b.props.title),['Reset','Apply filters'])
+ s.options.find(o=>o.props.label==='Published lead time').props.onPress();s.options.find(o=>o.props.label==='Shortest lead time').props.onPress()
+ assert.deepEqual(s.sets,[[0,'lead_time'],[1,'lead_time']],'choices are a draft until applied');assert.deepEqual(s.applied,[])
+ // Apply commits the draft; Reset applies the defaults.
+ const d=sheet({},['accepting','lead_time'])
+ d.buttons.find(b=>b.props.title==='Apply filters').props.onPress();assert.deepEqual(d.applied,[{availability:'accepting',sort:'lead_time'}])
+ d.buttons.find(b=>b.props.title==='Reset').props.onPress();assert.deepEqual(d.applied.pop(),{availability:'',sort:'default'})
+ d.all.find(n=>n.props?.accessibilityLabel==='Close filters').props.onPress();assert.equal(d.closed.length,1)
+ assert.equal(d.all.find(n=>n.type==='Modal').props.visible,true)
+ assert.equal(sheet({visible:false}).all.find(n=>n.type==='Modal').props.visible,false)
 })
 
 test('web controls reuse the existing search options form and sort select',async()=>{
