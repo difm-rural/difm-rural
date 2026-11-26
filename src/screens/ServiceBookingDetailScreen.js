@@ -72,8 +72,15 @@ function DetailRow({ label, value }) {
 export default function ServiceBookingDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets()
   const initialBooking = route.params?.booking || null
-  const viewerRole = route.params?.viewerRole || 'provider'
   const [booking, setBooking] = useState(initialBooking)
+  // Who you are on this booking comes from the booking itself once we know the
+  // signed-in user; the caller's viewerRole is only a starting guess. This keeps
+  // requester and provider actions from ever being shown to the wrong side.
+  const [signedInId, setSignedInId] = useState(null)
+  useEffect(() => { supabase.auth.getSession().then(({ data }) => setSignedInId(data?.session?.user?.id || null)).catch(() => {}) }, [])
+  const viewerRole = signedInId && booking?.provider_id === signedInId ? 'provider'
+    : signedInId && booking?.requester_id === signedInId ? 'requester'
+    : route.params?.viewerRole || 'provider'
   const [cancelVisible,setCancelVisible]=useState(false)
   const [cancelling,setCancelling]=useState(false)
   const [savingArrangement, setSavingArrangement] = useState(false)

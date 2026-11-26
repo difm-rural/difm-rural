@@ -59,6 +59,7 @@ test('offer form keeps entered values and shows pricing guidance only for hourly
   '@/components/navigation-link':{default:'a'},
   '@shared/dates':dates,'@shared/offers':offers,
   '@shared/requestedDate':{offerDefaultDay:()=>null,requestedLabel:()=>''},
+  '@shared/postingDates':{nzToday:()=>'2026-01-01'},
   '../../work-actions':{sendOffer(){},changeOffer(){}},
  })
  const render=(offer)=>{cursor=0;return nodes(OfferForm({jobId:'fixture',schedule:{},providerMaterials:false,offer}))}

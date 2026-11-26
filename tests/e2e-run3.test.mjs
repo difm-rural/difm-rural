@@ -14,3 +14,9 @@ test('a completed job with payment sorted has no payment Undo',()=>{
  assert.equal(paymentAcknowledgementAvailable('completed','accepted',true,'2026-11-26T07:17:37Z'),false)
  assert.equal(paymentAcknowledgementAvailable('completed','accepted',true,null),true)
 })
+
+test("offer dates use NZ's today, not the server's UTC date",async()=>{
+ const {nzToday}=await import('../shared/postingDates.ts')
+ // 9am NZDT on 27 Nov is still 26 Nov in UTC; the earliest allowed day must be the 27th.
+ assert.equal(nzToday(new Date('2026-11-26T20:00:00Z')),'2026-11-27')
+})

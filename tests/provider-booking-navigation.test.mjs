@@ -111,13 +111,13 @@ test('confirmed grazing makes Chat primary and completion secondary without trun
  assert.equal(options[0].style,'cancel');assert.equal(options[0].onPress,undefined);assert.deepEqual(detail.writes,[])
 })
 for(const role of ['provider','requester'])test(`completed ${role} sees independent review or submitted state`,()=>{
- const opts={record:{...booking,status:'completed'},route:{viewerRole:role},states:{14:true}}
+ const opts={record:{...booking,status:'completed'},route:{viewerRole:role},states:{15:true}}
  const detail=screen('ServiceBookingDetailScreen.js',opts)
  assert.ok(detail.all.some(n=>n.type==='Button'&&n.props.title===(role==='provider'?'Review requester':'Leave a review')))
- const submitted=screen('ServiceBookingDetailScreen.js',{...opts,states:{14:true,11:{id:'own',rating:5,comment:'Great'}}})
+ const submitted=screen('ServiceBookingDetailScreen.js',{...opts,states:{15:true,12:{id:'own',rating:5,comment:'Great'}}})
  assert.ok(submitted.all.some(n=>n.type==='Button'&&n.props.title==='Edit review'))
  assert.ok(!submitted.all.some(n=>n.type==='Button'&&['Leave a review','Review requester'].includes(n.props.title)))
- const failed=screen('ServiceBookingDetailScreen.js',{...opts,states:{14:true,15:true}})
+ const failed=screen('ServiceBookingDetailScreen.js',{...opts,states:{15:true,16:true}})
  assert.ok(failed.all.some(n=>n.type==='Button'&&n.props.title==='Retry loading review'))
  assert.ok(!failed.all.some(n=>n.type==='Button'&&['Leave a review','Review requester'].includes(n.props.title)))
 })
@@ -130,7 +130,7 @@ for(const relist of [true,false])test(`completion sends only selected booking an
 })
 
 test('repeated review submissions share the existing save workflow and are guarded while in flight',async()=>{
- const detail=screen('ServiceBookingDetailScreen.js',{record:{...booking,status:'completed'},states:{14:true}})
+ const detail=screen('ServiceBookingDetailScreen.js',{record:{...booking,status:'completed'},states:{15:true}})
  const modal=detail.all.find(n=>n.type==='ReviewModal');assert.ok(modal)
  await Promise.all([modal.props.onSubmit({rating:5,comment:'Great'}),modal.props.onSubmit({rating:5,comment:'Great'})])
  assert.equal(detail.writes.filter(w=>w[0]==='saveBookingReview').length,1)

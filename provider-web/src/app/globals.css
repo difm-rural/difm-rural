@@ -927,3 +927,9 @@ a.row:hover { background: var(--sage); }
 /* Home: "Not reviewing" beside a Leave-a-review row */
 .dismiss-review { margin: -6px 0 8px 52px; }
 .dismiss-review button { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+
+/* Completed job: prominent banner (matches the mobile app) */
+.work-completed-banner { display: flex; align-items: center; gap: 14px; margin: 0 0 12px; padding: 18px 20px; border-radius: 14px; background: var(--forest-deep); color: #fff; }
+.work-completed-banner h2 { margin: 0; font-size: 24px; font-weight: 800; color: #fff; }
+.work-completed-banner p { margin: 4px 0 0; font-size: 15px; }
+.work-completed-banner a { color: #fff; text-decoration: underline; }

@@ -4,8 +4,7 @@ import {useState,useEffect,useRef,useActionState} from 'react'
 import {useRouter} from 'next/navigation'
 import Link from '@/components/navigation-link'
 import {OFFER_PRICING_TYPES,OFFER_MATERIALS_OPTIONS,HOURLY_OFFER_GUIDANCE,initialOfferLines,updateOfferPricingDescription,editOfferPriceDescription,formatOfferAmount} from '@shared/offers'
-import {toLocalIsoDate} from '@shared/dates'
-import type {JobSchedule} from '@shared/postingDates'
+import {nzToday,type JobSchedule} from '@shared/postingDates'
 import {offerDefaultDay,requestedLabel} from '@shared/requestedDate'
 import {sendOffer,changeOffer} from '../../work-actions'
 import {DateInput} from '@/components/date-input'
@@ -14,7 +13,9 @@ type Offer={id:string;amount:number;message:string|null;line_items:{label:string
 export function OfferForm({jobId,offer,providerMaterials,schedule}:{jobId:string;offer?:Offer;providerMaterials:boolean;schedule:JobSchedule}){
  const router=useRouter()
  // A new offer starts "Available from" on the requested (first) date when it is today or later.
- const [today]=useState(()=>toLocalIsoDate(new Date())!)
+ // NZ's date, not the machine's: this first renders on the server (UTC), and
+ // before 1pm NZ the UTC date is still yesterday, which let the picker allow it.
+ const [today]=useState(()=>nzToday())
  const availableDefault=offer?(offer.available_from || ''):(offerDefaultDay(schedule,today) || '')
  const [state,submit,pending]=useActionState(offer?changeOffer:sendOffer,{error:''})
  const [items,setItems]=useState(()=>initialOfferLines(offer)),[pricing,setPricing]=useState(offer?.pricing_type || 'fixed')
