@@ -152,6 +152,12 @@ export default function HomeTabScreen({ navigation }) {
   const actionSummary=homeAttentionSummary(loadError||activeMoves===null?null:modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})),
     propertyMode?0:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null,unreadCount)
   const nextMoves=actionSummary.items
+  // Items needing action per mode, so the mode Home didn't open on still shows them.
+  const modeAttention={
+    property:(activeMoves||[]).filter(item=>item.viewerRole==='requester'&&item.nextMove.needsAction).length,
+    work:(activeMoves||[]).filter(item=>item.viewerRole==='provider'&&item.nextMove.needsAction).length
+      +(invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length||0),
+  }
   const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
   const attention=nextMoves.slice(0,5)
   function openAttentionItem(item) {
@@ -187,7 +193,7 @@ export default function HomeTabScreen({ navigation }) {
           <View style={styles.modeSwitch} accessibilityRole="radiogroup" accessibilityLabel="Home mode">
             {HOME_MODES.map(item=><TouchableOpacity key={item.id} style={[styles.modeButton,mode===item.id&&styles.modeSelected]}
               accessibilityRole="radio" accessibilityState={{checked:mode===item.id}} onPress={()=>chooseMode(item.id)}>
-              <Text style={[styles.modeLabel,mode===item.id&&styles.modeLabelSelected]}>{item.label}</Text>
+              <Text style={[styles.modeLabel,mode===item.id&&styles.modeLabelSelected]}>{item.label}{modeAttention[item.id]>0?` (${modeAttention[item.id]})`:''}</Text>
             </TouchableOpacity>)}
           </View>
         </View>

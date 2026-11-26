@@ -6,7 +6,12 @@ import { safeReturnPath } from '@/lib/return-path'
 // setup before continuing to their original destination.
 export async function requireProvider(returnTo='/', allowSetup=false) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // getClaims verifies the access token locally against the project's ES256
+  // signing keys (cached JWKS), instead of a round trip to the Auth server on
+  // every page and action. The proxy has already refreshed an expiring session.
+  const { data: auth } = await supabase.auth.getClaims()
+  const claims = auth?.claims
+  const user = claims?.sub ? { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null } : null
   if (!user) redirect('/login'+(returnTo==='/'?'':'?next='+encodeURIComponent(safeReturnPath(returnTo))))
 
   const { data: profile, error } = await supabase

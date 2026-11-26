@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { BOOKING_ACTIVE_STATUSES, JOB_ACTIVE_STATUSES } from './lifecycle'
 import { jobNextMove, bookingNextMove } from '../../shared/nextMove'
+import { loadReviewPrompts } from '../../shared/reviewPrompts'
 
 // Pure next-step logic now lives in shared/nextMove.ts (UI-free, reused by
 // provider-web). Re-exported here so existing mobile imports from
@@ -216,6 +217,22 @@ export async function fetchActiveNextMoves(userId, isProvider, {strict=false}={}
         updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at],
       })
     }
+  })
+
+  // Completed work you haven't reviewed yet stays until you do (best-effort).
+  const reviews = await loadReviewPrompts(supabase, userId).catch(() => [])
+  ;(reviews || []).forEach(prompt => {
+    items.push({
+      id: prompt.key,
+      entityType: prompt.kind,
+      entityId: prompt.id,
+      viewerRole: prompt.viewerRole,
+      title: prompt.title,
+      item: { id: prompt.id, title: prompt.title, status: 'completed', _viewerRole: prompt.viewerRole },
+      nextMove: prompt.next,
+      createdAt: prompt.updatedAt[0],
+      updatedAt: prompt.updatedAt,
+    })
   })
 
   return items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))

@@ -1,7 +1,7 @@
 // Automatic chat notes written by the database, not typed by either person.
-// `mark_payment_sorted` inserts one of these as a message from whoever tapped
-// the button, so without this they render as an ordinary "You:" bubble and the
-// payment reads as announced twice. Show them as a neutral status line instead.
+// `mark_payment_sorted` and `confirm_job` insert these as a message from
+// whoever tapped the button, so without this they render as an ordinary "You:"
+// bubble. Show them as a neutral status line instead, naming who did it.
 const PAYMENT_EVENTS: Record<string, {mine: string; theirs: (name: string) => string}> = {
   'Payment all taken care of ✓': {
     mine: 'You marked payment as sorted ✓',
@@ -13,14 +13,36 @@ const PAYMENT_EVENTS: Record<string, {mine: string; theirs: (name: string) => st
   },
 }
 
-export function isChatEvent(content: unknown): boolean {
-  return typeof content === 'string' && Object.prototype.hasOwnProperty.call(PAYMENT_EVENTS, content.trim())
+// confirm_job: "Confirmed: I'll be there around <when>.\n<payment line>…\n\n<provider's own note>"
+const CONFIRMED_PREFIX = "Confirmed: I'll be there around "
+
+function personName(name?: string | null) {
+  const full = name?.trim()
+  // First name, like the rest of the app ("Waiting on Sam to confirm").
+  return full && full !== 'Community member' && full !== 'Member' ? full.split(/\s+/)[0] : 'The other person'
 }
 
-// The status line for an automatic note, or null for an ordinary message.
+export function isChatEvent(content: unknown): boolean {
+  if (typeof content !== 'string') return false
+  return Object.prototype.hasOwnProperty.call(PAYMENT_EVENTS, content.trim()) || content.startsWith(CONFIRMED_PREFIX)
+}
+
+// The status text for an automatic note (may span lines), or null for an
+// ordinary message.
 export function chatEventText(content: unknown, mine: boolean, otherName?: string | null): string | null {
   if (!isChatEvent(content)) return null
-  const event = PAYMENT_EVENTS[(content as string).trim()]
-  const first = otherName && otherName !== 'Community member' ? otherName.trim().split(/\s+/)[0] : ''
-  return mine ? event.mine : event.theirs(first || 'The other person')
+  const text = content as string
+  const who = mine ? 'You' : personName(otherName)
+  if (text.startsWith(CONFIRMED_PREFIX)) {
+    const [first, ...rest] = text.split('\n')
+    const when = first.slice(CONFIRMED_PREFIX.length).replace(/\.$/, '')
+    return [who + ' confirmed the job: arriving around ' + when + '.', ...rest].join('\n')
+  }
+  const event = PAYMENT_EVENTS[text.trim()]
+  return mine ? event.mine : event.theirs(who)
+}
+
+// One line for inbox previews.
+export function chatEventPreview(content: unknown, mine: boolean, otherName?: string | null): string | null {
+  return chatEventText(content, mine, otherName)?.split('\n')[0] ?? null
 }

@@ -10,7 +10,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve))
 async function poll(refreshPage){
  let interval,timeout,cleanup,refreshes=0,reads=0,counts
  const channel={on(){return channel},subscribe(){return channel}}
- const client={auth:{getUser:async()=>({data:{user:{id:'test-user'}}})},from(){reads++;const q={select(){return q},eq(){return q},then(resolve){return Promise.resolve({count:2,error:null}).then(resolve)}};return q},channel:()=>channel,removeChannel:async()=>{}}
+ const client={auth:{getSession:async()=>({data:{session:{user:{id:'test-user'}}},error:null})},from(){reads++;const q={select(){return q},eq(){return q},then(resolve){return Promise.resolve({count:2,error:null}).then(resolve)}};return q},channel:()=>channel,removeChannel:async()=>{}}
  const module={exports:{}}
  vm.runInNewContext(code,{exports:module.exports,require(name){if(name==='react')return {useEffect:fn=>cleanup=fn(),useState:()=>[null,value=>counts=value]};if(name==='next/navigation')return {useRouter:()=>({refresh:()=>refreshes++})};if(name==='@/lib/supabase/client')return {createClient:()=>client,refreshRealtimeAuth:async()=>{}};if(name==='@/lib/realtime')return {isLiveThreadRow:()=>false,liveChannel:(c,name,bind)=>{bind(c.channel(name)).subscribe();return ()=>{}}};throw Error(name)},document:{visibilityState:'visible',addEventListener(){},removeEventListener(){}},window:{addEventListener(){},removeEventListener(){}},crypto:{randomUUID:()=> 'local-test'},setInterval:fn=>{interval=fn;return 1},clearInterval(){},setTimeout:fn=>{timeout=fn;return 1},clearTimeout(){}})
  module.exports.useWebAlerts(true,refreshPage)

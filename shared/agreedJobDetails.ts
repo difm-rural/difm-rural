@@ -5,10 +5,10 @@ import {formatOfferAvailability} from './offers'
 // confirmed arrival (work_schedules); until they confirm, `proposedStart` is
 // the day their accepted offer said they could start, so the agreed timing is
 // never missing between acceptance and confirmation.
-export function agreedJobDetails(arrival?:string|null,duration?:string|null,availableFrom?:string|null){
+export function agreedJobDetails(arrival?:string|null,duration?:string|null,availableFrom?:string|null,availableTime?:string|null){
  const dateTime=arrival?formatWorkDateTime(arrival):'—'
  const confirmed=dateTime==='—'?null:dateTime
- const proposed=!confirmed&&availableFrom?formatOfferAvailability(availableFrom):''
+ const proposed=!confirmed&&availableFrom?formatOfferAvailability(availableFrom,availableTime):''
  return {
   arrival:confirmed,
   proposedStart:proposed&&proposed!=='—'?proposed:null,

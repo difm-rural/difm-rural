@@ -21,7 +21,7 @@ const source=path=>readFile(new URL(path,import.meta.url),'utf8')
 function compile(source, imports){
  const code=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  const exports={}
- vm.runInNewContext(code,{exports,process,performance,require(name){if(name==='react/jsx-runtime')return jsx;if(name in imports)return imports[name];throw Error(name)}})
+ vm.runInNewContext(code,{exports,process,performance,require(name){if(name==='react/jsx-runtime')return jsx;if(name in imports)return imports[name];if(name==='@/components/pending-note'||name==='./pending-note')return {PendingNote:()=>null};if(name==='@/components/date-input')return {DateInput:'input'};throw Error(name)}})
  return exports
 }
 function nodes(node){
@@ -97,7 +97,8 @@ test('offer form keeps entered values and shows pricing guidance only for hourly
  field(editing,'pricing_type').props.onChange({target:{value:'hourly'}})
  assert.equal(field(render(saved),'item_label').props.value,'Fixed price')
  assert.equal(field(editing,'item_amount').props.value,'90')
- assert.equal(field(editing,'available_from').props.value,'07/03/2026')
+ // The date picker holds ISO; it shows the NZ date itself.
+ assert.equal(field(editing,'available_from').props.value,'2026-03-07')
 })
 
 test('shared offer defaults distinguish automatic text from manual and saved labels',()=>{

@@ -17,7 +17,11 @@ export function useWebAlerts(enabled=true,refreshPage=true){
       if(busy || document.visibilityState!=='visible')return
       busy=true
       try{
-        const {data:{user},error:authError}=await client.auth.getUser()
+        // The local session is enough to scope the counts (RLS enforces access);
+        // getUser() would call the Auth server on every poll and 403s once the
+        // session has ended.
+        const {data:{session},error:authError}=await client.auth.getSession()
+        const user=session?.user
         if(!alive || authError || !user)return
         const [all,messages]=await Promise.all([
           client.from('notifications').select('id',{count:'exact',head:true}).eq('user_id',user.id).eq('read',false),
@@ -44,7 +48,7 @@ export function useWebAlerts(enabled=true,refreshPage=true){
     const realtimeChange=(payload:Change)=>schedule(!isLiveThreadRow(payload.table || '',payload.new))
     const readChanged=()=>schedule(false)
     async function start(){
-      const {data:{user}}=await client.auth.getUser();if(!alive || !user)return
+      const {data:{session}}=await client.auth.getSession();const user=session?.user;if(!alive || !user)return
       await refreshCounts()
       if(!alive)return
       // Rejoins on its own if the channel errors, times out or is closed (e.g. an

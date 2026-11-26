@@ -18,6 +18,8 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  await supabase.auth.getUser()
+  // Refreshes an expiring session (writing the new cookies) and verifies the
+  // token locally — no Auth-server round trip on every request.
+  await supabase.auth.getClaims()
   return response
 }

@@ -50,7 +50,7 @@ test('failed profile save stays in setup; successful actions forward their desti
 })
 let authProfile,authError,authUser
 const authQuery={select(){return authQuery},eq(key,id){assert.equal(key,'id');assert.equal(id,'me');return authQuery},maybeSingle:async()=>({data:authProfile,error:authError})}
-globalThis.__firstTimeAuth={redirect:mock.redirect,createClient:async()=>({auth:{getUser:async()=>({data:{user:authUser}})},from(table){assert.equal(table,'profiles');return authQuery}})}
+globalThis.__firstTimeAuth={redirect:mock.redirect,createClient:async()=>({auth:{getUser:async()=>({data:{user:authUser}}),getClaims:async()=>({data:authUser?{claims:{sub:authUser.id,email:authUser.email}}:null})},from(table){assert.equal(table,'profiles');return authQuery}})}
 let authSource=await readFile(new URL('../provider-web/src/lib/auth.ts',import.meta.url),'utf8')
 authSource=authSource.replace("import { redirect } from 'next/navigation'","const {redirect}=globalThis.__firstTimeAuth").replace("import { createClient } from '@/lib/supabase/server'","const {createClient}=globalThis.__firstTimeAuth").replace("'@/lib/return-path'",JSON.stringify(returnUrl))
 const {requireProvider}=await import(moduleUrl(authSource))
