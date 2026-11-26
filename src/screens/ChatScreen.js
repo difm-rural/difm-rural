@@ -216,11 +216,6 @@ export default function ChatScreen({ route, navigation }) {
     return true
   }
 
-  async function handleShareAddress() {
-    if (!jobInfo?.location_name) return
-    await insertChatMessage(`📍 My address: ${jobInfo.location_name}`)
-  }
-
   async function sendProgressPhoto() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
     if (status !== 'granted') {
@@ -405,17 +400,8 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         ) : (
           <>
-          {!isServiceBookingChat && jobInfo?.hide_exact_location && currentUserId === jobInfo?.requester_id && jobInfo?.location_name && (
-            <TouchableOpacity
-              style={styles.shareAddrBar}
-              onPress={handleShareAddress}
-              accessibilityRole="button"
-              accessibilityLabel="Share your exact address">
-              <Icon name="location-outline" size={16} color={colors.primary} />
-              <Text style={styles.shareAddrText}>Share your exact address with {otherUserName?.split(' ')[0] || 'them'}</Text>
-              <Icon name="chevron-forward" size={14} color={colors.primary} />
-            </TouchableOpacity>
-          )}
+          {/* No "share your address" bar: accepting an offer already reveals the exact
+              address to that provider, and posting it to anyone else would leak it. */}
           <View style={[styles.inputBar, { paddingBottom: insets.bottom + 10 }]}>
             <TouchableOpacity
               style={styles.iconBtn}

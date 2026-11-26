@@ -61,22 +61,27 @@ export default function WorkScheduleCard({
             title="Add to phone calendar"
             detail="Includes an evening-before and two-hour reminder."
             onPress={onAddCalendar}
+            last={!canSetWindow}
           />
+          {/* Arrival changes and "running late" are the provider's: they're the one
+              travelling. canSetWindow is true only for the provider. */}
           {canSetWindow ? (
-            <Row
-              icon="time-outline"
-              title="Update arrival window"
-              detail="The requester will be notified of the change."
-              onPress={onSetWindow}
-            />
+            <>
+              <Row
+                icon="time-outline"
+                title="Update arrival window"
+                detail="The requester will be notified of the change."
+                onPress={onSetWindow}
+              />
+              <Row
+                icon="car-outline"
+                title="I’m running late"
+                detail="Notify the requester with an updated delay."
+                onPress={onRunningLate}
+                last
+              />
+            </>
           ) : null}
-          <Row
-            icon="car-outline"
-            title="I’m running late"
-            detail="Notify the other party with an updated delay."
-            onPress={onRunningLate}
-            last
-          />
         </>
       )}
     </View>

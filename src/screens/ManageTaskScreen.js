@@ -253,7 +253,11 @@ export default function ManageTaskScreen({ navigation, route }) {
     const provName = bid.provider?.full_name || 'this provider'
     Alert.alert(
       'Accept offer?',
-      `Accept ${provName}'s offer of ${nzMoney(bid.amount)}? All other offers will be declined.`,
+      // The exact address is revealed to the accepted provider by the database
+      // (jobs_public / can_see_job_location) — say so before they accept.
+      `Accept ${provName}'s offer of ${nzMoney(bid.amount)}? All other offers will be declined.${job.location_name ? `
+
+Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
