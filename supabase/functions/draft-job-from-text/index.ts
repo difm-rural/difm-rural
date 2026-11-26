@@ -28,7 +28,11 @@ Return JSON only, with this exact shape:
   "duration": string | null,    // plain estimate e.g. "About 2 hours", or null
   "skills": string[],           // helpful skills/experience e.g. ["Stock handling","Working dog"]
   "schedule_type": "asap" | "specific" | "flexible",
-  "scheduled_date": string | null  // "YYYY-MM-DD" only when a specific day is implied, else null
+  "scheduled_date": string | null, // "YYYY-MM-DD" only when a specific day is implied, else null
+  "area": string | null,           // the town or locality the user named (e.g. "Waitoki"), else null.
+                                   //   Town only — never a street, number or full address.
+  "stated_budget": number | null   // NZD the user explicitly said they'd pay (e.g. "about $80"), else null.
+                                   //   Never an estimate — use budget_low/high for estimates.
 }
 
 Rules:
@@ -84,6 +88,9 @@ function normalizeDraft(raw: Record<string, unknown>) {
     skills: Array.isArray(raw.skills) ? raw.skills.filter(s => typeof s === 'string').slice(0, 6) : [],
     schedule_type: scheduleType,
     scheduled_date: scheduleType === 'specific' ? scheduledDate : null,
+    // Town only: drop anything with digits (a street number) or over 60 chars.
+    area: typeof raw.area === 'string' && raw.area.trim() && !/\d/.test(raw.area) ? raw.area.trim().slice(0, 60) : null,
+    stated_budget: (() => { const v = num(raw.stated_budget); return v !== null && v > 0 && v <= 10000000 ? v : null })(),
   }
 }
 

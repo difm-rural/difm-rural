@@ -6,7 +6,7 @@ import {jobDraftCategory} from '@shared/categories'
 import {nzToday} from '@shared/postingDates'
 import {createClient} from '@/lib/supabase/client'
 
-type TextDraft={title:string;description:string;category:string}
+type TextDraft={title:string;description:string;category:string;area?:string|null;stated_budget?:number|null}
 const choices={
  Photo:{label:'Use a photo',description:'Take or choose a photo and add a few words if you like.',Icon:Camera},
  Speak:{label:'Speak',description:'Tell our Assistant what needs doing.',Icon:Mic},

@@ -27,12 +27,15 @@ export function homeWorkSummary(counts:Record<Indicator['id'],number|null>){
 // notification read state. Informational history stays in Notifications.
 // `unread` only changes the wording: "all caught up" beside a bell showing
 // unread updates reads as a contradiction, so say what is actually true.
-export function homeAttentionSummary<T extends {needsAction:boolean}>(moves:readonly T[]|null, additional:number|null=0, unread:number|null=0){
+// `otherMode` names the other Home mode when it has items waiting, so an empty
+// mode doesn't claim "nothing needs your action" overall.
+export function homeAttentionSummary<T extends {needsAction:boolean}>(moves:readonly T[]|null, additional:number|null=0, unread:number|null=0, otherMode?:{label:string;count:number}|null){
  const items=(moves||[]).filter(item=>item.needsAction)
  const count=moves===null||additional===null?null:items.length+additional
  const updates=unread&&unread>0?unread:0
+ const elsewhere=otherMode&&otherMode.count>0?` ${otherMode.count} ${otherMode.count===1?'item needs':'items need'} you in ${otherMode.label}.`:''
  return {items,count,text:count===null?'Activity summary unavailable. Refresh to try again.':
-  count===0?(updates?`Nothing needs your action. ${updates} unread ${updates===1?'update':'updates'} in Notifications.`:"You're all caught up."):`${count} ${count===1?'item needs':'items need'} your attention.`}
+  count===0?(elsewhere?`Nothing needs your action here.${elsewhere}`:updates?`Nothing needs your action. ${updates} unread ${updates===1?'update':'updates'} in Notifications.`:"You're all caught up."):`${count} ${count===1?'item needs':'items need'} your attention.`}
 }
 
 type CountQuery={eq:(key:string,value:string)=>CountQuery;neq:(key:string,value:string)=>PromiseLike<{count:number|null;error:unknown}>}

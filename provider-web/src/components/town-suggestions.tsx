@@ -28,7 +28,10 @@ export function useTownSuggestions(query:string){
  return query.trim().length<3?[]:towns
 }
 
-export function TownSuggestions({id,query}:{id:string;query:string}){
+// Visible buttons (like the address search) rather than a <datalist>, which
+// some browsers never show. Hidden once the field matches a suggestion.
+export function TownSuggestions({query,onPick}:{query:string;onPick:(town:string)=>void}){
  const towns=useTownSuggestions(query)
- return <datalist id={id}>{towns.map(town=><option key={town} value={town}/>)}</datalist>
+ if(!towns.length||towns.some(town=>town.toLowerCase()===query.trim().toLowerCase()))return null
+ return <ul aria-label="Town suggestions">{towns.map(town=><li key={town}><button type="button" className="lform-cancel" onClick={()=>onPick(town)}>{town}</button></li>)}</ul>
 }

@@ -773,7 +773,7 @@ export default function JobDetailScreen({ route, navigation }) {
               sortedBy={myBid.payment_sorted_by || null}
               requesterId={job.requester_id}
               providerId={currentUser?.id}
-              canUpdate={paymentAcknowledgementAvailable(job.status, myBid.status, isAcceptedProvider)}
+              canUpdate={paymentAcknowledgementAvailable(job.status, myBid.status, isAcceptedProvider, myBid.payment_sorted_at)}
               canEditMethod={jobConfirmed && ['accepted', 'in_progress'].includes(job.status)}
               onChanged={fetchData}
             />
@@ -1502,7 +1502,7 @@ export default function JobDetailScreen({ route, navigation }) {
               sortedBy={acceptedBid.payment_sorted_by}
               requesterId={job.requester_id}
               providerId={acceptedBid.provider_id}
-              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner)}
+              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner, acceptedBid.payment_sorted_at)}
               onChanged={fetchData}
             />
   ) : null

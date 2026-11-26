@@ -94,6 +94,9 @@ test('acknowledgement attribution and eligibility mirror the current participant
  assert.ok(!paymentAcknowledgementAvailable('completed','pending',true))
  assert.ok(!paymentAcknowledgementAvailable('completed','accepted',false))
  for(const status of ['open','cancelled','in_progress'])assert.ok(!paymentAcknowledgementAvailable(status,'accepted',true))
+ // Settled: a completed job whose payment is sorted offers no Undo.
+ assert.ok(!paymentAcknowledgementAvailable('completed','accepted',true,'2026-11-26T07:17:37Z'))
+ assert.ok(paymentAcknowledgementAvailable('accepted','accepted',true,'2026-11-26T07:17:37Z'))
 })
 
 test('mobile mark and Undo use one RPC, preserve status on errors, and restore the reminder on success',async()=>{

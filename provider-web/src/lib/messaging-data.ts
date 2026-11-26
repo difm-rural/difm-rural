@@ -72,6 +72,32 @@ export async function loadConversation(client:SupabaseClient,userId:string,ref:C
   if(error)throw error
   return {...ref,title,name:p?.full_name || p?.display_name || 'Community member',closed,privateJob,userId,messages:messages.reverse()}
 }
+// Whether the viewer may still send in a job or booking thread, without
+// loading the conversation: one parallel round instead of loadConversation's
+// messages → subject → profile chain. Same rules as loadConversation for an
+// active thread (the accepted pair, not closed). null = use loadConversation.
+export async function sendableThread(client:SupabaseClient,userId:string,ref:ConversationRef):Promise<{ok:boolean;closed:boolean}|null>{
+  if(!validConversation(ref) || userId===ref.person)return {ok:false,closed:false}
+  if(ref.kind==='booking'){
+    const {data:b,error}=await client.from('bookings').select('requester_id,provider_id,status').eq('id',ref.id).maybeSingle()
+    if(error)throw error
+    const ok=!!b && [b.requester_id,b.provider_id].includes(userId) && (userId===b.requester_id?b.provider_id:b.requester_id)===ref.person
+    return {ok,closed:!!b&&['completed','cancelled','withdrawn','declined'].includes(b.status)}
+  }
+  if(ref.kind==='job'){
+    const [{data:j,error},{data:b,error:bidError}]=await Promise.all([
+      client.from('jobs_public').select('requester_id,status').eq('id',ref.id).maybeSingle(),
+      client.from('bids').select('provider_id').eq('job_id',ref.id).eq('status','accepted').maybeSingle(),
+    ])
+    if(error || bidError)throw error || bidError
+    // Before acceptance (open-job offer threads) fall back to the full rules.
+    if(!j || !b)return null
+    const expected=j.requester_id===userId?b.provider_id:b.provider_id===userId?j.requester_id:null
+    if(expected!==ref.person)return null
+    return {ok:true,closed:['completed','cancelled'].includes(j.status)}
+  }
+  return null
+}
 export async function unreadNotices(client:SupabaseClient,userId:string){
   const rows:Notice[]=[]
   for(let offset=0;;offset+=500){

@@ -106,10 +106,16 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
  useEffect(()=>{if(state.error){submissionLock.current=false;setSubmitting(false);try{if(hasJobDraftChanges(draft,baseline))sessionStorage.setItem(key,JSON.stringify({draft,id:jobId}))}catch{}}if(state.jobId){try{sessionStorage.removeItem(key)}catch{}router.push('/jobs/'+state.jobId+(mode==='edit'?'?edited=1':'?posted=1'))}},[state,key,router,mode])  // eslint-disable-line react-hooks/exhaustive-deps -- draft/jobId are re-saved only at the moment a failure arrives
  useEffect(()=>{heading.current?.focus();heading.current?.scrollIntoView({block:'start'})},[step])
  const [suggestionFeedback,setSuggestionFeedback]=useState('')
- function applySuggestion(value:Pick<PhotoSuggestion,'title'|'description'|'category'>){
+ function applySuggestion(value:Pick<PhotoSuggestion,'title'|'description'|'category'>&{area?:string|null;stated_budget?:number|null}){
   const result=fillJobDraftFields(draft,value)
   if(!result)return false
-  setDraft(current=>({...current,...fillJobDraftFields(current,value)?.fields}))
+  // The text assistant may also name a town and a budget the person stated;
+  // like the other fields, they only fill fields that are still empty.
+  const area=typeof value.area==='string'?value.area.trim():''
+  const budget=typeof value.stated_budget==='number'&&value.stated_budget>0?String(value.stated_budget):''
+  setDraft(current=>({...current,...fillJobDraftFields(current,value)?.fields,
+   ...(area&&!current.area.trim()?{area}:{}),
+   ...(budget&&current.price_type==='open'&&!current.price.trim()?{price_type:'fixed',price:budget}:{})}))
   setSuggestionFeedback(result.changed?'Suggestion applied. Review and edit the details as needed.':'Your existing job details were kept.')
   return true
  }
@@ -227,7 +233,8 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
   {inviteProvider&&<section className="card work-detail"><h2>Invite {inviteProvider.name}</h2><p>This job will be visible only to you and this provider unless you choose the public board.</p><label className="account-setting"><input type="checkbox" disabled={pending||busy||submitting} checked={draft.also_public} onChange={e=>set('also_public',e.target.checked)}/>Also put this job on the public Jobs board</label></section>}
   {mode==='repeat'&&<p className="account-current">This is a new copy. Choose fresh dates before posting. The original job, offers, messages and reviews stay unchanged.</p>}
   {mode==='edit'&&offerCount>0&&<p className="home-load-error">This job has {offerCount} offer{offerCount===1?'':'s'}. Changes may affect those offers; discuss material changes before accepting.</p>}
-  {furthest>0&&<nav className="job-steps" aria-label="Job posting steps">{steps.map((label,i)=><button type="button" key={label} aria-current={step===i?'step':undefined} disabled={pending||busy||submitting||i>furthest} onClick={()=>{setError('');setAttempted(false);setStep(i)}}>{i+1}. {label}</button>)}</nav>}
+  {/* Always shown so step 1 matches the others; steps not reached yet stay disabled. */}
+  {<nav className="job-steps" aria-label="Job posting steps">{steps.map((label,i)=><button type="button" key={label} aria-current={step===i?'step':undefined} disabled={pending||busy||submitting||i>furthest} onClick={()=>{setError('');setAttempted(false);setStep(i)}}>{i+1}. {label}</button>)}</nav>}
   <div className="job-progress"><p className="eyebrow">Step {step+1} of {steps.length} · {steps[step]}</p><progress aria-label="Job posting progress" value={step+1} max={steps.length}/></div><h2 tabIndex={-1} ref={heading}>{step===0?"What do you need done?":steps[step]}</h2>
   {mode==='new'&&propertyOrigin&&<><input type="hidden" name="property_owner" value={propertyOrigin.ownerId}/><input type="hidden" name="property_area" value={propertyOrigin.area}/></>}
   <input type="hidden" name="job_id" value={jobId}/>{inviteProvider&&<input type="hidden" name="invite_provider_id" value={inviteProvider.id}/>}{mode==='repeat'&&<input type="hidden" name="repeated_from_job_id" value={seed?.id}/>}
@@ -260,7 +267,7 @@ export function JobForm({userId,seed,mode='new',offerCount=0,inviteProvider,priv
    {draft.schedule_type==='specific'&&<label className="lform-field">Preferred date *<DateInput type="date" min={mode==='edit'&&draft.scheduled_date===seed?.scheduled_date?undefined:nzToday()} {...field('scheduled_date')} value={draft.scheduled_date} onChange={e=>set('scheduled_date',e.target.value)}/>{issue('scheduled_date')}</label>}
    {draft.schedule_type==='range'&&<div className="lform-repeat-grid"><label className="lform-field">From *<DateInput type="date" min={mode==='edit'&&draft.date_from===seed?.date_from?undefined:nzToday()} {...field('date_from')} value={draft.date_from} onChange={e=>set('date_from',e.target.value)}/>{issue('date_from')}</label><label className="lform-field">To *<DateInput type="date" min={mode==='edit'&&draft.date_to===seed?.date_to?undefined:draft.date_from>nzToday()?draft.date_from:nzToday()} value={draft.date_to} {...field('date_to')} onChange={e=>set('date_to',e.target.value)}/>{issue('date_to')}</label></div>}
   </div>}
-  {step===1&&<div className="lform-step"><JobAddressInput value={draft.location} onChange={changeJobAddress}/><label className="lform-field">Public town or area (optional)<input {...field('area')} value={draft.area} maxLength={150} list="job-area-towns" autoComplete="off" onChange={e=>set('area',e.target.value)} placeholder="e.g. Cambridge, Waikato"/><TownSuggestions id="job-area-towns" query={draft.area}/>{issue('area')}<small className="muted">Town or area only, e.g. Waitoki or Te Kūiti.</small></label>
+  {step===1&&<div className="lform-step"><JobAddressInput value={draft.location} onChange={changeJobAddress}/><label className="lform-field">Public town or area (optional)<input {...field('area')} value={draft.area} maxLength={150} autoComplete="off" onChange={e=>set('area',e.target.value)} placeholder="e.g. Cambridge, Waikato"/><TownSuggestions query={draft.area} onPick={town=>set('area',town)}/>{issue('area')}<small className="muted">Town or area only, e.g. Waitoki or Te Kūiti.</small></label>
    <label className="account-setting"><input type="checkbox" checked={draft.hide_exact_location} onChange={e=>set('hide_exact_location',e.target.checked)}/><span><strong>Hide my approximate distance too</strong><small>{draft.hide_exact_location?'Providers see only the public area, not how far away it is.':'Providers see the public area and roughly how far away it is (to about 1 km).'} The exact location, GPS and location note go only to the provider you accept.</small></span></label>
    <JobLocationMap latitude={draft.latitude} longitude={draft.longitude} onPick={pickJobLocation}/>
    <div className="lform-actions"><button type="button" className="lform-cancel" onClick={useLocation}>Use my location</button>{draft.latitude&&<button type="button" className="lform-cancel" onClick={()=>{set('latitude','');set('longitude','')}}>Clear GPS</button>}</div><p className="muted">Use GPS only when you are at the job site. This adds coordinates without changing the address above.</p>
