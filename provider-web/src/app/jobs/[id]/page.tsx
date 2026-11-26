@@ -7,6 +7,7 @@ import {jobMapTarget} from '@shared/jobMapTarget'
 import {formatMoney as nzMoney,formatDate as nzDate,formatWorkDate} from '@shared/formatting'
 import {jobNextMove,nextMoveHeading} from '@shared/nextMove'
 import Link from '@/components/navigation-link'
+import { CheckCircle2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { SideKicker } from '@/components/side-kicker'
@@ -213,7 +214,13 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  </>
 
  return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/jobs" className="card-link">Back to Jobs</Link><header className="home-heading work-head job-head"><div><SideKicker side="job" label="Jobs · wanted"/><p className="eyebrow">{next?.badge || (manageRole?statusLabel(job.status):jobBoardStatusLabel(job.status))}</p><h1>{job.title}</h1></div><LiveRefresh/></header>
-  {job.status==='completed'&&manageRole&&<p className="status-banner job-success" role="status">Job completed. <Link href="/activity?view=history">View History</Link></p>}
+  {/* Same prominent banner as the mobile app's completed view. */}
+  {job.status==='completed'&&manageRole&&<section className="work-completed-banner" role="status">
+   <CheckCircle2 size={34} aria-hidden="true"/>
+   <div><h2>Work completed</h2>
+    <p>{ownReview?'Thanks — your review is in.':actions.includes('review')?<>Leave a review for {otherFirst} <a href="#reviews">below</a>.</>:'This job is finished.'} <Link href="/activity?view=history">View History</Link></p>
+   </div>
+  </section>}
   {offered==='1'&&!own&&myOffer?.status==='pending'&&<p className="status-banner job-success" role="status">Offer sent.</p>}
   {twoCol?<div className="work-workspace"><div className="work-main">{mainColumn}</div><aside className="work-conversation" id="conversation"><Conversation compact context={conversation!} heading={chatHeading}/></aside></div>:mainColumn}
  </section></AppShell>

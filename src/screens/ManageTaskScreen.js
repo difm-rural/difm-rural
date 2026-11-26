@@ -569,6 +569,24 @@ export default function ManageTaskScreen({ navigation, route }) {
     )
   }
 
+  // Manage job is the requester's screen. The job's provider belongs on their
+  // own job screen (provider actions: confirm, complete, review the requester),
+  // never on Share / Repeat / Cancel / Review provider.
+  if (currentUserId && !isTaskOwner && isAcceptedProvider) {
+    return (
+      <View style={styles.screen}>
+        {headerJSX}
+        <View style={[styles.scrollContent, { flex: 1 }]}>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>You're the provider on this job</Text>
+            <Text style={styles.accessBody}>Job management is for the person who posted it. Your actions are on the job screen.</Text>
+            <Button title="Open job" onPress={() => navigation.replace('JobDetail', { job })} style={{ marginHorizontal: 16, marginBottom: 10 }} />
+          </View>
+        </View>
+      </View>
+    )
+  }
+
   if (currentUserId && !isTaskOwner && !isAcceptedProvider && !(isAwarded && (loadingBid || !acceptedBid))) {
     return (
       <View style={styles.screen}>
