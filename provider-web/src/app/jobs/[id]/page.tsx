@@ -96,9 +96,11 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
  const confirmationCard=showPayment&&acceptedOffer&&isAcceptedProvider&&['accepted','in_progress'].includes(job.status)
    ? <ConfirmJob bidId={acceptedOffer.id} jobId={id} jobTitle={job.title} requesterFirst={otherFirst} schedule={jobSchedule} availableFrom={acceptedOffer.available_from} arrivalStart={workArrival} amount={acceptedOffer.amount} pricingType={acceptedOffer.pricing_type}/>
    : null
- const agreed=showPayment?agreedJobDetails(workArrival,acceptedOffer?.estimated_duration):null
- const arrangements=(agreed?.arrival||agreed?.duration)&&<section className="card"><h2>Agreed arrangements</h2>
+ const agreed=showPayment?agreedJobDetails(workArrival,acceptedOffer?.estimated_duration,acceptedOffer?.available_from):null
+ const providerFirst=(acceptedProviderId?names.get(acceptedProviderId):'')?.trim().split(/\s+/)[0] || 'the provider'
+ const arrangements=(agreed?.arrival||agreed?.proposedStart||agreed?.duration)&&<section className="card"><h2>Agreed arrangements</h2>
   {agreed.arrival&&<p><strong>Arrival:</strong> {agreed.arrival}</p>}
+  {agreed.proposedStart&&<p><strong>Start:</strong> from {agreed.proposedStart} <span className="muted">({isAcceptedProvider?'confirm your arrival time below':'waiting for '+providerFirst+' to confirm the arrival time'})</span></p>}
   {agreed.duration&&<p><strong>Estimated duration:</strong> {agreed.duration}</p>}
  </section>
  const paymentCard=showPayment&&acceptedOffer
@@ -132,7 +134,9 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
 
  const detailsCard=<article className="card work-detail">{job.category&&<p>Category: {job.category}</p>}<p>Location: {job.location_area || job.location_name || 'To be arranged'}</p><p className="work-description">{job.description}</p>{acceptedOffer&&job.status!=='cancelled'
    ? <><strong>{'Agreed: '+(acceptedOffer.amount?formatOfferAmount(acceptedOffer.amount,acceptedOffer.pricing_type):'price to be confirmed')}</strong><p className="muted">{'Posted as: '+(job.price_type==='fixed'?'Budget '+nzMoney(job.price):'open to offers')}</p></>
-   : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}<p>{schedule}</p><p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
+   : <strong>{job.price_type==='fixed'?"Budget: "+nzMoney(job.price)+'':'Open to offers'}</strong>}{agreed?.arrival?<><p>Start: {agreed.arrival}</p><p className="muted">Requested: {schedule}</p></>
+   :agreed?.proposedStart?<><p>Start: from {agreed.proposedStart} (to be confirmed)</p><p className="muted">Requested: {schedule}</p></>
+   :<p>{schedule}</p>}<p className="muted">Posted by <Link href={'/people/'+job.requester_id} className="card-link">{names.get(job.requester_id) || 'a community member'}</Link></p>
    {job.location_name&&<p>Property location: {job.location_name}</p>}{job.location_note&&<p className="work-description">Location note: {job.location_note}</p>}
    {mapTarget&&<a className="card-link" href={mapTarget.href} target="_blank" rel="noopener noreferrer">{mapTarget.label}</a>}
    {(job.hide_exact_location||job.location_exact===false)&&<p className="muted">The exact property location, GPS and location note are shared with the accepted provider.</p>}

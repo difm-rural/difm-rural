@@ -22,6 +22,7 @@ import { KindTag } from '../components/SideHeader'
 import EnquiryPersonCard from '../components/EnquiryPersonCard'
 import { getCurrentLocation, reverseGeocode } from '../lib/location'
 import { markNotificationsReadFor } from '../lib/notifications'
+import { chatEventText } from '../../shared/chatEvents'
 
 function parseSpecialMessage(content) {
   try {
@@ -282,6 +283,16 @@ export default function ChatScreen({ route, navigation }) {
     const isMine   = item.sender_id === currentUserId
     const special  = parseSpecialMessage(item.content)
     const ts = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const event = chatEventText(item.content, isMine, otherUserName)
+
+    // Automatic note (e.g. payment marked sorted) — not something either person typed.
+    if (event) {
+      return (
+        <View style={styles.eventRow} accessible accessibilityLabel={`${event}, ${ts}`}>
+          <Text style={styles.eventText}>{event} · {ts}</Text>
+        </View>
+      )
+    }
 
     if (special?.type === 'location') {
       return (
@@ -466,6 +477,8 @@ const styles = StyleSheet.create({
 
   // ─── Bubbles ───────────────────────────────────────────────────────
   bubbleWrapper: { marginBottom: 10, flexDirection: 'row' },
+  eventRow:      { alignItems: 'center', marginBottom: 10, paddingHorizontal: 16 },
+  eventText:     { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
   myWrapper:     { justifyContent: 'flex-end' },
   theirWrapper:  { justifyContent: 'flex-start' },
 

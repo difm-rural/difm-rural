@@ -383,9 +383,13 @@ test('review submission checks eligibility, redirects after a write and reports 
 
 
 test('agreed arrangements use the latest Auckland arrival and omit missing estimates',()=>{
- assert.deepEqual(agreedJobDetails('2026-11-19T22:00:00Z',' 2 hours '),{arrival:'Fri 20 Nov 2026, 11:00 am',duration:'2 hours'})
- assert.deepEqual(agreedJobDetails('2026-11-20T00:00:00Z',''),{arrival:'Fri 20 Nov 2026, 1:00 pm',duration:null})
- assert.deepEqual(agreedJobDetails(null,null),{arrival:null,duration:null})
+ assert.deepEqual(agreedJobDetails('2026-11-19T22:00:00Z',' 2 hours '),{arrival:'Fri 20 Nov 2026, 11:00 am',proposedStart:null,duration:'2 hours'})
+ assert.deepEqual(agreedJobDetails('2026-11-20T00:00:00Z',''),{arrival:'Fri 20 Nov 2026, 1:00 pm',proposedStart:null,duration:null})
+ assert.deepEqual(agreedJobDetails(null,null),{arrival:null,proposedStart:null,duration:null})
+ // Between acceptance and the provider confirming, the offer's start day stands in.
+ assert.deepEqual(agreedJobDetails(null,null,'2026-11-20'),{arrival:null,proposedStart:'Fri 20 Nov 2026',duration:null})
+ // Once confirmed, the confirmed arrival wins.
+ assert.equal(agreedJobDetails('2026-11-19T22:00:00Z',null,'2026-11-25').proposedStart,null)
 })
 
 test('offer submission navigates to a persistent job banner only after database success',async()=>{

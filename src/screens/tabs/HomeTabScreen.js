@@ -150,7 +150,7 @@ export default function HomeTabScreen({ navigation }) {
   const modeItems=(activeMoves||[]).filter(item=>item.viewerRole===homeRole(mode))
   const networkLines=network?propertyNetworkHomeLines(network):[]
   const actionSummary=homeAttentionSummary(loadError||activeMoves===null?null:modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})),
-    propertyMode?0:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null)
+    propertyMode?0:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null,unreadCount)
   const nextMoves=actionSummary.items
   const onTheGo=rankOnTheGo(modeItems.map(item=>({...item,needsAction:item.nextMove.needsAction})))
   const attention=nextMoves.slice(0,5)

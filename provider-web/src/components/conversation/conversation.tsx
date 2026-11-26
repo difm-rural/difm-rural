@@ -1,5 +1,6 @@
 'use client'
 import {formatDateTime as nzDateTime} from '@shared/formatting'
+import {chatEventText} from '@shared/chatEvents'
 import Link from '@/components/navigation-link'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { ImagePlus, MapPin, Send, X } from 'lucide-react'
@@ -111,7 +112,9 @@ export function Conversation({context,compact=false,heading}:{context:Conversati
     {readError && <p className="form-error" role="alert">{readError}</p>}
     <div className="enq-messages message-scroll" ref={scrollRef} onScroll={()=>{const el=scrollRef.current;if(el)nearBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<120}}>
       {!messages.length && <p className="empty">No messages yet. Send a message to get started.</p>}
-      {messages.map(m=>{const body=attachment(m.content);return <article key={m.id} className={m.sender_id===context.userId?'bubble mine':'bubble theirs'}>
+      {messages.map(m=>{const event=chatEventText(m.content,m.sender_id===context.userId,context.name)
+        if(event)return <p key={m.id} className="chat-event" role="note">{event} <time className="bubble-time" dateTime={m.created_at}>{nzDateTime(new Date(m.created_at))}</time></p>
+        const body=attachment(m.content);return <article key={m.id} className={m.sender_id===context.userId?'bubble mine':'bubble theirs'}>
         <span className="sr-only">{m.sender_id===context.userId?'You':context.name}:</span>
         {body.type==='photo'?<><a href={body.url} target="_blank" rel="noopener noreferrer"><img className="message-photo" src={body.url} alt={body.caption || 'Shared photo'} loading="lazy"/></a>{body.caption && <p>{body.caption}</p>}</>
         :body.type==='location'?<><p>{body.text}</p>{body.latitude!==null && body.longitude!==null && <a className="message-map" target="_blank" rel="noopener noreferrer" href={'https://www.google.com/maps/search/?api=1&query='+body.latitude+','+body.longitude}>Open shared location in Maps ↗</a>}</>

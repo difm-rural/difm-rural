@@ -129,7 +129,9 @@ for(const status of ['withdrawn','cancelled','declined','completed','confirmed']
  const events=Array.from({length:27},(_,id)=>({...historicalNotice,id}))
  const {html,calls}=await dashboard({bookingRows:[grazingBooking(status)],notificationEvents:events})
  assert.doesNotMatch(html,/Needs attention|Confirm or decline the booking|Confirm the withdrawn grazing request/)
- assert.match(html,/You&#x27;re all caught up\./)
+ // Nothing to act on, but the 27 unread updates are named rather than called "caught up".
+ assert.match(html,/Nothing needs your action\. 27 unread updates in Notifications\./)
+ assert.doesNotMatch(html,/caught up/)
  assert.match(html,/All notifications \(27 unread\)/)
  const query=calls.find(call=>call.table==='notifications')
  assert.equal(query.cols,'id');assert.equal(query.options.count,'exact');assert.equal(query.options.head,true)
