@@ -790,7 +790,7 @@ Accepting also shares your exact address with ${(bid.profiles?.full_name || 'the
               requesterId={job.requester_id}
               providerId={currentUser?.id}
               canUpdate={paymentAcknowledgementAvailable(job.status, myBid.status, isAcceptedProvider, myBid.payment_sorted_at)}
-              canEditMethod={jobConfirmed && ['accepted', 'in_progress'].includes(job.status)}
+              canEditMethod={false /* method changes are agreed in chat */}
               onChanged={fetchData}
             />
           ) : null}
@@ -856,6 +856,9 @@ Accepting also shares your exact address with ${(bid.profiles?.full_name || 'the
             return <View style={styles.section}>
               {workDay && <Button title="Mark as completed" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
               {jobConfirmed && !workDay && <Button title={`Chat with ${requesterFirstName}`} icon="chatbubble-ellipses-outline" onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
+              {/* Once confirmed, Mark as completed is always a full button (main on the
+                  arrival day, outlined before it), never hidden under More. */}
+              {jobConfirmed && !workDay && <Button title="Mark as completed" icon="checkmark" variant="secondary" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" style={{ marginTop: 10, marginBottom: 0 }} />}
               <View style={styles.actionRow}>
                 {(!jobConfirmed || workDay) && <Button title="Chat" icon="chatbubble-ellipses-outline" variant="secondary" size="sm" style={styles.actionRowBtn}
                   onPress={handleChat} accessibilityLabel={`Chat with ${requesterFirstName}`} />}
@@ -866,11 +869,9 @@ Accepting also shares your exact address with ${(bid.profiles?.full_name || 'the
               </View>
               {jobConfirmed && moreOpen && <View style={styles.moreActions}>
                 <Button title="Change arrival time" variant="secondary" onPress={() => setArrivalModalVisible(true)} />
-                <Button title="I'm running late" variant="secondary" onPress={handleRunningLate} />
                 <Button title="Add to phone calendar" variant="secondary" onPress={() => addWorkToPhoneCalendar({
                   title: job.title, schedule: workSchedule, location: jobLocation(job), otherPartyName: requesterProfile?.full_name,
                 })} />
-                {!workDay && <Button title="Mark as completed" variant="secondary" icon="checkmark" onPress={handleMarkComplete} accessibilityLabel="Mark job as completed" />}
               </View>}
             </View>
           })()}

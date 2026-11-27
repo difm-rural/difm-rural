@@ -53,7 +53,6 @@ export function ConfirmJob({bidId,jobId,jobTitle,requesterFirst,schedule,availab
   return <section className="card payment-card">
    {state.success&&<p className="status-banner" role="status">{state.success}</p>}
    <details className="activity-action"><summary>Change time</summary><ChangeTime jobId={jobId} schedule={schedule} availableFrom={availableFrom} arrivalStart={confirmedArrival}/></details>
-   <details className="activity-action"><summary>Change payment</summary><ChangePayment bidId={bidId} jobId={jobId} jobTitle={jobTitle} requesterFirst={requesterFirst} amount={amount} pricingType={pricingType}/></details>
   </section>
  }
 
