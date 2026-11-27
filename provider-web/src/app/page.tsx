@@ -134,14 +134,14 @@ export default async function HomePage() {
    {hasError&&<div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
    <HomeModes owner={user.id} attention={{property:goItems.filter(item=>item.viewerRole==='requester'&&item.needsAction).length,work:goItems.filter(item=>item.viewerRole==='provider'&&item.needsAction).length+(invitations.count||0)}} refresh={<LiveRefresh/>} property={<>
     <header className="home-heading"><div><h1>{HOME_MODES[0].heading}</h1><p className="muted">{HOME_MODES[0].subtitle}</p></div></header>
-    {/* A line only once the network has something in it: no setup prompt. */}
+    {/* My Network stays in the sidebar; My People is a tab on My Network. */}
+    {actions(false)}
+    {activity('requester')}
+    {/* Below the day-to-day work (not the main v0.1 feature); only once it has something in it. */}
     {networkLines.length>0&&<Link href="/property-network" className="home-network-line">
      <UsersRound size={22} aria-hidden="true"/><span><strong>My Property Network</strong>{networkLines.map(line=><span key={line}>{line}</span>)}</span>
      <ArrowRight size={18} aria-hidden="true"/>
     </Link>}
-    {/* My Network stays in the sidebar; My People is a tab on My Network. */}
-    {actions(false)}
-    {activity('requester')}
    </>} work={<>
     <header className="home-heading"><div><h1>{HOME_MODES[1].heading}</h1><p className="muted">{HOME_MODES[1].subtitle}</p></div></header>
     {invitationCount>0&&<p><Link href="/connections/invitations" className="card-link">{invitationCount} {invitationCount===1?'invitation':'invitations'} to review ›</Link></p>}

@@ -219,17 +219,6 @@ export default function HomeTabScreen({ navigation }) {
         <Text style={styles.subtitle}>{HOME_MODES.find(item=>item.id===mode).subtitle}</Text>
         {(loadError||!activeMoves)&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
-          {/* Always shown: it is Home's way into My Network (and, from there, My People),
-              now that the separate My Network / My People links are gone. */}
-          <TouchableOpacity style={styles.networkPreview} accessibilityRole="button"
-            accessibilityLabel={'My Property Network'+(networkLines.length?', '+networkLines.join(', '):'')} onPress={()=>navigation.navigate('PropertyNetwork')}>
-            <Icon name="people-outline" size={22} color={colors.primary}/>
-            <View style={{flex:1}}><Text style={styles.sectionTitle}>My Property Network</Text>
-              {networkLines.length>0
-                ? networkLines.map(line=><Text key={line} style={styles.subtitle}>{line}</Text>)
-                : <Text style={styles.subtitle}>Who looks after your place</Text>}</View>
-            <Icon name="chevron-forward" size={18} color={colors.primary}/>
-          </TouchableOpacity>
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Post a job" subtitle="Get help with something that needs doing."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Home'}})}/>
@@ -344,6 +333,20 @@ export default function HomeTabScreen({ navigation }) {
 
         {propertyMode&&activeMoves&&!loadError&&attention.length===0&&onTheGo.total===0&&<EmptyState compact icon="leaf-outline"
           title={emptyState.title} body={emptyState.body}/>}
+
+        {propertyMode&&<>
+          {/* Below the day-to-day work: My Property Network isn't the main v0.1 feature.
+              Always shown on My Property, as Home's way into My Network (and My People). */}
+          <TouchableOpacity style={styles.networkPreview} accessibilityRole="button"
+            accessibilityLabel={'My Property Network'+(networkLines.length?', '+networkLines.join(', '):'')} onPress={()=>navigation.navigate('PropertyNetwork')}>
+            <Icon name="people-outline" size={22} color={colors.primary}/>
+            <View style={{flex:1}}><Text style={styles.sectionTitle}>My Property Network</Text>
+              {networkLines.length>0
+                ? networkLines.map(line=><Text key={line} style={styles.subtitle}>{line}</Text>)
+                : <Text style={styles.subtitle}>Who looks after your place</Text>}</View>
+            <Icon name="chevron-forward" size={18} color={colors.primary}/>
+          </TouchableOpacity>
+        </>}
 
         {seasonalReminders.length > 0 && (
           <View style={styles.seasonalSection}>
