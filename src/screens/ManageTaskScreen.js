@@ -836,7 +836,8 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
       subtitle: 'Update title, description, budget or schedule',
       onPress: handleEdit,
     },
-    {
+    // Sharing only helps while the job is open to offers.
+    job.status === 'open' && {
       key: 'share',
       emoji: 'share-social-outline',
       iconBg: colors.infoLight,
