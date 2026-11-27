@@ -933,3 +933,14 @@ a.row:hover { background: var(--sage); }
 .work-completed-banner h2 { margin: 0; font-size: 24px; font-weight: 800; color: #fff; }
 .work-completed-banner p { margin: 4px 0 0; font-size: 15px; }
 .work-completed-banner a { color: #fff; text-decoration: underline; }
+
+/* My Property, compact (round 2): title-only buttons, one-line items */
+.home-actions.compact .home-action { min-height: 0; padding-top: 14px; padding-bottom: 14px; }
+.home-compact .list { margin: 0; }
+.compact-row { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--line); }
+.compact-row:last-child { border-bottom: 0; }
+.compact-line { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: inherit; text-decoration: none; padding: 10px 0; }
+.compact-action { flex: none; font-weight: 700; }
+.compact-row .dismiss-review { margin: 0; flex: none; }
+.home-network-row { display: flex; align-items: center; gap: 12px; margin: 12px 0; padding: 14px 16px; border-radius: 12px; background: var(--sage); color: var(--forest-deep); font-weight: 700; text-decoration: none; }
+.home-network-row span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

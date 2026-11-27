@@ -1,3 +1,4 @@
+import * as homeCompact from '../shared/homeCompact.ts'
 import * as lifecycleUx from '../shared/bookingLifecycleUx.ts'
 import * as bookingDuration from '../shared/bookingDuration.ts'
 import test from 'node:test'
@@ -66,7 +67,7 @@ async function home(initialMoves,{unreadCount=27,invites=[]}={}){
   '@react-navigation/native':{useFocusEffect:f=>{if(!tree)effects.push(f)}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
   '@react-native-async-storage/async-storage':{__esModule:true,default:{getItem:async()=> 'work',setItem:async()=>{}}},
   '../../../shared/homeMode':modes,'../../../shared/homeSummary':summary,'../../../shared/onTheGo':{rankOnTheGo},
-  '../../../shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[],propertyNetworkHelpCount:()=>0},
+  '../../../shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[],propertyNetworkHelpCount:()=>0,propertyNetworkPeopleCount:()=>0},'../../../shared/homeCompact':homeCompact,'../../../shared/propertyNetworkJobs':{loadPropertyJobs:async()=>null,propertyPostParams:()=>({}),propertyPostPath:()=>'/jobs/new'},
   '../../lib/supabase':{supabase:{auth:{getUser:async()=>({data:{user:{id:'viewer'}}})},from:()=>({select:()=>({eq:()=>({neq:async()=>({count:0})})})})}},
   '../../lib/notifications':{fetchNotificationInbox:async options=>{inboxCalls.push(options);return {items:[],unreadCount}}},
   '../../lib/invites':{fetchInvitedJobsForProvider:async()=>invites},

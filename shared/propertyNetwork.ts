@@ -532,12 +532,18 @@ export function propertyNetworkHelpCount(data:NetworkData|null|undefined){
  return data?propertyGaps(propertyAreas(data)).length:0
 }
 
-export function propertyNetworkHomeLines(data:NetworkData){
- const areas=propertyAreas(data),active=new Set(areas.filter(area=>area.active).map(area=>area.id))
- const people=new Set([
+// People (providers and private contacts) looking after an active area.
+export function propertyNetworkPeopleCount(data:NetworkData|null|undefined){
+ if(!data)return 0
+ const active=new Set(propertyAreas(data).filter(area=>area.active).map(area=>area.id))
+ return new Set([
   ...(data.links??[]).filter(row=>active.has(row.area)).map(row=>'member:'+row.provider_id),
   ...(data.contactLinks??[]).filter(row=>active.has(row.area)).map(row=>'contact:'+row.contact_id),
  ]).size
+}
+
+export function propertyNetworkHomeLines(data:NetworkData){
+ const people=propertyNetworkPeopleCount(data)
  const help=propertyNetworkHelpCount(data)
  const lines:string[]=[]
  if(people)lines.push(people+(people===1?' person':' people')+' in your property network')
