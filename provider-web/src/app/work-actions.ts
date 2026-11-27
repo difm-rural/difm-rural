@@ -207,11 +207,12 @@ export async function markJobPaymentSorted(_:ActionState,data:FormData):Promise<
   const {error}=await supabase.rpc('mark_job_payment_sorted',{p_bid:bidId,p_undo:undo})
   if(error)throw error
  } catch {
-  return {error:'Could not update the payment acknowledgement. Please try again.'}
+  return {error:'Could not update the payment record. Please try again.'}
  }
  if(validId(jobId))revalidatePath('/jobs/'+jobId)
  revalidatePath('/activity');revalidatePath('/')
- return {error:'',success:undo?'Payment acknowledgement removed.':'Payment sorted'}
+ // Must match paymentAcknowledgement.sorted / .removed (the card compares them).
+ return {error:'',success:undo?'Payment received removed.':'Payment received ✓'}
 }
 export async function jobQuestion(_:ActionState,data:FormData):Promise<ActionState>{
  const {supabase,user}=await requireProvider(),id=text(data,'job_id'),questionId=text(data,'question_id'),content=text(data,questionId?'answer':'question')

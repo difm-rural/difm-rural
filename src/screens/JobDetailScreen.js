@@ -1557,7 +1557,7 @@ Accepting also shares your exact address with ${(bid.profiles?.full_name || 'the
               sortedBy={acceptedBid.payment_sorted_by}
               requesterId={job.requester_id}
               providerId={acceptedBid.provider_id}
-              canUpdate={paymentAcknowledgementAvailable(job.status, acceptedBid.status, isJobOwner, acceptedBid.payment_sorted_at)}
+              canUpdate={false /* requester sees the status only */}
               onChanged={fetchData}
             />
   ) : null

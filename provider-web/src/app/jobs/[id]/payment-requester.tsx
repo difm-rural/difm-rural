@@ -39,9 +39,8 @@ export function PaymentSorted({ bidId, jobId, sortedAt, actor, methodLabel, canU
     <section className="card payment-card">
       <h2>Payment</h2>
       {sortedAt && <p role={justSorted ? "status" : undefined} tabIndex={justSorted ? -1 : undefined} ref={justSorted ? feedback : undefined}><strong>{copy.sorted}</strong></p>}
-      {!sortedAt && <p>{copy.reminder}</p>}
+      {!sortedAt && <p>{canUpdate ? copy.providerReminder : copy.reminder}</p>}
       <p className="muted">Rural Connections doesn&apos;t handle or verify payments.</p>
-      {sortedAt && actor && <p>Marked by the {actor}.</p>}
       {methodLabel && <p>Agreed method: {methodLabel}</p>}
       {canUpdate && (sortedAt ? (
         <button type="button" className="lform-cancel payment-ack-button" disabled={pending} onClick={() => dialog.current?.showModal()}>

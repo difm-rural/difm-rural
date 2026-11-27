@@ -116,7 +116,7 @@ test('accepted requester shows only the accepted provider, correct agreed amount
  assert.ok(app.text().includes('Your provider'));assert.ok(!app.text().includes('Offer Received'));assert.ok(!app.text().includes('Provider p'))
  assert.ok(app.text().includes('Agreed price: $375'));assert.ok(app.text().includes('4.8 (12)'));assert.ok(app.text().includes('18 done'))
  const all=app.all(),chat=all.find(n=>n.props?.title==='Chat with Provider'),payment=all.find(n=>n.type==='JobPaymentHandoff')
- assert.equal(chat.props.variant,'primary');assert.ok(all.indexOf(chat)<all.indexOf(payment));assert.equal(payment.props.bidId,'q');assert.equal(payment.props.providerId,'q');assert.equal(payment.props.canUpdate,true)
+ assert.equal(chat.props.variant,'primary');assert.ok(all.indexOf(chat)<all.indexOf(payment));assert.equal(payment.props.bidId,'q');assert.equal(payment.props.providerId,'q');assert.equal(payment.props.canUpdate,false) // requester: status only
  assert.equal(all.filter(n=>n.type==='NextMoveBanner').length,1)
  assert.ok(!app.text().includes('Status: ACCEPTED'));assert.ok(!app.text().includes(baseJob.description));assert.ok(!app.text().includes('Agreed work specifics'))
  await app.press('Chat with Provider');assert.deepEqual(app.log.navigate.at(-1),['Chat',{jobId:'job',jobTitle:baseJob.title,otherUserId:'q',otherUserName:'Provider q'}])

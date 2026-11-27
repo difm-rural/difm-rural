@@ -35,7 +35,8 @@ test('payment remains visible and shows only authorised primary actions',()=>{
  for(const canUpdate of [true,false]){
   const unsorted=card({canUpdate})
   assert.ok(text(unsorted,'h2','Payment'))
-  assert.ok(text(unsorted,'p',copy.reminder))
+  // The provider (who can mark it) gets the 'mark it here' line; others the neutral one.
+  assert.ok(text(unsorted,'p',canUpdate?copy.providerReminder:copy.reminder))
   assert.equal(!!button(unsorted,copy.mark),canUpdate)
   assert.equal(!!button(unsorted,copy.undo),false)
   const sorted=card({canUpdate,sortedAt:'2026-11-17T03:00Z'})
@@ -87,16 +88,13 @@ test('acknowledgement attribution and eligibility mirror the current participant
  assert.equal(paymentAcknowledgementActor('requester','requester','provider'),'requester')
  assert.equal(paymentAcknowledgementActor('provider','requester','provider'),'provider')
  for(const actor of [null,'not-a-party'])assert.equal(paymentAcknowledgementActor(actor,'requester','provider'),null)
- assert.ok(paymentAcknowledgementAvailable('accepted','accepted',true))
- assert.ok(!paymentAcknowledgementAvailable('accepted','pending',true))
- assert.ok(!paymentAcknowledgementAvailable('accepted','accepted',false))
+ // "Payment received": the provider only, and only once the job is complete.
  assert.ok(paymentAcknowledgementAvailable('completed','accepted',true))
- assert.ok(!paymentAcknowledgementAvailable('completed','pending',true))
  assert.ok(!paymentAcknowledgementAvailable('completed','accepted',false))
- for(const status of ['open','cancelled','in_progress'])assert.ok(!paymentAcknowledgementAvailable(status,'accepted',true))
- // Settled: a completed job whose payment is sorted offers no Undo.
- assert.ok(!paymentAcknowledgementAvailable('completed','accepted',true,'2026-11-26T07:17:37Z'))
- assert.ok(paymentAcknowledgementAvailable('accepted','accepted',true,'2026-11-26T07:17:37Z'))
+ assert.ok(!paymentAcknowledgementAvailable('completed','pending',true))
+ for(const status of ['open','accepted','cancelled','in_progress'])assert.ok(!paymentAcknowledgementAvailable(status,'accepted',true),status)
+ // The provider can still undo a mis-tap after marking it.
+ assert.ok(paymentAcknowledgementAvailable('completed','accepted',true,'2026-11-26T07:17:37Z'))
 })
 
 test('mobile mark and Undo use one RPC, preserve status on errors, and restore the reminder on success',async()=>{
@@ -131,7 +129,7 @@ test('mobile mark and Undo use one RPC, preserve status on errors, and restore t
 
  fail=true
  await act(copy.mark).props.onPress()
- assert.ok(has(copy.reminder)&&has(copy.error))
+ assert.ok(has(copy.providerReminder)&&has(copy.error))
  fail=false
  const mark=act(copy.mark)
  const marking=mark.props.onPress()
@@ -156,7 +154,7 @@ test('mobile mark and Undo use one RPC, preserve status on errors, and restore t
  assert.deepEqual(calls.at(-1),['mark_job_payment_sorted','award',true])
  respond()
  await undoing
- assert.ok(has(copy.reminder)&&has(copy.removed)&&!has(copy.sorted))
+ assert.ok(has(copy.providerReminder)&&has(copy.removed)&&!has(copy.sorted))
 })
 
 test('web completion ignores a legacy payment checkbox and both participants can review completed work',async()=>{
