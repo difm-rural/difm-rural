@@ -190,15 +190,17 @@ test('provider scheduled: one arrival summary, ordered actions and scheduling co
  const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2099-01-01T03:00:00Z',arrival_end_at:'2099-01-01T04:00:00Z'}})
  assert.ok(app.text().includes('Scheduled'));assert.equal(app.text().split('2099-01-01T03:00:00Z').length-1,1)
  const buttons=app.all().filter(n=>n.type==='Button').map(n=>n.props.title)
- // Before the arrival day: Chat is the main action, then Directions and More side by side.
- assert.deepEqual(buttons.slice(0,3),['Chat with Requester','Directions','More'])
+ // Before the arrival day: Chat is the main action, Mark as completed a full outlined
+ // button, then Directions and More side by side.
+ assert.deepEqual(buttons.slice(0,4),['Chat with Requester','Mark as completed','Directions','More'])
  await app.press('Chat with Requester');assert.equal(app.log.navigate.at(-1)[0],'Chat')
  await app.press('Directions');assert.equal(app.log.navigate.at(-1)[0],'JobMap')
  await app.press('More actions')
  await app.press('Add to phone calendar');assert.equal(app.log.calendar.length,1)
  await app.press('Change arrival time');const sheet=app.all().find(n=>n.type==='ArrivalWindowModal');assert.equal(sheet.props.visible,true)
  await sheet.props.onSave('2099-01-02T03:00:00Z','2099-01-02T04:00:00Z');await app.settle();assert.equal(app.log.arrival[0].jobId,'job');assert.ok(app.text().includes('2099-01-02T03:00:00Z'))
- await app.press("I'm running late");await app.log.alerts.at(-1)[2].find(b=>b.text==='15 minutes').onPress();await app.settle();assert.deepEqual(app.log.late[0],{jobId:'job',minutes:15})
+ // "Running late" was removed (delays go in chat).
+ assert.ok(!app.all().some(n=>n.type==='Button'&&/running late/i.test(n.props.title||'')))
 })
 test('completion cancellation writes nothing; completion remains available before future arrival, then prioritises review and payment',async()=>{
  const app=await openScreen({job:{status:'accepted'},bids:[acceptedOffer],userId:'q',schedule:{arrival_start_at:'2099-01-01T03:00:00Z'}})

@@ -65,8 +65,8 @@ export default function WorkScheduleCard({
             onPress={onAddCalendar}
             last={!canSetWindow}
           />
-          {/* Arrival changes and "running late" are the provider's: they're the one
-              travelling. canSetWindow is true only for the provider. */}
+          {/* Arrival changes are the provider's (canSetWindow is true only for them).
+              Delays are sent in chat; there is no separate "running late" action. */}
           {canSetWindow ? (
             <>
               <Row
@@ -74,12 +74,6 @@ export default function WorkScheduleCard({
                 title="Update arrival window"
                 detail="The requester will be notified of the change."
                 onPress={onSetWindow}
-              />
-              <Row
-                icon="car-outline"
-                title="I’m running late"
-                detail="Notify the requester with an updated delay."
-                onPress={onRunningLate}
                 last
               />
             </>
