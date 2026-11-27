@@ -701,7 +701,7 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
             ) : acceptedBid ? (
               <>
                 <TouchableOpacity
-                  style={styles.providerRow}
+                  style={[styles.providerRow, { borderBottomWidth: 0 }]}
                   onPress={() => navigation.navigate(otherPartyRouteName, otherPartyRouteParams)}
                   activeOpacity={0.75}
                   accessibilityRole="button"
@@ -719,7 +719,7 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
                   </View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
-                <Text style={styles.agreedLine}>Agreed: {formatOfferAmount(acceptedBid.bidAmount, acceptedBid.pricingType)}</Text>
+
                 {focusedAccepted && <JobArrangementSummary duration={acceptedBid?.duration} />}
               </>
             ) : null}
@@ -751,11 +751,12 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
 
           {focusedAccepted && detailsJSX}
           {/* Actions */}
-          {/* Cancelling is rare: a quiet link, still behind its own confirmation. */}
+          {/* Cancel job: the same card row as Edit / Share, still behind its own confirmation. */}
           {isTaskOwner && (
-            <TouchableOpacity onPress={handleCancel} accessibilityRole="button" accessibilityLabel="Cancel job" style={styles.cancelLink}>
-              <Text style={styles.cancelLinkText}>Cancel job</Text>
-            </TouchableOpacity>
+            <View style={styles.card}>
+              <ActionRow emoji="close-circle-outline" iconBg={colors.warningLight} label="Cancel job"
+                subtitle={acceptedBid ? `Close the job and let ${otherPartyFirstName} know` : 'Close the job'} onPress={handleCancel} last />
+            </View>
           )}
 
           {!focusedAccepted && <>
@@ -1260,9 +1261,6 @@ const styles = StyleSheet.create({
   loadingText:  { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 16 },
 
   // ─── Info box ───────────────────────────────────────────────────
-  agreedLine:     { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginTop: 10 },
-  cancelLink:     { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16, marginBottom: 8 },
-  cancelLinkText: { fontSize: 14, color: colors.danger, textDecorationLine: 'underline' },
   infoBox: {
     marginHorizontal: 16,
     marginTop: 4,
