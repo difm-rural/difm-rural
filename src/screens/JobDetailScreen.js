@@ -1095,6 +1095,7 @@ Accepting also shares your exact address with ${(bid.profiles?.full_name || 'the
           requesterFirst={requesterFirstName}
           job={job}
           availableFrom={myBid?.available_from}
+          availableTime={myBid?.available_time}
           amount={myBid?.amount}
           pricingType={myBid?.pricing_type}
           onClose={() => setConfirmJobVisible(false)}
