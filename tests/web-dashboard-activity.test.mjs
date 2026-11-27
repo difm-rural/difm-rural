@@ -79,7 +79,8 @@ test('dashboard ranks awards using a participant-filtered timestamp and keeps jo
  assert.match(html,/Awarded fence.*Pending fence/)
  const view=calls.find(call=>call.table==='jobs_public')
  assert.equal(view.cols,'id,title,status,requester_id,created_at,scheduled_date,date_from')
- assert.match(html,/<strong>1<\/strong> Upcoming confirmed/)
+ // The work-stage count row was removed; On the go lists the work instead.
+ assert.doesNotMatch(html,/Upcoming confirmed|Active work/)
  const award=calls.find(call=>call.table==='bids'&&call.cols.includes('job:jobs'))
  assert.equal(award.cols,'job_id,job:jobs(accepted_at)')
  assert.deepEqual(award.filters,[['eq','provider_id','viewer'],['eq','status','accepted'],['in','job_id',['awarded']]])

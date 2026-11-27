@@ -53,9 +53,9 @@ test('Needs attention, On the go and focused Active work all lead to the same bo
  assert.equal(bookingLinks.length,2);bookingLinks.forEach(n=>n.props.onPress())
  const expected=['ServiceBookingDetail',{booking,viewerRole:'provider'}]
  assert.deepEqual(home.calls,[expected,expected]);assert.deepEqual(home.writes,[])
- const metric=home.all.find(n=>n.props?.accessibilityLabel==='1 Active work');assert.ok(metric);metric.props.onPress()
- assert.deepEqual(home.calls.at(-1),['Activity',{screen:'ActivityMain',params:{homeFocus:'work'}}])
- const activity=screen('tabs/ActivityTabScreen.js',{states:{0:{role:'provider'},5:[booking],11:false},route:home.calls.at(-1)[1].params})
+ // The work-stage count row was removed from Home; On the go lists the work.
+ assert.equal(home.all.find(n=>n.props?.accessibilityLabel==='1 Active work'),undefined)
+ const activity=screen('tabs/ActivityTabScreen.js',{states:{0:{role:'provider'},5:[booking],11:false},route:{homeFocus:'work'}})
  const list=activity.all.find(n=>n.type==='FlatList'&&n.props.data.includes(booking));assert.ok(list);assert.equal(list.props.horizontal,false)
  const card=list.props.renderItem({item:booking});assert.equal(card.props.fullWidth,true);assert.equal(card.props.detailsOnly,true)
  const all=nodes(card.type(card.props)),controls=all.filter(n=>n.type==='TouchableOpacity')

@@ -20,7 +20,7 @@ import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../../../shared/homeMode'
-import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '../../../shared/homeSummary'
+import {homeCustomerCount,homeAttentionSummary} from '../../../shared/homeSummary'
 import {loadPropertyNetwork,propertyNetworkHomeLines} from '../../../shared/propertyNetwork'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
@@ -141,14 +141,9 @@ export default function HomeTabScreen({ navigation }) {
   }
 
   const propertyMode=mode==='property'
-  const workItems=(activeMoves||[]).filter(item=>item.viewerRole==='provider')
-  const pendingOffers=workItems.filter(item=>item.entityType==='job'&&item.item.status==='open').length
-  const upcoming=workItems.filter(item=>homeUpcoming(item.nextMove.tone,item.entityType,item.arrivalAt)).length
-  const work=homeWorkSummary({
-    invitations:invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length??null,
-    offers:activeMoves?pendingOffers:null,upcoming:activeMoves?upcoming:null,
-    work:activeMoves?workItems.length-pendingOffers:null,
-  })
+  // The work-stage counts were removed (On the go lists that work by name, and
+  // the counts overlapped); invitations keep one line, as Home's only way to them.
+  const invitationCount=invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length||0
   const modeItems=(activeMoves||[]).filter(item=>item.viewerRole===homeRole(mode))
   const networkLines=network?propertyNetworkHomeLines(network):[]
   // Items needing action per mode, so the mode Home didn't open on still shows them.
@@ -220,7 +215,7 @@ export default function HomeTabScreen({ navigation }) {
         showsVerticalScrollIndicator={false}>
 
         <Text style={styles.title} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
-        {(loadError||!activeMoves||(!propertyMode&&work.unavailable&&work.indicators.length>0))&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
+        {(loadError||!activeMoves)&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
           <Text style={styles.subtitle}>Find local help and keep track of who looks after your property.</Text>
           {/* A line only once the network has something in it: no setup prompt. */}
@@ -247,14 +242,10 @@ export default function HomeTabScreen({ navigation }) {
           </View>
         </> : <>
           <Text style={styles.workEmpty}>{actionSummary.text}</Text>
-          {work.indicators.length>0?<View style={styles.workSummary}>
-            {work.indicators.map(item=>
-              <TouchableOpacity key={item.id} style={styles.workMetric} accessibilityRole="button" accessibilityLabel={item.count+' '+item.label}
-                onPress={()=>item.id==='invitations'?navigation.navigate('InvitedJobs'):
-                  navigation.getParent()?.navigate('Activity',{screen:'ActivityMain',params:{homeFocus:item.id}})}>
-                <Text style={styles.metricNumber}>{item.count}</Text><Text style={styles.metricLabel}>{item.label}</Text>
-              </TouchableOpacity>)}
-          </View>:null}
+          {invitationCount>0&&<TouchableOpacity onPress={()=>navigation.navigate('InvitedJobs')} accessibilityRole="button"
+            accessibilityLabel={`${invitationCount} ${invitationCount===1?'invitation':'invitations'} to review`} style={{marginBottom:12}}>
+            <Text style={styles.sectionLink}>{invitationCount} {invitationCount===1?'invitation':'invitations'} to review ›</Text>
+          </TouchableOpacity>}
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Find work" subtitle="Browse available jobs."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'JobsBoard'})}/>
