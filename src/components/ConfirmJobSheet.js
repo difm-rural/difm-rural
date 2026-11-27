@@ -29,11 +29,24 @@ const METHOD_LABELS = {
 //
 // Full screen: "When" is one collapsed row (ArrivalWhen), then payment, note and
 // the message preview; Confirm job stays pinned above the keyboard.
-export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, job, availableFrom, amount, pricingType, onClose, onConfirmed }) {
-  const initialDay = arrivalDayChoices(job, { today: nzToday(), offerDay: availableFrom }).preselect
-  const [start, setStart] = useState(() => arrivalPickerSeed(initialDay))
+// Starts on the accepted offer's day (and start time, when the offer gave one):
+// that is what was agreed. Otherwise the requested day, if any.
+function initialArrival(job, availableFrom, availableTime) {
+  const today = nzToday()
+  const offerDay = nzCalendarDay(availableFrom)
+  const day = offerDay && offerDay >= today ? offerDay : arrivalDayChoices(job, { today, offerDay: availableFrom }).preselect
+  const start = arrivalPickerSeed(day)
+  const m = day && day === offerDay && typeof availableTime === 'string' ? /^(\d{2}):(\d{2})/.exec(availableTime) : null
+  if (m) start.setHours(Number(m[1]), Number(m[2]), 0, 0)
+  return { day, start, timeKnown: !!m }
+}
+
+export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFirst, job, availableFrom, availableTime, amount, pricingType, onClose, onConfirmed }) {
+  const seed = initialArrival(job, availableFrom, availableTime)
+  const initialDay = seed.day
+  const [start, setStart] = useState(() => seed.start)
   const [daySelected, setDaySelected] = useState(!!initialDay)
-  const [timeSelected, setTimeSelected] = useState(false)
+  const [timeSelected, setTimeSelected] = useState(seed.timeKnown)
   const submitting = useRef(false)
   const [choice, setChoice] = useState('agreed')
   const [acct, setAcct] = useState('')
@@ -45,12 +58,13 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
 
   useEffect(() => {
     if (!visible) return
-    setStart(arrivalPickerSeed(initialDay))
-    setDaySelected(!!initialDay)
-    setTimeSelected(false)
+    const fresh = initialArrival(job, availableFrom, availableTime)
+    setStart(fresh.start)
+    setDaySelected(!!fresh.day)
+    setTimeSelected(fresh.timeKnown)
     setChoice('agreed'); setAcct(''); setAcctNo('')
     setReference('Payment for ' + (jobTitle || 'the job')); setNote(''); setError('')
-  }, [visible, initialDay, jobTitle])
+  }, [visible, initialDay, jobTitle, availableTime])
 
   const arrival = daySelected && timeSelected ? arrivalPickerInstant(start) : null
   const isPast = arrival && arrival.getTime() <= Date.now()
@@ -70,6 +84,12 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
     + (noteText ? `\nNote: ${noteText}` : '')
     + (paymentMessage ? `\n\n${paymentMessage}` : '')
   const blocked = !arrival || isPast || busy
+  // Say exactly what Confirm is waiting for (payment and note are optional).
+  const missing = !daySelected && !timeSelected ? 'Choose a day and an arrival time to confirm.'
+    : !daySelected ? 'Choose a day to confirm.'
+    : !timeSelected ? 'Choose an arrival time to confirm.'
+    : isPast ? 'That time has passed. Choose a later time.'
+    : ''
 
   async function confirm() {
     if (blocked || submitting.current) return
@@ -103,11 +123,14 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
       visible={visible}
       title="Confirm the job"
       onClose={onClose}
-      footer={<Button title="Confirm job" onPress={confirm} loading={busy} disabled={blocked} />}>
-      <Text style={styles.section}>When will you arrive?</Text>
-      <ArrivalWhen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} daySelected={daySelected} onDaySelected={setDaySelected} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
+      footer={<>
+        {!!missing && <Text style={styles.missing} accessibilityLiveRegion="polite">{missing}</Text>}
+        <Button title="Confirm job" onPress={confirm} loading={busy} disabled={blocked} />
+      </>}>
+      <Text style={styles.section}>1. When will you arrive?</Text>
+      <ArrivalWhen alwaysOpen value={start} onChange={setStart} job={job} offerDay={availableFrom} resetKey={visible} daySelected={daySelected} onDaySelected={setDaySelected} timeSelected={timeSelected} onTimeSelected={setTimeSelected} />
 
-      <Text style={styles.section}>Payment method (optional)</Text>
+      <Text style={styles.section}>2. How would you like to be paid? <Text style={styles.optional}>(optional)</Text></Text>
       <View style={styles.options}>
         {Object.entries(METHOD_LABELS).map(([id, label]) => (
           <TouchableOpacity
@@ -132,7 +155,7 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
           <TextInput style={styles.input} value={reference} onChangeText={setReference} maxLength={120} />
         </View>
       ) : null}
-      <Text style={styles.fieldLabel2}>Note (optional)</Text>
+      <Text style={styles.section}>3. Anything else? <Text style={styles.optional}>(optional)</Text></Text>
       <TextInput
         style={[styles.input, styles.noteInput]}
         value={note}
@@ -156,6 +179,8 @@ export default function ConfirmJobSheet({ visible, bidId, jobTitle, requesterFir
 
 const styles = StyleSheet.create({
   section: { color: colors.textPrimary, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
+  optional: { color: colors.textMuted, fontWeight: '500' },
+  missing: { color: colors.textSecondary, fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   fieldLabel2: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 4, marginTop: 8 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.textPrimary },
   noteInput: { minHeight: 64, textAlignVertical: 'top', marginBottom: 10 },

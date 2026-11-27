@@ -21,14 +21,16 @@ export function timeLabel(date) {
 //   job              — the job's requested schedule (optional)
 //   offerDay         — the date on the provider's own offer (optional)
 //   resetKey         — changes when the sheet reopens, to start collapsed again
-export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, daySelected = true, onDaySelected, timeSelected = true, onTimeSelected }) {
-  const [expanded, setExpanded] = useState(false)
+//   alwaysOpen       — show the day and time choices without a Change step
+//                      (the confirm sheet, where choosing them is the main task)
+export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, daySelected = true, onDaySelected, timeSelected = true, onTimeSelected, alwaysOpen = false }) {
+  const [expanded, setExpanded] = useState(alwaysOpen)
   const [picked, setPicked] = useState({ day: false, time: false })
   const [picker, setPicker] = useState(null)
 
   useEffect(() => {
-    setExpanded(false); setPicked({ day: false, time: false }); setPicker(null)
-  }, [resetKey])
+    setExpanded(alwaysOpen); setPicked({ day: false, time: false }); setPicker(null)
+  }, [resetKey, alwaysOpen])
 
   const day = toLocalIsoDate(value)
   const now = arrivalPickerDate(new Date())
@@ -46,7 +48,7 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
     if (part === 'day') onDaySelected?.(true)
     const next = { ...picked, [part]: true }
     if (next.day && next.time) {
-      setExpanded(false); setPicked({ day: false, time: false }); setPicker(null)
+      setExpanded(alwaysOpen); setPicked({ day: false, time: false }); setPicker(null)
     } else {
       setPicked(next)
     }
@@ -117,10 +119,10 @@ export default function ArrivalWhen({ value, onChange, job, offerDay, resetKey, 
           <Text style={styles.summaryLead}>Arriving: </Text>
           {dayText}{requested ? ' (requested)' : ''} · {timeText}
         </Text>
-        <TouchableOpacity onPress={() => { setExpanded(false); setPicked({ day: false, time: false }); setPicker(null) }}
+        {!alwaysOpen && <TouchableOpacity onPress={() => { setExpanded(false); setPicked({ day: false, time: false }); setPicker(null) }}
           accessibilityRole="button" accessibilityLabel="Done choosing the arrival time">
           <Text style={styles.change}>Done</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </View>
 
       <Text style={styles.label}>Day</Text>
