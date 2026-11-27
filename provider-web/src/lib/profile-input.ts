@@ -55,6 +55,6 @@ export function preferencesInput(data:FormData){
   const categories=[...new Set(data.getAll('preferred_categories').filter((s):s is string=>typeof s==='string'))]
   if(categories.some(c=>!CATEGORIES.includes(c)))return {ok:false as const,error:'Choose job interests from the available categories.'}
   const checked=(key:string)=>data.get(key)==='on'
-  return {ok:true as const,value:{email_transactional:checked('email_transactional'),email_messages:checked('email_messages'),email_seasonal:checked('email_seasonal'),daily_digest:checked('daily_digest'),
+  return {ok:true as const,value:{seasonal_cards:checked('seasonal_cards'),email_transactional:checked('email_transactional'),email_messages:checked('email_messages'),email_seasonal:checked('email_seasonal'),daily_digest:checked('daily_digest'),
     opportunity_alert_mode:mode,opportunity_radius_km:radius,opportunity_push:checked('opportunity_push'),opportunity_email:checked('opportunity_email'),preferred_categories:categories}}
 }

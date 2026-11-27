@@ -9,13 +9,15 @@ import { saveNotificationPreferences } from '../actions'
 export default async function PreferencesPage(){
   const {supabase,user,profile}=await requireProvider()
   const [{data:prefs,error},{data:p,error:profileError}]=await Promise.all([
-    supabase.from('user_preferences').select('daily_digest,email_transactional,email_messages,email_seasonal,opportunity_alert_mode,opportunity_radius_km,opportunity_push,opportunity_email,preferred_categories').eq('user_id',user.id).maybeSingle(),
+    supabase.from('user_preferences').select('seasonal_cards,daily_digest,email_transactional,email_messages,email_seasonal,opportunity_alert_mode,opportunity_radius_km,opportunity_push,opportunity_email,preferred_categories').eq('user_id',user.id).maybeSingle(),
     supabase.from('profiles').select('skills,latitude,longitude,availability_status,availability_until,availability_updated_at').eq('id',user.id).single(),
   ])
   const available=availabilityDisplay(p?.availability_status,p?.availability_until,p?.availability_updated_at)
   const defaults:Record<string,boolean>={email_transactional:prefs?.email_transactional!==false,email_messages:prefs?.email_messages!==false,email_seasonal:!!prefs?.email_seasonal,daily_digest:!!prefs?.daily_digest}
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page work-page"><Link href="/account" className="card-link">Back to Account</Link><h1>Notification preferences</h1>
     {error?<p role="alert">Could not load notification preferences. Refresh before changing them.</p>:<ActionForm action={saveNotificationPreferences} label="Save notification preferences">
+      {/* Home cards are separate from seasonal emails: on by default, emails stay opt-in. */}
+      <section className="card account-form-section"><h2>On Home</h2><label className="account-setting"><input type="checkbox" name="seasonal_cards" defaultChecked={prefs?.seasonal_cards!==false}/><span><strong>Seasonal reminder cards</strong><small>Timely rural reminders on your Home screen. A card you dismiss comes back after 60 days.</small></span></label></section>
       <section className="card account-form-section"><h2>Email updates</h2>{EMAIL_OPTIONS.map(o=><label className="account-setting" key={o.key}><input type="checkbox" name={o.key} defaultChecked={defaults[o.key]}/><span><strong>{o.label}</strong><small>{o.description}</small></span></label>)}</section>
       <section className="card account-form-section"><h2>Job opportunity alerts</h2><p className="muted">Alerts match your capabilities, private GPS location, travel area and current availability. These settings are shared with the mobile app.</p>
         <label className="lform-field">Frequency<select name="opportunity_alert_mode" defaultValue={prefs?.opportunity_alert_mode || 'off'}><option value="off">Off</option><option value="daily">Daily summary</option><option value="instant">As matching jobs appear</option></select></label>
