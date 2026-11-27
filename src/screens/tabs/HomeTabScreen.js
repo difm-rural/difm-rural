@@ -13,7 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../lib/supabase'
-import { colors } from '../../theme/tokens'
+import { colors, spacing } from '../../theme/tokens'
 import Icon from '../../components/Icon'
 import {fetchNotificationInbox} from '../../lib/notifications'
 import Loading from '../../components/Loading'
@@ -229,7 +229,7 @@ export default function HomeTabScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.title} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
+        <Text style={[styles.title, styles.homeHeading]} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
         {(loadError||!activeMoves)&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
           <View style={styles.actionsGrid}>
@@ -432,6 +432,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
 
   startup: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  // Room under the headline now that there is no subtitle (web has the same gap).
+  homeHeading: { marginTop: spacing.sm, marginBottom: spacing.xl },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',

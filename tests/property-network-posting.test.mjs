@@ -47,3 +47,17 @@ test('expired authentication never transfers the property draft into another acc
  const wizard=await ready();wizard.log.userId=null;await wizard.press('Post job')
  assert.deepEqual(wizard.log.inserts,[]);assert.deepEqual(wizard.log.links,[]);assert.equal(wizard.log.alerts.at(-1)[0],'Sign in again')
 })
+
+test('with the "Job posted" step switched off, posting opens the new job with a notice',async()=>{
+ globalThis.__showJobPosted=false
+ try{
+  const wizard=await ready({property:false})
+  await wizard.press('Post job')
+  assert.equal(wizard.step(),'ManageTask')
+  assert.equal(wizard.params().posted,'Job posted.')
+  assert.equal(wizard.params().job.id,'new');assert.equal(wizard.params().job.status,'open')
+  // The posting steps are gone from the stack: Back returns to where posting started.
+  assert.ok(!wizard.names().some(name=>name.startsWith('PostJob')))
+  assert.equal(wizard.log.inserts.length,1)
+ }finally{delete globalThis.__showJobPosted}
+})

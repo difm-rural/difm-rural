@@ -32,7 +32,7 @@ function screen(file,{states={},route={},record=booking,platform='android'}={}){
  const code=require('@babel/core').transformSync(source('src/screens/'+file),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
  const exports={};new Function('exports','require',code+(file.includes('ActivityTab')?'\nexports.BookingWorkCard=BookingWorkCard;':''))(exports,name=>{
   if(name in mods)return mods[name]
-  if(name.endsWith('/tokens'))return {colors:{}}
+  if(name.endsWith('/tokens'))return {colors:{},spacing:{sm:8,xl:20}}
   if(name.endsWith('/lifecycle'))return lifecycle
   if(name.endsWith('/listingEstimate'))return estimate
   if(name.endsWith('/nextMove'))return {bookingNextMove,jobNextMove}

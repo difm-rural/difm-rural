@@ -59,6 +59,7 @@ export function openWizard({row,params,savedDraft}){
   'expo-location':{Accuracy:{},requestForegroundPermissionsAsync:async()=>{log.gps++;return {status:'denied'}}},
   'expo-image-picker':{},'../../lib/draftJob':{},'@react-native-async-storage/async-storage':stub({getItem:async k=>local.get(k)??null,setItem:async(k,v)=>local.set(k,v),removeItem:async k=>local.delete(k),multiRemove:async keys=>keys.forEach(k=>local.delete(k))}),
   '../../theme/tokens':{colors:{}},'../theme/tokens':{colors:{}},
+  '../../lib/featureFlags':{SHOW_JOB_POSTED_SCREEN:globalThis.__showJobPosted??true},
   '../../lib/supabase':{supabase},'../../lib/analytics':{trackEvent(){}},'../../lib/preferences':{trackCategoryInterest(){}},
   '../../lib/location':{reverseGeocode:async()=>'9 New Road, Elsewhere 0999, New Zealand',coarseSuburb:address=>address?address.split(',').map(part=>part.trim()).filter(part=>part!=='New Zealand').at(-1):''},
   '../lib/location':{haversineDistance:()=>0},'../../lib/maps':{staticMapUrl:()=>'',staticMapPolygonUrl:()=>''},

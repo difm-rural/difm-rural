@@ -1,6 +1,7 @@
 import {saveGuestIntent} from '../../lib/guestIntent'
 import {propertyJobOrigin,linkPostedPropertyJob} from '../../../shared/propertyNetworkJobs'
 import { newJobId } from '../../lib/draftId'
+import { SHOW_JOB_POSTED_SCREEN } from '../../lib/featureFlags'
 import {formatMoney as nzMoney,formatWorkDate as nzDate} from '../../../shared/formatting.js'
 import {publicAreaError} from '../../../shared/publicArea'
 import {localityFromAddress} from '../../../shared/locality'
@@ -412,6 +413,26 @@ export default function PostJobStep5Review({ navigation, route }) {
             ? `${who} has been invited, and your job is also on the public board.`
             : `${who} has been invited. Only they can see this job.`)
         : 'Your job is live. Providers with matching capabilities and travel areas can now find it.'
+    const warnings = (propertyLinkFailed ? 'Your job was posted, but could not be linked to the maintenance area. Open My Network to link this existing job; do not post it again. ' : '')
+      + (photosFailed ? 'Some photos could not be saved. You can add them by editing the job.' : '')
+    if (!SHOW_JOB_POSTED_SCREEN) {
+      // No "Job posted" step (featureFlags): from My Property Network, back to
+      // that area as before; otherwise straight to the new job, with the posting
+      // steps removed so Back returns to where posting started.
+      if (jobData.propertyOrigin) {
+        const parent = navigation.getParent()
+        navigation.reset({ index: 0, routes: [{ name: navigation.getState().routes[0].name }] })
+        parent?.navigate('Home', { screen: 'PropertyNetwork', params: { area: jobData.propertyOrigin.area } })
+      } else {
+        const root = navigation.getState().routes[0].name
+        navigation.reset({ index: 1, routes: [
+          { name: root === 'PostJob' ? 'JobsBoard' : root },
+          { name: 'ManageTask', params: { job: { id: newJob.id, title: jobData.title, status: 'open', requester_id: user.id }, bidCount: 0, posted: successTitle.replace('!', '.') } },
+        ] })
+      }
+      if (warnings) Alert.alert(successTitle, warnings.trim())
+      return true
+    }
     // A new post lands on the "Job posted" screen (confirmation + ease rating),
     // which ends in the same returnAfterPost behaviour via its returnTo param.
     navigation.replace('JobPosted', {

@@ -75,7 +75,7 @@ async function home(initialMoves,{unreadCount=27,invites=[]}={}){
   '../../../shared/reviewPrompts':{dismissReviewPrompt:async()=>{}},
   '../../lib/nextMove':{fetchActiveNextMoves:async()=>{if(loadNext){const next=loadNext;loadNext=null;return next()}return currentMoves}},
   '../../lib/restartFlag':{takeRestartingFlag:async()=>false},
-  '../../lib/badgeEvents':{onBadgeRefresh:f=>{badge=f;return ()=>{}}},'../../theme/tokens':{colors:{}},
+  '../../lib/badgeEvents':{onBadgeRefresh:f=>{badge=f;return ()=>{}}},'../../theme/tokens':{colors:{},spacing:{sm:8,xl:20}},
  }
  const code=require('@babel/core').transformSync(source('src/screens/tabs/HomeTabScreen.js'),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code
  new Function('exports','require',code)(exports,name=>{
