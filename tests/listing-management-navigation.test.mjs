@@ -19,7 +19,7 @@ function native(file,{viewer=true,rows=[]}={}){
  const exports={};new Function('exports','require',code)(exports,name=>{
   if(name in modules)return modules[name]
   if(name==='@react-native-async-storage/async-storage')return {__esModule:true,default:{}}
-  if(name.endsWith('/theme/tokens'))return {colors:{}}
+  if(name.endsWith('/theme/tokens'))return {colors:{},spacing:{sm:8,xl:20}}
   if(name.endsWith('/useNearbyBrowsing'))return {__esModule:true,default:()=>({})}
   if(name.endsWith('/nearbyBrowsing'))return {filterNearby:()=>({items:[],missingLocationCount:0})}
   if(name.includes('/components/'))return {__esModule:true,default:name.split('/').at(-1)}

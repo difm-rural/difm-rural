@@ -76,3 +76,19 @@ test('a need is "not posted yet" until its area has an open or accepted linked j
  assert.deepEqual(names(c.unpostedNeeds(network,[{...jobs[0],status:'completed'}],[{area:'fencing',job_id:'j1'}])),['Boundary fence','Gates','Trough'])
  assert.deepEqual(c.unpostedNeeds(null),[])
 })
+
+test('Jobs tab On the go: agreed jobs only, waiting-on-you first, one line each',async()=>{
+ const {jobsOnTheGo}=await import('../shared/homeCompact.ts')
+ const move=(badge,needsAction=false,extra={})=>({label:badge,detail:'',badge,tone:'waiting',needsAction,...extra})
+ const items=[
+  {id:'open',entityType:'job',title:'Open job',item:{status:'open'},nextMove:move('Waiting for offers'),updatedAt:'2026-11-27'},
+  {id:'b',entityType:'booking',title:'Booking',item:{status:'confirmed'},nextMove:move('Waiting on Sam to complete'),updatedAt:'2026-11-27'},
+  {id:'review',entityType:'job',review:true,title:'Done job',item:{status:'completed'},nextMove:move('Waiting on you to review',true)},
+  {id:'old',entityType:'job',title:'Clean barn',item:{status:'accepted'},nextMove:move('Waiting on Paul to complete'),updatedAt:'2026-11-26'},
+  {id:'mine',entityType:'job',title:'Paint fence',item:{status:'accepted'},nextMove:move('Waiting on you to confirm',true),updatedAt:'2026-11-01'},
+ ]
+ const go=jobsOnTheGo(items)
+ assert.deepEqual(go.shown.map(i=>i.id),['mine','old'])
+ assert.deepEqual(go.shown.map(i=>i.line),['Paint fence · waiting on you to confirm','Clean barn · waiting on Paul to complete'])
+ assert.equal(jobsOnTheGo(null).total,0)
+})

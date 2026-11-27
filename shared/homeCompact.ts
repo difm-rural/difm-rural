@@ -1,6 +1,6 @@
 // My Property Home, compact form: one line per item, at most 3 per section.
 // Shared by the mobile app and provider-web so both read the same.
-import { latestTime } from './onTheGo.ts'
+import { latestTime, rankOnTheGo } from './onTheGo.ts'
 import { formatWorkDate } from './formatting.js'
 import { propertyAreas, propertyGaps, type NetworkData } from './propertyNetwork.ts'
 import { propertyLinkedJobs, type AreaJob, type AreaJobLink } from './propertyNetworkJobs.ts'
@@ -80,3 +80,13 @@ export function unpostedNeeds(network: NetworkData | null | undefined, jobs: Are
 
 export const propertyNetworkRow = (people: number) =>
   `My Property Network · ${plural(people, 'person', 'people')}`
+
+// Jobs tab "On the go": agreed (accepted) jobs on either side, one line each,
+// waiting-on-you first. Open jobs and pending offers have their own rows there.
+type InFlight = { entityType: string; review?: unknown; title: string; arrivalAt?: string | null; item?: { status?: string } | null;
+  nextMove: MoveLike & { badge: string }; updatedAt?: unknown }
+export function jobsOnTheGo<T extends InFlight>(items: T[] | null | undefined, limit = HOME_COMPACT_LIMIT) {
+  return rankOnTheGo((items || [])
+    .filter(item => item.entityType === 'job' && !item.review && item.item?.status === 'accepted')
+    .map(item => ({ ...item, needsAction: item.nextMove.needsAction, line: goLine(item.title, item.nextMove, item.arrivalAt) })), limit)
+}

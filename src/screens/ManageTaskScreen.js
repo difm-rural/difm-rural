@@ -93,7 +93,7 @@ function ActionRow({ emoji, iconBg, label, subtitle, onPress, last }) {
 
 export default function ManageTaskScreen({ navigation, route }) {
   const insets = useSafeAreaInsets()
-  const { job: initialJob, bidCount = 0 } = route.params
+  const { job: initialJob, bidCount = 0, posted = null } = route.params
   const [job, setJob] = useState(initialJob)
   const [acceptedBid, setAcceptedBid] = useState(null)
   const [invites, setInvites] = useState([])
@@ -557,6 +557,8 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
       <Text style={styles.kicker}>Manage job</Text>
       <Text style={styles.headerTitle} accessibilityRole="header" accessibilityLabel={job.title}>{job.title}</Text>
       {job.status==='completed'&&<JobStatusNotice>Job completed.</JobStatusNotice>}
+      {/* Just posted (no "Job posted" step): a short confirmation here instead. */}
+      {!!posted&&job.status==='open'&&<JobStatusNotice>{posted}</JobStatusNotice>}
 
     </View>
     </View>
