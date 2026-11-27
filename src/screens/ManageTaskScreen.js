@@ -674,7 +674,7 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
               sortedBy={acceptedBid.paymentSortedBy}
               requesterId={job.requester_id}
               providerId={acceptedBid.providerId}
-              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner, acceptedBid.paymentSortedAt)}
+              canUpdate={false /* requester sees the status only */}
               onChanged={fetchAcceptedBid}
             />
           ) : null}
@@ -744,7 +744,7 @@ Accepting also shares your exact address with ${provName.split(' ')[0]}.` : ''}`
               sortedBy={acceptedBid.paymentSortedBy}
               requesterId={job.requester_id}
               providerId={acceptedBid.providerId}
-              canUpdate={paymentAcknowledgementAvailable(job.status, 'accepted', isTaskOwner, acceptedBid.paymentSortedAt)}
+              canUpdate={false /* requester sees the status only */}
               onChanged={fetchAcceptedBid}
             />
           ) : null}

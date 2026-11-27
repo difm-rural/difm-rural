@@ -109,7 +109,7 @@ export default async function JobPage({params,searchParams}:{params:Promise<{id:
    ? <PaymentSorted key={acceptedOffer.id} bidId={acceptedOffer.id} jobId={id} sortedAt={acceptedOffer.payment_sorted_at}
        actor={paymentAcknowledgementActor(acceptedOffer.payment_sorted_by,job.requester_id,acceptedProviderId)}
        methodLabel={payMethod ? agreedPaymentMethodLabels[payMethod] : undefined}
-       canUpdate={paymentAcknowledgementAvailable(job.status,acceptedOffer.status,!!manageRole,acceptedOffer.payment_sorted_at)}/>
+       canUpdate={paymentAcknowledgementAvailable(job.status,acceptedOffer.status,manageRole==='provider')}/>
    : null
 
 

@@ -10,9 +10,10 @@ test('an empty Home mode points at the other mode instead of claiming nothing ne
  assert.equal(homeAttentionSummary([{needsAction:true}],0,0,{label:'My Work',count:4}).text,'1 item needs your attention.')
 })
 
-test('a completed job with payment sorted has no payment Undo',()=>{
- assert.equal(paymentAcknowledgementAvailable('completed','accepted',true,'2026-11-26T07:17:37Z'),false)
- assert.equal(paymentAcknowledgementAvailable('completed','accepted',true,null),true)
+test('payment received: only the provider, only after completion (undo stays for a mis-tap)',()=>{
+ assert.equal(paymentAcknowledgementAvailable('completed','accepted',true,'2026-11-26T07:17:37Z'),true)
+ assert.equal(paymentAcknowledgementAvailable('completed','accepted',false,null),false)
+ assert.equal(paymentAcknowledgementAvailable('accepted','accepted',true,null),false)
 })
 
 test("offer dates use NZ's today, not the server's UTC date",async()=>{

@@ -77,8 +77,7 @@ export default function JobPaymentHandoff({
     <View style={styles.card}>
       <Text accessibilityRole="header" style={styles.title}>Payment</Text>
       {sorted && <Text accessibilityLiveRegion="polite" style={styles.status}>{copy.sorted}</Text>}
-      {!sorted && <Text style={styles.body}>{copy.reminder}</Text>}
-      {sorted && actor && <Text style={styles.body}>Marked by the {actor}.</Text>}
+      {!sorted && <Text style={styles.body}>{canUpdate ? copy.providerReminder : copy.reminder}</Text>}
       {agreedPaymentMethodLabels[method] && <Text style={styles.body}>Agreed method: {agreedPaymentMethodLabels[method]}</Text>}
       {canUpdate && (
         <Button
