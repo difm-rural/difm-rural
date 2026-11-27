@@ -32,7 +32,9 @@ export default function WorkScheduleCard({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <View>
+        {/* The text takes the remaining width and wraps, so a long date never
+            pushes the calendar icon off the card's edge. */}
+        <View style={styles.headerText}>
           <Text style={styles.eyebrow}>WORK SCHEDULE</Text>
           <Text style={styles.title}>
             {schedule ? formatArrivalWindow(schedule) : 'Arrival time not confirmed'}
@@ -97,7 +99,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: 'hidden',
   },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: 16 },
+  headerText: { flex: 1, minWidth: 0 },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 0.9, marginBottom: 5 },
   title: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
   row: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
