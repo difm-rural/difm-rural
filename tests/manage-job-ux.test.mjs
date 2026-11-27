@@ -90,3 +90,10 @@ test('Manage Job makes the full multiline job title the primary heading, with it
  const completed=screen({job:{status:'completed'}}),rows=completed.render()
  assert.ok(rows.findIndex(n=>n.props?.accessibilityRole==='header')<rows.findIndex(n=>n.type==='JobStatusNotice'))
 })
+
+test('Share job is only offered while the job is open',()=>{
+ for(const status of ['completed','cancelled']){
+  const s=screen({job:{status}})
+  assert.ok(!s.render().some(v=>v.props?.accessibilityLabel==='Share job'),status)
+ }
+})
