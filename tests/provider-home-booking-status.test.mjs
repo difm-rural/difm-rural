@@ -59,7 +59,7 @@ test('grazing location copy follows the viewer role; other listing policies are 
 async function home(initialMoves,{unreadCount=27,invites=[]}={}){
  const slots=[],effects=[],navigation=[],inboxCalls=[];let index=0,tree,currentMoves=initialMoves,badge,loadNext
  const jsx=(type,props)=>({type,props})
- const react={useState(v){const at=index++;if(!(at in slots))slots[at]=typeof v==='function'?v():v;return [slots[at],v=>{slots[at]=typeof v==='function'?v(slots[at]):v}]},useRef(v){const at=index++;slots[at]??={current:v};return slots[at]},useCallback:f=>f}
+ const react={useState(v){const at=index++;if(!(at in slots))slots[at]=typeof v==='function'?v():v;return [slots[at],v=>{slots[at]=typeof v==='function'?v(slots[at]):v}]},useRef(v){const at=index++;slots[at]??={current:v};return slots[at]},useCallback:f=>f,useEffect(){}}
  react.default=react
  const exports={},mods={
   react:{...react,__esModule:true},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
@@ -74,6 +74,7 @@ async function home(initialMoves,{unreadCount=27,invites=[]}={}){
   '../../lib/seasonalReminders':{fetchSeasonalReminders:async()=>[],recordSeasonalEvent(){}},
   '../../../shared/reviewPrompts':{dismissReviewPrompt:async()=>{}},
   '../../lib/nextMove':{fetchActiveNextMoves:async()=>{if(loadNext){const next=loadNext;loadNext=null;return next()}return currentMoves}},
+  '../../lib/restartFlag':{takeRestartingFlag:async()=>false},
   '../../lib/badgeEvents':{onBadgeRefresh:f=>{badge=f;return ()=>{}}},'../../theme/tokens':{colors:{}},
  }
  const code=require('@babel/core').transformSync(source('src/screens/tabs/HomeTabScreen.js'),{configFile:false,babelrc:false,presets:[['@babel/preset-react',{runtime:'automatic'}]],plugins:['@babel/plugin-transform-modules-commonjs']}).code

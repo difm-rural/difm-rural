@@ -52,7 +52,7 @@ function screen(file,{states={},route={},record=booking,platform='android'}={}){
 }
 test('Needs attention, On the go and focused Active work all lead to the same booking details without mutations',()=>{
  const nextMove=bookingNextMove(booking,'provider'),active={id:'next',entityId:booking.id,entityType:'booking',viewerRole:'provider',title:booking.service.title,item:booking,nextMove,needsAction:true}
- const home=screen('tabs/HomeTabScreen.js',{states:{0:'provider',1:'work',4:0,5:[],9:[active],10:false}})
+ const home=screen('tabs/HomeTabScreen.js',{states:{0:'provider',1:'work',5:0,6:[],10:[active],11:false}})
  const bookingLinks=home.all.filter(n=>n.type==='TouchableOpacity'&&n.props.accessibilityLabel?.startsWith(booking.service.title))
  assert.equal(bookingLinks.length,2);bookingLinks.forEach(n=>n.props.onPress())
  const expected=['ServiceBookingDetail',{booking,viewerRole:'provider'}]

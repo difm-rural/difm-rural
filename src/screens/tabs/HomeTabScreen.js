@@ -1,6 +1,6 @@
 import {rankOnTheGo} from '../../../shared/onTheGo'
 import DevelopmentBadge from '../../components/DevelopmentBadge'
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   RefreshControl,
@@ -28,6 +28,7 @@ import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
 import SeasonalReminderCard from '../../components/SeasonalReminderCard'
 import { fetchActiveNextMoves } from '../../lib/nextMove'
+import { takeRestartingFlag } from '../../lib/restartFlag'
 import { dismissReviewPrompt } from '../../../shared/reviewPrompts'
 
 function PrimaryAction({ title, subtitle, onPress, variant = 'primary' }) {
@@ -55,6 +56,8 @@ export default function HomeTabScreen({ navigation }) {
   const [mode,setMode]=useState('property')
   const [network,setNetwork]=useState(null)
   const [propertyJobs,setPropertyJobs]=useState(null)
+  const [restarting,setRestarting]=useState(false)
+  useEffect(()=>{takeRestartingFlag().then(setRestarting)},[])
   const preferenceOwner=useRef(null)
   const preferenceRevision=useRef(0)
   const loadRevision=useRef(0)
@@ -196,11 +199,11 @@ export default function HomeTabScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        {/* One centred block: "Restarting…" right after an update restart, else "Loading…". */}
+        <View style={[styles.startup, { paddingTop: insets.top }]}>
           <Text style={styles.kicker}>Rural Connections</Text>
-          <Text style={styles.title} accessibilityRole="header">Home</Text>
+          <Loading label={restarting ? 'Restarting…' : 'Loading…'} style={{ flex: 0, paddingTop: 12 }} />
         </View>
-        <Loading label="Loading home…" />
       </View>
     )
   }
@@ -428,6 +431,7 @@ const styles = StyleSheet.create({
   onTheGoMore:         { fontSize: 12, color: colors.textMuted, marginTop: 8 },
   screen: { flex: 1, backgroundColor: colors.background },
 
+  startup: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',

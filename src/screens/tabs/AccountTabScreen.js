@@ -1,4 +1,5 @@
 import {publicNameError,PUBLIC_NAME_MAX} from '../../../shared/profileName'
+import { markRestartingForUpdate } from '../../lib/restartFlag'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -201,7 +202,7 @@ export default function AccountTabScreen({ navigation, route }) {
         await Updates.fetchUpdateAsync()
         Alert.alert('Update downloaded', 'A new version is ready to use.', [
           { text: 'Later', style: 'cancel' },
-          { text: 'Restart now', onPress: () => Updates.reloadAsync() },
+          { text: 'Restart now', onPress: async () => { await markRestartingForUpdate(); await Updates.reloadAsync() } },
         ])
       } else {
         Alert.alert('Up to date', "You're on the latest version.")
