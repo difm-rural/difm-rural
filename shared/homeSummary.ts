@@ -47,3 +47,13 @@ export async function homeCustomerCount(client:unknown,owner:string){
   return error?null:count
  }catch{return null}
 }
+
+// My Property empty state. Shown only when there is no work in flight (no jobs
+// or bookings in any active state — open, awaiting a provider, booked or under
+// way all appear in On the go). When the Property Network has "Need help"
+// items it says so, rather than a "nothing here" that contradicts that line.
+export function homePropertyEmpty(helpCount:number){
+ return helpCount>0
+  ?{title:'No jobs posted yet',body:`Post a job for the ${helpCount} ${helpCount===1?'thing':'things'} you need help with, or find local help.`}
+  :{title:'No active work yet',body:'Post a job or find local help to get started.'}
+}

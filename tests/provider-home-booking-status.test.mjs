@@ -66,7 +66,7 @@ async function home(initialMoves,{unreadCount=27,invites=[]}={}){
   '@react-navigation/native':{useFocusEffect:f=>{if(!tree)effects.push(f)}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:0,bottom:0})},
   '@react-native-async-storage/async-storage':{__esModule:true,default:{getItem:async()=> 'work',setItem:async()=>{}}},
   '../../../shared/homeMode':modes,'../../../shared/homeSummary':summary,'../../../shared/onTheGo':{rankOnTheGo},
-  '../../../shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[]},
+  '../../../shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[],propertyNetworkHelpCount:()=>0},
   '../../lib/supabase':{supabase:{auth:{getUser:async()=>({data:{user:{id:'viewer'}}})},from:()=>({select:()=>({eq:()=>({neq:async()=>({count:0})})})})}},
   '../../lib/notifications':{fetchNotificationInbox:async options=>{inboxCalls.push(options);return {items:[],unreadCount}}},
   '../../lib/invites':{fetchInvitedJobsForProvider:async()=>invites},
@@ -97,7 +97,7 @@ test('native Home ignores unread history after withdrawal and keeps its unread c
  row.props.onPress();assert.equal(screen.navigation.at(-1)[0],'ServiceBookingDetail')
  screen.setMoves([]);screen.refresh();await screen.settle()
  assert.match(screen.text(),/Nothing needs your action. 27 unread updates in Notifications./)
- assert.match(screen.text(),/All notifications \(27 unread\)/)
+ assert.match(screen.text(),/27 unread updates in Notifications/);assert.doesNotMatch(screen.text(),/All notifications/)
  assert.doesNotMatch(screen.text(),/Confirm or decline|Needs attention/)
  assert.ok(screen.inboxCalls.every(options=>options.limit===0))
 })

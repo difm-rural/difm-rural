@@ -20,8 +20,8 @@ import EmptyState from '../../components/EmptyState'
 import Loading from '../../components/Loading'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {HOME_MODES,homeMode,homeModeKey,homeRole} from '../../../shared/homeMode'
-import {homeCustomerCount,homeAttentionSummary} from '../../../shared/homeSummary'
-import {loadPropertyNetwork,propertyNetworkHomeLines} from '../../../shared/propertyNetwork'
+import {homeCustomerCount,homeAttentionSummary,homePropertyEmpty} from '../../../shared/homeSummary'
+import {loadPropertyNetwork,propertyNetworkHelpCount,propertyNetworkHomeLines} from '../../../shared/propertyNetwork'
 import { onBadgeRefresh } from '../../lib/badgeEvents'
 import { fetchInvitedJobsForProvider } from '../../lib/invites'
 import { fetchSeasonalReminders, recordSeasonalEvent } from '../../lib/seasonalReminders'
@@ -146,6 +146,7 @@ export default function HomeTabScreen({ navigation }) {
   const invitationCount=invitedJobs?.filter(invite=>invite.status==='pending'||invite.status==='seen').length||0
   const modeItems=(activeMoves||[]).filter(item=>item.viewerRole===homeRole(mode))
   const networkLines=network?propertyNetworkHomeLines(network):[]
+  const emptyState=homePropertyEmpty(propertyNetworkHelpCount(network))
   // Items needing action per mode, so the mode Home didn't open on still shows them.
   const modeAttention={
     property:(activeMoves||[]).filter(item=>item.viewerRole==='requester'&&item.nextMove.needsAction).length,
@@ -215,25 +216,20 @@ export default function HomeTabScreen({ navigation }) {
         showsVerticalScrollIndicator={false}>
 
         <Text style={styles.title} accessibilityRole="header">{HOME_MODES.find(item=>item.id===mode).heading}</Text>
+        <Text style={styles.subtitle}>{HOME_MODES.find(item=>item.id===mode).subtitle}</Text>
         {(loadError||!activeMoves)&&<Text style={styles.subtitle} accessibilityRole="alert">Some activity could not be loaded. Pull down to try again.</Text>}
         {propertyMode ? <>
-          <Text style={styles.subtitle}>Find local help and keep track of who looks after your property.</Text>
-          {/* A line only once the network has something in it: no setup prompt. */}
-          {networkLines.length>0&&<TouchableOpacity style={styles.networkPreview} accessibilityRole="button"
-            accessibilityLabel={'My Property Network, '+networkLines.join(', ')} onPress={()=>navigation.navigate('PropertyNetwork')}>
+          {/* Always shown: it is Home's way into My Network (and, from there, My People),
+              now that the separate My Network / My People links are gone. */}
+          <TouchableOpacity style={styles.networkPreview} accessibilityRole="button"
+            accessibilityLabel={'My Property Network'+(networkLines.length?', '+networkLines.join(', '):'')} onPress={()=>navigation.navigate('PropertyNetwork')}>
             <Icon name="people-outline" size={22} color={colors.primary}/>
             <View style={{flex:1}}><Text style={styles.sectionTitle}>My Property Network</Text>
-              {networkLines.map(line=><Text key={line} style={styles.subtitle}>{line}</Text>)}</View>
+              {networkLines.length>0
+                ? networkLines.map(line=><Text key={line} style={styles.subtitle}>{line}</Text>)
+                : <Text style={styles.subtitle}>Who looks after your place</Text>}</View>
             <Icon name="chevron-forward" size={18} color={colors.primary}/>
-          </TouchableOpacity>}
-          <View style={[styles.networkActions,networkLines.length===0&&{marginVertical:12}]}>
-            <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('PropertyNetwork')}>
-              <Text style={styles.sectionLink}>My Network</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.networkAction} accessibilityRole="button" onPress={()=>navigation.navigate('Connections',{side:'locals'})}>
-              <Text style={styles.sectionLink}>My People</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
           <View style={styles.actionsGrid}>
             <PrimaryAction title="Post a job" subtitle="Get help with something that needs doing."
               onPress={()=>navigation.getParent()?.navigate('Jobs',{screen:'PostJob',params:{origin:'Home'}})}/>
@@ -261,9 +257,6 @@ export default function HomeTabScreen({ navigation }) {
           </TouchableOpacity>
         </>}
 
-        <TouchableOpacity accessibilityRole="button" onPress={()=>navigation.navigate('Notifications')} style={{minHeight:44,justifyContent:'center'}}>
-          <Text style={styles.sectionLink}>{unreadCount===null?'All notifications':`All notifications (${unreadCount} unread)`}</Text>
-        </TouchableOpacity>
         {attention.length > 0 && (
           <>
           {/* Current lifecycle actions; unread history is independent. */}
@@ -350,7 +343,7 @@ export default function HomeTabScreen({ navigation }) {
         )}
 
         {propertyMode&&activeMoves&&!loadError&&attention.length===0&&onTheGo.total===0&&<EmptyState compact icon="leaf-outline"
-          title="No active work yet" body="Post a job or find local help to get started."/>}
+          title={emptyState.title} body={emptyState.body}/>}
 
         {seasonalReminders.length > 0 && (
           <View style={styles.seasonalSection}>
@@ -417,8 +410,6 @@ const styles = StyleSheet.create({
   modeLabelSelected:{color:colors.white},
   networkPreview:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:colors.primaryLight,borderRadius:16,marginVertical:12},
   networkArt:{width:96,height:106,position:'relative'},
-  networkActions:{flexDirection:'row',flexWrap:'wrap',columnGap:12},
-  networkAction:{minHeight:44,justifyContent:'center'},
   miniNode:{position:'absolute',width:23,height:23,marginLeft:-11.5,marginTop:-11.5,borderRadius:12,backgroundColor:colors.white,alignItems:'center',justifyContent:'center'},
   miniGap:{backgroundColor:colors.warningLight},
   miniCentre:{position:'absolute',left:'50%',top:'50%',marginLeft:-15,marginTop:-15,width:30,height:30,borderRadius:15,backgroundColor:colors.primaryDark,alignItems:'center',justifyContent:'center'},

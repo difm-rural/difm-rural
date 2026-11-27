@@ -39,6 +39,7 @@ function screen(file,{states={},route={},record=booking,platform='android'}={}){
   if(name.endsWith('/supabase'))return {supabase:{auth:{getUser:async()=>({data:{user:{id:'provider'}}})},rpc:async(...v)=>{writes.push(['rpc',...v]);return {error:null}}}}
   if(name.endsWith('/bookingActions'))return new Proxy({},{get:(_,action)=>async(...v)=>{writes.push([action,...v]);return action==='saveBookingReview'?{id:'saved-review',rating:5}:{error:null}}})
   if(name.includes('/components/'))return {__esModule:true,default:name.split('/').at(-1),CARD_GAP:12,SNAP_INTERVAL:276}
+  if(name.endsWith('/shared/propertyNetwork'))return {propertyNetworkHelpCount:()=>0,propertyNetworkHomeLines:()=>[]}
   if(name.includes('/lib/')||name.includes('/shared/'))return {}
   throw Error('Missing '+name)
  })

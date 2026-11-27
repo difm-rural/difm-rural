@@ -561,7 +561,9 @@ test('Home shows a network line only once there is something in it, with no setu
  assert.deepEqual(propertyNetworkHomeLines(data)[0],'1 person in your property network')
  for(const file of ['src/screens/tabs/HomeTabScreen.js','provider-web/src/app/page.tsx']){
   const source=readFileSync(new URL('../'+file,import.meta.url),'utf8')
-  assert.match(source,/networkLines\.length>0&&/)
+  // Lines only when there is something to say (mobile always shows the card
+  // itself, as Home's way into My Network, with a neutral line when empty).
+  assert.match(source,/networkLines\.length>0/)
   assert.doesNotMatch(source,/Start building|setting up a support area|What.s on your property/)
  }
  // Setup only lives in My Property Network (and its map), never in onboarding or posting.

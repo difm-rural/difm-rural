@@ -5,7 +5,8 @@ import {createRequire} from 'node:module'
 import vm from 'node:vm'
 import {rankOnTheGo} from '../shared/onTheGo.ts'
 import {jobNextMove,bookingNextMove} from '../shared/nextMove.ts'
-import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '../shared/homeSummary.ts'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary,homePropertyEmpty} from '../shared/homeSummary.ts'
+import * as homeModes from '../shared/homeMode.ts'
 
 const require=createRequire(import.meta.url),ts=require('typescript')
 const webRequire=createRequire(new URL('../provider-web/package.json',import.meta.url))
@@ -54,9 +55,9 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@shared/formatting':{formatDate:()=>''},
   '@shared/notificationBody':{},'@shared/marketSide':{},
   '@shared/nextMove':{jobNextMove,bookingNextMove},'@shared/onTheGo':{rankOnTheGo},
-  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[]},
+  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[],propertyNetworkHelpCount:()=>0},
   './property-network/area-icon':{PropertyAreaIcon:()=>null},
-  '@shared/homeSummary':{homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary},
+  '@shared/homeSummary':{homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary,homePropertyEmpty},'@shared/homeMode':homeModes,
   '@/components/home-modes':{HomeModes:({work})=>work},
   '@/components/seasonal-reminders':{SeasonalReminders:()=>null},
   '@/lib/seasonal-reminders':{loadSeasonalReminders:()=>[]},
@@ -125,7 +126,7 @@ test('pending grazing request shows the current response action, full title and 
  assert.match(html,/href="\/bookings\/grazing-request"/)
  assert.match(html,/Winter grazing for a small herd with flexible dates and access requirements/)
  assert.doesNotMatch(html,/Confirm the withdrawn grazing request/)
- assert.match(html,/All notifications \(1 unread\)/)
+ assert.doesNotMatch(html,/All notifications/)
  assert.doesNotMatch(html,/caught up/)
 })
 for(const status of ['withdrawn','cancelled','declined','completed','confirmed'])test(`${status} grazing booking never revives an unread acceptance event`,async()=>{
@@ -135,7 +136,7 @@ for(const status of ['withdrawn','cancelled','declined','completed','confirmed']
  // Nothing to act on, but the 27 unread updates are named rather than called "caught up".
  assert.match(html,/Nothing needs your action\. 27 unread updates in Notifications\./)
  assert.doesNotMatch(html,/caught up/)
- assert.match(html,/All notifications \(27 unread\)/)
+ assert.match(html,/27 unread updates in Notifications/);assert.doesNotMatch(html,/All notifications/)
  const query=calls.find(call=>call.table==='notifications')
  assert.equal(query.cols,'id');assert.equal(query.options.count,'exact');assert.equal(query.options.head,true)
  assert.ok(query.filters.some(([op,key,value])=>op==='eq'&&key==='user_id'&&value==='viewer'))
