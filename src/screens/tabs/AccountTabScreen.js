@@ -240,6 +240,7 @@ export default function AccountTabScreen({ navigation, route }) {
   const [emailTransactional, setEmailTransactional] = useState(true)
   const [emailMessages,      setEmailMessages]      = useState(true)
   const [emailSeasonal,      setEmailSeasonal]      = useState(false)
+  const [seasonalCards,      setSeasonalCards]      = useState(true)
   const [opportunityMode,    setOpportunityMode]    = useState('off')
   const [opportunityRadius,  setOpportunityRadius]  = useState(30)
   const [opportunityPush,    setOpportunityPush]    = useState(true)
@@ -331,6 +332,7 @@ export default function AccountTabScreen({ navigation, route }) {
     setEmailTransactional(prefs?.email_transactional !== false)
     setEmailMessages(prefs?.email_messages !== false)
     setEmailSeasonal(!!prefs?.email_seasonal)
+    setSeasonalCards(prefs?.seasonal_cards !== false)
     setOpportunityMode(prefs?.opportunity_alert_mode || 'off')
     setOpportunityRadius(prefs?.opportunity_radius_km || 30)
     setOpportunityPush(prefs?.opportunity_push !== false)
@@ -356,6 +358,12 @@ export default function AccountTabScreen({ navigation, route }) {
     const next = !emailMessages
     setEmailMessages(next)
     await updateUserPreferences({ email_messages: next })
+  }
+
+  async function handleSeasonalCardsToggle() {
+    const next = !seasonalCards
+    setSeasonalCards(next)
+    await updateUserPreferences({ seasonal_cards: next })
   }
 
   async function handleEmailSeasonalToggle() {
@@ -873,6 +881,13 @@ export default function AccountTabScreen({ navigation, route }) {
         />
         <MenuRow
           icon="leaf-outline"
+          label="Seasonal reminder cards"
+          sub="Timely reminders on Home. Dismissed cards come back after 60 days"
+          value={seasonalCards ? 'On' : 'Off'}
+          onPress={handleSeasonalCardsToggle}
+        />
+        <MenuRow
+          icon="mail-outline"
           label="Seasonal reminder emails"
           sub="Occasional, relevant reminders for your region"
           value={emailSeasonal ? 'On' : 'Off'}
