@@ -3,13 +3,15 @@ import {rankOnTheGo} from '@shared/onTheGo'
 import {loadReviewPrompts} from '@shared/reviewPrompts'
 import {DismissReview} from '@/components/dismiss-review'
 import {HomeModes} from '@/components/home-modes'
-import {homeCustomerCount,homeAttentionSummary,homePropertyEmpty} from '@shared/homeSummary'
+import {homeCustomerCount,homeAttentionSummary} from '@shared/homeSummary'
+import {attentionGroup,attentionLine,goLine,propertyNetworkRow,rankAttention,rankRecent,unpostedNeeds} from '@shared/homeCompact'
+import {loadPropertyJobs,propertyPostPath} from '@shared/propertyNetworkJobs'
 import {HOME_MODES} from '@shared/homeMode'
-import {loadPropertyNetwork,propertyNetworkHelpCount,propertyNetworkHomeLines} from '@shared/propertyNetwork'
+import {loadPropertyNetwork,propertyNetworkPeopleCount} from '@shared/propertyNetwork'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
-import { ArrowRight, Plus, Search, Leaf, ListChecks, UsersRound, Briefcase, Tag } from 'lucide-react'
+import { ArrowRight, Plus, Search, ListChecks, UsersRound, Briefcase, Tag } from 'lucide-react'
 import { requireProvider } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
 import { LiveRefresh } from '@/components/live-refresh'
@@ -18,7 +20,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   const { supabase, user, profile } = await requireProvider()
-  const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations, customerCount, reviewPrompts] = await Promise.all([
+  const [jobs, bookings, offers, notifications, listings, seasonal, network, invitations, customerCount, reviewPrompts, propertyJobs] = await Promise.all([
     supabase.from('jobs').select('id,title,status,created_at,accepted_at,scheduled_date,date_from').eq('requester_id', user.id).in('status', ACTIVE_JOBS),
     supabase.from('bookings').select('id,status,provider_id,requester_id,created_at,quote_sent_at,quote_accepted_at,scheduled_date,service:services_public(title,kind,pricing_type)').or('requester_id.eq.' + user.id + ',provider_id.eq.' + user.id).in('status', ACTIVE_BOOKINGS),
     supabase.from('bids').select('id,job_id,status,created_at,payment_method,payment_sorted_at,payment_details_sent_at').eq('provider_id', user.id).in('status', ['pending','accepted']),
@@ -30,6 +32,7 @@ export default async function HomePage() {
       .eq('provider_id',user.id).in('status',['pending','seen']).eq('job.status','open'),
     homeCustomerCount(supabase,user.id),
     loadReviewPrompts(supabase,user.id).catch(()=>[]),
+    loadPropertyJobs(supabase,user.id).catch(()=>null),
   ])
   const offerIds = [...new Set((offers.data || []).map(o => o.job_id))]
   const offerJobs = offerIds.length ? await supabase.from('jobs_public').select('id,title,status,requester_id,created_at,scheduled_date,date_from').in('id',offerIds) : {data:[],error:null}
@@ -72,7 +75,7 @@ export default async function HomePage() {
   for (const job of ownJobs) {
     const accepted = acceptedOnOwn.get(job.id)
     const next = jobNextMove(job, 'requester', {...confirmation(job.id),otherName: accepted ? names.get(accepted.provider_id) : null, bidCount: pendingCount.get(job.id) || 0, unansweredQuestionCount: questionCount.get(job.id) || 0, paymentMethod: accepted?.payment_method, paymentSortedAt: accepted?.payment_sorted_at})
-    if (next) goItems.push({viewerRole:'requester',key: 'job:' + job.id, side: 'job', own: true, title: job.title, href: '/jobs/' + job.id, next, needsAction: next.needsAction, updatedAt: [job.created_at, job.accepted_at, accepted?.payment_details_sent_at, accepted?.payment_sorted_at]})
+    if (next) goItems.push({viewerRole:'requester',arrivalAt:arrivals.get(job.id),key: 'job:' + job.id, side: 'job', own: true, title: job.title, href: '/jobs/' + job.id, next, needsAction: next.needsAction, updatedAt: [job.created_at, job.accepted_at, accepted?.payment_details_sent_at, accepted?.payment_sorted_at]})
   }
   for (const offer of offers.data || []) {
     const job = offerJobById.get(offer.job_id)
@@ -85,13 +88,33 @@ export default async function HomePage() {
     const providing = booking.provider_id === user.id
     const service = booking.service as unknown as {title?:string;kind?:string;pricing_type?:string} | null
     const next = bookingNextMove({...booking, service}, providing ? 'provider' : 'requester', {otherName: names.get(providing ? booking.requester_id : booking.provider_id)})
-    if (next) goItems.push({viewerRole:providing?'provider':'requester',key: 'booking:' + booking.id, side: 'listing', own: providing, title: service?.title || 'Booking', href: '/bookings/' + booking.id, next, needsAction: next.needsAction, updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at]})
+    if (next) goItems.push({viewerRole:providing?'provider':'requester',arrivalAt:booking.scheduled_date,key: 'booking:' + booking.id, side: 'listing', own: providing, title: service?.title || 'Booking', href: '/bookings/' + booking.id, next, needsAction: next.needsAction, updatedAt: [booking.created_at, booking.quote_sent_at, booking.quote_accepted_at]})
   }
   // Completed work you haven't reviewed yet stays on Home until you do.
   for (const prompt of reviewPrompts) goItems.push({review:{kind:prompt.kind,id:prompt.id},viewerRole:prompt.viewerRole,key:prompt.key,side:prompt.kind==='job'?'job':'listing',own:prompt.viewerRole===(prompt.kind==='job'?'requester':'provider'),title:prompt.title,href:(prompt.kind==='job'?'/jobs/':'/bookings/')+prompt.id+'#reviews',next:prompt.next,needsAction:true,updatedAt:prompt.updatedAt})
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes, schedules, invitations].some(r => r.error)
-  const networkLines=network?propertyNetworkHomeLines(network):[]
-  const emptyState=homePropertyEmpty(propertyNetworkHelpCount(network))
+  const networkRow=propertyNetworkRow(propertyNetworkPeopleCount(network))
+  // My Property, compact (shared/homeCompact): Needs attention = waiting on you,
+  // then needs not posted yet, then reviews; On the go = the rest, newest first.
+  const needs=unpostedNeeds(network,propertyJobs?.jobs,propertyJobs?.links)
+  const requesterItems=goItems.filter(item=>item.viewerRole==='requester')
+  const propertyAttention=rankAttention([
+   ...requesterItems.filter(item=>item.needsAction).map(item=>({key:item.key,group:attentionGroup(item.next),line:attentionLine(item.title,item.next),href:item.href,updatedAt:item.updatedAt,review:item.review,title:item.title,need:null as null|(typeof needs)[number]})),
+   ...needs.map(need=>({key:need.key,group:'need' as const,line:need.text,href:'/property-network?area='+need.area.id,updatedAt:undefined,review:undefined,title:need.service.name,need})),
+  ])
+  const propertyGo=rankRecent(requesterItems.filter(item=>!item.review&&!item.needsAction).map(item=>({key:item.key,href:item.href,updatedAt:item.updatedAt,line:goLine(item.title,item.next,item.arrivalAt)})))
+  function propertyActivity(){
+   return <>
+    {propertyAttention.total>0&&<section className="card home-attention home-compact"><div className="card-head"><h2>Needs attention</h2>{propertyAttention.more>0&&<Link href="/activity" className="card-link">See all</Link>}</div>
+     <ul className="list">{propertyAttention.shown.map(item=><li key={item.key} className="compact-row">
+      <Link href={item.href} className="compact-line">{item.line}</Link>
+      {item.need&&<Link href={propertyPostPath(item.need.area,item.need.service,undefined,user.id)} className="card-link compact-action">Post it</Link>}
+      {item.review&&<DismissReview kind={item.review.kind} id={item.review.id} role="requester" title={item.title}/>}
+     </li>)}</ul></section>}
+    {propertyGo.total>0&&<section className="card home-attention home-compact"><div className="card-head"><h2>On the go</h2>{propertyGo.more>0&&<Link href="/activity" className="card-link">See all</Link>}</div>
+     <ul className="list">{propertyGo.shown.map(item=><li key={item.key} className="compact-row"><Link href={item.href} className="compact-line">{item.line}</Link></li>)}</ul></section>}
+   </>
+  }
   // The work-stage counts (offers / upcoming / active) were removed: On the go
   // already lists that work by name, and the counts overlapped. Invitations
   // keep a single line, since Home has no other way to them.
@@ -104,7 +127,8 @@ export default async function HomePage() {
     {title:'Post a job',text:'Get help with something that needs doing.',href:'/jobs/new',icon:Plus},
     {title:'Find local help',text:'Browse local providers and services.',href:'/browse',icon:Search},
    ]
-   return <div className="home-actions">{items.map((item,index)=><Link key={item.href} href={item.href} className={'home-action'+(index===0?' primary':'')}><item.icon size={22}/><strong>{item.title}</strong><span>{item.text}</span><ArrowRight size={18} className="home-action-arrow"/></Link>)}</div>
+   // My Property: titles only, shorter buttons. My Work keeps its descriptions.
+   return <div className={'home-actions'+(work?'':' compact')}>{items.map((item,index)=><Link key={item.href} href={item.href} className={'home-action'+(index===0?' primary':'')}><item.icon size={22}/><strong>{item.title}</strong>{work&&<span>{item.text}</span>}<ArrowRight size={18} className="home-action-arrow"/></Link>)}</div>
   }
   function activity(role:'requester'|'provider'){
    // Review prompts live in Needs attention only; On the go is work still in flight.
@@ -126,24 +150,19 @@ export default async function HomePage() {
         <ul className="list">{onTheGo.shown.map(item => <li key={item.key}><Link className="row" href={item.href}><span className={'attention-icon ' + item.side}>{item.side === 'job' ? <Briefcase size={18}/> : <Tag size={18}/>}</span><span className="row-main"><span className={'side-tag ' + item.side}>{(item.own ? 'YOUR ' : '') + (item.side === 'job' ? 'JOB' : 'LISTING')}</span><strong>{item.title}</strong><span className={'work-badge' + (item.next.badgeTone === 'attention' ? ' attention' : '')}>{item.next.badge}</span></span><ArrowRight size={16}/></Link></li>)}</ul>
         {onTheGo.more > 0 && <p className="muted home-onthego-more">+{onTheGo.more} more in Activity</p>}
       </section>}
-      {role==='requester'&&attentionSummary.count===0&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>{emptyState.title}</h3><p>{emptyState.body}</p></div>}
    </>
   }
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page home-v2">
    {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Finish your profile</h2><p>Add your public name and town or region.</p><Link href="/setup" className="card-link">Finish your profile</Link></section>}
    {hasError&&<div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
    <HomeModes owner={user.id} attention={{property:goItems.filter(item=>item.viewerRole==='requester'&&item.needsAction).length,work:goItems.filter(item=>item.viewerRole==='provider'&&item.needsAction).length+(invitations.count||0)}} refresh={<LiveRefresh/>} property={<>
-    <header className="home-heading"><div><h1>{HOME_MODES[0].heading}</h1><p className="muted">{HOME_MODES[0].subtitle}</p></div></header>
-    {/* My Network stays in the sidebar; My People is a tab on My Network. */}
+    <header className="home-heading"><div><h1>{HOME_MODES[0].heading}</h1></div></header>
     {actions(false)}
-    {activity('requester')}
-    {/* Below the day-to-day work (not the main v0.1 feature); only once it has something in it. */}
-    {networkLines.length>0&&<Link href="/property-network" className="home-network-line">
-     <UsersRound size={22} aria-hidden="true"/><span><strong>My Property Network</strong>{networkLines.map(line=><span key={line}>{line}</span>)}</span>
-     <ArrowRight size={18} aria-hidden="true"/>
-    </Link>}
+    {propertyActivity()}
+    {/* One row, below the day-to-day work (not the main v0.1 feature). */}
+    <Link href="/property-network" className="home-network-row"><UsersRound size={20} aria-hidden="true"/><span>{networkRow}</span><ArrowRight size={18} aria-hidden="true"/></Link>
    </>} work={<>
-    <header className="home-heading"><div><h1>{HOME_MODES[1].heading}</h1><p className="muted">{HOME_MODES[1].subtitle}</p></div></header>
+    <header className="home-heading"><div><h1>{HOME_MODES[1].heading}</h1></div></header>
     {invitationCount>0&&<p><Link href="/connections/invitations" className="card-link">{invitationCount} {invitationCount===1?'invitation':'invitations'} to review ›</Link></p>}
     {actions(true)}
     <div className="home-work-links">

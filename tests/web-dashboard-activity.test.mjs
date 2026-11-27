@@ -1,3 +1,4 @@
+import * as homeCompact from '../shared/homeCompact.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
@@ -5,7 +6,7 @@ import {createRequire} from 'node:module'
 import vm from 'node:vm'
 import {rankOnTheGo} from '../shared/onTheGo.ts'
 import {jobNextMove,bookingNextMove} from '../shared/nextMove.ts'
-import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary,homePropertyEmpty} from '../shared/homeSummary.ts'
+import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '../shared/homeSummary.ts'
 import * as homeModes from '../shared/homeMode.ts'
 
 const require=createRequire(import.meta.url),ts=require('typescript')
@@ -55,9 +56,9 @@ async function dashboard({viewError=false,awardError=false,awardHidden=false,onl
   '@shared/formatting':{formatDate:()=>''},
   '@shared/notificationBody':{},'@shared/marketSide':{},
   '@shared/nextMove':{jobNextMove,bookingNextMove},'@shared/onTheGo':{rankOnTheGo},
-  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[],propertyNetworkHelpCount:()=>0},
+  '@shared/propertyNetwork':{loadPropertyNetwork:async()=>null,propertyNetworkHomeLines:()=>[],propertyNetworkHelpCount:()=>0,propertyNetworkPeopleCount:()=>0},'@shared/homeCompact':homeCompact,'@shared/propertyNetworkJobs':{loadPropertyJobs:async()=>null,propertyPostParams:()=>({}),propertyPostPath:()=>'/jobs/new'},
   './property-network/area-icon':{PropertyAreaIcon:()=>null},
-  '@shared/homeSummary':{homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary,homePropertyEmpty},'@shared/homeMode':homeModes,
+  '@shared/homeSummary':{homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary},'@shared/homeMode':homeModes,
   '@/components/home-modes':{HomeModes:({work})=>work},
   '@/components/seasonal-reminders':{SeasonalReminders:()=>null},
   '@/lib/seasonal-reminders':{loadSeasonalReminders:()=>[]},

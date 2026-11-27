@@ -1,3 +1,4 @@
+import * as homeCompact from '../shared/homeCompact.ts'
 import * as tokens from '../src/theme/tokens.js'
 import * as lifecycleUx from '../shared/bookingLifecycleUx.ts'
 import * as bookingDuration from '../shared/bookingDuration.ts'
@@ -39,7 +40,9 @@ function screen(file,{states={},route={},record=booking,platform='android'}={}){
   if(name.endsWith('/supabase'))return {supabase:{auth:{getUser:async()=>({data:{user:{id:'provider'}}})},rpc:async(...v)=>{writes.push(['rpc',...v]);return {error:null}}}}
   if(name.endsWith('/bookingActions'))return new Proxy({},{get:(_,action)=>async(...v)=>{writes.push([action,...v]);return action==='saveBookingReview'?{id:'saved-review',rating:5}:{error:null}}})
   if(name.includes('/components/'))return {__esModule:true,default:name.split('/').at(-1),CARD_GAP:12,SNAP_INTERVAL:276}
-  if(name.endsWith('/shared/propertyNetwork'))return {propertyNetworkHelpCount:()=>0,propertyNetworkHomeLines:()=>[]}
+  if(name.endsWith('/shared/propertyNetwork'))return {propertyNetworkHelpCount:()=>0,propertyNetworkHomeLines:()=>[],propertyNetworkPeopleCount:()=>0}
+  if(name.endsWith('/shared/homeCompact'))return homeCompact
+  if(name.endsWith('/shared/propertyNetworkJobs'))return {loadPropertyJobs:async()=>null,propertyPostParams:()=>({}),propertyPostPath:()=>'/jobs/new'}
   if(name.includes('/lib/')||name.includes('/shared/'))return {}
   throw Error('Missing '+name)
  })
@@ -49,7 +52,7 @@ function screen(file,{states={},route={},record=booking,platform='android'}={}){
 }
 test('Needs attention, On the go and focused Active work all lead to the same booking details without mutations',()=>{
  const nextMove=bookingNextMove(booking,'provider'),active={id:'next',entityId:booking.id,entityType:'booking',viewerRole:'provider',title:booking.service.title,item:booking,nextMove,needsAction:true}
- const home=screen('tabs/HomeTabScreen.js',{states:{0:'provider',1:'work',3:0,4:[],8:[active],9:false}})
+ const home=screen('tabs/HomeTabScreen.js',{states:{0:'provider',1:'work',4:0,5:[],9:[active],10:false}})
  const bookingLinks=home.all.filter(n=>n.type==='TouchableOpacity'&&n.props.accessibilityLabel?.startsWith(booking.service.title))
  assert.equal(bookingLinks.length,2);bookingLinks.forEach(n=>n.props.onPress())
  const expected=['ServiceBookingDetail',{booking,viewerRole:'provider'}]

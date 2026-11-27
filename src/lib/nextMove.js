@@ -129,6 +129,7 @@ export async function fetchActiveNextMoves(userId, isProvider, {strict=false}={}
     if (nextMove) {
       items.push({
         id: `next-job-${job.id}`,
+        arrivalAt: arrivals.get(job.id),
         entityType: 'job',
         entityId: job.id,
         viewerRole: 'requester',
