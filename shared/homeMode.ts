@@ -1,6 +1,6 @@
 export const HOME_MODES = [
- {id:'property',label:'My Property',heading:'Your property, your people'},
- {id:'work',label:'My Work',heading:'Your work, your opportunities'},
+ {id:'property',label:'My Property',heading:'What needs doing?',subtitle:'Post a job or find local help for your place.'},
+ {id:'work',label:'My Work',heading:'What can you offer?',subtitle:'Find local work or let people know what you do.'},
 ] as const
 
 export type HomeMode = typeof HOME_MODES[number]['id']

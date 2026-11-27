@@ -526,13 +526,19 @@ export async function dismissPropertySuggestion(client:unknown,owner:string,sugg
 }
 
 // Home shows a line only once the network has something in it.
+// Property Network items marked "Need help" (not jobs). One source for Home's
+// "N things you need help with" line and its empty state, so they agree.
+export function propertyNetworkHelpCount(data:NetworkData|null|undefined){
+ return data?propertyGaps(propertyAreas(data)).length:0
+}
+
 export function propertyNetworkHomeLines(data:NetworkData){
  const areas=propertyAreas(data),active=new Set(areas.filter(area=>area.active).map(area=>area.id))
  const people=new Set([
   ...(data.links??[]).filter(row=>active.has(row.area)).map(row=>'member:'+row.provider_id),
   ...(data.contactLinks??[]).filter(row=>active.has(row.area)).map(row=>'contact:'+row.contact_id),
  ]).size
- const help=propertyGaps(areas).length
+ const help=propertyNetworkHelpCount(data)
  const lines:string[]=[]
  if(people)lines.push(people+(people===1?' person':' people')+' in your property network')
  if(help)lines.push(help+(help===1?' thing':' things')+' you need help with')

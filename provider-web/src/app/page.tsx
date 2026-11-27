@@ -3,8 +3,9 @@ import {rankOnTheGo} from '@shared/onTheGo'
 import {loadReviewPrompts} from '@shared/reviewPrompts'
 import {DismissReview} from '@/components/dismiss-review'
 import {HomeModes} from '@/components/home-modes'
-import {homeCustomerCount,homeAttentionSummary} from '@shared/homeSummary'
-import {loadPropertyNetwork,propertyNetworkHomeLines} from '@shared/propertyNetwork'
+import {homeCustomerCount,homeAttentionSummary,homePropertyEmpty} from '@shared/homeSummary'
+import {HOME_MODES} from '@shared/homeMode'
+import {loadPropertyNetwork,propertyNetworkHelpCount,propertyNetworkHomeLines} from '@shared/propertyNetwork'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
 import Link from '@/components/navigation-link'
@@ -90,6 +91,7 @@ export default async function HomePage() {
   for (const prompt of reviewPrompts) goItems.push({review:{kind:prompt.kind,id:prompt.id},viewerRole:prompt.viewerRole,key:prompt.key,side:prompt.kind==='job'?'job':'listing',own:prompt.viewerRole===(prompt.kind==='job'?'requester':'provider'),title:prompt.title,href:(prompt.kind==='job'?'/jobs/':'/bookings/')+prompt.id+'#reviews',next:prompt.next,needsAction:true,updatedAt:prompt.updatedAt})
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes, schedules, invitations].some(r => r.error)
   const networkLines=network?propertyNetworkHomeLines(network):[]
+  const emptyState=homePropertyEmpty(propertyNetworkHelpCount(network))
   // The work-stage counts (offers / upcoming / active) were removed: On the go
   // already lists that work by name, and the counts overlapped. Invitations
   // keep a single line, since Home has no other way to them.
@@ -113,7 +115,6 @@ export default async function HomePage() {
    const attention=attentionSummary.items
    return <>
       <p className="home-work-empty">{attentionSummary.text}</p>
-      <p><Link href="/notifications" className="card-link">All notifications{notifications.count!=null?` (${notifications.count} unread)`:''}</Link></p>
       {attention.length>0 && <section className="card home-attention"><div className="card-head"><h2>Needs attention ({attention.length})</h2><Link href="/activity" className="card-link">View activity <ArrowRight size={14}/></Link></div>
         <ul className="list">{attention.slice(0,5).map(item=><li key={item.key}><Link className="row" href={item.href}>
           <span className={'attention-icon '+item.side}>{item.side==='job'?<Briefcase size={18}/>:<Tag size={18}/>}</span>
@@ -125,27 +126,24 @@ export default async function HomePage() {
         <ul className="list">{onTheGo.shown.map(item => <li key={item.key}><Link className="row" href={item.href}><span className={'attention-icon ' + item.side}>{item.side === 'job' ? <Briefcase size={18}/> : <Tag size={18}/>}</span><span className="row-main"><span className={'side-tag ' + item.side}>{(item.own ? 'YOUR ' : '') + (item.side === 'job' ? 'JOB' : 'LISTING')}</span><strong>{item.title}</strong><span className={'work-badge' + (item.next.badgeTone === 'attention' ? ' attention' : '')}>{item.next.badge}</span></span><ArrowRight size={16}/></Link></li>)}</ul>
         {onTheGo.more > 0 && <p className="muted home-onthego-more">+{onTheGo.more} more in Activity</p>}
       </section>}
-      {role==='requester'&&attentionSummary.count===0&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>No active work yet</h3><p>Post a job or find local help to get started.</p></div>}
+      {role==='requester'&&attentionSummary.count===0&&onTheGo.total===0&&!hasError&&<div className="home-empty"><Leaf size={24}/><h3>{emptyState.title}</h3><p>{emptyState.body}</p></div>}
    </>
   }
   return <AppShell providerName={profile?.full_name || 'Member'}><section className="page home-page home-v2">
    {(!profile.full_name?.trim() || !profile.region?.trim()) && <section className="card account-form-section"><h2>Finish your profile</h2><p>Add your public name and town or region.</p><Link href="/setup" className="card-link">Finish your profile</Link></section>}
    {hasError&&<div className="home-load-error" role="alert">Some activity could not be loaded. Check your connection and use Refresh to try again.</div>}
    <HomeModes owner={user.id} attention={{property:goItems.filter(item=>item.viewerRole==='requester'&&item.needsAction).length,work:goItems.filter(item=>item.viewerRole==='provider'&&item.needsAction).length+(invitations.count||0)}} refresh={<LiveRefresh/>} property={<>
-    <header className="home-heading"><div><h1>Your property, your people</h1><p className="muted">Find local help and keep track of who looks after your property.</p></div></header>
+    <header className="home-heading"><div><h1>{HOME_MODES[0].heading}</h1><p className="muted">{HOME_MODES[0].subtitle}</p></div></header>
     {/* A line only once the network has something in it: no setup prompt. */}
     {networkLines.length>0&&<Link href="/property-network" className="home-network-line">
      <UsersRound size={22} aria-hidden="true"/><span><strong>My Property Network</strong>{networkLines.map(line=><span key={line}>{line}</span>)}</span>
      <ArrowRight size={18} aria-hidden="true"/>
     </Link>}
-    <div className="home-network-actions">
-     <Link href="/property-network" className="card-link">My Network <ArrowRight size={16}/></Link>
-     <Link href="/connections?view=locals" className="card-link">My People <ArrowRight size={16}/></Link>
-    </div>
+    {/* My Network stays in the sidebar; My People is a tab on My Network. */}
     {actions(false)}
     {activity('requester')}
    </>} work={<>
-    <header className="home-heading"><div><h1>Your work, your opportunities</h1></div></header>
+    <header className="home-heading"><div><h1>{HOME_MODES[1].heading}</h1><p className="muted">{HOME_MODES[1].subtitle}</p></div></header>
     {invitationCount>0&&<p><Link href="/connections/invitations" className="card-link">{invitationCount} {invitationCount===1?'invitation':'invitations'} to review ›</Link></p>}
     {actions(true)}
     <div className="home-work-links">
