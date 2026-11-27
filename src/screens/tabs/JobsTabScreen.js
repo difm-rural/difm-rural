@@ -21,6 +21,8 @@ import { supabase } from '../../lib/supabase'
 import { colors } from '../../theme/tokens'
 import { useUser } from '../../context/UserContext'
 import { canProvide } from '../../lib/roles'
+import { fetchActiveNextMoves } from '../../lib/nextMove'
+import { jobsOnTheGo } from '../../../shared/homeCompact'
 import { coarseSuburb, reverseGeocode } from '../../lib/location'
 import { fetchWatchlistIds, addToWatchlist, removeFromWatchlist } from '../../lib/watchlist'
 import { saveJobSearch, SAVED_INTEREST_FREQUENCIES } from '../../lib/savedInterests'
@@ -100,6 +102,7 @@ export default function JobsTabScreen({ navigation }) {
   const [boardJobs, setBoardJobs]     = useState([])
   const [myOpenJobs, setMyOpenJobs]   = useState([])
   const [myBidJobs, setMyBidJobs]     = useState([])
+  const [inFlight, setInFlight]       = useState([])
   const [watchedIds, setWatchedIds]   = useState(new Set())
   const nearby = useNearbyBrowsing()
   const coords = nearby.point, radius = nearby.radius ?? 'any'
@@ -152,6 +155,8 @@ export default function JobsTabScreen({ navigation }) {
       // to track — fetch regardless of the provider flag.
       user?.id ? fetchMyBids(user.id) : Promise.resolve(),
       user?.id ? fetchWatchlistIds(user.id).then(setWatchedIds) : Promise.resolve(),
+      // Agreed jobs on either side (same source as Home's On the go).
+      user?.id ? fetchActiveNextMoves(user.id, true).then(setInFlight) : Promise.resolve(),
     ])
     setBoardError(results[0].status === 'rejected')
     } catch { setBoardError(true) }
@@ -300,12 +305,22 @@ export default function JobsTabScreen({ navigation }) {
   // Board jobs the viewing provider has already offered on → surfaced on the card.
   const myOfferByJobId = new Map(myBidJobs.map(b => [b.job_id, b.amount]))
 
+  // On the go: agreed jobs you're doing or that someone is doing for you. Open
+  // jobs and pending offers already have their own rows above, so only
+  // accepted jobs appear here. Waiting-on-you first, at most 3, one line each.
+  const onTheGo = jobsOnTheGo(inFlight)
+  function openInFlight(item) {
+    if (item.viewerRole === 'provider') navigation.navigate('JobDetail', { job: item.item })
+    else navigation.navigate('ManageTask', { job: item.item, bidCount: 0 })
+  }
+
   // Any personal section above the board? If so, draw a divider before it so the
   // switch from "your stuff" to the open board reads clearly.
   const hasPersonalSection =
     isRequester ||
     (isRequester && myOpenJobs.length > 0) ||
-    myBidJobs.length > 0
+    myBidJobs.length > 0 ||
+    onTheGo.total > 0
 
   const listHeader = (
     <View>
@@ -374,6 +389,28 @@ export default function JobsTabScreen({ navigation }) {
             snapToInterval={SNAP_INTERVAL}
             decelerationRate="fast"
           />
+        </View>
+      )}
+
+      {onTheGo.total > 0 && (
+        <View style={styles.railSection}>
+          <View style={styles.goHeader}>
+            <Text style={[styles.railTitle, { paddingHorizontal: 0, marginBottom: 0 }]}>On the go</Text>
+            {onTheGo.more > 0 && <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Activity')}
+              accessibilityRole="button" accessibilityLabel={`See all ${onTheGo.total} in Activity`}>
+              <Text style={styles.goSeeAll}>See all</Text>
+            </TouchableOpacity>}
+          </View>
+          <View style={styles.goCard}>
+            {onTheGo.shown.map((item, i) => (
+              <TouchableOpacity key={item.id} style={[styles.goRow, i < onTheGo.shown.length - 1 && styles.goRowBorder]}
+                onPress={() => openInFlight(item)} accessibilityRole="button" accessibilityLabel={item.line}>
+                {item.needsAction && <View style={styles.goDot} />}
+                <Text style={styles.goText} numberOfLines={1}>{item.line}</Text>
+                <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       )}
 
@@ -636,6 +673,14 @@ const styles = StyleSheet.create({
   postIntro: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginBottom: 10 },
 
   railSection: { marginTop: 14 },
+  goHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 },
+  goSeeAll:    { fontSize: 13, fontWeight: '600', color: colors.primary },
+  goCard:      { marginHorizontal: 16, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
+  goRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, paddingVertical: 10 },
+  goRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  goDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
+  goText:      { flex: 1, fontSize: 15, color: colors.textPrimary },
+
   railTitle: {
     fontSize: 16,
     fontWeight: '700',
