@@ -3,7 +3,7 @@ import {rankOnTheGo} from '@shared/onTheGo'
 import {loadReviewPrompts} from '@shared/reviewPrompts'
 import {DismissReview} from '@/components/dismiss-review'
 import {HomeModes} from '@/components/home-modes'
-import {homeCustomerCount,homeUpcoming,homeWorkSummary,homeAttentionSummary} from '@shared/homeSummary'
+import {homeCustomerCount,homeAttentionSummary} from '@shared/homeSummary'
 import {loadPropertyNetwork,propertyNetworkHomeLines} from '@shared/propertyNetwork'
 import {SeasonalReminders} from '@/components/seasonal-reminders'
 import {loadSeasonalReminders} from '@/lib/seasonal-reminders'
@@ -90,15 +90,10 @@ export default async function HomePage() {
   for (const prompt of reviewPrompts) goItems.push({review:{kind:prompt.kind,id:prompt.id},viewerRole:prompt.viewerRole,key:prompt.key,side:prompt.kind==='job'?'job':'listing',own:prompt.viewerRole===(prompt.kind==='job'?'requester':'provider'),title:prompt.title,href:(prompt.kind==='job'?'/jobs/':'/bookings/')+prompt.id+'#reviews',next:prompt.next,needsAction:true,updatedAt:prompt.updatedAt})
   const hasError = [jobs, bookings, offers, notifications, listings, offerJobs, ownBids, ownQuestions, awardTimes, schedules, invitations].some(r => r.error)
   const networkLines=network?propertyNetworkHomeLines(network):[]
-  const workItems=goItems.filter(item=>item.viewerRole==='provider')
-  const pendingOffers=workItems.filter(item=>item.pendingOffer).length
-  const upcoming=workItems.filter(item=>homeUpcoming(item.next.tone,item.side==='job'?'job':'booking',item.arrivalAt)).length
-  const work=homeWorkSummary({
-   invitations:invitations.error?null:invitations.count??null,
-   offers:offers.error||offerJobs.error?null:pendingOffers,
-   upcoming:offers.error||offerJobs.error||bookings.error||schedules.error?null:upcoming,
-   work:offers.error||offerJobs.error||bookings.error?null:workItems.length-pendingOffers,
-  })
+  // The work-stage counts (offers / upcoming / active) were removed: On the go
+  // already lists that work by name, and the counts overlapped. Invitations
+  // keep a single line, since Home has no other way to them.
+  const invitationCount=invitations.error?0:invitations.count||0
   function actions(work:boolean){
    const items=work?[
     {title:'Find work',text:'Browse available jobs.',href:'/jobs',icon:Search},
@@ -151,9 +146,7 @@ export default async function HomePage() {
     {activity('requester')}
    </>} work={<>
     <header className="home-heading"><div><h1>Your work, your opportunities</h1></div></header>
-    {work.indicators.length>0?<section className="home-work-summary" aria-label="My Work overview">
-     {work.indicators.map(item=><Link key={item.id} href={item.href} className="home-summary-item"><strong>{item.count}</strong> {item.label}</Link>)}
-    </section>:null}
+    {invitationCount>0&&<p><Link href="/connections/invitations" className="card-link">{invitationCount} {invitationCount===1?'invitation':'invitations'} to review ›</Link></p>}
     {actions(true)}
     <div className="home-work-links">
      <Link href="/connections?view=customers" className="card home-quick"><UsersRound size={22}/><span><strong>My Customers</strong>
